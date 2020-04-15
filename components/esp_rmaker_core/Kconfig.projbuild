@@ -1,0 +1,59 @@
+menu "ESP RainMaker Config"
+
+config ESP_RMAKER_SELF_CLAIM
+     bool "Use Self Claiming"
+     depends on IDF_TARGET_ESP32S2
+     default y
+     help
+        Use Self Claiming i.e. get the MQTT credentials
+        directly from the claiming service.
+
+config ESP_RMAKER_CLAIM_BASE_URL
+    string "ESP RainMaker Claiming Service Base URL"
+    default "https://claiming.rainmaker.espressif.com"
+    depends on ESP_RMAKER_SELF_CLAIM
+    help
+        ESP RainMaker Claiming Service Base URL.
+
+config ESP_RMAKER_MQTT_HOST
+    string "ESP RainMaker MQTT Host"
+    depends on ESP_RMAKER_SELF_CLAIM
+    default "a1p72mufdu6064-ats.iot.us-east-1.amazonaws.com"
+    help
+        ESP RainMaker MQTT Host name
+
+config ESP_RMAKER_TASK_STACK
+    int "ESP RainMaker Core Task stack"
+    default 10240
+    help
+        Stack size for the ESP RainMaker Core Task. Atleast 10KB is required
+        if you are using "Self Claiming"
+        
+config ESP_RMAKER_TASK_PRIORITY
+    int "ESP RainMaker Core Task priority"
+    default 5
+    help
+        Priority for the ESP RainMaker Core Task. Not recommended to be changed
+        unless you really need it.
+
+config ESP_RMAKER_MAX_NODE_CONFIG_SIZE
+    int "Maximum Node Config size"
+    default 2048
+    range 512 65536
+    help
+        Maximum size of the payload for reporting Node configuration.
+
+config ESP_RMAKER_MAX_PARAM_DATA_SIZE
+    int "Maximum Parameters' data size"
+    default 1024
+    range 64 8192
+    help
+        Maximum size of the payload for reporting parameter values.
+
+config ESP_RMAKER_FACTORY_PARTITION_NAME
+    string "ESP RainMaker Factory Partition Name"
+    default "fctry"
+    help
+        Factory NVS Partition name which will have the MQTT connectivity credentials
+
+endmenu

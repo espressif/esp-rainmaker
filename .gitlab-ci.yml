@@ -1,0 +1,69 @@
+stages:
+  - build
+
+variables:
+  BATCH_BUILD: "1"
+  V: "0"
+  MAKEFLAGS: "-j5 --no-keep-going"
+  IDF_PATH: "$CI_PROJECT_DIR/esp-idf"
+  IDF_CI_BUILD: "1"
+
+build_demo:
+  stage: build
+  image: $CI_DOCKER_REGISTRY/esp32-ci-env
+  tags:
+    - build
+  artifacts:
+    paths:
+      - examples/gpio/build/gpio.bin
+      - examples/switch/build/switch.bin
+      - examples/led_light/build/led_light.bin
+      - examples/fan/build/fan.bin
+      - examples/temperature_sensor/build/temperature_sensor.bin
+      - examples/multi_device/build/multi_device.bin
+    expire_in: 6 mos
+
+  script:
+    # add gitlab ssh key
+    - mkdir -p ~/.ssh
+    - chmod 700 ~/.ssh
+    - echo -n $GITLAB_KEY > ~/.ssh/id_rsa_base64
+    - base64 --decode --ignore-garbage ~/.ssh/id_rsa_base64 > ~/.ssh/id_rsa
+    - chmod 600 ~/.ssh/id_rsa
+    - echo -e "Host gitlab.espressif.cn\n\tStrictHostKeyChecking no\n" >> ~/.ssh/config
+    - git --version
+    - git clone --branch master --depth 1 $GITLAB_SSH_SERVER/idf/esp-idf.git
+    - cd esp-idf
+    - export IDF_PATH=$PWD
+    - ./install.sh
+    - . export.sh
+    - cd ..
+    - cd examples/gpio
+    - idf.py build
+    - rm -rf build/ sdkconfig
+    - make -j8
+    - cd ../switch
+    - idf.py build
+    - rm -rf build/ sdkconfig
+    - make defconfig
+    - make -j8
+    - cd ../led_light
+    - idf.py build
+    - rm -rf build/ sdkconfig
+    - make defconfig
+    - make -j8
+    - cd ../fan
+    - idf.py build
+    - rm -rf build/ sdkconfig
+    - make defconfig
+    - make -j8
+    - cd ../temperature_sensor
+    - idf.py build
+    - rm -rf build/ sdkconfig
+    - make defconfig
+    - make -j8
+    - cd ../multi_device
+    - idf.py build
+    - rm -rf build/ sdkconfig
+    - make defconfig
+    - make -j8
