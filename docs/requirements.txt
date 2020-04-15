@@ -1,0 +1,5 @@
+# This is a list of python packages used to generate documentation. This file is used with pip:
+# pip install --user -r requirements.txt
+#
+sphinx==2.3.1
+breathe==4.14.1

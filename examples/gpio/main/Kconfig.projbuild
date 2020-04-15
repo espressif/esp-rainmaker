@@ -1,0 +1,15 @@
+menu "Example Configuration"
+
+    config APP_PROV_SHOW_QR
+        bool "Show provisioning QR code"
+        default y
+        help
+            Show the QR code for provisioning.
+
+    config APP_LED_GPIO
+        int "RGB LED GPIO"
+        default 18
+        help
+            Set the WS2812 RGB LED GPIO.
+
+endmenu
