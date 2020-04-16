@@ -31,6 +31,18 @@ typedef struct {
     char *secret_key;
 } esp_rmaker_user_mapping_data_t;
 
+static void esp_rmaker_user_mapping_cleanup_data(esp_rmaker_user_mapping_data_t *data)
+{
+    if (data) {
+        if (data->user_id) {
+            free(data->user_id);
+        }
+        if (data->secret_key) {
+            free(data->secret_key);
+        }
+        free(data);
+    }
+}
 
 static void esp_rmaker_user_mapping_cb(void *priv_data)
 {
@@ -54,6 +66,7 @@ static void esp_rmaker_user_mapping_cb(void *priv_data)
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "MQTT Publish Error %d", err);
     }
+    esp_rmaker_user_mapping_cleanup_data(data);
     return;
 }
 esp_err_t esp_rmaker_start_user_node_mapping(char *user_id, char *secret_key)
@@ -76,15 +89,7 @@ esp_err_t esp_rmaker_start_user_node_mapping(char *user_id, char *secret_key)
     return ESP_OK;
 
 user_mapping_error:
-    if (data) {
-        if (data->user_id) {
-            free(data->user_id);
-        }
-        if (data->secret_key) {
-            free(data->secret_key);
-        }
-        free(data);
-    }
+    esp_rmaker_user_mapping_cleanup_data(data);
     return ESP_FAIL;
 }
 
