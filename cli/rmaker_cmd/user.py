@@ -49,7 +49,7 @@ def signup(vars=None):
         log.error(signup_err)
     else:
         if status is True:
-            verification_code = input('Enter verification code sent on your'
+            verification_code = input('Enter verification code sent on your '
                                       'Email.\n Verification Code : ')
             try:
                 status = u.signup(verification_code)

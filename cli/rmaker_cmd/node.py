@@ -21,6 +21,7 @@ try:
     from rmaker_lib import session, node, serverconfig, configmanager
     from rmaker_lib.exceptions import NetworkError, InvalidJSONError, SSLError
     from rmaker_lib.logger import log
+    from rmaker_tools.rmaker_claim.claim import claim
 except ImportError as err:
     print("Failed to import ESP Rainmaker library. " + str(err))
     raise err
@@ -230,7 +231,7 @@ def get_mqtt_host(vars=None):
         log.debug("Get MQTT Host request url : " + request_url)
         response = requests.get(url=request_url,
                                 verify=configmanager.CERT_FILE)
-        log.debug("Get MQTT Host resonse : " + response.text)
+        log.debug("Get MQTT Host response : " + response.text)
         response.raise_for_status()
     except requests.exceptions.SSLError:
         raise SSLError
@@ -250,3 +251,17 @@ def get_mqtt_host(vars=None):
     else:
         log.error("MQTT Host does not exists.")
     return response['mqtt_host']
+
+
+def claim_node(vars=None):
+    """
+    Claim the node connected to the given serial port
+    (Get cloud credentials)
+    :param args:
+    a) port - Serial Port connected to the device
+    """
+    try:
+        claim(vars['port'])
+    except Exception as claim_err:
+        log.error(claim_err)
+        return

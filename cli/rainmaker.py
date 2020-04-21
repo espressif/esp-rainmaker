@@ -16,7 +16,8 @@
 
 import argparse
 from rmaker_cmd.node import get_nodes, get_node_config, get_node_status,\
-                            set_params, get_params, remove_node, get_mqtt_host
+                            set_params, get_params, remove_node,\
+                            get_mqtt_host, claim_node
 from rmaker_cmd.user import signup, login, forgot_password
 from rmaker_cmd.provision import provision
 from rmaker_cmd.test import test
@@ -82,6 +83,7 @@ def main():
                                   help='Node ID for the node')
     setparams_parser = setparams_parser.add_mutually_exclusive_group(
         required=True)
+
     setparams_parser.add_argument('--filepath',
                                   help='Path of the JSON file\
                                         containing parameters to be set')
@@ -121,6 +123,13 @@ def main():
                                                      to be used in the\
                                                      firmware')
     getmqtthost_parser.set_defaults(func=get_mqtt_host)
+
+    claim_parser = subparsers.add_parser('claim',
+                                         help='Claim the node connected to the given serial port\
+                                              (Get cloud credentials)')
+    claim_parser.add_argument("port", metavar='<port>',
+                              help='Serial Port connected to the device.')
+    claim_parser.set_defaults(func=claim_node)
 
     test_parser = subparsers.add_parser('test',
                                         help='Test commands to check\

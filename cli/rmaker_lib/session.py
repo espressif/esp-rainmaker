@@ -34,7 +34,7 @@ class Session:
         self.id_token = config.get_access_token()
         if self.id_token is None:
             raise InvalidConfigError
-        self.request_header = {'content-type': 'application/json',
+        self.request_header = {'Content-Type': 'application/json',
                                'Authorization': self.id_token}
 
     def get_nodes(self):
@@ -90,7 +90,7 @@ class Session:
             log.debug("Get MQTT Host request url : " + request_url)
             response = requests.get(url=request_url,
                                     verify=configmanager.CERT_FILE)
-            log.debug("Get MQTT Host resonse : " + response.text)
+            log.debug("Get MQTT Host response : " + response.text)
             response.raise_for_status()
         except requests.exceptions.SSLError:
             raise SSLError
