@@ -19,4 +19,4 @@ idf_component_register(SRCS "${srcs}"
                        REQUIRES
                        PRIV_REQUIRES protobuf-c json_parser json_generator wifi_provisioning nvs_flash esp_http_client esp_rmaker_mqtt esp_rmaker_standard_types app_update esp-tls)
 target_add_binary_data(${COMPONENT_TARGET} "server_certs/mqtt_server.crt" TEXT)
-target_add_binary_data(${COMPONENT_TARGET} "server_certs/claiming_server.crt" TEXT)
+target_add_binary_data(${COMPONENT_TARGET} "server_certs/claim_service_server.crt" TEXT)

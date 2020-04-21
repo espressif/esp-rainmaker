@@ -140,7 +140,7 @@ static esp_err_t mqtt_event_handler(esp_mqtt_event_handle_t event)
             xEventGroupSetBits(mqtt_event_group, MQTT_CONNECTED_EVENT);
             break;
         case MQTT_EVENT_DISCONNECTED:
-            ESP_LOGW(TAG, "MQTT Disconnected");
+            ESP_LOGW(TAG, "MQTT Disconnected. Will try reconnecting in a while...");
             break;
 
         case MQTT_EVENT_SUBSCRIBED:

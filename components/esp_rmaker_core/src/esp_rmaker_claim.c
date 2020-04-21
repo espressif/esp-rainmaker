@@ -44,9 +44,9 @@
 
 static const char *TAG = "esp_claim";
 
-#define CLAIM_BASE_URL      CONFIG_ESP_RMAKER_CLAIM_BASE_URL
-#define CLAIM_INIT_PATH     "initiate"
-#define CLAIM_VERIFY_PATH   "verify"
+#define CLAIM_BASE_URL      CONFIG_ESP_RMAKER_CLAIM_SERVICE_BASE_URL
+#define CLAIM_INIT_PATH     "claim/initiate"
+#define CLAIM_VERIFY_PATH   "claim/verify"
 
 #define CLAIM_PK_SIZE       2048
 
@@ -60,8 +60,8 @@ typedef struct {
 } esp_rmaker_claim_data_t;
 esp_rmaker_claim_data_t *g_claim_data;
 
-extern uint8_t claiming_server_root_ca_pem_start[] asm("_binary_claiming_server_crt_start");
-extern uint8_t claiming_server_root_ca_pem_end[] asm("_binary_claiming_server_crt_end");
+extern uint8_t claim_service_server_root_ca_pem_start[] asm("_binary_claim_service_server_crt_start");
+extern uint8_t claim_service_server_root_ca_pem_end[] asm("_binary_claim_service_server_crt_end");
 
 static void escape_new_line(esp_rmaker_claim_data_t *data)
 {
@@ -143,19 +143,19 @@ static esp_err_t hmac_challenge(const char* hmac_request, unsigned char *hmac_re
 /* Parse the Claim Init response and generate Claim Verify request
  *
  * Claim Init Response format:
- *  {"claim-id":"<unique-claim-id>", "challenge":"<upto 128 byte challenge>"}
+ *  {"auth_id":"<unique-auth-id>", "challenge":"<upto 128 byte challenge>"}
  *
  * Claim Verify Request format
- *  {"claim-id":"<claim-id-from-init>", "challenge-response":"<64byte-response-in-hex>"}
+ *  {"auth_id":"<claim-id-from-init>", "challenge_response":"<64byte-response-in-hex>, "csr":"<csr-generated-earlier>"}
  */
 static esp_err_t handle_claim_init_response(esp_rmaker_claim_data_t *claim_data)
 {
     ESP_LOGD(TAG, "Claim Init Response: %s", claim_data->payload);
     jparse_ctx_t jctx;
     if (json_parse_start(&jctx, claim_data->payload, strlen(claim_data->payload)) == 0) {
-        char claim_id[64];
+        char auth_id[64];
         char challenge[130];
-        int ret = json_obj_get_string(&jctx, "claim-id", claim_id, sizeof(claim_id));
+        int ret = json_obj_get_string(&jctx, "auth_id", auth_id, sizeof(auth_id));
         ret |= json_obj_get_string(&jctx, "challenge", challenge, sizeof(challenge));
         json_parse_end(&jctx);
         if (ret == 0) {
@@ -164,15 +164,16 @@ static esp_err_t handle_claim_init_response(esp_rmaker_claim_data_t *claim_data)
                 json_gen_str_t jstr;
                 json_gen_str_start(&jstr, claim_data->payload, sizeof(claim_data->payload), NULL, NULL);
                 json_gen_start_object(&jstr);
-                json_gen_obj_set_string(&jstr, "claim-id", claim_id);
+                json_gen_obj_set_string(&jstr, "auth_id", auth_id);
                 /* Add Challenge Response as a hex representation */
-                json_gen_obj_start_long_string(&jstr, "challenge-response", NULL);
+                json_gen_obj_start_long_string(&jstr, "challenge_response", NULL);
                 for(int i = 0 ; i < sizeof(response); i++) {
                     char hexstr[3];
                     snprintf(hexstr, sizeof(hexstr), "%02X", response[i]);
                     json_gen_add_to_long_string(&jstr, hexstr);
                 }
                 json_gen_end_long_string(&jstr);
+                json_gen_obj_set_string(&jstr, "csr", (char *)claim_data->csr);
                 json_gen_end_object(&jstr);
                 json_gen_str_end(&jstr);
                 return ESP_OK;
@@ -227,7 +228,7 @@ static esp_err_t esp_rmaker_claim_perform_common(esp_rmaker_claim_data_t *claim_
         .url = url,
         .transport_type = HTTP_TRANSPORT_OVER_SSL,
         .buffer_size = 1024,
-        .cert_pem = (const char *)claiming_server_root_ca_pem_start,
+        .cert_pem = (const char *)claim_service_server_root_ca_pem_start,
         .skip_cert_common_name_check = false
     };
     esp_http_client_handle_t client = esp_http_client_init(&config);
@@ -261,7 +262,12 @@ static esp_err_t esp_rmaker_claim_perform_common(esp_rmaker_claim_data_t *claim_
         esp_http_client_cleanup(client);
         return ESP_OK;
     } else {
-        ESP_LOGE(TAG, "Invalid response for %s. Status = %d, Content Length = %d.",url, status, len);
+        len = esp_http_client_read_response(client, claim_data->payload, sizeof(claim_data->payload));
+        if (len >= 0) {
+            claim_data->payload[len] = 0;
+        }
+        ESP_LOGE(TAG, "Invalid response for %s", url);
+        ESP_LOGE(TAG, "Status = %d, Data = %s", status, len > 0 ? claim_data->payload : "None");
     }
     esp_http_client_close(client);
     esp_http_client_cleanup(client);
@@ -424,8 +430,9 @@ esp_err_t esp_rmaker_self_claim_init(void)
      */
     void *csr = esp_rmaker_get_client_csr();
     if (csr) {
-        snprintf(g_claim_data->payload, MAX_PAYLOAD_SIZE, "{\"device-id\":\"%s\",\"csr\":\"%s\"}",
-                esp_rmaker_get_node_id(), (char *)csr);
+        snprintf(g_claim_data->payload, MAX_PAYLOAD_SIZE, "{\"mac_addr\":\"%s\",\"platform\":\"esp32s2\"}",
+                esp_rmaker_get_node_id());
+        strncpy((char *)g_claim_data->csr, csr, sizeof(g_claim_data->csr));
         free(csr);
         ESP_LOGI(TAG, "CSR already exists. No need to re-initialise Claiming.");
         return ESP_OK;
@@ -457,7 +464,7 @@ esp_err_t esp_rmaker_self_claim_init(void)
         return err;
     }
 
-    /* New line characters from the CSR need to be removed and replaced with explicit \r\n for thr claiming
+    /* New line characters from the CSR need to be removed and replaced with explicit \n for the claiming
      * service to parse properly. Make that change here and store the CSR in storage.
      */
     escape_new_line(g_claim_data);
@@ -469,7 +476,7 @@ esp_err_t esp_rmaker_self_claim_init(void)
     } else {
         ESP_LOGI(TAG, "Self Claiming initialised successfully.");
     }
-    snprintf(g_claim_data->payload, MAX_PAYLOAD_SIZE, "{\"device-id\":\"%s\",\"csr\":\"%s\"}",
-            esp_rmaker_get_node_id(), g_claim_data->csr);
+    snprintf(g_claim_data->payload, MAX_PAYLOAD_SIZE, "{\"mac_addr\":\"%s\",\"platform\":\"esp32s2\"}",
+            esp_rmaker_get_node_id());
     return err;
 }

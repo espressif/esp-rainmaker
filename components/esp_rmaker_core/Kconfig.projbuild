@@ -8,9 +8,9 @@ config ESP_RMAKER_SELF_CLAIM
         Use Self Claiming i.e. get the MQTT credentials
         directly from the claiming service.
 
-config ESP_RMAKER_CLAIM_BASE_URL
+config ESP_RMAKER_CLAIM_SERVICE_BASE_URL
     string "ESP RainMaker Claiming Service Base URL"
-    default "https://claiming.rainmaker.espressif.com"
+    default "https://esp-claiming.rainmaker.espressif.com"
     depends on ESP_RMAKER_SELF_CLAIM
     help
         ESP RainMaker Claiming Service Base URL.
