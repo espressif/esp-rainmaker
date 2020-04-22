@@ -15,8 +15,6 @@
 #define DEFAULT_BRIGHTNESS  25
 
 void app_driver_init(void);
-void app_wifi_init(void);
-void app_wifi_start(void);
 esp_err_t app_light_set(uint32_t hue, uint32_t saturation, uint32_t brightness);
 esp_err_t app_light_set_power(bool power);
 esp_err_t app_light_set_brightness(uint16_t brightness);

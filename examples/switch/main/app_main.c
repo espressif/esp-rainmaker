@@ -19,6 +19,8 @@
 #include <esp_rmaker_standard_devices.h>
 #include <esp_rmaker_ota.h>
 
+#include <app_wifi.h>
+
 #include "app_priv.h"
 
 extern uint8_t ota_server_cert[] asm("_binary_raw_github_server_crt_start");

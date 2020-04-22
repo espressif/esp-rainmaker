@@ -17,6 +17,8 @@
 #include <esp_rmaker_standard_params.h>
 #include <esp_rmaker_standard_devices.h>
 
+#include <app_wifi.h>
+
 #include "app_priv.h"
 
 static const char *TAG = "app_main";

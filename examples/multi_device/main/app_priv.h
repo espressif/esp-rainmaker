@@ -21,5 +21,3 @@ void app_driver_init(void);
 int app_driver_set_state(bool state);
 bool app_driver_get_state(void);
 float app_get_current_temperature();
-void app_wifi_init(void);
-void app_wifi_start(void);
