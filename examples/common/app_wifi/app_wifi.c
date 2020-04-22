@@ -24,6 +24,7 @@ static EventGroupHandle_t wifi_event_group;
 
 #define PROV_TRANSPORT_SOFTAP   "softap"
 #define PROV_TRANSPORT_BLE      "ble"
+#define QRCODE_BASE_URL     "https://rainmaker.espressif.com/qrcode.html"
 
 static void app_wifi_print_qr(const char *name, const char *pop, const char *transport)
 {
@@ -35,13 +36,11 @@ static void app_wifi_print_qr(const char *name, const char *pop, const char *tra
     snprintf(payload, sizeof(payload), "{\"ver\":\"%s\",\"name\":\"%s\"" \
                     ",\"pop\":\"%s\",\"transport\":\"%s\"}",
                     PROV_QR_VERSION, name, pop, transport);
-    ESP_LOGI(TAG, "Payload for Provisioning QR Code: %s", payload);
 #ifdef CONFIG_APP_WIFI_PROV_SHOW_QR
     ESP_LOGI(TAG, "Scan this QR code from the phone app for Provisioning.");
     qrcode_display(payload);
-#else
-    ESP_LOGW(TAG, "Cannot show provisiong QR code. Enable CONFIG_APP_WIFI_PROV_SHOW_QR if required.");
 #endif /* CONFIG_APP_WIFI_PROV_SHOW_QR */
+    ESP_LOGI(TAG, "If QR code is not visible, copy paste the below URL in a browser.\n%s?data=%s", QRCODE_BASE_URL, payload);
 }
 
 /* Event handler for catching system events */
