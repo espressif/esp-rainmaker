@@ -6,11 +6,6 @@
    CONDITIONS OF ANY KIND, either express or implied.
 */
 #pragma once
-#include <stdint.h>
-#include <stdbool.h>
 
-#define DEFAULT_POWER  true
-
-void app_driver_init(void);
-int app_driver_set_state(bool state);
-bool app_driver_get_state(void);
+void app_wifi_init(void);
+void app_wifi_start(void);

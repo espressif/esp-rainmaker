@@ -13,7 +13,5 @@
 #define DEFAULT_SPEED       3
 
 void app_driver_init(void);
-void app_wifi_init(void);
-void app_wifi_start(void);
 esp_err_t app_fan_set_power(bool power);
 esp_err_t app_fan_set_speed(uint8_t speed);

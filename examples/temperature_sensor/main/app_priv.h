@@ -13,6 +13,4 @@
 #define REPORTING_PERIOD    60 /* Seconds */
 
 void app_driver_init(void);
-void app_wifi_init(void);
-void app_wifi_start(void);
 float app_get_current_temperature();
