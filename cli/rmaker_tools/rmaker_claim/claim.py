@@ -61,6 +61,23 @@ BLOCKS = [
 
 
 def flash_bin_onto_node(port, esptool, bin_to_flash):
+    """
+    Flash binary onto node
+
+    :param port: Serial Port
+    :type port: str
+
+    :param esptool: esptool module
+    :type esptool: module
+
+    :param bin_to_flash: Filname of binary to flash
+    :type bin_to_flash: str
+
+    :raises Exception: If there is any issue when flashing binary onto node
+
+    :return: None on Success
+    :rtype: None
+    """
     try:
         command = ['--port', port, 'write_flash', '0x340000', bin_to_flash]
         esptool.main(command)
@@ -70,6 +87,18 @@ def flash_bin_onto_node(port, esptool, bin_to_flash):
 
 
 def get_node_platform_and_mac(esptool, port):
+    """
+    Get Node Platform and Mac Addres from device
+
+    :param esptool: esptool module
+    :type esptool: module
+
+    :param port: Serial Port
+    :type port: str
+
+    :return: Node Platform and Mac Address on Success
+    :rtype: str
+    """
     sys.stdout = mystdout = StringIO()
     command = ['--port', port, 'chip_id']
     log.info("Running esptool command to get node\
@@ -89,6 +118,18 @@ def get_node_platform_and_mac(esptool, port):
 
 
 def get_secret_key(port, esptool):
+    """
+    Generate Secret Key
+
+    :param port: Serial Port
+    :type port: str
+
+    :param esptool: esptool module
+    :type esptool: module
+
+    :return: Secret Key on Success
+    :rtype: str
+    """
     esp = esptool.ESP32ROM(port)
     esp.connect('default_reset')
     for (name, idx, read_addr, _, _) in BLOCKS:
@@ -102,6 +143,19 @@ def get_secret_key(port, esptool):
 
 
 def gen_hmac_challenge_resp(secret_key, hmac_challenge):
+    """
+    Generate HMAC Challenge Response
+
+    :param secret_key: Secret Key to generate HMAC Challenge Response
+    :type secret_key: str
+
+    :param hmac_challenge: HMAC Challenge received in
+                           esp32s2 claim initate response
+    :type hmac_challenge: str
+
+    :return: HMAC Challenge Response on Success
+    :rtype: str
+    """
     h = hmac.HMAC(bytes.fromhex(secret_key),
                   hashes.SHA512(),
                   backend=default_backend())
@@ -111,6 +165,19 @@ def gen_hmac_challenge_resp(secret_key, hmac_challenge):
 
 
 def gen_host_csr(private_key, common_name=None):
+    """
+    Generate Host CSR
+
+    :param private_key: RSA Private Key to sign CSR
+    :type private_key: RSA Key Object
+
+    :param common_name: Common Name used in subject name of certificate,
+                        defaults to None
+    :type common_name: str|None
+
+    :return: CSR on Success, None on Failure
+    :rtype: str|None
+    """
     # Generate CSR on host
     builder = x509.CertificateSigningRequestBuilder()
     builder = builder.subject_name(x509.Name([
@@ -132,6 +199,33 @@ def gen_host_csr(private_key, common_name=None):
 
 def create_files_of_claim_info(dest_filedir, node_id, private_key, node_cert,
                                endpointinfo, node_info_csv):
+    """
+    Create files with claiming details
+
+    :param dest_filedir: Destination File Directory
+    :type port: str
+
+    :param node_id: Node Id (data) to write to `node.info` file
+    :type port: str
+
+    :param private_key: Private Key (data) to write to `node.key` file
+    :type port: bytes
+
+    :param node_cert: Node Certificate (data) to write to `node.crt` file
+    :type port: str
+
+    :param endpointinfo: MQTT endpoint (data) to write to `endpoint.info` file
+    :type port: str
+
+    :param node_info_csv: List of output csv file details (node information)
+                          to write to `node_info.csv` file
+    :type port: list
+
+    :raises Exception: If there is any issue when writing to file
+
+    :return: None on Success
+    :rtype: None
+    """
     try:
         log.debug("Writing node info at location: " + dest_filedir +
                   'node.info')
@@ -166,6 +260,20 @@ def create_files_of_claim_info(dest_filedir, node_id, private_key, node_cert,
 
 
 def claim(port):
+    """
+    Claim the node connected to the given serial port
+    (Get cloud credentials)
+
+    :param port: Serial Port
+    :type port: str
+
+    :raises Exception: If there is an HTTP issue while claiming
+            SSLError: If there is an issue in SSL certificate validation
+            ConnectionError: If there is network connection issue
+
+    :return: None on Success
+    :rtype: None
+    """
     try:
         node_id = None
         node_info = None
