@@ -18,15 +18,15 @@ HOST = 'https://api.rainmaker.espressif.com/' + VERSION + '/'
 
 CLIENT_ID = '60i6kac5f9rjuetqnq5mnmaqv6'
 
-LOGIN_URL = 'https://rainmaker-login-ui.s3.amazonaws.com/index.html?port='
+LOGIN_URL = 'https://rainmaker-signin-ui.s3.amazonaws.com/index.html?port='
 
-TOKEN_URL = ('https://rainmaker-prod.auth.us-east-1.amazoncognito.com/'
+TOKEN_URL = ('https://auth.rainmaker.espressif.com/'
              'oauth2/token')
 
 REDIRECT_URL = 'https://rainmaker-login-ui.s3.amazonaws.com/welcome.html'
 
 EXTERNAL_LOGIN_URL = (
-                     'https://rainmaker-prod.auth.us-east-1.amazoncognito.com/'
+                     'https://auth.rainmaker.espressif.com/'
                      'oauth2/authorize?&redirect_uri=' +
                      REDIRECT_URL + '&response_type=CODE&client_id=' +
                      CLIENT_ID + '&scope=aws.cognito.signin.user.'
