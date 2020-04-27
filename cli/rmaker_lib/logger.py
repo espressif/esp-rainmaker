@@ -25,7 +25,7 @@ log_filename = "logs/log_" + date_time_obj.strftime("%d-%m-%Y") + ".log"
 
 log = logging.getLogger("CLI_LOGS")
 file_formatter = logging.Formatter('%(asctime)s:[%(funcName)s]:\
-                                   [%(levelname)s]:%(message)s')
+[%(levelname)s]:%(message)s')
 console_formatter = logging.Formatter('[%(levelname)s]:%(message)s')
 log.setLevel(logging.DEBUG)
 

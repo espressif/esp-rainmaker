@@ -82,12 +82,9 @@ class Config:
             raise set_config_err
         log.info("Configured config file successfully.")
 
-    def get_config(self, node=None, config_file=CONFIG_FILE):
+    def get_config(self, config_file=CONFIG_FILE):
         """
         Get the configuration details from config file.
-
-        :params node: Name of node
-        :type node: str
 
         :params config_file: Config filename to read config data from
         :type data: str
@@ -103,30 +100,21 @@ class Config:
         """
         file = Path(path.expanduser(HOME_DIRECTORY) + config_file)
         if not file.exists():
-            if node and node.lower() == 'esp32':
-                return None
-            else:
-                raise InvalidUserError
+            raise InvalidUserError
         try:
             with open(path.join(path.expanduser(HOME_DIRECTORY),
                       config_file), 'r') as config_file:
                 data = json.load(config_file)
-                if node and node.lower() == "esp32":
-                    return data
-                else:
-                    idtoken = data['idtoken']
-                    refresh_token = data['refreshtoken']
-                    access_token = data['accesstoken']
+                idtoken = data['idtoken']
+                refresh_token = data['refreshtoken']
+                access_token = data['accesstoken']
         except Exception as get_config_err:
             raise get_config_err
         return idtoken, refresh_token, access_token
 
-    def get_binary_config(self, node=None, config_file=CONFIG_FILE):
+    def get_binary_config(self, config_file=CONFIG_FILE):
         """
         Get the configuration details from binary config file.
-
-        :params node: Name of node
-        :type node: str
 
         :params config_file: Config filename to read config data from
         :type data: str
@@ -139,14 +127,12 @@ class Config:
         """
         file = Path(path.expanduser(HOME_DIRECTORY) + config_file)
         if not file.exists():
-            if node and node.lower() == 'esp32':
-                return None
+            return None
         try:
             with open(path.join(path.expanduser(HOME_DIRECTORY),
                       config_file), 'rb') as config_file:
                 data = config_file.read()
-                if node and node.lower() == "esp32":
-                    return data
+                return data
         except Exception as get_config_err:
             raise get_config_err
         return

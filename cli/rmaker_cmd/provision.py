@@ -32,7 +32,6 @@ PROVISION_FAILURE_MSG = 'Provisioning Failed. Reset your board to factory'
 'defaults and retry.'
 
 
-
 def provision(vars=None):
     """
     Provisioning of the node.
