@@ -113,11 +113,10 @@ void esp_rmaker_deinit_handle(esp_rmaker_handle_t *rmaker_handle)
     free(rmaker_handle);
 }
 
-
 static char *esp_rmaker_populate_node_id()
 {
     char *node_id = esp_rmaker_storage_get("node_id");
-#ifdef CONFIG_IDF_TARGET_ESP32S2
+#ifdef CONFIG_ESP_RMAKER_SELF_CLAIM
     if (!node_id) {
         uint8_t eth_mac[6];
         esp_err_t err = esp_wifi_get_mac(WIFI_IF_STA, eth_mac);
@@ -128,9 +127,8 @@ static char *esp_rmaker_populate_node_id()
         node_id = calloc(1, ESP_CLAIM_NODE_ID_SIZE + 1); /* +1 for NULL terminatation */
         snprintf(node_id, ESP_CLAIM_NODE_ID_SIZE + 1, "%02X%02X%02X%02X%02X%02X",
                 eth_mac[0], eth_mac[1], eth_mac[2], eth_mac[3], eth_mac[4], eth_mac[5]);
-        esp_rmaker_storage_set("node_id", node_id, strlen(node_id));
     }
-#endif /* CONFIG_IDF_TARGET_ESP32S2 */
+#endif /* CONFIG_ESP_RMAKER_SELF_CLAIM */
     return node_id;
 }
 
@@ -156,7 +154,7 @@ esp_err_t esp_rmaker_init(esp_rmaker_config_t *config)
     }
     g_ra_handle->node_id = esp_rmaker_populate_node_id();
     if (!g_ra_handle->node_id) {
-        ESP_LOGE(TAG, "Failed to initialise Node Id");
+        ESP_LOGE(TAG, "Failed to initialise Node Id. Please perform \"claiming\" using RainMaker CLI.");
         esp_rmaker_deinit_handle(g_ra_handle);
         g_ra_handle = NULL;
         return ESP_FAIL;
@@ -205,7 +203,7 @@ esp_err_t esp_rmaker_init(esp_rmaker_config_t *config)
 #else
         esp_rmaker_deinit_handle(g_ra_handle);
         g_ra_handle = NULL;
-        ESP_LOGE(TAG, "Failed to initialise MQTT Config. Credentials missing.");
+        ESP_LOGE(TAG, "Failed to initialise MQTT Config. Please perform \"claiming\" using RainMaker CLI.");
         return ESP_FAIL;
 #endif /* !CONFIG_ESP_RMAKER_SELF_CLAIM */
     } else {
