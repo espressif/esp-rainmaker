@@ -257,8 +257,14 @@ def claim_node(vars=None):
     """
     Claim the node connected to the given serial port
     (Get cloud credentials)
-    :param args:
-    a) port - Serial Port connected to the device
+
+    :param vars: `port` as key - Serial Port, defaults to `None`
+    :type vars: str | None
+
+    :raises Exception: If there is an HTTP issue while claiming
+
+    :return: None on Success
+    :rtype: None
     """
     try:
         claim(vars['port'])
