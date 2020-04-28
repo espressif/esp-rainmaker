@@ -14,22 +14,22 @@
 
 import uuid
 import time
-from packaging import version
 import sys
 
-try:
-    from rmaker_lib.logger import log
-    from rmaker_lib import session, configmanager, node
-    from rmaker_lib.exceptions import NetworkError, SSLError
-except ImportError as err:
-    print("Failed to import ESP Rainmaker library. " + str(err))
-    raise err
-
-MINIMUM_PROTOBUF_VERSION = '3.10.0'
 TRANSPORT_MODE_SOFTAP = 'softap'
 MAX_HTTP_CONNECTION_RETRIES = 5
-PROVISION_FAILURE_MSG = 'Provisioning Failed. Reset your board to factory'
-'defaults and retry.'
+PROVISION_FAILURE_MSG = ('Provisioning Failed. Reset your board to factory '
+                         'defaults and retry.')
+
+try:
+    from rmaker_tools.rmaker_prov.esp_rainmaker_prov import provision_device
+    from rmaker_lib.logger import log
+    from rmaker_lib import session, configmanager, node
+    from rmaker_lib.exceptions import NetworkError, SSLError,\
+        RequestTimeoutError
+except ImportError as err:
+    print("Failed to import ESP Rainmaker library.\n" + str(err))
+    raise err
 
 
 def provision(vars=None):
@@ -46,19 +46,6 @@ def provision(vars=None):
     :return: None on Success and Failure
     :rtype: None
     """
-    try:
-        from rmaker_tools.rmaker_prov.esp_rainmaker_prov\
-             import provision_device
-    except ImportError as err:
-        import google.protobuf
-        if version.parse(google.protobuf.__version__)\
-                < version.parse(MINIMUM_PROTOBUF_VERSION):
-            log.warn('Package protobuf does not satisfy\
-                     the minimum required version.\n'
-                     'Minimum required version is ' + MINIMUM_PROTOBUF_VERSION)
-        else:
-            log.error('Provisioning failed due to import error.', err)
-            raise err
     log.info('Provisioning the node.')
     secret_key = str(uuid.uuid4())
     pop = vars['pop']
@@ -78,14 +65,14 @@ def provision(vars=None):
 
     node_id = provision_device(TRANSPORT_MODE_SOFTAP, pop, userid, secret_key)
     if node_id is None:
-        print(PROVISION_FAILURE_MSG)
+        log.error(PROVISION_FAILURE_MSG)
         return
     log.debug('Node ' + node_id + ' provisioned successfully.')
 
     print('------------------------------------------')
-    input('Please ensure host machine is connected to internet and'
+    input('Please ensure host machine is connected to internet and '
           'Press Enter to continue...')
-    print('Adding User-Node association...')
+
     retries = MAX_HTTP_CONNECTION_RETRIES
     node_object = None
     while retries > 0:
@@ -95,90 +82,120 @@ def provision(vars=None):
             node_object = node.Node(node_id, session.Session())
         except SSLError:
             log.error(SSLError())
-            print(PROVISION_FAILURE_MSG)
-            return
-        except NetworkError:
-            time.sleep(5)
-            log.warn("Session is expired. Initialising new session.")
-            pass
+            break
+        except (NetworkError, RequestTimeoutError) as conn_err:
+            print(conn_err)
+            log.warn(conn_err)
         except Exception as node_init_err:
             log.error(node_init_err)
-            print(PROVISION_FAILURE_MSG)
-            return
+            break
         else:
             break
+        time.sleep(5)
         retries -= 1
+        if retries:
+            print("Retries left:", retries)
+            log.info("Retries left: " + str(retries))
 
     if node_object is None:
-        print('Please check the internet connectivity.')
-        print(PROVISION_FAILURE_MSG)
+        log.error('Initialising new session...Failed\n' +
+                  '\n' + PROVISION_FAILURE_MSG)
         return
+
+    print('\nAdding User-Node association')
+    log.info("Adding User-Node association")
+
     retries = MAX_HTTP_CONNECTION_RETRIES
     request_id = None
+    log.info('Sending User-Node Association Request...')
     while retries > 0:
+        print('Sending User-Node Association Request...')
         try:
-            log.debug('Adding user-node association.')
             request_id = node_object.add_user_node_mapping(secret_key)
         except SSLError:
             log.error(SSLError())
-            print(PROVISION_FAILURE_MSG)
-            return
-        except Exception as user_node_mapping_err:
-            print('Sending User-Node association request to '
-                  'ESP RainMaker Cloud - Failed\nRetrying...')
-            log.warn(user_node_mapping_err)
-            pass
+            break
+        except (NetworkError, RequestTimeoutError) as conn_err:
+            print(conn_err)
+            log.warn(conn_err)
+        except Exception as mapping_err:
+            print(mapping_err)
+            log.warn(mapping_err)
+            break
         else:
             if request_id is not None:
-                log.debug('User-node mapping added successfully'
-                          'with request_id'
+                log.debug('User-Node mapping added successfully '
+                          'with request_id '
                           + request_id)
                 break
-        time.sleep(5)
+
         retries -= 1
+        if retries:
+            print("Retries left:", retries)
+            log.info("Retries left: " + str(retries))
+            time.sleep(5)
 
     if request_id is None:
-        print('Sending User-Node association request to'
-              'ESP RainMaker Cloud - Failed')
-        print(PROVISION_FAILURE_MSG)
+        log.error('User-Node Association Request...Failed\n' +
+                  '\n' + PROVISION_FAILURE_MSG)
         return
-    print('Sending User-Node association request to'
-          'ESP RainMaker Cloud - Successful')
 
+    print('User-Node Association Request...Success')
+    log.info('User-Node Association Request...Success')
+
+    retries = MAX_HTTP_CONNECTION_RETRIES
     status = None
-    while True:
-        log.debug('Checking user-node association status.')
+    log.info('Checking User-Node Association Status...')
+    while retries > 0:
+        print('Checking User-Node Association Status...')
         try:
             status = node_object.get_mapping_status(request_id)
         except SSLError:
             log.error(SSLError())
-            print(PROVISION_FAILURE_MSG)
-            return
+            break
+        except (NetworkError, RequestTimeoutError) as conn_err:
+            print(conn_err)
+            log.warn(conn_err)
+            status = None
         except Exception as mapping_status_err:
+            print(mapping_status_err)
             log.warn(mapping_status_err)
-            pass
+            break
         else:
-            log.debug('User-node association status ' + status)
             if status == 'requested':
-                print('Checking User Node association status -'
-                      'Requested\nRetrying...')
+                print('User-Node Association Status - Requested'
+                      '\n')
+                log.debug('User-Node Association Status - Requested'
+                          '\n')
             elif status == 'confirmed':
-                print('Checking User Node association status - Confirmed')
-                print('Provisioning was Successful.')
-                return
+                print('User-Node Association Status - Confirmed'
+                      '\nProvisioning was Successful.')
+                log.debug('User-Node Association Status - Confirmed'
+                          '\nProvisioning was Successful.')
+                break
             elif status == 'timedout':
-                print('Checking User Node association status - Timeout')
-                print(PROVISION_FAILURE_MSG)
-                return
+                print('User-Node Association Status - Timedout')
+                log.debug('User-Node Association Status - Timedout')
+                break
             elif status == 'discarded':
-                print('Checking User Node association status - Discarded')
-                print(PROVISION_FAILURE_MSG)
-                return
+                print('User-Node Association Status - Discarded')
+                log.debug('User-Node Association Status - Discarded')
+                break
+            else:
+                log.debug('User-Node Association Status - ' + status)
+                break
+
+        if status not in ["requested"]:
+            retries -= 1
+            if retries:
+                print("Retries left:", retries)
+                log.info("Retries left: " + str(retries))
         time.sleep(5)
 
-    if status is None:
-        print(PROVISION_FAILURE_MSG)
-        print('Checking User Node association status failed. '
-              'Please check the internet connectivity.')
+    if status not in ["confirmed"]:
+        log.error('Checking User-Node Association Status...Failed.\n'
+                  '\nCould not confirm User-Node Association Status. '
+                  '\nPlease use cli command '
+                  '`python3 rainmaker.py getnodes` to confirm.')
         return
     return

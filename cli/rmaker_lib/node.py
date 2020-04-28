@@ -14,8 +14,12 @@
 
 import requests
 import json
+import socket
 from rmaker_lib import serverconfig, configmanager
-from rmaker_lib.exceptions import NetworkError, InvalidClassInput, SSLError
+from requests.exceptions import Timeout, ConnectionError,\
+                                RequestException
+from rmaker_lib.exceptions import NetworkError, InvalidClassInput, SSLError,\
+                                  RequestTimeoutError
 from rmaker_lib.logger import log
 
 
@@ -213,6 +217,7 @@ class Node:
         :return: Request Id if Success, None if Failure
         :rtype: str | None
         """
+        socket.setdefaulttimeout(10)
         path = 'user/nodes/mapping'
         config = configmanager.Config()
         userid = config.get_user_id()
@@ -231,15 +236,22 @@ class Node:
             response = requests.put(url=request_url,
                                     data=json.dumps(request_payload),
                                     headers=self.__request_header,
-                                    verify=configmanager.CERT_FILE)
+                                    verify=configmanager.CERT_FILE,
+                                    timeout=(5.0, 5.0))
             log.debug("User node mapping response : " + response.text)
             response.raise_for_status()
-        except requests.exceptions.SSLError:
+        except requests.exceptions.SSLError as ssl_err:
+            log.debug(ssl_err)
             raise SSLError
-        except requests.exceptions.ConnectionError:
+        except (ConnectionError, socket.timeout) as conn_err:
+            log.debug(conn_err)
             raise NetworkError
-        except Exception:
-            raise Exception(response.text)
+        except Timeout as time_err:
+            log.debug(time_err)
+            raise RequestTimeoutError
+        except RequestException as mapping_status_err:
+            log.debug(mapping_status_err)
+            raise mapping_status_err
 
         try:
             response = json.loads(response.text)
@@ -304,8 +316,9 @@ class Node:
         :return: Request Status on Success, None on Failure
         :type: str | None
         """
-        log.info("Checking status of user node mapping with request_id : " +
-                 request_id)
+        socket.setdefaulttimeout(10)
+        log.debug("Checking status of user node mapping with request_id : " +
+                  request_id)
         path = 'user/nodes/mapping'
         query_parameters = "&request_id=" + request_id
 
@@ -315,15 +328,22 @@ class Node:
                       request_url)
             response = requests.get(url=request_url,
                                     headers=self.__request_header,
-                                    verify=configmanager.CERT_FILE)
+                                    verify=configmanager.CERT_FILE,
+                                    timeout=(5.0, 5.0))
             log.debug("Check user node mapping status response : " +
                       response.text)
             response.raise_for_status()
-        except requests.exceptions.SSLError:
+        except requests.exceptions.SSLError as ssl_err:
+            log.debug(ssl_err)
             raise SSLError
-        except requests.exceptions.ConnectionError:
+        except (ConnectionError, socket.timeout) as conn_err:
+            log.debug(conn_err)
             raise NetworkError
-        except Exception as mapping_status_err:
+        except Timeout as time_err:
+            log.debug(time_err)
+            raise RequestTimeoutError
+        except RequestException as mapping_status_err:
+            log.debug(mapping_status_err)
             raise mapping_status_err
 
         try:
