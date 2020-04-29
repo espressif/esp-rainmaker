@@ -129,9 +129,8 @@ class Config:
         if not file.exists():
             return None
         try:
-            with open(path.join(path.expanduser(HOME_DIRECTORY),
-                      config_file), 'rb') as config_file:
-                data = config_file.read()
+            with open(file, 'rb') as cfg_file:
+                data = cfg_file.read()
                 return data
         except Exception as get_config_err:
             raise get_config_err

@@ -351,11 +351,14 @@ def claim(port):
         # Set config mac addr path
         mac_addr_config_path = str(Path(path.expanduser(
             configmanager.CONFIG_DIRECTORY))) + '/claim_data/' +\
+            userid +\
+            '/' +\
             mac_addr +\
             '/' + output_bin_filename
 
         # Check if claim data for node exists in CONFIG directory
         log.debug("Checking if claim data for node exists in directory: " +
+                  configmanager.HOME_DIRECTORY +
                   configmanager.CONFIG_DIRECTORY)
         curr_claim_data = configmanager.Config().get_binary_config(
             config_file=mac_addr_config_path)
@@ -366,15 +369,9 @@ def claim(port):
                       dest_filedir)
             log.info("Using existing claiming data")
             print("Using existing claiming data")
-            print("Generating NVS Partition binary: " + dest_filedir +
-                  output_bin_filename)
-            # Run NVS Partition Utility to create binary of node info data
-            # and flash onto node
-            log.debug("Generating NVS Partition binary: " + dest_filedir +
-                      output_bin_filename)
-            nvs_partition_gen.generate(nvs_args)
-            print("\nFlashing binary onto node\n")
-            log.info("Flashing binary onto node")
+            # Flashing existing binary onto node
+            print("\nFlashing existing binary onto node\n")
+            log.info("Flashing existing binary onto node")
             flash_bin_onto_node(port, esptool, dest_filedir +
                                 output_bin_filename)
             log.info("Binary flashed onto node")
@@ -486,6 +483,9 @@ def claim(port):
                           ' Please send your registered email address to'
                           ' esp-rainmaker-admin@espressif.com for whitelisting'
                           )
+                else:
+                    log.error('Claim verification failed.\n' +
+                              claim_verify_response.text)
                 exit(0)
             print("Claim verify done")
             log.debug("Claim Verify POST Response: status code: " +
