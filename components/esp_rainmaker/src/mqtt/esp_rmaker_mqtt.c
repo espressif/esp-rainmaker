@@ -13,6 +13,7 @@
 // limitations under the License.
 #include <stdio.h>
 #include <string.h>
+#include <sdkconfig.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
 #include <freertos/event_groups.h>
@@ -211,7 +212,9 @@ esp_err_t esp_rmaker_mqtt_disconnect(void)
     }
     return err;
 }
-
+#ifdef CONFIG_ESP_RMAKER_MQTT_PORT_443
+static const char *alpn_protocols[] = { "x-amzn-mqtt-ca", NULL };
+#endif /* CONFIG_ESP_RMAKER_MQTT_PORT_443 */
 esp_err_t esp_rmaker_mqtt_init(esp_rmaker_mqtt_config_t *config)
 {
     if (mqtt_data) {
@@ -226,7 +229,13 @@ esp_err_t esp_rmaker_mqtt_init(esp_rmaker_mqtt_config_t *config)
     mqtt_data->config = config;
     const esp_mqtt_client_config_t mqtt_client_cfg = {
         .host = config->mqtt_host,
+#ifdef CONFIG_ESP_RMAKER_MQTT_PORT_443
+        .port = 443,
+        .alpn_protos = alpn_protocols,
+#endif /* CONFIG_ESP_RMAKER_MQTT_PORT_443 */
+#ifdef CONFIG_ESP_RMAKER_MQTT_PORT_8883
         .port = 8883,
+#endif /* CONFIG_ESP_RMAKER_MQTT_PORT_8883 */
         .cert_pem = (const char *)config->server_cert,
         .client_cert_pem = (const char *)config->client_cert,
         .client_key_pem = (const char *)config->client_key,
@@ -234,6 +243,9 @@ esp_err_t esp_rmaker_mqtt_init(esp_rmaker_mqtt_config_t *config)
         .keepalive = 120,
         .event_handle = mqtt_event_handler,
         .transport = MQTT_TRANSPORT_OVER_SSL,
+#ifdef CONFIG_RMAKER_MQTT_PERSISTENT_SESSION
+        .disable_clean_session = 1,
+#endif /* CONFIG_RMAKER_MQTT_PERSISTENT_SESSION */
     };
     mqtt_data->mqtt_client = esp_mqtt_client_init(&mqtt_client_cfg);
     return ESP_OK;

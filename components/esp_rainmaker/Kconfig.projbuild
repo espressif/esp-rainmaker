@@ -55,6 +55,36 @@ menu "ESP RainMaker Config"
         help
             Factory NVS Partition name which will have the MQTT connectivity credentials.
 
+    config RMAKER_MQTT_PERSISTENT_SESSION
+        bool "Use Persisent MQTT sessions"
+        default n
+        help
+            Use persistent MQTT sessions. This improves reliability as QOS1 messages missed
+            out due to some network issue are received after the MQTT reconnects. The broker
+            caches messages for a period of upto 1hour. However, a side-effect of this is that
+            messages can be received at unexpected time. Enable this option only if it suits
+            your use case. Please read MQTT specs to understand more about persistent sessions
+            and the cleanSession flag.
+
+    choice ESP_RMAKER_MQTT_PORT
+        bool "MQTT Port"
+        default ESP_RMAKER_MQTT_PORT_443
+        help
+            ESP RainMaker MQTT Broker can be connected to either on Port 8883 or port 443.
+            Port 443 is recommended as it is generally not blocked by any firewalls,
+            since it is standard HTTPS port.
+
+        config ESP_RMAKER_MQTT_PORT_443
+            bool "443"
+        config ESP_RMAKER_MQTT_PORT_8883
+            bool "8883"
+    endchoice
+
+    config ESP_RMAKER_MQTT_PORT
+        int
+        default 1 if ESP_RMAKER_MQTT_PORT_443
+        default 2 if ESP_RMAKER_MQTT_PORT_8883
+
     config ESP_RMAKER_SNTP_SERVER_NAME
         string "ESP RainMaker SNTP Server Name"
         default "pool.ntp.org"
