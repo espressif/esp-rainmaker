@@ -35,3 +35,9 @@ Each example has its own README with additional information about using the exam
 ### API Documentation Build Status
 
 [![Documentation Status](https://readthedocs.com/projects/espressif-esp-rainmaker/badge/?version=latest)](https://docs.espressif.com/projects/esp-rainmaker/en/latest/)
+
+## Discussions
+
+[ESP32 Forum](https://www.esp32.com/viewforum.php?f=41)
+
+[![Gitter Chat](https://badges.gitter.im/esp-rainmaker/community.svg)](https://gitter.im/esp-rainmaker/community?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge)
