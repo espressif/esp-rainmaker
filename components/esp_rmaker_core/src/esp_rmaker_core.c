@@ -695,6 +695,29 @@ esp_err_t esp_rmaker_param_add_ui_type(const char *dev_name, const char *name, c
     return ESP_FAIL;
 }
 
+static esp_err_t esp_rmaker_report_node_config_and_state()
+{
+    if (esp_rmaker_report_node_config() != ESP_OK) {
+        ESP_LOGE(TAG, "Report node config failed.");
+        return ESP_FAIL;
+    }
+    if (esp_rmaker_report_node_state() != ESP_OK) {
+        ESP_LOGE(TAG, "Report node state failed.");
+        return ESP_FAIL;
+    }
+    return ESP_OK;
+}
+
+static void __esp_rmaker_report_node_config_and_state(void *data)
+{
+    esp_rmaker_report_node_config_and_state();
+}
+
+esp_err_t esp_rmaker_report_node_details()
+{
+    return esp_rmaker_queue_work(__esp_rmaker_report_node_config_and_state, NULL);
+}
+
 void esp_rmaker_handle_work_queue()
 {
     ESP_RMAKER_CHECK_HANDLE();
@@ -748,11 +771,7 @@ static void esp_rmaker_task(void *param)
         vTaskDelete(NULL);
     }
     g_ra_handle->mqtt_connected = true;
-    if (esp_rmaker_report_node_config() != ESP_OK) {
-        ESP_LOGE(TAG, "Aborting!!!");
-        goto rmaker_end;
-    }
-    if (esp_rmaker_report_node_state() != ESP_OK) {
+    if (esp_rmaker_report_node_config_and_state() != ESP_OK) {
         ESP_LOGE(TAG, "Aborting!!!");
         goto rmaker_end;
     }
