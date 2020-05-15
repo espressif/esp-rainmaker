@@ -374,6 +374,20 @@ esp_err_t esp_rmaker_device_assign_primary_param(const char *dev_name, const cha
  */
 typedef void (*esp_rmaker_work_fn_t)(void *priv_data);
 
+/** Report the node details to the cloud
+ *
+ * This API reports node details i.e. the node configuration and values of all the parameters to the ESP RainMaker cloud.
+ * Eg. If a new device is created (with some parameters and attributes), then this API should be called after that
+ * to send the node details to the cloud again and the changes to be reflected in the clients (like phone apps).
+ *
+ * @note Please use this API only if you need to create or delete devices after esp_rmaker_start() has already
+ * been called, for use cases like bridges or hubs.
+ *
+ * @return ESP_OK if the node details are successfully queued to be published.
+ * @return error in case of failures.
+ */
+esp_err_t esp_rmaker_report_node_details();
+
 /** Queue execution of a function in ESP RainMaker's context
  *
  * This API queues a work function for execution in the ESP RainMaker Task's context.
