@@ -16,8 +16,15 @@
 class NetworkError(Exception):
     """ Raised when internet connection is not available """
     def __str__(self):
-        return 'Please check the internet connectivity.\
-                No internet connection available.'
+        return ('Could not connect. '
+                'Please check your Internet connection.')
+
+
+class RequestTimeoutError(Exception):
+    """ Raised when HTTP Request times out """
+    def __str__(self):
+        return ('HTTP Request timed out. '
+                'Please check your Internet connection.')
 
 
 class InvalidJSONError(Exception):

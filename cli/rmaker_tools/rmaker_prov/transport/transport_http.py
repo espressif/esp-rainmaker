@@ -35,7 +35,8 @@ class Transport_HTTP(Transport):
             ssl_ctx = ssl.create_default_context(cafile=certfile)
             self.conn = http.client.HTTPSConnection(hostname, context=ssl_ctx, timeout=30)
         try:
-            print("Connecting to " + hostname)
+            print("Connecting to " + hostname +
+                  " (this may take some time)")
             self.conn.connect()
         except Exception as err:
             raise RuntimeError("Connection Failure : " + str(err))

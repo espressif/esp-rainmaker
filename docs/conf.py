@@ -15,7 +15,7 @@ import sys
 
 sys.path.insert(0, os.path.abspath('.'))
 sys.path.append(os.path.abspath('../cli/'))
-autodoc_mock_imports = ["pathlib", "cryptography", "nvs_partition_gen", "oauth2client", "serial", "user_mapping", "rmaker_tools.esp_rainmaker_prov.security","rmaker_tools.esp_rainmaker_prov.prov", "rmaker_tools.esp_rainmaker_prov.prov_util", "rmaker_tools.rmaker_claim.claim"]
+autodoc_mock_imports = ["pathlib", "cryptography", "nvs_partition_gen", "oauth2client", "serial", "user_mapping", "rmaker_tools.rmaker_prov.esp_rainmaker_prov", "rmaker_tools.rmaker_prov.security", "rmaker_tools.rmaker_prov.prov", "rmaker_tools.rmaker_prov.prov_util", "rmaker_tools.rmaker_claim.claim"]
 
 
 # -- Project information -----------------------------------------------------

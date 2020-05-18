@@ -18,6 +18,7 @@ import os
 import base64
 import time
 import requests
+import socket
 from pathlib import Path
 from os import path
 
@@ -27,7 +28,8 @@ from rmaker_lib.exceptions import NetworkError,\
                                   InvalidUserError,\
                                   InvalidApiVersionError,\
                                   ExpiredSessionError,\
-                                  SSLError
+                                  SSLError,\
+                                  RequestTimeoutError
 from rmaker_lib.logger import log
 
 CONFIG_DIRECTORY = '.espressif/rainmaker'
@@ -227,11 +229,17 @@ class Config:
         if access_token is None:
             raise InvalidConfigError
         if self.__is_valid_token() is False:
+            print('Previous Session expired. Initialising new session...')
+            log.info('Previous Session expired. Initialising new session...')
             username = self.get_token_attribute('email')
             refresh_token = self.get_refresh_token()
             access_token, id_token = self.__get_new_token(username,
                                                           refresh_token)
             self.update_config(access_token, id_token)
+            print('Previous Session expired. Initialising new session...'
+                  'Success')
+            log.info('Previous Session expired. Initialising new session...'
+                     'Success')
         return access_token
 
     def get_user_id(self):
@@ -270,7 +278,6 @@ class Config:
         current_timestamp = int(time.time())
         if exp_timestamp > current_timestamp:
             return True
-        log.info("Session expired.")
         return False
 
     def __is_valid_version(self):
@@ -285,16 +292,20 @@ class Config:
         :return: True on Success, False on Failure
         :rtype: bool
         """
+        socket.setdefaulttimeout(10)
         log.info("Checking for supported version.")
         path = 'apiversions'
         request_url = serverconfig.HOST.split(serverconfig.VERSION)[0] + path
         try:
             log.debug("Version check request url : " + request_url)
-            response = requests.get(url=request_url, verify=CERT_FILE)
+            response = requests.get(url=request_url, verify=CERT_FILE,
+                                    timeout=(5.0, 5.0))
             log.debug("Version check response : " + response.text)
             response.raise_for_status()
         except requests.exceptions.SSLError:
             raise SSLError
+        except requests.exceptions.Timeout:
+            raise RequestTimeoutError
         except requests.exceptions.ConnectionError:
             raise NetworkError
         except Exception as ver_err:
@@ -331,6 +342,7 @@ class Config:
         :rtype: str | None
 
         """
+        socket.setdefaulttimeout(10)
         log.info("Extending user login session.")
         path = 'login'
         request_payload = {
@@ -343,13 +355,16 @@ class Config:
             log.debug("Extend session url : " + request_url)
             response = requests.post(url=request_url,
                                      data=json.dumps(request_payload),
-                                     verify=CERT_FILE)
+                                     verify=CERT_FILE,
+                                     timeout=(5.0, 5.0))
             response.raise_for_status()
             log.debug("Extend session response : " + response.text)
         except requests.exceptions.SSLError:
             raise SSLError
         except requests.exceptions.ConnectionError:
             raise NetworkError
+        except requests.exceptions.Timeout:
+            raise RequestTimeoutError
         except Exception:
             raise ExpiredSessionError
 
