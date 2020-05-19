@@ -29,6 +29,9 @@
 #include "esp_efuse.h"
 #include "esp_efuse_table.h"
 
+#include <freertos/FreeRTOS.h>
+#include <freertos/task.h>
+#include <freertos/event_groups.h>
 
 #include <esp_tls.h>
 #include <esp_rmaker_core.h>
@@ -59,6 +62,8 @@ typedef struct {
     mbedtls_pk_context key;
 } esp_rmaker_claim_data_t;
 esp_rmaker_claim_data_t *g_claim_data;
+static EventGroupHandle_t self_claim_event_group;
+static const int SELF_CLAIM_TASK_BIT = BIT0;
 
 extern uint8_t claim_service_server_root_ca_pem_start[] asm("_binary_claim_service_server_crt_start");
 extern uint8_t claim_service_server_root_ca_pem_end[] asm("_binary_claim_service_server_crt_end");
@@ -411,7 +416,7 @@ exit:
     return ret;
 }
 
-esp_err_t esp_rmaker_self_claim_init(void)
+esp_err_t __esp_rmaker_self_claim_init(void)
 {
     ESP_LOGI(TAG, "Initialising Self Claiming. This may take time.");
     /* Check if the claim data structure is already allocated. If yes, free it */
@@ -479,4 +484,44 @@ esp_err_t esp_rmaker_self_claim_init(void)
     snprintf(g_claim_data->payload, MAX_PAYLOAD_SIZE, "{\"mac_addr\":\"%s\",\"platform\":\"esp32s2\"}",
             esp_rmaker_get_node_id());
     return err;
+}
+
+void esp_rmaker_self_claim_task(void *args)
+{
+    esp_err_t err = __esp_rmaker_self_claim_init();
+    if (args) {
+        *((esp_err_t *)args) = err;
+    }
+    xEventGroupSetBits(self_claim_event_group, SELF_CLAIM_TASK_BIT);
+    vTaskDelete(NULL);
+}
+
+esp_err_t esp_rmaker_self_claim_init(void)
+{
+    self_claim_event_group = xEventGroupCreate();
+    if (!self_claim_event_group) {
+        ESP_LOGE(TAG, "Couldn't create event group");
+        return ESP_ERR_NO_MEM;
+    }
+    esp_err_t *err = (esp_err_t *)calloc(1, sizeof(esp_err_t));
+    if (!err) {
+        ESP_LOGE(TAG, "Couldn't allocate err");
+        vEventGroupDelete(self_claim_event_group);
+        return ESP_ERR_NO_MEM;
+    }
+
+#define ESP_RMAKER_SELF_CLAIM_TASK_STACK_SIZE (10 * 1024)
+    if (xTaskCreate(&esp_rmaker_self_claim_task, "self_claim_task", ESP_RMAKER_SELF_CLAIM_TASK_STACK_SIZE, err, (CONFIG_ESP_RMAKER_TASK_PRIORITY + 1), NULL) != pdPASS) {
+        ESP_LOGE(TAG, "Couldn't create Self Claim task");
+        free(err);
+        vEventGroupDelete(self_claim_event_group);
+        return ESP_ERR_NO_MEM;
+    }
+
+    /* Wait for self claim to complete */
+    xEventGroupWaitBits(self_claim_event_group, SELF_CLAIM_TASK_BIT, false, true, portMAX_DELAY);
+    esp_err_t ret = *err;
+    free(err);
+    vEventGroupDelete(self_claim_event_group);
+    return ret;
 }

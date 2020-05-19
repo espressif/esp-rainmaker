@@ -200,6 +200,12 @@ esp_err_t esp_rmaker_init(esp_rmaker_config_t *config)
     if (!g_ra_handle->mqtt_config) {
 #ifdef CONFIG_ESP_RMAKER_SELF_CLAIM
         g_ra_handle->self_claim = true;
+        if (esp_rmaker_self_claim_init() != ESP_OK) {
+            esp_rmaker_deinit_handle(g_ra_handle);
+            g_ra_handle = NULL;
+            ESP_LOGE(TAG, "Failed to initialise Self Claiming.");
+            return ESP_FAIL;
+        }
 #else
         esp_rmaker_deinit_handle(g_ra_handle);
         g_ra_handle = NULL;
@@ -733,11 +739,6 @@ static void esp_rmaker_task(void *param)
 {
     ESP_RMAKER_CHECK_HANDLE();
     esp_err_t err;
-#ifdef CONFIG_ESP_RMAKER_SELF_CLAIM
-    if (g_ra_handle->self_claim) {
-        ESP_ERROR_CHECK(esp_rmaker_self_claim_init());
-    }
-#endif /* CONFIG_ESP_RMAKER_SELF_CLAIM */
     wifi_event_group = xEventGroupCreate();
     ESP_ERROR_CHECK(esp_event_handler_register(IP_EVENT, IP_EVENT_STA_GOT_IP, &esp_rmaker_event_handler, NULL)); 
     /* Wait for Wi-Fi connection */
