@@ -24,7 +24,7 @@ config ESP_RMAKER_MQTT_HOST
 
 config ESP_RMAKER_TASK_STACK
     int "ESP RainMaker Core Task stack"
-    default 10240
+    default 4096
     help
         Stack size for the ESP RainMaker Core Task. Atleast 10KB is required
         if you are using "Self Claiming"
