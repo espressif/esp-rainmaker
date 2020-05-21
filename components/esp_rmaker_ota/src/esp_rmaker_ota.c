@@ -27,19 +27,7 @@
 
 static const char *TAG = "esp_rmaker_ota";
 
-#ifdef CONFIG_ESP_RMAKER_OTA_USING_PARAMS
-/* When using params, a larger delay is desired so that the clients can
- * check the status using the param values.
- * After a reboot, the param values will get reset to their defaults
- */
 #define OTA_REBOOT_TIMER_SEC    10
-#endif /* CONFIG_ESP_RMAKER_OTA_USING_PARAMS */
-#ifdef CONFIG_ESP_RMAKER_OTA_USING_TOPICS
-/* While using topics, since entire history is maintained in Cloud DB, we
- * can reboot after a short timeout
- */
-#define OTA_REBOOT_TIMER_SEC    3
-#endif /* CONFIG_ESP_RMAKER_OTA_USING_TOPICS */
 
 char *esp_rmaker_ota_status_to_string(ota_status_t status)
 {
@@ -62,13 +50,13 @@ esp_err_t esp_rmaker_ota_report_status(esp_rmaker_ota_handle_t ota_handle, ota_s
     if (!ota_handle) {
         return ESP_FAIL;
     }
+    esp_rmaker_ota_t *ota = (esp_rmaker_ota_t *)ota_handle;
     esp_err_t err = ESP_FAIL;
-#ifdef CONFIG_ESP_RMAKER_OTA_USING_PARAMS
-    err = esp_rmaker_ota_report_status_using_params(ota_handle, status, additional_info);
-#endif /* CONFIG_ESP_RMAKER_OTA_USING_PARAMS */
-#ifdef CONFIG_ESP_RMAKER_OTA_USING_TOPICS
-    err = esp_rmaker_ota_report_status_using_topics(ota_handle, status, additional_info);
-#endif /* CONFIG_ESP_RMAKER_OTA_USING_TOPICS */
+    if (ota->type == OTA_USING_PARAMS) {
+        err = esp_rmaker_ota_report_status_using_params(ota_handle, status, additional_info);
+    } else if (ota->type == OTA_USING_TOPICS) {
+        err = esp_rmaker_ota_report_status_using_topics(ota_handle, status, additional_info);
+    }
     if (err == ESP_OK) {
         esp_rmaker_ota_t *ota = (esp_rmaker_ota_t *)ota_handle;
         ota->last_reported_status = status;
@@ -93,7 +81,11 @@ void esp_rmaker_ota_common_cb(void *priv)
     };
     ota->ota_cb((esp_rmaker_ota_handle_t) ota, &ota_data);
 ota_finish:
-    esp_rmaker_ota_finish(ota);
+    if (ota->type == OTA_USING_PARAMS) {
+        esp_rmaker_ota_finish_using_params(ota);
+    } else if (ota->type == OTA_USING_TOPICS) {
+        esp_rmaker_ota_finish_using_topics(ota);
+    }
 }
 
 static esp_err_t validate_image_header(esp_rmaker_ota_handle_t ota_handle,
@@ -139,7 +131,8 @@ static esp_err_t esp_rmaker_ota_default_cb(esp_rmaker_ota_handle_t ota_handle, e
         .url = ota_data->url,
         .cert_pem = ota_data->server_cert,
         .timeout_ms = 5000,
-        .buffer_size = 1024
+        .buffer_size = 1024,
+        .buffer_size_tx = 1024
     };
     config.skip_cert_common_name_check = true;
 #ifdef CONFIG_ESP_RMAKER_SKIP_COMMON_NAME_CHECK
@@ -154,7 +147,7 @@ static esp_err_t esp_rmaker_ota_default_cb(esp_rmaker_ota_handle_t ota_handle, e
         ESP_LOGD(TAG, "Received file size: %d", ota_data->filesize);
     }
 
-    esp_rmaker_ota_report_status(ota_handle, OTA_STATUS_IN_PROGRESS, "Starting OTA");
+    esp_rmaker_ota_report_status(ota_handle, OTA_STATUS_IN_PROGRESS, "Starting OTA Upgrade");
 
 /* Using a warning just to highlight the message */
     ESP_LOGW(TAG, "Starting OTA. This may take time.");
@@ -188,6 +181,7 @@ static esp_err_t esp_rmaker_ota_default_cb(esp_rmaker_ota_handle_t ota_handle, e
         goto ota_end;
     }
 
+    esp_rmaker_ota_report_status(ota_handle, OTA_STATUS_IN_PROGRESS, "Downloading Firmware Image");
     int count = 0;
     while (1) {
         err = esp_https_ota_perform(https_ota_handle);
@@ -211,12 +205,13 @@ static esp_err_t esp_rmaker_ota_default_cb(esp_rmaker_ota_handle_t ota_handle, e
         // the OTA image was not completely received and user can customise the response to this situation.
         ESP_LOGE(TAG, "Complete data was not received.");
     }
+    esp_rmaker_ota_report_status(ota_handle, OTA_STATUS_IN_PROGRESS, "Firmware Image download complete");
 ota_end:
     esp_wifi_set_ps(ps_type);
     ota_finish_err = esp_https_ota_finish(https_ota_handle);
     if ((err == ESP_OK) && (ota_finish_err == ESP_OK)) {
         ESP_LOGI(TAG, "OTA upgrade successful. Rebooting in %d seconds...", OTA_REBOOT_TIMER_SEC);
-        esp_rmaker_ota_report_status(ota_handle, OTA_STATUS_SUCCESS, "Image downloaded successfully");
+        esp_rmaker_ota_report_status(ota_handle, OTA_STATUS_SUCCESS, "OTA Upgrade finished successfully");
         esp_rmaker_reboot(OTA_REBOOT_TIMER_SEC);
         return ESP_OK;
     } else {
@@ -234,8 +229,12 @@ ota_end:
 }
 
 /* Enable the ESP RainMaker specific OTA */
-esp_err_t esp_rmaker_ota_enable(esp_rmaker_ota_config_t *ota_config)
+esp_err_t esp_rmaker_ota_enable(esp_rmaker_ota_config_t *ota_config, esp_rmaker_ota_type_t type)
 {
+    if (!ota_config || ((type != OTA_USING_PARAMS) && (type != OTA_USING_TOPICS))) {
+        ESP_LOGE(TAG,"Invalid arguments for esp_rmaker_ota_enable()");
+        return ESP_ERR_INVALID_ARG;
+    }
     static bool ota_init_done;
     if (ota_init_done) {
         ESP_LOGE(TAG, "OTA already initialised");
@@ -274,12 +273,12 @@ esp_err_t esp_rmaker_ota_enable(esp_rmaker_ota_config_t *ota_config)
     ota->priv = ota_config->priv;
     ota->server_cert = ota_config->server_cert;
     esp_err_t err = ESP_FAIL;
-#ifdef CONFIG_ESP_RMAKER_OTA_USING_PARAMS
-    err = esp_rmaker_ota_enable_using_params(ota);
-#endif /* CONFIG_ESP_RMAKER_OTA_USING_PARAMS */
-#ifdef CONFIG_ESP_RMAKER_OTA_USING_TOPICS
-    err = esp_rmaker_ota_enable_using_topics(ota);
-#endif /* CONFIG_ESP_RMAKER_OTA_USING_TOPICS */
+    ota->type = type;
+    if (type == OTA_USING_PARAMS) {
+        err = esp_rmaker_ota_enable_using_params(ota);
+    } else if (type == OTA_USING_TOPICS) {
+        err = esp_rmaker_ota_enable_using_topics(ota);
+    }
     if (err == ESP_OK) {
         ota_init_done = true;
     } else {
