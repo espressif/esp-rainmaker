@@ -1,9 +1,0 @@
-menu "App Wi-Fi Provisioning"
-
-    config APP_WIFI_PROV_SHOW_QR
-        bool "Show provisioning QR code"
-        default y
-        help
-            Show the QR code for provisioning.
-
-endmenu
