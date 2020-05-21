@@ -23,7 +23,7 @@
 
 #include "app_priv.h"
 
-extern uint8_t ota_server_cert[] asm("_binary_raw_github_server_crt_start");
+extern uint8_t ota_server_cert[] asm("_binary_server_crt_start");
 
 static const char *TAG = "app_main";
 
@@ -86,7 +86,7 @@ void app_main()
     esp_rmaker_ota_config_t ota_config = {
         .server_cert = (char *)ota_server_cert,
     };
-    esp_rmaker_ota_enable(&ota_config);
+    esp_rmaker_ota_enable(&ota_config, OTA_USING_PARAMS);
 
     /* Start the ESP RainMaker Agent */
     esp_rmaker_start();
