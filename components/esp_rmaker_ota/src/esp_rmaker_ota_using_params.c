@@ -28,7 +28,7 @@ static const char *TAG = "esp_rmaker_ota_using_params";
 
 #define ESP_RMAKER_OTA_SERV_NAME    "ota"
 
-void esp_rmaker_ota_finish(esp_rmaker_ota_t *ota)
+void esp_rmaker_ota_finish_using_params(esp_rmaker_ota_t *ota)
 {
     if (ota->url) {
         free(ota->url);
@@ -61,7 +61,7 @@ static esp_err_t esp_rmaker_ota_service_cb(const char *dev_name, const char *nam
             ota->filesize = 0;
             ota->ota_in_progress = true;
             if (esp_rmaker_queue_work(esp_rmaker_ota_common_cb, ota) != ESP_OK) {
-                esp_rmaker_ota_finish(ota);
+                esp_rmaker_ota_finish_using_params(ota);
             } else {
                 return ESP_OK;
             }
@@ -76,10 +76,10 @@ esp_err_t esp_rmaker_ota_report_status_using_params(esp_rmaker_ota_handle_t ota_
     if (!ota_handle) {
         return ESP_FAIL;
     }
-    esp_rmaker_update_param(ESP_RMAKER_OTA_SERV_NAME, ESP_RMAKER_DEF_OTA_STATUS_NAME,
-            esp_rmaker_str(esp_rmaker_ota_status_to_string(status)));
     esp_rmaker_update_param(ESP_RMAKER_OTA_SERV_NAME, ESP_RMAKER_DEF_OTA_INFO_NAME,
             esp_rmaker_str(additional_info));
+    esp_rmaker_update_param(ESP_RMAKER_OTA_SERV_NAME, ESP_RMAKER_DEF_OTA_STATUS_NAME,
+            esp_rmaker_str(esp_rmaker_ota_status_to_string(status)));
     return ESP_OK;
 }
 

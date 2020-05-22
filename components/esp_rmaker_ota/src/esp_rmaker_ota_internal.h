@@ -18,6 +18,7 @@
 #include <esp_err.h>
 #include <esp_rmaker_ota.h>
 typedef struct {
+    esp_rmaker_ota_type_t type;
     esp_rmaker_ota_cb_t ota_cb;
     void *priv;
     char *server_cert;
@@ -30,14 +31,11 @@ typedef struct {
 
 char *esp_rmaker_ota_status_to_string(ota_status_t status);
 void esp_rmaker_ota_common_cb(void *priv);
-void esp_rmaker_ota_finish(esp_rmaker_ota_t *ota);
-#ifdef CONFIG_ESP_RMAKER_OTA_USING_PARAMS
+void esp_rmaker_ota_finish_using_params(esp_rmaker_ota_t *ota);
+void esp_rmaker_ota_finish_using_topics(esp_rmaker_ota_t *ota);
 esp_err_t esp_rmaker_ota_enable_using_params(esp_rmaker_ota_t *ota);
 esp_err_t esp_rmaker_ota_report_status_using_params(esp_rmaker_ota_handle_t ota_handle,
             ota_status_t status, char *additional_info);
-#endif /* CONFIG_ESP_RMAKER_OTA_USING_PARAMS */
-#ifdef CONFIG_ESP_RMAKER_OTA_USING_TOPICS
 esp_err_t esp_rmaker_ota_enable_using_topics(esp_rmaker_ota_t *ota);
 esp_err_t esp_rmaker_ota_report_status_using_topics(esp_rmaker_ota_handle_t ota_handle,
         ota_status_t status, char *additional_info);
-#endif /* CONFIG_ESP_RMAKER_OTA_USING_TOPICS */

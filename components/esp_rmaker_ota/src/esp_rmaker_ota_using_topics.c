@@ -67,7 +67,7 @@ esp_err_t esp_rmaker_ota_report_status_using_topics(esp_rmaker_ota_handle_t ota_
     return ESP_OK;
 }
 
-void esp_rmaker_ota_finish(esp_rmaker_ota_t *ota)
+void esp_rmaker_ota_finish_using_topics(esp_rmaker_ota_t *ota)
 {
     if (ota->url) {
         free(ota->url);
@@ -152,11 +152,11 @@ static void ota_url_handler(const char *topic, void *payload, size_t payload_len
     ota->filesize = filesize;
     ota->ota_in_progress = true;
     if (esp_rmaker_queue_work(esp_rmaker_ota_common_cb, ota) != ESP_OK) {
-        esp_rmaker_ota_finish(ota);
+        esp_rmaker_ota_finish_using_topics(ota);
     }
     return;
 end:
-    esp_rmaker_ota_finish(ota);
+    esp_rmaker_ota_finish_using_topics(ota);
     json_parse_end(&jctx);
     return;
 }

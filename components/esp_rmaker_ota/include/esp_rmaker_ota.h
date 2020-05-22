@@ -28,6 +28,14 @@ typedef enum {
     OTA_STATUS_DELAYED,
 } ota_status_t;
 
+/** OTA Workflow type */
+typedef enum {
+    /** OTA will be performed using services and parameters. */
+    OTA_USING_PARAMS = 1,
+    /** OTA will be performed using pre-defined MQTT topics. */
+    OTA_USING_TOPICS
+} esp_rmaker_ota_type_t;
+
 /** The OTA Handle to be used by the OTA callback */
 typedef void *esp_rmaker_ota_handle_t;
 
@@ -103,11 +111,12 @@ typedef struct {
  * additional details.
  *
  * @param[in] ota_config Pointer to an OTA configuration structure
+ * @param[in] type The OTA workflow type
  *
  * @return ESP_OK on success
  * @return error on failure
  */
-esp_err_t esp_rmaker_ota_enable(esp_rmaker_ota_config_t *ota_config);
+esp_err_t esp_rmaker_ota_enable(esp_rmaker_ota_config_t *ota_config, esp_rmaker_ota_type_t type);
 
 /** Report OTA Status
  *

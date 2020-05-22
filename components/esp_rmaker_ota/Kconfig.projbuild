@@ -1,34 +1,14 @@
 menu "ESP RainMaker OTA Config"
 
-    choice ESP_RMAKER_OTA_WORKFLOW_TYPE
-        bool "OTA Workflow Type"
-        default ESP_RMAKER_OTA_USING_PARAMS
-        help
-            The Type of OTA workflow to be used. OTA can be performed either using
-            Parameters, which is the simplest approach for hobbyists/makers or using
-            pre-define MQTT Topics, which is suitable for commercial use case.
-            Please refer the ESP RainMaker documentation for details.
-
-        config ESP_RMAKER_OTA_USING_PARAMS
-            bool "OTA using Params"
-        config ESP_RMAKER_OTA_USING_TOPICS
-            bool "OTA using Topics"
-    endchoice
-
-    config ESP_RMAKER_OTA_WORKFLOW_TYPE
-        int
-        default 1 if ESP_RMAKER_OTA_USING_PARAMS
-        default 2 if ESP_RMAKER_OTA_USING_TOPICS
-
     config ESP_RMAKER_OTA_AUTOFETCH
         bool "Auto Fetch OTA"
-        default n
-        depends on ESP_RMAKER_OTA_USING_TOPICS
+        default y
         help
+            Applicable only for OTA using Topics.
             Fetch the OTA (i.e. get the URL and other details) by actively sending an
             OTA fetch request to ESP RainMaker Cloud. If this is disabled, the node
             will stay subscribed to the OTA Topics, but will get the information only
-            if a user explicitly triggers it.
+            if someone explicitly triggers it.
 
     config ESP_RMAKER_OTA_AUTOFETCH_PERIOD
         int "OTA Auto Fetch Period"
