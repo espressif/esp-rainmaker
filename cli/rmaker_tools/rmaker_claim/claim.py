@@ -130,7 +130,7 @@ def get_secret_key(port, esptool):
     :return: Secret Key on Success
     :rtype: str
     """
-    esp = esptool.ESP32ROM(port)
+    esp = esptool.ESP32S2ROM(port)
     esp.connect('default_reset')
     for (name, idx, read_addr, _, _) in BLOCKS:
         addrs = range(read_addr, read_addr + 32, 4)
@@ -283,6 +283,7 @@ def claim(port):
         claim_verify_url = CLAIM_VERIFY_URL
         private_key = None
         curr_claim_data = None
+        secret_key = None
         user_whitelist_err_msg = ('user is not allowed to claim esp32 device.'
                                   ' please contact administrator')
 
@@ -306,6 +307,13 @@ def claim(port):
 
         node_platform, mac_addr = get_node_platform_and_mac(esptool, port)
         print("Node platform detected is: ", node_platform)
+        if node_platform not in ["esp32"]:
+            secret_key = get_secret_key(port, esptool)
+            secret_key = secret_key.strip('0')
+            if not secret_key:
+                node_platform="esp32"
+            else:
+                node_platform=node_platform.replace('-', '')
         print("MAC address is: ", mac_addr)
         log.debug("MAC address received: " + mac_addr)
         log.debug("Node platform detected is: " + node_platform)
@@ -443,7 +451,8 @@ def claim(port):
                     raise Exception("CSR Not Generated. Claiming Failed")
                 log.info("CSR generated")
                 log.info("Getting secret key from device")
-                secret_key = get_secret_key(port, esptool)
+                if not secret_key:
+                    secret_key = get_secret_key(port, esptool)
                 log.info("Getting secret key from device")
                 log.info("Generating hmac challenge response")
                 hmac_challenge_response = gen_hmac_challenge_resp(
