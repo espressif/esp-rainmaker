@@ -1,3 +1,5 @@
+ESP RainMaker OTA Upgrade Server Certificate.
+Replace this if you choose to use any other Server.
 -----BEGIN CERTIFICATE-----
 MIIEYzCCA0ugAwIBAgIQAYL4CY6i5ia5GjsnhB+5rzANBgkqhkiG9w0BAQsFADBa
 MQswCQYDVQQGEwJJRTESMBAGA1UEChMJQmFsdGltb3JlMRMwEQYDVQQLEwpDeWJl
