@@ -23,7 +23,7 @@
 
 #include "app_priv.h"
 
-extern uint8_t ota_server_cert[] asm("_binary_server_crt_start");
+extern const uint8_t ota_server_cert[] asm("_binary_server_crt_start");
 
 static const char *TAG = "app_main";
 
