@@ -42,7 +42,7 @@ class Node:
         self.__nodeid = nodeid
         self.__session = session
         try:
-            self.__request_header = {'content-type': 'application/json',
+            self.request_header = {'content-type': 'application/json',
                                      'Authorization': session.id_token}
         except AttributeError:
             raise InvalidClassInput(session, 'Invalid Session Input.\
@@ -77,7 +77,7 @@ class Node:
         try:
             log.debug("Get node status request url : " + getnodestatus_url)
             response = requests.get(url=getnodestatus_url,
-                                    headers=self.__request_header,
+                                    headers=self.request_header,
                                     verify=configmanager.CERT_FILE)
             log.debug("Get node status response : " + response.text)
             response.raise_for_status()
@@ -101,6 +101,7 @@ class Node:
         :return: Configuration of node on Success
         :rtype: dict
         """
+        socket.setdefaulttimeout(10)
         log.info("Getting node config for node : " + self.__nodeid)
         path = 'user/nodes/config'
         query_parameters = 'nodeid=' + self.__nodeid
@@ -108,8 +109,9 @@ class Node:
         try:
             log.debug("Get node config request url : " + getnodeconfig_url)
             response = requests.get(url=getnodeconfig_url,
-                                    headers=self.__request_header,
-                                    verify=configmanager.CERT_FILE)
+                                    headers=self.request_header,
+                                    verify=configmanager.CERT_FILE,
+                                    timeout=(5.0, 5.0))
             log.debug("Get node config response : " + response.text)
             response.raise_for_status()
         except requests.exceptions.SSLError:
@@ -134,6 +136,7 @@ class Node:
         :rtype: dict | None
 
         """
+        socket.setdefaulttimeout(10)
         log.info("Getting parameters of the node with nodeid : " +
                  self.__nodeid)
         path = 'user/nodes/params'
@@ -142,8 +145,9 @@ class Node:
         try:
             log.debug("Get node params request url : " + getparams_url)
             response = requests.get(url=getparams_url,
-                                    headers=self.__request_header,
-                                    verify=configmanager.CERT_FILE)
+                                    headers=self.request_header,
+                                    verify=configmanager.CERT_FILE,
+                                    timeout=(5.0, 5.0))
             log.debug("Get node params response : " + response.text)
             response.raise_for_status()
         except requests.exceptions.SSLError:
@@ -174,6 +178,7 @@ class Node:
         :return: True on Success
         :rtype: bool
         """
+        socket.setdefaulttimeout(10)
         log.info("Updating parameters of the node with nodeid : " +
                  self.__nodeid)
         path = 'user/nodes/params'
@@ -182,10 +187,12 @@ class Node:
         try:
             log.debug("Set node params request url : " + setparams_url)
             log.debug("Set node params request payload : " + json.dumps(data))
+            log.debug("Set node params request header : " + json.dumps(self.request_header))
             response = requests.put(url=setparams_url,
                                     data=json.dumps(data),
-                                    headers=self.__request_header,
-                                    verify=configmanager.CERT_FILE)
+                                    headers=self.request_header,
+                                    verify=configmanager.CERT_FILE,
+                                    timeout=(5.0, 5.0))
             log.debug("Set node params response : " + response.text)
             response.raise_for_status()
         except requests.exceptions.SSLError:
@@ -235,7 +242,7 @@ class Node:
                       str(request_payload))
             response = requests.put(url=request_url,
                                     data=json.dumps(request_payload),
-                                    headers=self.__request_header,
+                                    headers=self.request_header,
                                     verify=configmanager.CERT_FILE,
                                     timeout=(5.0, 5.0))
             log.debug("User node mapping response : " + response.text)
@@ -327,7 +334,7 @@ class Node:
             log.debug("Check user node mapping status request url : " +
                       request_url)
             response = requests.get(url=request_url,
-                                    headers=self.__request_header,
+                                    headers=self.request_header,
                                     verify=configmanager.CERT_FILE,
                                     timeout=(5.0, 5.0))
             log.debug("Check user node mapping status response : " +
@@ -354,3 +361,4 @@ class Node:
         if 'request_status' in response:
             return response['request_status']
         return None
+

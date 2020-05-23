@@ -17,7 +17,7 @@
 import argparse
 from rmaker_cmd.node import get_nodes, get_node_config, get_node_status,\
                             set_params, get_params, remove_node,\
-                            get_mqtt_host, claim_node
+                            get_mqtt_host, claim_node, ota_upgrade
 from rmaker_cmd.user import signup, login, forgot_password
 from rmaker_cmd.provision import provision
 from rmaker_cmd.test import test
@@ -138,6 +138,18 @@ def main():
                              metavar='<nodeid>',
                              help='Add user node mapping')
     test_parser.set_defaults(func=test)
+    
+    upload_ota_image_parser = subparsers.add_parser('otaupgrade',
+                                                    help='Upload OTA Firmware image and start OTA Upgrade')
+    upload_ota_image_parser.add_argument('nodeid',
+                                         type=str,
+                                         metavar='<nodeid>',
+                                         help='Node ID for the node')
+    upload_ota_image_parser.add_argument('otaimagepath',
+                                        type=str,
+                                        metavar='<ota_image_path>',
+                                        help='OTA Firmware image path')
+    upload_ota_image_parser.set_defaults(func=ota_upgrade)
 
     args = parser.parse_args()
 
