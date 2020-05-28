@@ -85,6 +85,9 @@ class Node:
             raise SSLError
         except requests.exceptions.ConnectionError:
             raise NetworkError
+        except Timeout as time_err:
+            log.debug(time_err)
+            raise RequestTimeoutError
         except Exception:
             raise Exception(response.text)
         log.info("Received node status successfully.")
@@ -118,8 +121,13 @@ class Node:
             raise SSLError
         except requests.exceptions.ConnectionError:
             raise NetworkError
-        except Exception:
-            raise Exception(response.text)
+        except Timeout as time_err:
+            log.debug(time_err)
+            raise RequestTimeoutError
+        except RequestException as get_nodes_config_err:
+            log.debug(get_nodes_config_err)
+            raise get_nodes_config_err
+
         log.info("Received node config successfully.")
         return response.json()
 
@@ -154,8 +162,12 @@ class Node:
             raise SSLError
         except requests.exceptions.ConnectionError:
             raise NetworkError
-        except Exception:
-            raise Exception(response.text)
+        except Timeout as time_err:
+            log.debug(time_err)
+            raise RequestTimeoutError
+        except RequestException as get_nodes_params_err:
+            log.debug(get_nodes_params_err)
+            raise get_nodes_params_err
 
         response = json.loads(response.text)
         if 'status' in response and response['status'] == 'failure':
@@ -199,8 +211,12 @@ class Node:
             raise SSLError
         except requests.exceptions.ConnectionError:
             raise NetworkError
-        except Exception:
-            raise Exception(response.text)
+        except Timeout as time_err:
+            log.debug(time_err)
+            raise RequestTimeoutError
+        except RequestException as set_nodes_params_err:
+            log.debug(set_nodes_params_err)
+            raise set_nodes_params_err
         log.info("Updated node parameters successfully.")
         return True
 

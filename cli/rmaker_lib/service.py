@@ -77,8 +77,7 @@ class Service:
         """
         node_config = node_obj.get_node_config()
         service_config = node_config["services"]
-        log.debug("Checking " + service_type + " in node config...")
-        print("Checking " + service_type + " in node config...")
+        log.debug("Checking " + str(service_type) + " in node config...")
         for service in service_config:
             if service["type"] == service_type:
                 return service, service["name"]
@@ -104,18 +103,23 @@ class Service:
         :type: bool,str | None
         """
         ota_status = ""
+        ota_status_empty_str = "(empty)"
         log.debug("Received service read params: " + json.dumps(service_read_params))
         ota_status_key = service_read_params[OTA_PARAMS['status']]
         ota_info_key = service_read_params[OTA_PARAMS['info']]
-        log.debug("OTA Status Key : " + ota_status_key)
-        log.debug("OTA Info Key : " + ota_info_key)
-        print("Getting OTA Status...")
+        log.debug("OTA Status Key : " + str(ota_status_key))
+        log.debug("OTA Info Key : " + str(ota_info_key))
         while True:
             curr_status = None
             curr_info = None
             time.sleep(8)
             log.info("Getting node params for OTA status")
             new_node_params = node_obj.get_node_params()
+            if service_name not in new_node_params and (curr_status not in [None, ota_status_empty_str]):
+                log.info("OTA may have completed, check the node to confirm.")
+                print("OTA may have completed, check the node to confirm.")
+                ota_status = None
+                break
             node_service_params = new_node_params[service_name]
             for k,v in node_service_params.items():
                 if ota_status_key and k in ota_status_key and not v:
@@ -129,22 +133,22 @@ class Service:
                 elif ota_info_key and k in ota_info_key:
                     curr_info = v
 
-            log.debug("Current OTA status: " + curr_status)
+            log.debug("Current OTA status: " + str(curr_status))
             curr_time = time.time()
             if not curr_status:
                 if not ota_status_key:
-                    print("Node Param of type: " + OTA_PARAMS['status'] + " not found...Exiting...")
-                    log.debug("Node Param of type: " + OTA_PARAMS['status'] + " not found...Exiting...")
+                    print("Node param of type: " + OTA_PARAMS['status'] + " not found... Exiting...")
+                    log.debug("Node param of type: " + OTA_PARAMS['status'] + " not found...Exiting...")
                     ota_status = ""
                     break
-                curr_status = "(empty)"
+                curr_status = ota_status_empty_str
             if not curr_info:
                 if not ota_info_key:
-                    print("Node Param of type: " + OTA_PARAMS['info'] + " not found...Exiting...")
-                    log.debug("Node Param of type: " + OTA_PARAMS['info'] + " not found...Exiting...")
+                    print("Node param of type: " + OTA_PARAMS['info'] + " not found... Exiting...")
+                    log.debug("Node param of type: " + OTA_PARAMS['info'] + " not found...Exiting...")
                     ota_status = ""
                     break
-                curr_info = "(empty)"
+                curr_info = ota_status_empty_str
             timestamp = datetime.datetime.fromtimestamp(curr_time).strftime('%H:%M:%S')
             log.debug("[{:<6}] {:<3} : {:<3}".format(timestamp, curr_status,curr_info))
             print("[{:<8}] {:<3} : {:<3}".format(timestamp, curr_status,curr_info))
@@ -192,11 +196,10 @@ class Service:
         global start_time
         start_time = None
         ota_url_key = service_write_params[OTA_PARAMS['url']]
-        log.debug("OTA URL Key : " + ota_url_key)
-        log.debug("Setting new url: " + url_to_set)
+        log.debug("OTA URL Key : " + str(ota_url_key))
+        log.debug("Setting new url: " + str(url_to_set))
         params_to_set = {service_name: {ota_url_key: url_to_set}}
         log.debug("New node params after setting url: " + json.dumps(params_to_set))
-        print("Setting the OTA URL parameter...")
         set_node_status = node_obj.set_node_params(params_to_set)
         if not set_node_status:
             return False
@@ -230,8 +233,6 @@ class Service:
         :type: str | None
         """
         socket.setdefaulttimeout(100)
-        print("Uploading OTA Firmware Image...")
-        log.info("Uploading OTA Firmware Image...")
         path = 'user/ota_image'
         request_payload = {
             'image_name': img_name,
@@ -241,17 +242,15 @@ class Service:
         request_url = serverconfig.HOST + path
         try:
             log.debug("Uploading OTA Firmware Image Request URL : " +
-                      request_url +
-                      " data: " +
-                      json.dumps(request_payload)
+                      str(request_url)
                      )
             response = requests.post(url=request_url,
                                      data=json.dumps(request_payload),
                                      headers=node.request_header,
                                      verify=configmanager.CERT_FILE,
-                                     timeout=(5.0, 5.0))
+                                     timeout=(60.0, 60.0))
             log.debug("Uploading OTA Firmware Image Status Response : " +
-                      response.text)
+                      str(response.text))
             response.raise_for_status()
         except requests.exceptions.SSLError as ssl_err:
             log.debug(ssl_err)
