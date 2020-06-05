@@ -21,7 +21,7 @@ typedef struct {
     esp_rmaker_ota_type_t type;
     esp_rmaker_ota_cb_t ota_cb;
     void *priv;
-    char *server_cert;
+    const char *server_cert;
     char *url;
     int filesize;
     bool ota_in_progress;

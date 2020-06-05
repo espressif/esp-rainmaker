@@ -16,12 +16,15 @@
 #include <esp_rmaker_core.h>
 #include <esp_rmaker_standard_params.h>
 #include <esp_rmaker_standard_devices.h>
+#include <esp_rmaker_ota.h>
 
 #include <app_wifi.h>
 
 #include "app_priv.h"
 
 static const char *TAG = "app_main";
+
+extern const char ota_server_cert[] asm("_binary_server_crt_start");
 
 /* Callback to handle commands received from the RainMaker cloud */
 static esp_err_t common_callback(const char *dev_name, const char *name, esp_rmaker_param_val_t val, void *priv_data)
@@ -92,6 +95,12 @@ void app_main()
     esp_rmaker_device_add_brightness_param("Light", "brightness", DEFAULT_BRIGHTNESS);
     esp_rmaker_device_add_hue_param("Light", "hue", DEFAULT_HUE);
     esp_rmaker_device_add_saturation_param("Light", "saturation", DEFAULT_SATURATION);
+
+    /* Enable OTA */
+    esp_rmaker_ota_config_t ota_config = {
+        .server_cert = ota_server_cert,
+    };
+    esp_rmaker_ota_enable(&ota_config, OTA_USING_PARAMS);
 
     /* Start the ESP RainMaker Agent */
     esp_rmaker_start();

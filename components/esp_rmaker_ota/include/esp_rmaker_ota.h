@@ -16,6 +16,9 @@
 #include <stdbool.h>
 #include <esp_err.h>
 
+/** Default ESP RainMaker OTA Server Certificate */
+extern const char *ESP_RMAKER_OTA_DEFAULT_SERVER_CERT;
+
 /** OTA Status to be reported to ESP RainMaker Cloud */
 typedef enum {
     /** OTA is in Progress. This can be reported multiple times as the OTA progresses. */
@@ -47,7 +50,7 @@ typedef struct {
      * the ESP RainMaker Cloud */
     int filesize;
     /** The server certificate passed in esp_rmaker_enable_ota() */
-    char *server_cert;
+    const char *server_cert;
     /** The private data passed in esp_rmaker_enable_ota() */
     char *priv;
 } esp_rmaker_ota_data_t;
@@ -94,9 +97,11 @@ typedef struct {
     esp_rmaker_post_ota_diag_t ota_diag;
     /** Server Certificate.
      * The certificate to be passed to the OTA callback for server authentication.
-     * This is mandatory, unless you have disabled it in ESP HTTPS OTA config options
+     * This is mandatory, unless you have disabled it in ESP HTTPS OTA config option.
+     * If you are using the ESP RainMaker OTA Service, you can just set this to
+     * `ESP_RMAKER_DEFAULT_OTA_SERVER_CERT`.
      */
-    char *server_cert;
+    const char *server_cert;
     /** Private Data.
      * Optional private data to be passed to the OTA callback.
      */
