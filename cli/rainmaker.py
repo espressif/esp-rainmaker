@@ -14,6 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import sys
 import argparse
 from rmaker_cmd.node import get_nodes, get_node_config, get_node_status,\
                             set_params, get_params, remove_node,\
@@ -126,12 +127,31 @@ def main():
 
     claim_parser = subparsers.add_parser('claim',
                                          help='Claim the node connected to the given serial port\
-                                              (Get cloud credentials)')
+                                              (Get cloud credentials)',
+                                         formatter_class=argparse.RawTextHelpFormatter)
+
     claim_parser.add_argument("port", metavar='<port>',
-                              help='Serial Port connected to the device.')
-    claim_parser.add_argument("--address", metavar='<address>',
-                              help='Flash claiming data at this address.')
-    claim_parser.set_defaults(func=claim_node)
+                              default=None,
+                              help='Serial Port connected to the device.'
+                                   '\nUsage: ./rainmaker.py claim <port> [<optional arguments>]',
+                              nargs='?')
+
+    claim_parser.add_argument("--platform",
+                              choices=['esp32', 'esp32s2'],
+                              type=str,
+                              help='Node platform.')
+
+    claim_parser.add_argument("--mac", metavar='<mac>',
+                              type=str,
+                              help='Node MAC address in the format AABBCC112233.')
+
+    claim_parser.add_argument("--secret-key", metavar='<secret-key>',
+                              type=str,
+                              help='Unique secret key read from the efuse in the format 009b77a8a38d989e9e5c3ddd790cc619.\nRequired for esp32s2 only.')
+    
+    claim_parser.add_argument("--addr", metavar='<flash-address>',
+                              help='Address in the flash memory where the claim data will be written.\nDefault: 0x340000')
+    claim_parser.set_defaults(func=claim_node, parser=claim_parser)
 
     test_parser = subparsers.add_parser('test',
                                         help='Test commands to check\
