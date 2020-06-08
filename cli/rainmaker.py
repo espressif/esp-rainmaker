@@ -129,6 +129,8 @@ def main():
                                               (Get cloud credentials)')
     claim_parser.add_argument("port", metavar='<port>',
                               help='Serial Port connected to the device.')
+    claim_parser.add_argument("--address", metavar='<address>',
+                              help='Flash claiming data at this address.')
     claim_parser.set_defaults(func=claim_node)
 
     test_parser = subparsers.add_parser('test',
