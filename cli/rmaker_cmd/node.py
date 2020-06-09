@@ -286,7 +286,7 @@ def claim_node(vars=None):
     :rtype: None
     """
     try:
-        claim(vars['port'])
+        claim(vars['port'], vars['address'])
     except Exception as claim_err:
         log.error(claim_err)
         return

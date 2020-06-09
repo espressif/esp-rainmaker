@@ -60,7 +60,7 @@ BLOCKS = [
 ]
 
 
-def flash_bin_onto_node(port, esptool, bin_to_flash):
+def flash_bin_onto_node(port, esptool, bin_to_flash, address):
     """
     Flash binary onto node
 
@@ -79,7 +79,7 @@ def flash_bin_onto_node(port, esptool, bin_to_flash):
     :rtype: None
     """
     try:
-        command = ['--port', port, 'write_flash', '0x340000', bin_to_flash]
+        command = ['--port', port, 'write_flash', address, bin_to_flash]
         esptool.main(command)
     except Exception as err:
         log.error(err)
@@ -259,7 +259,7 @@ def create_files_of_claim_info(dest_filedir, node_id, private_key, node_cert,
         raise file_error
 
 
-def claim(port):
+def claim(port, address):
     """
     Claim the node connected to the given serial port
     (Get cloud credentials)
@@ -286,6 +286,9 @@ def claim(port):
         secret_key = None
         user_whitelist_err_msg = ('user is not allowed to claim esp32 device.'
                                   ' please contact administrator')
+
+        if not address:
+            address = '0x340000'
 
         config = configmanager.Config()
         userid = config.get_user_id()
@@ -381,7 +384,7 @@ def claim(port):
             print("\nFlashing existing binary onto node\n")
             log.info("Flashing existing binary onto node")
             flash_bin_onto_node(port, esptool, dest_filedir +
-                                output_bin_filename)
+                                output_bin_filename, address)
             log.info("Binary flashed onto node")
             return
 
@@ -539,7 +542,7 @@ def claim(port):
         nvs_partition_gen.generate(nvs_args)
         print("\nFlashing onto node\n")
         log.info("Flashing binary onto node")
-        flash_bin_onto_node(port, esptool, dest_filedir + output_bin_filename)
+        flash_bin_onto_node(port, esptool, dest_filedir + output_bin_filename, address)
 
         print("Claiming done")
         log.info("Claiming done")
