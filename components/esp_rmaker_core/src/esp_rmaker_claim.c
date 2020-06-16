@@ -113,7 +113,7 @@ static esp_err_t read_hmac_key(uint32_t *out_hmac_key, size_t hmac_key_size)
     if (hmac_key_size != 16) {
         ESP_LOGE(TAG, "HMAC key size should be 16 bytes.");
     }
-    esp_err_t err = esp_efuse_read_field_blob(ESP_EFUSE_SYS_DATA_PART1, out_hmac_key, hmac_key_size * 8);
+    esp_err_t err = esp_efuse_read_field_blob(ESP_EFUSE_OPTIONAL_UNIQUE_ID, out_hmac_key, hmac_key_size * 8);
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "esp_efuse_read_field_blob failed!");
     }
