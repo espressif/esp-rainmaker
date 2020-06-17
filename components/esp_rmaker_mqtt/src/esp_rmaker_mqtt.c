@@ -111,13 +111,13 @@ esp_err_t esp_rmaker_mqtt_unsubscribe(const char *topic)
     return ESP_FAIL;
 }
 
-esp_err_t esp_rmaker_mqtt_publish(const char *topic, const char *data)
+esp_err_t esp_rmaker_mqtt_publish(const char *topic, void *data, size_t data_len)
 {
     if (!mqtt_data || !topic || !data) {
         return ESP_FAIL;
     }
     ESP_LOGD(TAG, "Publishing to %s", topic);
-    int ret = esp_mqtt_client_publish(mqtt_data->mqtt_client, topic, data, strlen(data), 1, 0);
+    int ret = esp_mqtt_client_publish(mqtt_data->mqtt_client, topic, data, data_len, 1, 0);
     if (ret < 0) {
         ESP_LOGE(TAG, "MQTT Publish failed");
         return ESP_FAIL;
