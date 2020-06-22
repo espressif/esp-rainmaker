@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 #include <stdint.h>
+#include <string.h>
 #include <json_parser.h>
 #include <json_generator.h>
 #include <esp_log.h>
@@ -59,7 +60,7 @@ esp_err_t esp_rmaker_ota_report_status_using_topics(esp_rmaker_ota_handle_t ota_
 
     char publish_topic[100];
     snprintf(publish_topic, sizeof(publish_topic), "node/%s/%s", node_id, OTASTATUS_TOPIC_SUFFIX);
-    esp_err_t err = esp_rmaker_mqtt_publish(publish_topic, publish_payload);
+    esp_err_t err = esp_rmaker_mqtt_publish(publish_topic, publish_payload, strlen(publish_payload));
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "esp_rmaker_mqtt_publish_data returned error %d",err);
         return ESP_FAIL;
@@ -179,7 +180,7 @@ static void esp_rmaker_ota_fetch(void *priv)
     json_gen_str_end(&jstr);
     char publish_topic[100];
     snprintf(publish_topic, sizeof(publish_topic), "node/%s/%s", esp_rmaker_get_node_id(), OTAFETCH_TOPIC_SUFFIX);
-    esp_err_t err = esp_rmaker_mqtt_publish(publish_topic, publish_payload);
+    esp_err_t err = esp_rmaker_mqtt_publish(publish_topic, publish_payload, strlen(publish_payload));
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "OTA Fetch Publish Error %d", err);
     }

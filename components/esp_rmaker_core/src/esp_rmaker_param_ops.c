@@ -56,7 +56,7 @@ static void __esp_rmaker_report_ts_param(void *priv_data)
         json_gen_str_end(&jstr);
         snprintf(publish_topic, sizeof(publish_topic), "node/%s/%s", esp_rmaker_get_node_id(), TIME_SERIES_DATA_TOPIC_SUFFIX);
 
-        esp_rmaker_mqtt_publish(publish_topic, publish_payload);
+        esp_rmaker_mqtt_publish(publish_topic, publish_payload, strlen(publish_payload));
     }
 #endif
 }
@@ -99,7 +99,7 @@ static esp_err_t esp_rmaker_report_params(uint8_t flags, bool init)
         snprintf(publish_topic, sizeof(publish_topic), "node/%s/%s", esp_rmaker_get_node_id(),
                 init ? NODE_PARAMS_LOCAL_INIT_TOPIC_SUFFIX : NODE_PARAMS_LOCAL_TOPIC_SUFFIX);
         ESP_LOGI(TAG, "Reporting params: %s", publish_payload);
-        esp_rmaker_mqtt_publish(publish_topic, publish_payload);
+        esp_rmaker_mqtt_publish(publish_topic, publish_payload, strlen(publish_payload));
     }
     return ESP_OK;
 }

@@ -70,12 +70,13 @@ esp_err_t esp_rmaker_mqtt_disconnect(void);
 /** Publish MQTT Message
  *
  * @param[in] topic The MQTT topic on which the message should be published.
- * @param[in] data NULL terminated data string to be published.
+ * @param[in] data Data to be published
+ * @param[in] data_len Length of the data
  *
  * @return ESP_OK on success.
  * @return error in case of any error.
  */
-esp_err_t esp_rmaker_mqtt_publish(const char *topic, const char *data);
+esp_err_t esp_rmaker_mqtt_publish(const char *topic, void *data, size_t data_len);
 
 /** Subscribe to MQTT topic
  *
