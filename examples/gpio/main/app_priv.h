@@ -12,5 +12,3 @@
 
 void app_driver_init(void);
 esp_err_t app_driver_set_gpio(const char *name, bool state);
-void app_wifi_init(void);
-void app_wifi_start(void);
