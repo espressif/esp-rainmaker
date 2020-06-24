@@ -15,10 +15,26 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <esp_err.h>
+#include <esp_event.h>
 
 #define ESP_RMAKER_CONFIG_VERSION    "2020-03-20"
 
 #define MAX_VERSION_STRING_LEN  16
+
+/** ESP RainMaker Event Base */
+ESP_EVENT_DECLARE_BASE(RMAKER_EVENT);
+
+/** ESP RainMaker Events */
+typedef enum {
+    /** RainMaker Core Initialisation Done */
+    RMAKER_EVENT_INIT_DONE = 1,
+    /** Self Claiming Started */
+    RMAKER_EVENT_CLAIM_STARTED,
+    /** Self Claiming was Successful */
+    RMAKER_EVENT_CLAIM_SUCCESSFUL,
+    /** Self Claiming Failed */
+    RMAKER_EVENT_CLAIM_FAILED,
+} esp_rmaker_event_t;
 
 /** ESP RainMaker Node information */
 typedef struct {

@@ -35,6 +35,8 @@ static EventGroupHandle_t wifi_event_group;
 
 #include <esp_wifi.h>
 
+ESP_EVENT_DEFINE_BASE(RMAKER_EVENT);
+
 #define ESP_CLAIM_NODE_ID_SIZE  12
 
 static const char *TAG = "esp_rmaker_core";
@@ -221,6 +223,7 @@ esp_err_t esp_rmaker_init(esp_rmaker_config_t *config)
         }
     }
     g_ra_handle->enable_time_sync = config->enable_time_sync;
+    esp_rmaker_post_event(RMAKER_EVENT_INIT_DONE, NULL, 0);
     return ESP_OK;
 }
 
@@ -749,11 +752,14 @@ static void esp_rmaker_task(void *param)
     }
 #ifdef CONFIG_ESP_RMAKER_SELF_CLAIM
     if (g_ra_handle->self_claim) {
+        esp_rmaker_post_event(RMAKER_EVENT_CLAIM_STARTED, NULL, 0);
         err = esp_rmaker_self_claim_perform();
         if (err != ESP_OK) {
+            esp_rmaker_post_event(RMAKER_EVENT_CLAIM_FAILED, NULL, 0);
             ESP_LOGE(TAG, "esp_rmaker_self_claim_perform() returned %d. Aborting", err);
             vTaskDelete(NULL);
         }
+        esp_rmaker_post_event(RMAKER_EVENT_CLAIM_SUCCESSFUL, NULL, 0);
         g_ra_handle->mqtt_config = esp_rmaker_get_mqtt_config();
         if (!g_ra_handle->mqtt_config) {
             ESP_LOGE(TAG, "Failed to initialise MQTT Config after claiming. Aborting");

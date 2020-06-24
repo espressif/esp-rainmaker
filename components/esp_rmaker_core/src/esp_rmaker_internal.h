@@ -78,3 +78,7 @@ esp_err_t esp_rmaker_report_param(void);
 esp_err_t esp_rmaker_queue_report_param(esp_rmaker_work_fn_t work_fn, void *priv_data);
 esp_err_t esp_rmaker_param_get_stored_value(esp_rmaker_param_t *param, esp_rmaker_param_val_t *val);
 esp_err_t esp_rmaker_param_store_value(esp_rmaker_param_t *param);
+static inline esp_err_t esp_rmaker_post_event(esp_rmaker_event_t event_id, void* data, size_t data_size)
+{
+    return esp_event_post(RMAKER_EVENT, event_id, data, data_size, portMAX_DELAY);
+}
