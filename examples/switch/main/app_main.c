@@ -11,6 +11,7 @@
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
 #include <esp_log.h>
+#include <esp_event.h>
 #include <nvs_flash.h>
 
 #include <esp_rmaker_core.h>
@@ -37,6 +38,31 @@ static esp_err_t switch_callback(const char *dev_name, const char *name, esp_rma
     }
     return ESP_OK;
 }
+/* Event handler for catching RainMaker events */
+static void event_handler(void* arg, esp_event_base_t event_base,
+                          int event_id, void* event_data)
+{
+    if (event_base == RMAKER_EVENT) {
+        switch (event_id) {
+            case RMAKER_EVENT_INIT_DONE:
+                ESP_LOGI(TAG, "RainMaker Initialised.");
+                break;
+            case RMAKER_EVENT_CLAIM_STARTED:
+                ESP_LOGI(TAG, "RainMaker Claim Started.");
+                break;
+            case RMAKER_EVENT_CLAIM_SUCCESSFUL:
+                ESP_LOGI(TAG, "RainMaker Claim Successful.");
+                break;
+            case RMAKER_EVENT_CLAIM_FAILED:
+                ESP_LOGI(TAG, "RainMaker Claim Failed.");
+                break;
+            default:
+                ESP_LOGW(TAG, "Unhandled RainMaker Event: %d", event_id);
+        }
+    } else {
+        ESP_LOGW(TAG, "Invalid event received!");
+    }
+}
 
 void app_main()
 {
@@ -58,7 +84,10 @@ void app_main()
     /* Initialize Wi-Fi. Note that, this should be called before esp_rmaker_init()
      */
     app_wifi_init();
-    
+
+    /* Register an event handler to catch RainMaker events */
+    ESP_ERROR_CHECK(esp_event_handler_register(RMAKER_EVENT, ESP_EVENT_ANY_ID, &event_handler, NULL));
+
     /* Initialize the ESP RainMaker Agent.
      * Note that this should be called after app_wifi_init() but before app_wifi_start()
      * */
