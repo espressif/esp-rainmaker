@@ -18,6 +18,7 @@
 #include <esp_rmaker_standard_params.h>
 #include <esp_rmaker_standard_devices.h>
 #include <esp_rmaker_ota.h>
+#include <esp_rmaker_console.h>
 
 #include <app_wifi.h>
 
@@ -42,6 +43,7 @@ void app_main()
     /* Initialize Application specific hardware drivers and
      * set initial state.
      */
+    esp_rmaker_console_init();
     app_driver_init();
     app_driver_set_state(DEFAULT_POWER);
 
