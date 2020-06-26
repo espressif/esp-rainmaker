@@ -209,6 +209,39 @@ int json_obj_get_strlen(jparse_ctx_t *jctx, char *name, int *strlen)
 	return OS_SUCCESS;
 }
 
+int json_obj_get_object_str(jparse_ctx_t *jctx, char *name, char *val, int size)
+{
+	json_tok_t *tok = json_obj_get_val_tok(jctx, name, JSMN_OBJECT);
+	if (!tok)
+		return -OS_FAIL;
+	return json_tok_to_string(jctx, tok, val, size);
+}
+
+int json_obj_get_object_strlen(jparse_ctx_t *jctx, char *name, int *strlen)
+{
+	json_tok_t *tok = json_obj_get_val_tok(jctx, name, JSMN_OBJECT);
+	if (!tok)
+		return -OS_FAIL;
+	*strlen = tok->end - tok->start;
+	return OS_SUCCESS;
+}
+int json_obj_get_array_str(jparse_ctx_t *jctx, char *name, char *val, int size)
+{
+	json_tok_t *tok = json_obj_get_val_tok(jctx, name, JSMN_ARRAY);
+	if (!tok)
+		return -OS_FAIL;
+	return json_tok_to_string(jctx, tok, val, size);
+}
+
+int json_obj_get_array_strlen(jparse_ctx_t *jctx, char *name, int *strlen)
+{
+	json_tok_t *tok = json_obj_get_val_tok(jctx, name, JSMN_ARRAY);
+	if (!tok)
+		return -OS_FAIL;
+	*strlen = tok->end - tok->start;
+	return OS_SUCCESS;
+}
+
 static json_tok_t *json_arr_search(jparse_ctx_t *ctx, uint32_t index)
 {
 	json_tok_t *tok = ctx->cur;

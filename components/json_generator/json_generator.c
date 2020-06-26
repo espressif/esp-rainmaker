@@ -127,11 +127,21 @@ int json_gen_push_object(json_gen_str_t *jstr, char *name)
 	jstr->comma_req = false;
 	return json_gen_add_to_str(jstr, "{");
 }
+
 int json_gen_pop_object(json_gen_str_t *jstr)
 {
 	jstr->comma_req = true;
 	return json_gen_add_to_str(jstr, "}");
 }
+
+int json_gen_push_object_str(json_gen_str_t *jstr, char *name, char *object_str)
+{
+	json_gen_handle_comma(jstr);
+	json_gen_handle_name(jstr, name);
+	jstr->comma_req = true;
+	return json_gen_add_to_str(jstr, object_str);
+}
+
 int json_gen_push_array(json_gen_str_t *jstr, char *name)
 {
 	json_gen_handle_comma(jstr);
@@ -143,6 +153,14 @@ int json_gen_pop_array(json_gen_str_t *jstr)
 {
 	jstr->comma_req = true;
 	return json_gen_add_to_str(jstr, "]");
+}
+
+int json_gen_push_array_str(json_gen_str_t *jstr, char *name, char *array_str)
+{
+	json_gen_handle_comma(jstr);
+	json_gen_handle_name(jstr, name);
+	jstr->comma_req = true;
+	return json_gen_add_to_str(jstr, array_str);
 }
 
 static int json_gen_set_bool(json_gen_str_t *jstr, bool val)
