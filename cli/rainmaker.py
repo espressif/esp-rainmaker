@@ -19,7 +19,8 @@ import argparse
 from rmaker_cmd.node import get_nodes, get_node_config, get_node_status,\
                             set_params, get_params, remove_node,\
                             get_mqtt_host, claim_node, ota_upgrade
-from rmaker_cmd.user import signup, login, forgot_password
+from rmaker_cmd.user import signup, login, forgot_password,\
+                            get_user_details, logout
 from rmaker_cmd.provision import provision
 from rmaker_cmd.test import test
 from rmaker_lib.logger import log
@@ -44,6 +45,11 @@ def main():
                               type=str,
                               help='Email address of the user')
     login_parser.set_defaults(func=login)
+
+    logout_parser = subparsers.add_parser("logout",
+                                         help="Logout current (logged-in) user")
+    logout_parser.set_defaults(func=logout)
+
 
     forgot_password_parser = subparsers.add_parser("forgotpassword",
                                                    help="Reset the password")
@@ -168,6 +174,10 @@ def main():
                                         metavar='<ota_image_path>',
                                         help='OTA Firmware image path')
     upload_ota_image_parser.set_defaults(func=ota_upgrade)
+
+    user_info_parser = subparsers.add_parser("getuserinfo",
+                                         help="Get details of current (logged-in) user")
+    user_info_parser.set_defaults(func=get_user_details)
 
     args = parser.parse_args()
 
