@@ -136,6 +136,8 @@ typedef enum {
     ESP_RMAKER_REQ_SRC_INIT,
     /** Request received from cloud */
     ESP_RMAKER_REQ_SRC_CLOUD,
+    /** Request received when a schedule has triggered */
+    ESP_RMAKER_REQ_SRC_SCHEDULE,
 } esp_rmaker_req_src_t;
 
 /** Write request Context */

@@ -8,3 +8,4 @@ C API Reference
    rainmaker_standard_types.rst
    rainmaker_mqtt.rst
    rainmaker_ota.rst
+   rainmaker_console.rst

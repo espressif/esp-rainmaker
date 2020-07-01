@@ -25,6 +25,7 @@ INPUT = \
     ../components/esp_rainmaker/include/esp_rmaker_core.h \
     ../components/esp_rainmaker/include/esp_rmaker_user_mapping.h \
     ../components/esp_rainmaker/include/esp_rmaker_utils.h \
+    ../components/esp_rainmaker/include/esp_rmaker_schedule.h \
     ## RainMaker Standard Types
     ../components/esp_rainmaker/include/esp_rmaker_standard_types.h \
     ../components/esp_rainmaker/include/esp_rmaker_standard_params.h \
@@ -33,7 +34,9 @@ INPUT = \
     ## RainMaker OTA
     ../components/esp_rainmaker/include/esp_rmaker_ota.h \
     ## RainMaker MQTT
-    ../components/esp_rainmaker/include/esp_rmaker_mqtt.h
+    ../components/esp_rainmaker/include/esp_rmaker_mqtt.h \
+    ## RainMaker Console
+    ../components/esp_rainmaker/include/esp_rmaker_console.h
 
 ## Get warnings for functions that have no documentation for their parameters or return value
 ##

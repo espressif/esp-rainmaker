@@ -16,6 +16,7 @@
 #include <esp_rmaker_core.h>
 #include <esp_rmaker_standard_params.h>
 #include <esp_rmaker_standard_devices.h>
+#include <esp_rmaker_schedule.h>
 
 #include <app_wifi.h>
 
@@ -113,6 +114,9 @@ void app_main()
     /* Create a Temperature Sensor device and add the relevant parameters to it */
     temp_sensor_device = esp_rmaker_temp_sensor_device_create("Temperature Sensor", NULL, app_get_current_temperature());
     esp_rmaker_node_add_device(node, temp_sensor_device);
+
+    /* Enable scheduling */
+    esp_rmaker_schedule_enable();
 
     /* Start the ESP RainMaker Agent */
     esp_rmaker_start();
