@@ -23,8 +23,8 @@
 #include <esp_ota_ops.h>
 
 #include <esp_rmaker_core.h>
+#include <esp_rmaker_utils.h>
 #include "esp_rmaker_internal.h"
-#include "esp_rmaker_time_sync.h"
 #include "esp_rmaker_storage.h"
 #include "esp_rmaker_mqtt.h"
 #include "esp_rmaker_claim.h"
@@ -747,8 +747,10 @@ static void esp_rmaker_task(void *param)
     /* Wait for Wi-Fi connection */
     xEventGroupWaitBits(wifi_event_group, WIFI_CONNECTED_EVENT, false, true, portMAX_DELAY);
 
-    if(g_ra_handle->enable_time_sync) {
-        esp_rmaker_time_sync(); /* TODO: Error handling */
+    if (g_ra_handle->enable_time_sync) {
+#ifdef CONFIG_MBEDTLS_HAVE_TIME_DATE
+        esp_rmaker_time_wait_for_sync(portMAX_DELAY);
+#endif
     }
 #ifdef CONFIG_ESP_RMAKER_SELF_CLAIM
     if (g_ra_handle->self_claim) {
@@ -821,7 +823,7 @@ esp_err_t esp_rmaker_start()
 {
     ESP_RMAKER_CHECK_HANDLE(ESP_FAIL);
     if (g_ra_handle->enable_time_sync) {
-        esp_rmaker_time_sync_init();
+        esp_rmaker_time_sync_init(NULL);
     }
     ESP_LOGI(TAG, "Starting RainMaker Core Task");
     if (xTaskCreate(&esp_rmaker_task, "esp_rmaker_task", ESP_RMAKER_TASK_STACK,

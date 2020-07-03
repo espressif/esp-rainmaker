@@ -56,4 +56,10 @@ config ESP_RMAKER_FACTORY_PARTITION_NAME
     help
         Factory NVS Partition name which will have the MQTT connectivity credentials
 
+config ESP_RMAKER_SNTP_SERVER_NAME
+    string "ESP RainMaker SNTP Server Name"
+    default "pool.ntp.org"
+    help
+        Default SNTP Server which is used for time synchronization.
+
 endmenu
