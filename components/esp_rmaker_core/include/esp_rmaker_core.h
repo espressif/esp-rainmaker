@@ -104,36 +104,36 @@ typedef enum {
 /**
  * Initialise a Boolean value
  *
- * param[in] bval Initialising value
+ * @param[in] bval Initialising value
  *
- * return Value structure
+ * @return Value structure
  */
 esp_rmaker_param_val_t esp_rmaker_bool(bool bval);
 
 /**
  * Initialise an Integer value
  *
- * param[in] ival Initialising value
+ * @param[in] ival Initialising value
  *
- * return Value structure
+ * @return Value structure
  */
 esp_rmaker_param_val_t esp_rmaker_int(int ival);
 
 /**
  * Initialise a Float value
  *
- * param[in] fval Initialising value
+ * @param[in] fval Initialising value
  *
- * return Value structure
+ * @return Value structure
  */
 esp_rmaker_param_val_t esp_rmaker_float(float fval);
 
 /**
  * Initialise a String value
  *
- * param[in] sval Initialising value
+ * @param[in] sval Initialising value
  *
- * return Value structure
+ * @return Value structure
  */
 esp_rmaker_param_val_t esp_rmaker_str(const char *sval);
 
@@ -246,7 +246,7 @@ esp_err_t esp_rmaker_device_add_attribute(const char *dev_name, const char *attr
 /**
  * Add a new parameter to a device
  *
- * Parameter cane be something like Temperature, Outlet state, Lightbulb brightness, etc.
+ * Parameter can be something like Temperature, Outlet state, Lightbulb brightness, etc.
  *
  * Any changes should be reported to using the esp_rmaker_update_param() API.
  * Any remote changes will be reported to the application via the device callback, if registered.
@@ -288,7 +288,7 @@ esp_err_t esp_rmaker_create_service(const char *serv_name, const char *type, esp
 /**
  * Add a new parameter to a service
  *
- * Parameter cane be something like OTA URL, RSSI, etc.
+ * Parameter can be something like OTA URL, RSSI, etc.
  *
  * Any changes should be reported to using the esp_rmaker_update_param() API.
  * Any remote changes will be reported to the application via the device callback, if registered.
