@@ -435,9 +435,10 @@ esp_err_t __esp_rmaker_self_claim_init(void)
      */
     void *csr = esp_rmaker_get_client_csr();
     if (csr) {
-        snprintf(g_claim_data->payload, MAX_PAYLOAD_SIZE, "{\"mac_addr\":\"%s\",\"platform\":\"esp32s2\"}",
+        snprintf(g_claim_data->payload, sizeof(g_claim_data->payload), "{\"mac_addr\":\"%s\",\"platform\":\"esp32s2\"}",
                 esp_rmaker_get_node_id());
-        strncpy((char *)g_claim_data->csr, csr, sizeof(g_claim_data->csr));
+        strncpy((char *)g_claim_data->csr, csr, (sizeof(g_claim_data->csr) - 1));
+        g_claim_data->csr[sizeof(g_claim_data->csr) - 1] = 0
         free(csr);
         ESP_LOGI(TAG, "CSR already exists. No need to re-initialise Claiming.");
         return ESP_OK;
@@ -481,7 +482,7 @@ esp_err_t __esp_rmaker_self_claim_init(void)
     } else {
         ESP_LOGI(TAG, "Self Claiming initialised successfully.");
     }
-    snprintf(g_claim_data->payload, MAX_PAYLOAD_SIZE, "{\"mac_addr\":\"%s\",\"platform\":\"esp32s2\"}",
+    snprintf(g_claim_data->payload, sizeof(g_claim_data->payload), "{\"mac_addr\":\"%s\",\"platform\":\"esp32s2\"}",
             esp_rmaker_get_node_id());
     return err;
 }
