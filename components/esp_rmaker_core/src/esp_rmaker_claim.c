@@ -438,7 +438,7 @@ esp_err_t __esp_rmaker_self_claim_init(void)
         snprintf(g_claim_data->payload, sizeof(g_claim_data->payload), "{\"mac_addr\":\"%s\",\"platform\":\"esp32s2\"}",
                 esp_rmaker_get_node_id());
         strncpy((char *)g_claim_data->csr, csr, (sizeof(g_claim_data->csr) - 1));
-        g_claim_data->csr[sizeof(g_claim_data->csr) - 1] = 0
+        g_claim_data->csr[sizeof(g_claim_data->csr) - 1] = 0;
         free(csr);
         ESP_LOGI(TAG, "CSR already exists. No need to re-initialise Claiming.");
         return ESP_OK;
