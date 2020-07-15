@@ -8,6 +8,7 @@ ESP RainMaker is an end-to-end solution offered by Espressif to enable remote co
 - RainMaker Agent (i.e. this repo, to develop the firmware)
 - RainMaker Cloud (backend, offering remote connectivity)
 - RainMaker Phone App/CLI (Client utilities for remote access)
+- 3rd Party Integrations (Alexa and GVA)
 
 
 The key features of ESP RainMaker are:
