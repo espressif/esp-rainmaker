@@ -13,6 +13,11 @@
 // limitations under the License.
 #pragma once
 
+#ifdef __cplusplus
+extern "C"
+{
+#endif
+
 /********** STANDARD UI TYPES **********/
 
 #define ESP_RMAKER_UI_TOGGLE            "esp.ui.toggle"
@@ -47,3 +52,7 @@
 
 /********** STANDARD SERVICE TYPES **********/
 #define ESP_RMAKER_SERVICE_OTA          "esp.service.ota"
+
+#ifdef __cplusplus
+}
+#endif

@@ -16,6 +16,11 @@
 #include <stdbool.h>
 #include <esp_err.h>
 
+#ifdef __cplusplus
+extern "C"
+{
+#endif
+
 /** Default ESP RainMaker OTA Server Certificate */
 extern const char *ESP_RMAKER_OTA_DEFAULT_SERVER_CERT;
 
@@ -139,3 +144,7 @@ esp_err_t esp_rmaker_ota_enable(esp_rmaker_ota_config_t *ota_config, esp_rmaker_
  * @return error on failure
  */
 esp_err_t esp_rmaker_ota_report_status(esp_rmaker_ota_handle_t ota_handle, ota_status_t status, char *additional_info);
+
+#ifdef __cplusplus
+}
+#endif

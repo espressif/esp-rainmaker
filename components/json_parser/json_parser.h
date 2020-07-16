@@ -6,6 +6,11 @@
 #include <stdint.h>
 #include <stdbool.h>
 
+#ifdef __cplusplus
+extern "C"
+{
+#endif
+
 #define OS_SUCCESS  0
 #define OS_FAIL     -1
 
@@ -44,5 +49,9 @@ int json_arr_get_int64(jparse_ctx_t *jctx, uint32_t index, int64_t *val);
 int json_arr_get_float(jparse_ctx_t *jctx, uint32_t index, float *val);
 int json_arr_get_string(jparse_ctx_t *jctx, uint32_t index, char *val, int size);
 int json_arr_get_strlen(jparse_ctx_t *jctx, uint32_t index, int *strlen);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* _JSON_PARSER_H_ */

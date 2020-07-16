@@ -18,6 +18,11 @@
 #include <esp_err.h>
 #include <esp_rmaker_core.h>
 
+#ifdef __cplusplus
+extern "C"
+{
+#endif
+
 /** Create a standard Switch device
  *
  * This creates a Switch device with the mandatory parameters and also assigns
@@ -93,3 +98,7 @@ esp_err_t esp_rmaker_create_fan_device(const char *dev_name,
  */
 esp_err_t esp_rmaker_create_temp_sensor_device(const char *dev_name,
         esp_rmaker_param_callback_t cb, void *priv_data, float temperature);
+
+#ifdef __cplusplus
+}
+#endif

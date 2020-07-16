@@ -15,6 +15,11 @@
 #include <stdint.h>
 #include <esp_err.h>
 
+#ifdef __cplusplus
+extern "C"
+{
+#endif
+
 /** ESP RainMaker MQTT Configuration */
 typedef struct {
     /** MQTT Host */
@@ -97,3 +102,7 @@ esp_err_t esp_rmaker_mqtt_subscribe(const char *topic, esp_rmaker_mqtt_subscribe
  * @return error in case of any error.
  */
 esp_err_t esp_rmaker_mqtt_unsubscribe(const char *topic);
+
+#ifdef __cplusplus
+}
+#endif

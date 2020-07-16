@@ -17,6 +17,11 @@
 #include <esp_err.h>
 #include <esp_event.h>
 
+#ifdef __cplusplus
+extern "C"
+{
+#endif
+
 #define ESP_RMAKER_CONFIG_VERSION    "2020-03-20"
 
 #define MAX_VERSION_STRING_LEN  16
@@ -415,3 +420,7 @@ esp_err_t esp_rmaker_report_node_details();
  * @return error in case of failures.
  */
 esp_err_t esp_rmaker_queue_work(esp_rmaker_work_fn_t work_fn, void *priv_data);
+
+#ifdef __cplusplus
+}
+#endif
