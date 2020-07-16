@@ -1,0 +1,124 @@
+menu "ESP RainMaker Config"
+
+    config ESP_RMAKER_SELF_CLAIM
+        bool "Use Self Claiming"
+        depends on IDF_TARGET_ESP32S2
+        default y
+        help
+            Use Self Claiming i.e. get the MQTT credentials
+            directly from the claiming service.
+
+    config ESP_RMAKER_CLAIM_SERVICE_BASE_URL
+        string "ESP RainMaker Claiming Service Base URL"
+        default "https://esp-claiming.rainmaker.espressif.com"
+        depends on ESP_RMAKER_SELF_CLAIM
+        help
+            ESP RainMaker Claiming Service Base URL.
+
+    config ESP_RMAKER_MQTT_HOST
+        string "ESP RainMaker MQTT Host"
+        depends on ESP_RMAKER_SELF_CLAIM
+        default "a1p72mufdu6064-ats.iot.us-east-1.amazonaws.com"
+        help
+            ESP RainMaker MQTT Host name.
+
+    config ESP_RMAKER_TASK_STACK
+        int "ESP RainMaker Core Task stack"
+        default 4096
+        help
+            Stack size for the ESP RainMaker Core Task.
+
+    config ESP_RMAKER_TASK_PRIORITY
+        int "ESP RainMaker Core Task priority"
+        default 5
+        help
+            Priority for the ESP RainMaker Core Task. Not recommended to be changed
+            unless you really need it.
+
+    config ESP_RMAKER_MAX_NODE_CONFIG_SIZE
+        int "Maximum Node Config size"
+        default 2048
+        range 512 65536
+        help
+            Maximum size of the payload for reporting Node configuration.
+
+    config ESP_RMAKER_MAX_PARAM_DATA_SIZE
+        int "Maximum Parameters' data size"
+        default 1024
+        range 64 8192
+        help
+            Maximum size of the payload for reporting parameter values.
+
+    config ESP_RMAKER_FACTORY_PARTITION_NAME
+        string "ESP RainMaker Factory Partition Name"
+        default "fctry"
+        help
+            Factory NVS Partition name which will have the MQTT connectivity credentials.
+
+    config ESP_RMAKER_SNTP_SERVER_NAME
+        string "ESP RainMaker SNTP Server Name"
+        default "pool.ntp.org"
+        help
+            Default SNTP Server which is used for time synchronization.
+
+    choice ESP_RMAKER_CONSOLE_UART_NUM
+        prompt "UART for console input"
+        default ESP_RMAKER_CONSOLE_UART_NUM_0
+        help
+            UART to be selected for serial console.
+
+        config ESP_RMAKER_CONSOLE_UART_NUM_0
+            bool "UART0"
+        config ESP_RMAKER_CONSOLE_UART_NUM_1
+            bool "UART1"
+    endchoice
+
+    config ESP_RMAKER_CONSOLE_UART_NUM
+        int
+        default 0 if ESP_RMAKER_CONSOLE_UART_NUM_0
+        default 1 if ESP_RMAKER_CONSOLE_UART_NUM_1
+
+    menu "ESP RainMaker OTA Config"
+
+        config ESP_RMAKER_OTA_AUTOFETCH
+            bool "Auto Fetch OTA"
+            default y
+            help
+                Applicable only for OTA using Topics.
+                Fetch the OTA (i.e. get the URL and other details) by actively sending an
+                OTA fetch request to ESP RainMaker Cloud. If this is disabled, the node
+                will stay subscribed to the OTA Topics, but will get the information only
+                if someone explicitly triggers it.
+
+        config ESP_RMAKER_OTA_AUTOFETCH_PERIOD
+            int "OTA Auto Fetch Period"
+            default 0
+            range 0 168
+            depends on ESP_RMAKER_OTA_AUTOFETCH
+            help
+                Periodically send an OTA fetch request. If set to 0, the request will be sent only once,
+                when the node connects to the ESP RainMaker Cloud first time after a boot.
+                Else, this defines the period (in hours) for the periodic fetch request.
+
+        config ESP_RMAKER_SKIP_COMMON_NAME_CHECK
+            bool "Skip server certificate CN field check"
+            default n
+            help
+                This allows you to skip the validation of OTA server certificate CN field.
+
+        config ESP_RMAKER_SKIP_VERSION_CHECK
+            bool "Skip firmware version check"
+            default n
+            help
+                This allows you to skip the firmware version check. Useful during development,
+                but not for production.
+
+        config ESP_RMAKER_SKIP_PROJECT_NAME_CHECK
+            bool "Skip project name check"
+            default n
+            help
+                This allows you to skip the project name check.
+
+    endmenu
+
+endmenu

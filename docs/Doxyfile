@@ -22,18 +22,18 @@ PROJECT_NAME = "ESP RainMaker Programming Guide"
 
 INPUT = \
     ## RainMaker Core
-    ../components/esp_rmaker_core/include/esp_rmaker_core.h \
-    ../components/esp_rmaker_core/include/esp_rmaker_user_mapping.h \
-    ../components/esp_rmaker_core/include/esp_rmaker_utils.h \
+    ../components/esp_rainmaker/include/esp_rmaker_core.h \
+    ../components/esp_rainmaker/include/esp_rmaker_user_mapping.h \
+    ../components/esp_rainmaker/include/esp_rmaker_utils.h \
     ## RainMaker Standard Types
-    ../components/esp_rmaker_standard_types/include/esp_rmaker_standard_types.h \
-    ../components/esp_rmaker_standard_types/include/esp_rmaker_standard_params.h \
-    ../components/esp_rmaker_standard_types/include/esp_rmaker_standard_devices.h \
-    ../components/esp_rmaker_standard_types/include/esp_rmaker_standard_services.h \
+    ../components/esp_rainmaker/include/esp_rmaker_standard_types.h \
+    ../components/esp_rainmaker/include/esp_rmaker_standard_params.h \
+    ../components/esp_rainmaker/include/esp_rmaker_standard_devices.h \
+    ../components/esp_rainmaker/include/esp_rmaker_standard_services.h \
     ## RainMaker OTA
-    ../components/esp_rmaker_ota/include/esp_rmaker_ota.h \
+    ../components/esp_rainmaker/include/esp_rmaker_ota.h \
     ## RainMaker MQTT
-    ../components/esp_rmaker_mqtt/include/esp_rmaker_mqtt.h
+    ../components/esp_rainmaker/include/esp_rmaker_mqtt.h
 
 ## Get warnings for functions that have no documentation for their parameters or return value
 ##
