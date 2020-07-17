@@ -25,7 +25,7 @@ before_script:
 - git --version
 # Cloning esp-idf - Started
 - echo Cloning esp-idf - Started
-- git clone --branch master --depth 1 $GITLAB_SSH_SERVER/idf/esp-idf.git
+- git clone --recursive --branch master --depth 1 $GITLAB_SSH_SERVER/idf/esp-idf.git
 - cd esp-idf
 - echo Cloning esp-idf - Done
 # Cloning esp-idf - Done
@@ -39,12 +39,6 @@ before_script:
 - . export.sh
 - echo Running export.sh - Done
 # Running export.sh - Done
-# Running get-full-sources.sh - Started
-- echo Running get-full-sources.sh - Started
-- time ./tools/ci/get-full-sources.sh
-- cd $CI_PROJECT_DIR
-- echo Running get-full-sources.sh - Done
-# Running get-full-sources.sh - Done
 
 .build_switch: &build_switch
 # Building switch app - Started
