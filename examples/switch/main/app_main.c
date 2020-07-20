@@ -56,6 +56,9 @@ static void event_handler(void* arg, esp_event_base_t event_base,
             case RMAKER_EVENT_CLAIM_FAILED:
                 ESP_LOGI(TAG, "RainMaker Claim Failed.");
                 break;
+            case RMAKER_EVENT_MQTT_CONNECTED:
+                ESP_LOGI(TAG, "RainMaker Connected to MQTT.");
+                break;
             default:
                 ESP_LOGW(TAG, "Unhandled RainMaker Event: %d", event_id);
         }

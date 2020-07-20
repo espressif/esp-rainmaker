@@ -780,6 +780,7 @@ static void esp_rmaker_task(void *param)
         vTaskDelete(NULL);
     }
     g_ra_handle->mqtt_connected = true;
+    esp_rmaker_post_event(RMAKER_EVENT_MQTT_CONNECTED, NULL, 0);
     if (esp_rmaker_report_node_config_and_state() != ESP_OK) {
         ESP_LOGE(TAG, "Aborting!!!");
         goto rmaker_end;

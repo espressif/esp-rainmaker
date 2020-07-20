@@ -34,6 +34,8 @@ typedef enum {
     RMAKER_EVENT_CLAIM_SUCCESSFUL,
     /** Self Claiming Failed */
     RMAKER_EVENT_CLAIM_FAILED,
+    /** MQTT Is Connected */
+    RMAKER_EVENT_MQTT_CONNECTED,
 } esp_rmaker_event_t;
 
 /** ESP RainMaker Node information */
