@@ -17,6 +17,11 @@
 #include <esp_err.h>
 #include <esp_rmaker_core.h>
 
+#ifdef __cplusplus
+extern "C"
+{
+#endif
+
 /* Suggested default names for the parameters.
  * These will also be used by default if you use any standard device helper APIs.
  *
@@ -222,3 +227,7 @@ esp_err_t esp_rmaker_service_add_ota_info_param(const char *serv_name, const cha
  * @return error in case of failures.
  */
 esp_err_t esp_rmaker_service_add_ota_url_param(const char *serv_name, const char *param_name);
+
+#ifdef __cplusplus
+}
+#endif

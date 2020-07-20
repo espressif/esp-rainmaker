@@ -14,6 +14,11 @@
 
 #pragma once
 
+#ifdef __cplusplus
+extern "C"
+{
+#endif
+
 /** Initialize console
  *
  * Initializes serial console and adds basic commands.
@@ -41,3 +46,7 @@ static void register_console_command()
     ESP_ERROR_CHECK(esp_console_cmd_register(&cmd));
 }
 */
+
+#ifdef __cplusplus
+}
+#endif

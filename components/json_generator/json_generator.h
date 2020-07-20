@@ -13,6 +13,11 @@
 #include <stdint.h>
 #include <stdbool.h>
 
+#ifdef __cplusplus
+extern "C"
+{
+#endif
+
 #define JSON_FLOAT_PRECISION 5
 
 /** JSON string flush callback prototype
@@ -434,5 +439,9 @@ int json_gen_add_to_long_string(json_gen_str_t *jstr, char *val);
  * added after that
  */
 int json_gen_end_long_string(json_gen_str_t *jstr);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

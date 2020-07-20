@@ -15,6 +15,11 @@
 #include <stdint.h>
 #include <esp_err.h>
 
+#ifdef __cplusplus
+extern "C"
+{
+#endif
+
 typedef struct esp_rmaker_time_config {
     /** If not specified, then 'CONFIG_ESP_RMAKER_SNTP_SERVER_NAME' is used as the SNTP server. */
     char *sntp_server_name;
@@ -64,3 +69,7 @@ bool esp_rmaker_time_check(void);
  * @return error on failure
  */
 esp_err_t esp_rmaker_time_wait_for_sync(uint32_t ticks_to_wait);
+
+#ifdef __cplusplus
+}
+#endif
