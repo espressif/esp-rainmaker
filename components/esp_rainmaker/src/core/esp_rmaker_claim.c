@@ -418,6 +418,10 @@ exit:
 
 esp_err_t __esp_rmaker_self_claim_init(void)
 {
+    char hexstr[9];
+    uint32_t my_random;
+    esp_err_t err;
+
     ESP_LOGI(TAG, "Initialising Self Claiming. This may take time.");
     /* Check if the claim data structure is already allocated. If yes, free it */
     if (g_claim_data) {
@@ -430,6 +434,7 @@ esp_err_t __esp_rmaker_self_claim_init(void)
         ESP_LOGE(TAG, "Failed to allocate %d bytes for Claim data.", sizeof(esp_rmaker_claim_data_t));
         return ESP_ERR_NO_MEM;
     }
+
     /* Check if the CSR is already available. If yes, just generate the payload for claim init
      * and return from here instead of re-generating the key and CSR
      */
@@ -444,7 +449,7 @@ esp_err_t __esp_rmaker_self_claim_init(void)
         return ESP_OK;
     }
     /* Generate the Private Key */
-    esp_err_t err = generate_key(g_claim_data);
+    err = generate_key(g_claim_data);
     if (err != ESP_OK) {
         free(g_claim_data);
         g_claim_data = NULL;
@@ -458,6 +463,19 @@ esp_err_t __esp_rmaker_self_claim_init(void)
          ESP_LOGE(TAG, "Failed to store private key to storage.");
         free(g_claim_data);
         g_claim_data = NULL;
+    }
+
+    /* Generate random hex string */
+    memset(hexstr, 0, sizeof(hexstr));
+    esp_fill_random(&my_random, sizeof(my_random));
+    snprintf(hexstr, sizeof(hexstr), "%08x", my_random);
+
+    /* Store the PoP in the storage */
+    err = esp_rmaker_storage_set(ESP_RMAKER_CLIENT_RANDOM_NVS_KEY, hexstr, strlen(hexstr));
+    if (err != ESP_OK) {
+        free(g_claim_data);
+        g_claim_data = NULL;
+        return err;
     }
 
     /* Generate CSR */

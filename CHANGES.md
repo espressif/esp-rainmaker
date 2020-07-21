@@ -1,5 +1,13 @@
 # Changes
 
+## 5-Aug-2020 (wifi_provisioning: Use a random pop instead of creating it from MAC address)
+
+Till date, the last 4 bytes of the MAC address were being used to generate the 8 character Proof of Possession (PoP) PIN for Wi-Fi provisioning. This is not secure enough because MAC address is a public information and can also be sniffed easily by devices in vicinity. A minor risk in this is that somebody else in the vicinity can provision your device, but a major risk is a man in the middle attack, wherein someone in vicinity can read the data being exchanged between a phone and the device and get the Wi-Fi credentials.
+
+To prevent this, it is best to use a randomly generated PoP which cannot be guessed. So now, a random stream of bytes is generated and flashed in the fctry partition during claiming and then used as PoP. If your device is already claimed, it is recommended to erase the flash and perform the claiming again. If you erase the flash again, the PoP will change. However, if you just do a reset to factory, it will not.
+
+If for some reason, you want to continue using the earlier mac address based method, please pass `POP_TYPE_MAC` to the `esp_err_t app_wifi_start(app_wifi_pop_type_t pop_type)` function.
+
 ## 31-July-2020 (esp\_rainmaker\_core: Code restructure and API changes)
 
 Recently we made some significant changes to most ESP RainMaker APIs to make them even more modular and object oriented. You can check the examples to see what has changed, but here is a guide to help you understand some major changes.
