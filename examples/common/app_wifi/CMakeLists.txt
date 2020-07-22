@@ -1,3 +1,3 @@
 idf_component_register(SRCS "app_wifi.c"
                     INCLUDE_DIRS "."
-                    REQUIRES wifi_provisioning esp_rmaker_core qrcode)
+                    REQUIRES wifi_provisioning esp_rainmaker qrcode)
