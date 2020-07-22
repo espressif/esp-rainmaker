@@ -16,15 +16,14 @@
 #include <esp_rmaker_standard_types.h>
 #include <esp_rmaker_standard_params.h>
 
-esp_err_t esp_rmaker_create_ota_service(const char *serv_name,
-        esp_rmaker_param_callback_t cb, void *priv_data)
+esp_rmaker_device_t *esp_rmaker_ota_service_create(const char *serv_name, void *priv_data)
 {
-    esp_err_t err = esp_rmaker_create_service(serv_name, ESP_RMAKER_SERVICE_OTA, cb, priv_data);
-    if (err == ESP_OK) {
-        esp_rmaker_service_add_ota_status_param(serv_name, ESP_RMAKER_DEF_OTA_STATUS_NAME);
-        esp_rmaker_service_add_ota_info_param(serv_name, ESP_RMAKER_DEF_OTA_INFO_NAME);
-        esp_rmaker_service_add_ota_url_param(serv_name, ESP_RMAKER_DEF_OTA_URL_NAME);
+    esp_rmaker_device_t *service = esp_rmaker_service_create(serv_name, ESP_RMAKER_SERVICE_OTA, priv_data);
+    if (service) {
+        esp_rmaker_device_add_param(service, esp_rmaker_ota_status_param_create(ESP_RMAKER_DEF_OTA_STATUS_NAME));
+        esp_rmaker_device_add_param(service, esp_rmaker_ota_info_param_create(ESP_RMAKER_DEF_OTA_INFO_NAME));
+        esp_rmaker_device_add_param(service, esp_rmaker_ota_url_param_create(ESP_RMAKER_DEF_OTA_URL_NAME));
     }
-    return err;
+    return service;
 }
 

@@ -17,6 +17,7 @@
 #include <iot_button.h>
 #include <led_strip.h>
 #include <esp_rmaker_core.h>
+#include <esp_rmaker_standard_types.h> 
 #include <esp_rmaker_standard_params.h> 
 
 #include "app_priv.h"
@@ -107,7 +108,9 @@ esp_err_t app_light_set(uint32_t hue, uint32_t saturation, uint32_t brightness)
     /* Whenever this function is called, light power will be ON */
     if (!g_power) {
         g_power = true;
-        esp_rmaker_update_param("Light", ESP_RMAKER_DEF_POWER_NAME, esp_rmaker_bool(g_power));
+        esp_rmaker_param_update_and_report(
+                esp_rmaker_device_get_param_by_type(light_device, ESP_RMAKER_PARAM_POWER),
+                esp_rmaker_bool(g_power));
     }
     return app_light_set_led(hue, saturation, brightness);
 }
@@ -165,7 +168,9 @@ esp_err_t app_light_init(void)
 static void push_btn_cb(void *arg)
 {
     app_light_set_power(!g_power);
-    esp_rmaker_update_param("Light","power", esp_rmaker_bool(g_power));
+    esp_rmaker_param_update_and_report(
+            esp_rmaker_device_get_param_by_type(light_device, ESP_RMAKER_PARAM_POWER),
+            esp_rmaker_bool(g_power));
 }
 
 static void button_press_3sec_cb(void *arg)

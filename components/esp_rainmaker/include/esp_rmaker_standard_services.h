@@ -29,16 +29,13 @@ extern "C"
  * Refer \ref esp_rmaker_standard_params.h for default names.
  *
  * @param[in] serv_name The unique service name
- * @param[in] cb Callback to be invoked for "write" request for service parameters.
- * Can be kept NULL if no write requests are expected
- * @param[in] priv_data (Optional) Private data that will be passed to the callback. This should stay
+ * @param[in] priv_data (Optional) Private data associated with the service. This should stay
  * allocated throughout the lifetime of the service.
  *
- * @return ESP_OK on success.
- * @return error in case of any error.
+ * @return service_handle on success.
+ * @return NULL in case of any error.
  */
-esp_err_t esp_rmaker_create_ota_service(const char *serv_name,
-        esp_rmaker_param_callback_t cb, void *priv_data);
+esp_rmaker_device_t *esp_rmaker_ota_service_create(const char *serv_name, void *priv_data);
 
 #ifdef __cplusplus
 }

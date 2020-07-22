@@ -50,8 +50,8 @@ esp_err_t esp_rmaker_ota_report_status_using_topics(esp_rmaker_ota_handle_t ota_
     json_gen_str_t jstr;
     json_gen_str_start(&jstr, publish_payload, sizeof(publish_payload), NULL, NULL);
     json_gen_start_object(&jstr);
-    if (ota->internal_priv) {
-        json_gen_obj_set_string(&jstr, "ota_job_id", (char *)ota->internal_priv);
+    if (ota->transient_priv) {
+        json_gen_obj_set_string(&jstr, "ota_job_id", (char *)ota->transient_priv);
     }
     json_gen_obj_set_string(&jstr, "status", esp_rmaker_ota_status_to_string(status));
     json_gen_obj_set_string(&jstr, "additional_info", additional_info);
@@ -75,9 +75,9 @@ void esp_rmaker_ota_finish_using_topics(esp_rmaker_ota_t *ota)
         ota->url = NULL;
     }
     ota->filesize = 0;
-    if (ota->internal_priv) {
-        free(ota->internal_priv);
-        ota->internal_priv = NULL;
+    if (ota->transient_priv) {
+        free(ota->transient_priv);
+        ota->transient_priv = NULL;
     }
     ota->ota_in_progress = false;
 }
@@ -125,7 +125,7 @@ static void ota_url_handler(const char *topic, void *payload, size_t payload_len
     }
     json_obj_get_string(&jctx, "ota_job_id", ota_job_id, len);
     ESP_LOGI(TAG, "OTA Job ID: %s", ota_job_id);
-    ota->internal_priv = ota_job_id;
+    ota->transient_priv = ota_job_id;
     len = 0;
     ret = json_obj_get_strlen(&jctx, "url", &len);
     if (ret != ESP_OK) {
@@ -165,7 +165,7 @@ end:
 #ifdef CONFIG_ESP_RMAKER_OTA_AUTOFETCH
 static void esp_rmaker_ota_fetch(void *priv)
 {
-    esp_rmaker_node_info_t *info = esp_rmaker_get_node_info();
+    esp_rmaker_node_info_t *info = esp_rmaker_node_get_info(esp_rmaker_get_node());
     if (!info) {
         ESP_LOGE(TAG, "Node info not found. Cant send otafetch request");
         return;

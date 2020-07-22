@@ -30,17 +30,15 @@ extern "C"
  * Refer \ref esp_rmaker_standard_params.h for default names.
  *
  * @param[in] dev_name The unique device name
- * @param[in] cb Callback to be invoked for "write" request for device parameters.
- * Can be kept NULL if no write requests are expected
- * @param[in] priv_data (Optional) Private data that will be passed to the callback. This should stay
+ * @param[in] priv_data (Optional) Private data associated with the device. This should stay
  * allocated throughout the lifetime of the device
  * #@param[in] power Default value of the mandatory parameter "power"
  *
- * @return ESP_OK on success.
- * @return error in case of any error.
+ * @return Device handle on success.
+ * @return NULL in case of failures.
  */
-esp_err_t esp_rmaker_create_switch_device(const char *dev_name,
-        esp_rmaker_param_callback_t cb, void *priv_data, bool power);
+esp_rmaker_device_t *esp_rmaker_switch_device_create(const char *dev_name,
+            void *priv_data, bool power);
 
 /** Create a standard Lightbulb device
  *
@@ -49,17 +47,15 @@ esp_err_t esp_rmaker_create_switch_device(const char *dev_name,
  * Refer \ref esp_rmaker_standard_params.h for default names.
  *
  * @param[in] dev_name The unique device name
- * @param[in] cb Callback to be invoked for "write" request for device parameters.
- * Can be kept NULL if no write requests are expected
- * @param[in] priv_data (Optional) Private data that will be passed to the callback. This should stay
+ * @param[in] priv_data (Optional) Private data associated with the device. This should stay
  * allocated throughout the lifetime of the device
  * @param[in] power Default value of the mandatory parameter "power"
  *
- * @return ESP_OK on success.
- * @return error in case of any error.
+ * @return Device handle on success.
+ * @return NULL in case of failures.
  */
-esp_err_t esp_rmaker_create_lightbulb_device(const char *dev_name,
-        esp_rmaker_param_callback_t cb, void *priv_data, bool power);
+esp_rmaker_device_t *esp_rmaker_lightbulb_device_create(const char *dev_name,
+            void *priv_data, bool power);
 
 /** Create a standard Fan device
  *
@@ -68,17 +64,15 @@ esp_err_t esp_rmaker_create_lightbulb_device(const char *dev_name,
  * Refer \ref esp_rmaker_standard_params.h for default names.
  *
  * @param[in] dev_name The unique device name
- * @param[in] cb Callback to be invoked for "write" request for device parameters.
- * Can be kept NULL if no write requests are expected
- * @param[in] priv_data (Optional) Private data that will be passed to the callback. This should stay
+ * @param[in] priv_data (Optional) Private data associated with the device. This should stay
  * allocated throughout the lifetime of the device
  * @param[in] power Default value of the mandatory parameter "power"
  *
- * @return ESP_OK on success.
- * @return error in case of any error.
+ * @return Device handle on success.
+ * @return NULL in case of failures.
  */
-esp_err_t esp_rmaker_create_fan_device(const char *dev_name,
-        esp_rmaker_param_callback_t cb, void *priv_data, bool power);
+esp_rmaker_device_t *esp_rmaker_fan_device_create(const char *dev_name,
+            void *priv_data, bool power);
 
 /** Create a standard Temperature Sensor device
  *
@@ -87,17 +81,15 @@ esp_err_t esp_rmaker_create_fan_device(const char *dev_name,
  * Refer \ref esp_rmaker_standard_params.h for default names.
  *
  * @param[in] dev_name The unique device name
- * @param[in] cb Callback to be invoked for "write" request for device parameters.
- * Can be kept NULL if no write requests are expected
- * @param[in] priv_data (Optional) Private data that will be passed to the callback. This should stay
+ * @param[in] priv_data (Optional) Private data associated with the device. This should stay
  * allocated throughout the lifetime of the device
  * @param[in] temperature Default value of the mandatory parameter "temperature"
  *
- * @return ESP_OK on success.
- * @return error in case of any error.
+ * @return Device handle on success.
+ * @return NULL in case of failures.
  */
-esp_err_t esp_rmaker_create_temp_sensor_device(const char *dev_name,
-        esp_rmaker_param_callback_t cb, void *priv_data, float temperature);
+esp_rmaker_device_t *esp_rmaker_temp_sensor_device_create(const char *dev_name,
+            void *priv_data, float temperature);
 
 #ifdef __cplusplus
 }

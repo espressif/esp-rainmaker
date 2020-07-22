@@ -26,7 +26,7 @@ typedef struct {
     int filesize;
     bool ota_in_progress;
     ota_status_t last_reported_status;
-    void *internal_priv;
+    void *transient_priv;
 } esp_rmaker_ota_t;
 
 char *esp_rmaker_ota_status_to_string(ota_status_t status);

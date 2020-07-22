@@ -16,50 +16,54 @@
 #include <esp_rmaker_standard_types.h>
 #include <esp_rmaker_standard_params.h>
 
-esp_err_t esp_rmaker_create_switch_device(const char *dev_name,
-        esp_rmaker_param_callback_t cb, void *priv_data, bool power)
+esp_rmaker_device_t *esp_rmaker_switch_device_create(const char *dev_name,
+        void *priv_data, bool power)
 {
-    esp_err_t err = esp_rmaker_create_device(dev_name, ESP_RMAKER_DEVICE_SWITCH, cb, priv_data);
-    if (err == ESP_OK) {
-        esp_rmaker_device_add_name_param(dev_name, ESP_RMAKER_DEF_NAME_PARAM);
-        esp_rmaker_device_add_power_param(dev_name, ESP_RMAKER_DEF_POWER_NAME, power);
-        esp_rmaker_device_assign_primary_param(dev_name, ESP_RMAKER_DEF_POWER_NAME);
-    }
-    return err;
+    esp_rmaker_device_t *device = esp_rmaker_device_create(dev_name, ESP_RMAKER_DEVICE_SWITCH, priv_data);
+    if (device) {
+        esp_rmaker_device_add_param(device, esp_rmaker_name_param_create(ESP_RMAKER_DEF_NAME_PARAM, dev_name));
+        esp_rmaker_param_t *primary = esp_rmaker_power_param_create(ESP_RMAKER_DEF_POWER_NAME, power);
+        esp_rmaker_device_add_param(device, primary);
+        esp_rmaker_device_assign_primary_param(device, primary);
+	}
+    return device;
 }
 
-esp_err_t esp_rmaker_create_lightbulb_device(const char *dev_name,
-        esp_rmaker_param_callback_t cb, void *priv_data, bool power)
+esp_rmaker_device_t *esp_rmaker_lightbulb_device_create(const char *dev_name,
+        void *priv_data, bool power)
 {
-    esp_err_t err = esp_rmaker_create_device(dev_name, ESP_RMAKER_DEVICE_LIGHTBULB, cb, priv_data);
-    if (err == ESP_OK) {
-        esp_rmaker_device_add_name_param(dev_name, ESP_RMAKER_DEF_NAME_PARAM);
-        esp_rmaker_device_add_power_param(dev_name, ESP_RMAKER_DEF_POWER_NAME, power);
-        esp_rmaker_device_assign_primary_param(dev_name, ESP_RMAKER_DEF_POWER_NAME);
+    esp_rmaker_device_t *device = esp_rmaker_device_create(dev_name, ESP_RMAKER_DEVICE_LIGHTBULB, priv_data);
+    if (device) {
+        esp_rmaker_device_add_param(device, esp_rmaker_name_param_create(ESP_RMAKER_DEF_NAME_PARAM, dev_name));
+        esp_rmaker_param_t *primary = esp_rmaker_power_param_create(ESP_RMAKER_DEF_POWER_NAME, power);
+        esp_rmaker_device_add_param(device, primary);
+        esp_rmaker_device_assign_primary_param(device, primary);
     }
-    return err;
+    return device;
 }
 
-esp_err_t esp_rmaker_create_fan_device(const char *dev_name,
-        esp_rmaker_param_callback_t cb, void *priv_data, bool power)
+esp_rmaker_device_t *esp_rmaker_fan_device_create(const char *dev_name,
+        void *priv_data, bool power)
 {
-    esp_err_t err = esp_rmaker_create_device(dev_name, ESP_RMAKER_DEVICE_FAN, cb, priv_data);
-    if (err == ESP_OK) {
-        esp_rmaker_device_add_name_param(dev_name, ESP_RMAKER_DEF_NAME_PARAM);
-        esp_rmaker_device_add_power_param(dev_name, ESP_RMAKER_DEF_POWER_NAME, power);
-        esp_rmaker_device_assign_primary_param(dev_name, ESP_RMAKER_DEF_POWER_NAME);
+    esp_rmaker_device_t *device = esp_rmaker_device_create(dev_name, ESP_RMAKER_DEVICE_FAN, priv_data);
+    if (device) {
+        esp_rmaker_device_add_param(device, esp_rmaker_name_param_create(ESP_RMAKER_DEF_NAME_PARAM, dev_name));
+        esp_rmaker_param_t *primary = esp_rmaker_power_param_create(ESP_RMAKER_DEF_POWER_NAME, power);
+        esp_rmaker_device_add_param(device, primary);
+        esp_rmaker_device_assign_primary_param(device, primary);
     }
-    return err;
+    return device;
 }
 
-esp_err_t esp_rmaker_create_temp_sensor_device(const char *dev_name,
-        esp_rmaker_param_callback_t cb, void *priv_data, float temperature)
+esp_rmaker_device_t *esp_rmaker_temp_sensor_device_create(const char *dev_name,
+        void *priv_data, float temperature)
 {
-    esp_err_t err = esp_rmaker_create_device(dev_name, ESP_RMAKER_DEVICE_TEMP_SENSOR, cb, priv_data);
-    if (err == ESP_OK) {
-        esp_rmaker_device_add_name_param(dev_name, ESP_RMAKER_DEF_NAME_PARAM);
-        esp_rmaker_device_add_temperature_param(dev_name, ESP_RMAKER_DEF_TEMPERATURE_NAME, temperature);
-        esp_rmaker_device_assign_primary_param(dev_name, ESP_RMAKER_DEF_TEMPERATURE_NAME);
-    }
-    return err;
+    esp_rmaker_device_t *device = esp_rmaker_device_create(dev_name, ESP_RMAKER_DEVICE_TEMP_SENSOR, priv_data);
+    if (device) {
+        esp_rmaker_device_add_param(device, esp_rmaker_name_param_create(ESP_RMAKER_DEF_NAME_PARAM, dev_name));
+        esp_rmaker_param_t *primary = esp_rmaker_temperature_param_create(ESP_RMAKER_DEF_TEMPERATURE_NAME, temperature);
+        esp_rmaker_device_add_param(device, primary);
+        esp_rmaker_device_assign_primary_param(device, primary);
+	}
+    return device;
 }

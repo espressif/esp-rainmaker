@@ -17,6 +17,7 @@
 #include <iot_button.h>
 #include <led_strip.h>
 #include <esp_rmaker_core.h>
+#include <esp_rmaker_standard_types.h> 
 #include <esp_rmaker_standard_params.h> 
 
 #include "app_priv.h"
@@ -118,7 +119,9 @@ static void app_sensor_update(void *priv)
     }
     g_hue = (100 - g_temperature) * 2;
     app_set_led(g_hue, g_saturation, g_value);
-    esp_rmaker_update_param("Temperature Sensor", ESP_RMAKER_DEF_TEMPERATURE_NAME, esp_rmaker_float(g_temperature)); 
+    esp_rmaker_param_update_and_report(
+            esp_rmaker_device_get_param_by_type(temp_sensor_device, ESP_RMAKER_PARAM_TEMPERATURE),
+            esp_rmaker_float(g_temperature));
 }
 
 float app_get_current_temperature()
