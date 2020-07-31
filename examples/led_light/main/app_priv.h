@@ -14,6 +14,8 @@
 #define DEFAULT_SATURATION  100
 #define DEFAULT_BRIGHTNESS  25
 
+extern esp_rmaker_device_t *light_device;
+
 void app_driver_init(void);
 esp_err_t app_light_set(uint32_t hue, uint32_t saturation, uint32_t brightness);
 esp_err_t app_light_set_power(bool power);

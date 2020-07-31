@@ -15,8 +15,11 @@
 #include <sdkconfig.h>
 #include <stdint.h>
 #include <string.h>
+
 #include <esp_rmaker_core.h>
-#include <esp_rmaker_storage.h>
+
+#include "esp_rmaker_internal.h"
+#include "esp_rmaker_storage.h"
 #include "esp_rmaker_client_data.h"
 
 extern uint8_t mqtt_server_root_ca_pem_start[] asm("_binary_mqtt_server_crt_start");

@@ -16,6 +16,7 @@
 #include <iot_button.h>
 #include <led_strip.h>
 #include <esp_rmaker_core.h>
+#include <esp_rmaker_standard_types.h>
 #include <esp_rmaker_standard_params.h>
 
 #include "app_priv.h"
@@ -47,7 +48,9 @@ static void app_sensor_update(void *priv)
     } else if (g_temperature < 1) {
         delta = 0.5;
     }
-    esp_rmaker_update_param("Temperature Sensor", ESP_RMAKER_DEF_TEMPERATURE_NAME, esp_rmaker_float(g_temperature)); 
+    esp_rmaker_param_update_and_report(
+                esp_rmaker_device_get_param_by_type(temp_sensor_device, ESP_RMAKER_PARAM_TEMPERATURE),
+                esp_rmaker_float(g_temperature));
 }
 
 float app_get_current_temperature()
@@ -106,7 +109,9 @@ static void push_btn_cb(void *arg)
 {
     bool new_state = !g_power_state;
     app_driver_set_state(new_state);
-    esp_rmaker_update_param("Switch", ESP_RMAKER_DEF_POWER_NAME, esp_rmaker_bool(new_state));
+    esp_rmaker_param_update_and_report(
+                esp_rmaker_device_get_param_by_type(switch_device, ESP_RMAKER_PARAM_POWER),
+                esp_rmaker_bool(new_state));
 }
 
 static void button_press_3sec_cb(void *arg)

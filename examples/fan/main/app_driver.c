@@ -17,6 +17,7 @@
 #include <iot_button.h>
 #include <led_strip.h>
 #include <esp_rmaker_core.h>
+#include <esp_rmaker_standard_types.h> 
 #include <esp_rmaker_standard_params.h> 
 
 #include "app_priv.h"
@@ -156,13 +157,19 @@ static void push_btn_cb(void *arg)
         g_speed = 0;
     }
     app_fan_set_speed(g_speed);
-    esp_rmaker_update_param("Fan", "speed", esp_rmaker_int(g_speed));
+    esp_rmaker_param_update_and_report(
+            esp_rmaker_device_get_param_by_type(fan_device, ESP_RMAKER_PARAM_SPEED),
+            esp_rmaker_int(g_speed));
     if (old_speed == 0) {
         g_power = true;
-        esp_rmaker_update_param("Fan", ESP_RMAKER_DEF_POWER_NAME, esp_rmaker_bool(g_power));
+        esp_rmaker_param_update_and_report(
+                esp_rmaker_device_get_param_by_type(fan_device, ESP_RMAKER_PARAM_POWER),
+                esp_rmaker_bool(g_power));
     } else if (g_speed == 0) {
         g_power = false;
-        esp_rmaker_update_param("Fan", ESP_RMAKER_DEF_POWER_NAME, esp_rmaker_bool(g_power));
+        esp_rmaker_param_update_and_report(
+                esp_rmaker_device_get_param_by_type(fan_device, ESP_RMAKER_PARAM_POWER),
+                esp_rmaker_bool(g_power));
     }
 }
 

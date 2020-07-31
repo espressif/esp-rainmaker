@@ -26,7 +26,7 @@ static const char *TAG = "esp_rmaker_node_config";
 static esp_err_t esp_rmaker_report_info(json_gen_str_t *jptr)
 {
     /* TODO: Error handling */
-    esp_rmaker_node_info_t *info = esp_rmaker_get_node_info();
+    esp_rmaker_node_info_t *info = esp_rmaker_node_get_info(esp_rmaker_get_node());
     json_gen_obj_set_string(jptr, "node_id", esp_rmaker_get_node_id());
     json_gen_obj_set_string(jptr, "config_version", ESP_RMAKER_CONFIG_VERSION);
     json_gen_push_object(jptr, "info");
@@ -48,7 +48,7 @@ static void esp_rmaker_report_attribute(esp_rmaker_attr_t *attr, json_gen_str_t 
 
 static esp_err_t esp_rmaker_report_node_attributes(json_gen_str_t *jptr)
 {
-    esp_rmaker_attr_t *attr = esp_rmaker_get_first_node_attribute();
+    esp_rmaker_attr_t *attr = esp_rmaker_node_get_first_attribute(esp_rmaker_get_node());
     if (!attr) {
         return ESP_OK;
     }
@@ -61,26 +61,7 @@ static esp_err_t esp_rmaker_report_node_attributes(json_gen_str_t *jptr)
     return ESP_OK;
 }
 
-static esp_err_t esp_rmaker_report_device_templates(json_gen_str_t *jptr)
-{
-    return ESP_OK;
-}
-static esp_err_t esp_rmaker_report_param_templates(json_gen_str_t *jptr)
-{
-    return ESP_OK;
-}
-static esp_err_t esp_rmaker_report_templates(json_gen_str_t *jptr)
-{
-    if ((esp_rmaker_get_first_device_template() != NULL ) ||
-            (esp_rmaker_get_first_param_template() != NULL)) {
-        json_gen_push_object(jptr, "templates");
-        esp_rmaker_report_param_templates(jptr);
-        esp_rmaker_report_device_templates(jptr);
-        json_gen_pop_object(jptr);
-    }
-    return ESP_OK;
-}
-esp_err_t esp_rmaker_report_value(esp_rmaker_param_val_t *val, char *key, json_gen_str_t *jptr)
+esp_err_t esp_rmaker_report_value(const esp_rmaker_param_val_t *val, char *key, json_gen_str_t *jptr)
 {
     if (!key || !jptr) {
         return ESP_FAIL;
@@ -130,7 +111,7 @@ esp_err_t esp_rmaker_report_data_type(esp_rmaker_val_type_t type, json_gen_str_t
     return ESP_OK;
 }
 
-static esp_err_t esp_rmaker_report_param_config(esp_rmaker_param_t *param, json_gen_str_t *jptr)
+static esp_err_t esp_rmaker_report_param_config(_esp_rmaker_param_t *param, json_gen_str_t *jptr)
 {
     json_gen_start_object(jptr);
     if (param->name) {
@@ -170,7 +151,7 @@ static esp_err_t esp_rmaker_report_param_config(esp_rmaker_param_t *param, json_
 
 static esp_err_t esp_rmaker_report_devices_or_services(json_gen_str_t *jptr, char *key)
 {
-    esp_rmaker_device_t *device = esp_rmaker_get_first_device();
+    _esp_rmaker_device_t *device = esp_rmaker_node_get_first_device(esp_rmaker_get_node());
     if (!device) {
         return ESP_OK;
     }
@@ -200,7 +181,7 @@ static esp_err_t esp_rmaker_report_devices_or_services(json_gen_str_t *jptr, cha
             }
             if (device->params) {
                 json_gen_push_array(jptr, "params");
-                esp_rmaker_param_t *param = device->params;
+                _esp_rmaker_param_t *param = device->params;
                 while (param) {
                     esp_rmaker_report_param_config(param, jptr);
                     param = param->next;
@@ -226,7 +207,6 @@ esp_err_t esp_rmaker_report_node_config()
     json_gen_start_object(&jstr);
     esp_rmaker_report_info(&jstr);
     esp_rmaker_report_node_attributes(&jstr);
-    esp_rmaker_report_templates(&jstr);
     esp_rmaker_report_devices_or_services(&jstr, "devices");
     esp_rmaker_report_devices_or_services(&jstr, "services");
     if (json_gen_end_object(&jstr) < 0) {

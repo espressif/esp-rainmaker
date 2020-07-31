@@ -43,190 +43,178 @@ extern "C"
 #define ESP_RMAKER_DEF_OTA_URL_NAME         "url"
 
 /**
- * Add name param to a Device
+ * Create standard name param
  *
- * This will add the standard name parameter to a device.
+ * This will create the standard name parameter.
  * This should be added to all devices for which you want a user customisable name.
- * Default value will automatically be set to the device name.
+ * The value should be same as the device name.
+ *
  * All standard device creation APIs will add this internally.
  * No application registered callback will be called for this parameter,
  * and changes will be managed internally.
  *
- * @param[in] dev_name Name of the device
  * @param[in] param_name Name of the parameter
  *
- * @return ESP_OK if the parameter was added successfully.
- * @return error in case of failures.
+ * @return Parameter handle on success.
+ * @return NULL in case of failures.
  */
-esp_err_t esp_rmaker_device_add_name_param(const char *dev_name, const char *param_name);
+esp_rmaker_param_t *esp_rmaker_name_param_create(const char *param_name, const char *val);
 
 /**
- * Add Power param to a Device
+ * Create standard Power param
  *
- * This will add the standard power parameter to a device.
+ * This will create the standard power parameter.
  *
- * @param[in] dev_name Name of the device
  * @param[in] param_name Name of the parameter
  * @param[in] val Default Value of the parameter
  *
- * @return ESP_OK if the parameter was added successfully.
- * @return error in case of failures.
+ * @return Parameter handle on success.
+ * @return NULL in case of failures.
  */
-esp_err_t esp_rmaker_device_add_power_param(const char *dev_name, const char *param_name, bool val);
+esp_rmaker_param_t *esp_rmaker_power_param_create(const char *param_name, bool val);
 
 /**
- * Add Brightness param to a Device
+ * Create standard Brightness param
  *
- * This will add the standard brightness parameter to a device.
+ * This will create the standard brightness parameter.
  *
- * @param[in] dev_name Name of the device
  * @param[in] param_name Name of the parameter
  * @param[in] val Default Value of the parameter
  *
- * @return ESP_OK if the parameter was added successfully.
- * @return error in case of failures.
+ * @return Parameter handle on success.
+ * @return NULL in case of failures.
  */
-esp_err_t esp_rmaker_device_add_brightness_param(const char *dev_name, const char *param_name, int val);
+esp_rmaker_param_t *esp_rmaker_brightness_param_create(const char *param_name, int val);
 
 /**
- * Add Hue param to a Device
+ * Create standard Hue param
  *
- * This will add the standard hue parameter to a device.
+ * This will create the standard hue parameter.
  *
- * @param[in] dev_name Name of the device
  * @param[in] param_name Name of the parameter
  * @param[in] val Default Value of the parameter
  *
- * @return ESP_OK if the parameter was added successfully.
- * @return error in case of failures.
+ * @return Parameter handle on success.
+ * @return NULL in case of failures.
  */
-esp_err_t esp_rmaker_device_add_hue_param(const char *dev_name, const char *param_name, int val);
+esp_rmaker_param_t *esp_rmaker_hue_param_create(const char *param_name, int val);
 
 /**
- * Add Saturation param to a Device
+ * Create standard Saturation param
  *
- * This will add the standard saturation parameter to a device.
+ * This will create the standard saturation parameter.
  *
- * @param[in] dev_name Name of the device
  * @param[in] param_name Name of the parameter
  * @param[in] val Default Value of the parameter
  *
- * @return ESP_OK if the parameter was added successfully.
- * @return error in case of failures.
+ * @return Parameter handle on success.
+ * @return NULL in case of failures.
  */
-esp_err_t esp_rmaker_device_add_saturation_param(const char *dev_name, const char *param_name, int val);
+esp_rmaker_param_t *esp_rmaker_saturation_param_create(const char *param_name, int val);
 
 /**
- * Add Intensity param to a Device
+ * Create standard Intensity param
  *
- * This will add the standard intensity parameter to a device.
+ * This will create the standard intensity parameter.
  *
- * @param[in] dev_name Name of the device
  * @param[in] param_name Name of the parameter
  * @param[in] val Default Value of the parameter
  *
- * @return ESP_OK if the parameter was added successfully.
- * @return error in case of failures.
+ * @return Parameter handle on success.
+ * @return NULL in case of failures.
  */
-esp_err_t esp_rmaker_device_add_intensity_param(const char *dev_name, const char *param_name, int val);
+esp_rmaker_param_t *esp_rmaker_intensity_param_create(const char *param_name, int val);
 
 /**
- * Add CCT param to a Device
+ * Create standard CCT param
  *
- * This will add the standard cct parameter to a device.
+ * This will create the standard cct parameter.
  *
- * @param[in] dev_name Name of the device
  * @param[in] param_name Name of the parameter
  * @param[in] val Default Value of the parameter
  *
- * @return ESP_OK if the parameter was added successfully.
- * @return error in case of failures.
+ * @return Parameter handle on success.
+ * @return NULL in case of failures.
  */
-esp_err_t esp_rmaker_device_add_cct_param(const char *dev_name, const char *param_name, int val);
+esp_rmaker_param_t *esp_rmaker_cct_param_create(const char *param_name, int val);
 
 /**
- * Add Direction param to a Device
+ * Create standard Direction param
  *
- * This will add the standard direction parameter to a device.
+ * This will create the standard direction parameter.
  *
- * @param[in] dev_name Name of the device
  * @param[in] param_name Name of the parameter
  * @param[in] val Default Value of the parameter
  *
- * @return ESP_OK if the parameter was added successfully.
- * @return error in case of failures.
+ * @return Parameter handle on success.
+ * @return NULL in case of failures.
  */
-esp_err_t esp_rmaker_device_add_direction_param(const char *dev_name, const char *param_name, int val);
+esp_rmaker_param_t *esp_rmaker_direction_param_create(const char *param_name, int val);
 
 /**
- * Add Speed param to a Device
+ * Create standard Speed param
  *
- * This will add the standard speed parameter to a device.
+ * This will create the standard speed parameter.
  *
- * @param[in] dev_name Name of the device
  * @param[in] param_name Name of the parameter
  * @param[in] val Default Value of the parameter
  *
- * @return ESP_OK if the parameter was added successfully.
- * @return error in case of failures.
+ * @return Parameter handle on success.
+ * @return NULL in case of failures.
  */
-esp_err_t esp_rmaker_device_add_speed_param(const char *dev_name, const char *param_name, int val);
+esp_rmaker_param_t *esp_rmaker_speed_param_create(const char *param_name, int val);
 
 /**
- * Add Temperature param to a Device
+ * Create standard Temperature param
  *
- * This will add the standard temperature parameter to a device.
+ * This will create the standard temperature parameter.
  *
- * @param[in] dev_name Name of the device
  * @param[in] param_name Name of the parameter
  * @param[in] val Default Value of the parameter
  *
- * @return ESP_OK if the parameter was added successfully.
- * @return error in case of failures.
+ * @return Parameter handle on success.
+ * @return NULL in case of failures.
  */
-esp_err_t esp_rmaker_device_add_temperature_param(const char *dev_name, const char *param_name, float val);
+esp_rmaker_param_t *esp_rmaker_temperature_param_create(const char *param_name, float val);
 
 /**
- * Add OTA Status param to a Service
+ * Create standard OTA Status param
  *
- * This will add the standard ota status parameter to a service. Default value
+ * This will create the standard ota status parameter. Default value
  * is set internally.
  *
- * @param[in] serv_name Name of the service
  * @param[in] param_name Name of the parameter
  *
- * @return ESP_OK if the parameter was added successfully.
- * @return error in case of failures.
+ * @return Parameter handle on success.
+ * @return NULL in case of failures.
  */
-esp_err_t esp_rmaker_service_add_ota_status_param(const char *serv_name, const char *param_name);
+esp_rmaker_param_t *esp_rmaker_ota_status_param_create(const char *param_name);
 
 /**
- * Add OTA Info param to a Service
+ * Create standard OTA Info param
  *
- * This will add the standard ota info parameter to a service. Default value
+ * This will create the standard ota info parameter. Default value
  * is set internally.
  *
- * @param[in] serv_name Name of the service
  * @param[in] param_name Name of the parameter
  *
- * @return ESP_OK if the parameter was added successfully.
- * @return error in case of failures.
+ * @return Parameter handle on success.
+ * @return NULL in case of failures.
  */
-esp_err_t esp_rmaker_service_add_ota_info_param(const char *serv_name, const char *param_name);
+esp_rmaker_param_t *esp_rmaker_ota_info_param_create(const char *param_name);
 
 /**
- * Add OTA URL param to a Service
+ * Create standard OTA URL param
  *
- * This will add the standard ota url parameter to a service. Default value
+ * This will create the standard ota url parameter. Default value
  * is set internally.
  *
- * @param[in] serv_name Name of the service
  * @param[in] param_name Name of the parameter
  *
- * @return ESP_OK if the parameter was added successfully.
- * @return error in case of failures.
+ * @return Parameter handle on success.
+ * @return NULL in case of failures.
  */
-esp_err_t esp_rmaker_service_add_ota_url_param(const char *serv_name, const char *param_name);
+esp_rmaker_param_t *esp_rmaker_ota_url_param_create(const char *param_name);
 
 #ifdef __cplusplus
 }

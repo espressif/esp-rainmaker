@@ -20,7 +20,6 @@
 #include <esp_log.h>
 #include <esp_wifi.h>
 #include <esp_event.h>
-#include <esp_ota_ops.h>
 
 #include <esp_rmaker_core.h>
 #include <esp_rmaker_utils.h>
@@ -33,11 +32,8 @@
 static const int WIFI_CONNECTED_EVENT = BIT0;
 static EventGroupHandle_t wifi_event_group;
 
-#include <esp_wifi.h>
 
 ESP_EVENT_DEFINE_BASE(RMAKER_EVENT);
-
-#define ESP_CLAIM_NODE_ID_SIZE  12
 
 static const char *TAG = "esp_rmaker_core";
 
@@ -48,72 +44,37 @@ static const char *TAG = "esp_rmaker_core";
 
 #define ESP_RMAKER_CHECK_HANDLE(rval) \
 { \
-    if (!g_ra_handle) {\
+    if (!esp_rmaker_priv_data) {\
         ESP_LOGE(TAG, "ESP RainMaker not initialised"); \
         return rval; \
     } \
 }
+
+#define ESP_CLAIM_NODE_ID_SIZE  12
+
+typedef enum {
+    ESP_RMAKER_STATE_DEINIT = 0,
+    ESP_RMAKER_STATE_INIT_DONE,
+    ESP_RMAKER_STATE_STARTING,
+    ESP_RMAKER_STATE_STARTED,
+    ESP_RMAKER_STATE_STOP_REQUESTED,
+} esp_rmaker_state_t;
+
 /* Handle to maintain internal information (will move to an internal file) */
 typedef struct {
     char *node_id;
-    esp_rmaker_node_info_t *info;
-    esp_rmaker_attr_t *node_attributes;
+    const esp_rmaker_node_t *node;
     bool enable_time_sync;
-    esp_rmaker_device_t *devices;
-    esp_rmaker_device_t *device_templates;
-    esp_rmaker_param_t *param_templates;
-    bool rmaker_stop;
+    esp_rmaker_state_t state;
     bool mqtt_connected;
     esp_rmaker_mqtt_config_t *mqtt_config;
 #ifdef CONFIG_ESP_RMAKER_SELF_CLAIM
     bool self_claim;
 #endif /* CONFIG_ESP_RMAKER_SELF_CLAIM */
     QueueHandle_t work_queue;
-} esp_rmaker_handle_t;
-esp_rmaker_handle_t *g_ra_handle;
+} esp_rmaker_priv_data_t;
 
-/* Event handler for catching system events */
-static void esp_rmaker_event_handler(void* arg, esp_event_base_t event_base,
-                          int event_id, void* event_data)
-{
-    if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP) {
-        /* Signal rmaker thread to continue execution */
-        xEventGroupSetBits(wifi_event_group, WIFI_CONNECTED_EVENT);
-    }
-}
-
-void esp_rmaker_deinit_handle(esp_rmaker_handle_t *rmaker_handle)
-{
-    if (!rmaker_handle) {
-        return;
-    }
-    if (rmaker_handle->node_id) {
-        free(rmaker_handle->node_id);
-    }
-    if (rmaker_handle->info) {
-        if (rmaker_handle->info->name) {
-            free(rmaker_handle->info->name);
-        }
-        if (rmaker_handle->info->type) {
-            free(rmaker_handle->info->type);
-        }
-        if (rmaker_handle->info->fw_version) {
-            free(rmaker_handle->info->fw_version);
-        }
-        if (rmaker_handle->info->model) {
-            free(rmaker_handle->info->model);
-        }
-        free(rmaker_handle->info);
-    }
-    if (rmaker_handle->work_queue) {
-        vQueueDelete(rmaker_handle->work_queue);
-    }
-    if (rmaker_handle->mqtt_config) {
-        esp_rmaker_clean_mqtt_config(rmaker_handle->mqtt_config);
-        free(rmaker_handle->mqtt_config);
-    }
-    free(rmaker_handle);
-}
+static esp_rmaker_priv_data_t *esp_rmaker_priv_data;
 
 static char *esp_rmaker_populate_node_id()
 {
@@ -134,574 +95,165 @@ static char *esp_rmaker_populate_node_id()
     return node_id;
 }
 
-/* Initialize ESP RainMaker */
-esp_err_t esp_rmaker_init(esp_rmaker_config_t *config)
+
+/* Event handler for catching system events */
+static void esp_rmaker_event_handler(void* arg, esp_event_base_t event_base,
+                          int event_id, void* event_data)
 {
-    if (g_ra_handle) {
-        ESP_LOGE(TAG, "ESP RainMaker already initialised");
-        return ESP_FAIL;
+    if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP) {
+        /* Signal rmaker thread to continue execution */
+        xEventGroupSetBits(wifi_event_group, WIFI_CONNECTED_EVENT);
     }
-    if (!config->info.name || !config->info.type) {
-        ESP_LOGE(TAG, "Invalid config. Name and Type are mandatory.");
-        return ESP_FAIL;
+}
+
+static esp_err_t esp_rmaker_deinit_priv_data(esp_rmaker_priv_data_t *rmaker_priv_data)
+{
+    if (!rmaker_priv_data) {
+        return ESP_ERR_INVALID_ARG;
+    }
+    if (rmaker_priv_data->work_queue) {
+        vQueueDelete(rmaker_priv_data->work_queue);
+    }
+    if (rmaker_priv_data->mqtt_config) {
+        esp_rmaker_clean_mqtt_config(rmaker_priv_data->mqtt_config);
+        free(rmaker_priv_data->mqtt_config);
+    }
+    if (rmaker_priv_data->node_id) {
+        free(rmaker_priv_data->node_id);
+    }
+    free(rmaker_priv_data);
+    return ESP_OK;
+}
+
+esp_err_t esp_rmaker_node_deinit(const esp_rmaker_node_t *node)
+{
+    if (!esp_rmaker_priv_data) {
+        ESP_LOGE(TAG, "ESP RainMaker already de-initialized.");
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    if (esp_rmaker_priv_data->state != ESP_RMAKER_STATE_INIT_DONE) {
+        ESP_LOGE(TAG, "ESP RainMaker is still running. Please stop it first.");
+        return ESP_ERR_INVALID_STATE;
+    }
+    esp_rmaker_node_delete(node);
+    esp_rmaker_priv_data->node = NULL;
+    esp_rmaker_deinit_priv_data(esp_rmaker_priv_data);
+    esp_rmaker_priv_data = NULL;
+    return ESP_OK;
+}
+
+char *esp_rmaker_get_node_id(void)
+{
+    if (esp_rmaker_priv_data) {
+        return esp_rmaker_priv_data->node_id;
+    }
+    return NULL;
+}
+/* Initialize ESP RainMaker */
+static esp_err_t esp_rmaker_init(const esp_rmaker_config_t *config)
+{
+    if (esp_rmaker_priv_data) {
+        ESP_LOGE(TAG, "ESP RainMaker already initialised");
+        return ESP_ERR_INVALID_STATE;
+    }
+    if (!config) {
+        ESP_LOGE(TAG, "RainMaker config missing. Cannot initialise");
+        return ESP_ERR_INVALID_ARG;
     }
     if (esp_rmaker_storage_init() != ESP_OK) {
         ESP_LOGE(TAG, "Failed to initialise storage");
         return ESP_FAIL;
     }
-    g_ra_handle = calloc(1, sizeof(esp_rmaker_handle_t));
-    if (!g_ra_handle) {
+    esp_rmaker_priv_data = calloc(1, sizeof(esp_rmaker_priv_data_t));
+    if (!esp_rmaker_priv_data) {
         ESP_LOGE(TAG, "Failed to allocate memory");
         return ESP_ERR_NO_MEM;
     }
-    g_ra_handle->node_id = esp_rmaker_populate_node_id();
-    if (!g_ra_handle->node_id) {
+
+    esp_rmaker_priv_data->node_id = esp_rmaker_populate_node_id();
+    if (!esp_rmaker_priv_data->node_id) {
+        esp_rmaker_deinit_priv_data(esp_rmaker_priv_data);
+        esp_rmaker_priv_data = NULL;
         ESP_LOGE(TAG, "Failed to initialise Node Id. Please perform \"claiming\" using RainMaker CLI.");
-        esp_rmaker_deinit_handle(g_ra_handle);
-        g_ra_handle = NULL;
-        return ESP_FAIL;
-    }
-    ESP_LOGI(TAG, "Node ID ----- %s", g_ra_handle->node_id);
-
-    g_ra_handle->info = calloc(1, sizeof(esp_rmaker_node_info_t));
-    if (!g_ra_handle->info) {
-        esp_rmaker_deinit_handle(g_ra_handle);
-        g_ra_handle = NULL;
-        ESP_LOGE(TAG, "Failed to allocate memory");
-        return ESP_ERR_NO_MEM;
-    }
-    g_ra_handle->info->name = strdup(config->info.name);
-    g_ra_handle->info->type = strdup(config->info.type);
-    const esp_app_desc_t *app_desc = esp_ota_get_app_description();
-    if (config->info.fw_version) {
-        g_ra_handle->info->fw_version = strdup(config->info.fw_version);
-    } else {
-        g_ra_handle->info->fw_version = strdup(app_desc->version);
-    }
-    if (config->info.model) {
-        g_ra_handle->info->model = strdup(config->info.model);
-    } else {
-        g_ra_handle->info->model = strdup(app_desc->project_name);
-    }
-    if (!g_ra_handle->info->name || !g_ra_handle->info->type
-            || !g_ra_handle->info->fw_version || !g_ra_handle->info->model) {
-        esp_rmaker_deinit_handle(g_ra_handle);
-        g_ra_handle = NULL;
-        ESP_LOGE(TAG, "Failed to allocate memory");
         return ESP_ERR_NO_MEM;
     }
 
-    g_ra_handle->work_queue = xQueueCreate(ESP_RMAKER_TASK_QUEUE_SIZE, sizeof(esp_rmaker_work_queue_entry_t));
-    if (!g_ra_handle->work_queue) {
-        esp_rmaker_deinit_handle(g_ra_handle);
-        g_ra_handle = NULL;
+    esp_rmaker_priv_data->work_queue = xQueueCreate(ESP_RMAKER_TASK_QUEUE_SIZE, sizeof(esp_rmaker_work_queue_entry_t));
+    if (!esp_rmaker_priv_data->work_queue) {
+        esp_rmaker_deinit_priv_data(esp_rmaker_priv_data);
+        esp_rmaker_priv_data = NULL;
         ESP_LOGE(TAG, "ESP RainMaker Queue Creation Failed");
         return ESP_ERR_NO_MEM;
     }
-    g_ra_handle->mqtt_config = esp_rmaker_get_mqtt_config();
-    if (!g_ra_handle->mqtt_config) {
+    esp_rmaker_priv_data->mqtt_config = esp_rmaker_get_mqtt_config();
+    if (!esp_rmaker_priv_data->mqtt_config) {
 #ifdef CONFIG_ESP_RMAKER_SELF_CLAIM
-        g_ra_handle->self_claim = true;
+        esp_rmaker_priv_data->self_claim = true;
         if (esp_rmaker_self_claim_init() != ESP_OK) {
-            esp_rmaker_deinit_handle(g_ra_handle);
-            g_ra_handle = NULL;
+            esp_rmaker_deinit_priv_data(esp_rmaker_priv_data);
+            esp_rmaker_priv_data = NULL;
             ESP_LOGE(TAG, "Failed to initialise Self Claiming.");
             return ESP_FAIL;
         }
 #else
-        esp_rmaker_deinit_handle(g_ra_handle);
-        g_ra_handle = NULL;
+        esp_rmaker_deinit_priv_data(esp_rmaker_priv_data);
+        esp_rmaker_priv_data = NULL;
         ESP_LOGE(TAG, "Failed to initialise MQTT Config. Please perform \"claiming\" using RainMaker CLI.");
         return ESP_FAIL;
 #endif /* !CONFIG_ESP_RMAKER_SELF_CLAIM */
     } else {
-        if (esp_rmaker_mqtt_init(g_ra_handle->mqtt_config) != ESP_OK) {
-            esp_rmaker_deinit_handle(g_ra_handle);
-            g_ra_handle = NULL;
+        if (esp_rmaker_mqtt_init(esp_rmaker_priv_data->mqtt_config) != ESP_OK) {
+            esp_rmaker_deinit_priv_data(esp_rmaker_priv_data);
+            esp_rmaker_priv_data = NULL;
             ESP_LOGE(TAG, "Failed to initialise MQTT");
             return ESP_FAIL;
         }
     }
-    g_ra_handle->enable_time_sync = config->enable_time_sync;
+    esp_rmaker_priv_data->enable_time_sync = config->enable_time_sync;
     esp_rmaker_post_event(RMAKER_EVENT_INIT_DONE, NULL, 0);
+    esp_rmaker_priv_data->state = ESP_RMAKER_STATE_INIT_DONE;
     return ESP_OK;
 }
 
-esp_err_t esp_rmaker_node_add_attribute(const char *attr_name, const char *value)
+static esp_err_t esp_rmaker_register_node(const esp_rmaker_node_t *node)
 {
-    ESP_RMAKER_CHECK_HANDLE(ESP_FAIL);
-    if (!attr_name || !value) {
+    ESP_RMAKER_CHECK_HANDLE(ESP_ERR_INVALID_STATE);
+    if (esp_rmaker_priv_data->node) {
+        ESP_LOGE(TAG, "A node has already been registered. Cannot register another.");
+        return ESP_ERR_INVALID_STATE;
+    }
+    if (!node) {
+        ESP_LOGE(TAG, "Node handle cannot be NULL.");
         return ESP_ERR_INVALID_ARG;
     }
-    esp_rmaker_attr_t *attr = g_ra_handle->node_attributes;
-    while(attr && attr->next) {
-        if (strcmp(attr->name, attr_name) == 0) {
-            ESP_LOGE(TAG, "Node attribute with name %s already exists", attr_name);
-        }
-        attr = attr->next;
-    }
-    esp_rmaker_attr_t *new_attr = calloc(1, sizeof(esp_rmaker_attr_t));
-    if (!new_attr) {
-        ESP_LOGE(TAG, "Failed to create node attribute %s", attr_name);
-        return ESP_FAIL;
-    }
-    new_attr->name = strdup(attr_name);
-    new_attr->value = strdup(value);
-    if (attr) {
-        attr->next = new_attr;
-    } else {
-        g_ra_handle->node_attributes = new_attr;
-    }
-    ESP_LOGI(TAG, "Node attribute %s created", attr_name);
+    esp_rmaker_priv_data->node = node;
     return ESP_OK;
 }
-esp_err_t esp_rmaker_add_param_template(const char *type, esp_rmaker_val_type_t val_type)
+
+esp_rmaker_node_t *esp_rmaker_node_init(const esp_rmaker_config_t *config, const char *name, const char *type)
 {
-    ESP_RMAKER_CHECK_HANDLE(ESP_FAIL);
-    esp_rmaker_param_t *param = g_ra_handle->param_templates;
-    while(param && param->next) {
-        if (strcmp(param->type, type) == 0) {
-            ESP_LOGE(TAG, "Template for param type %s already exists", type);
-        }
-        param = param->next;
+    esp_err_t err = esp_rmaker_init(config);
+    if (err != ESP_OK) {
+        return NULL;
     }
-    esp_rmaker_param_t *new_param = calloc(1, sizeof(esp_rmaker_param_t));
-    if (!new_param) {
-        return ESP_FAIL;
+    esp_rmaker_node_t *node = esp_rmaker_node_create(name, type);
+    if (!node) {
+        ESP_LOGE(TAG, "Failed to create node");
+        return NULL;
     }
-    new_param->type = strdup(type);
-    new_param->val.type = val_type;
-    if (param) {
-        param->next = new_param;
-    } else {
-        g_ra_handle->param_templates = new_param;
+    err = esp_rmaker_register_node(node);
+    if (err != ESP_OK) {
+        free(node);
+        return NULL;
     }
-    return ESP_OK;
+    return node;
 }
-esp_err_t esp_rmaker_add_dev_template(const char *type)
-{
-    ESP_RMAKER_CHECK_HANDLE(ESP_FAIL);
-    esp_rmaker_device_t *device = g_ra_handle->device_templates;
-    while(device && device->next) {
-        if (strcmp(device->type, type) == 0) {
-            ESP_LOGE(TAG, "Template for device type %s already exists", type);
-        }
-        device = device->next;
-    }
-    esp_rmaker_device_t *new_device = calloc(1, sizeof(esp_rmaker_device_t));
-    if (!new_device) {
-        return ESP_FAIL;
-    }
-    new_device->type = strdup(type);
-    if (device) {
-        device->next = new_device;
-    } else {
-        g_ra_handle->device_templates = new_device;
-    }
-    return ESP_OK;
-}
-esp_rmaker_device_t *esp_rmaker_get_device(const char *dev_name)
+
+const esp_rmaker_node_t *esp_rmaker_get_node()
 {
     ESP_RMAKER_CHECK_HANDLE(NULL);
-    esp_rmaker_device_t *device = g_ra_handle->devices;
-    while (device) {
-        if (strcmp(device->name, dev_name) == 0) {
-            break;
-        }
-        device = device->next;
-    }
-    return device;
-}
-
-esp_rmaker_device_t *esp_rmaker_get_first_device()
-{
-    if (g_ra_handle) {
-        return g_ra_handle->devices;
-    }
-    return NULL;
-}
-
-esp_rmaker_device_t *esp_rmaker_get_service(const char *serv_name)
-{
-    return esp_rmaker_get_device(serv_name);
-}
-
-esp_rmaker_node_info_t *esp_rmaker_get_node_info()
-{
-    if (g_ra_handle) {
-        return g_ra_handle->info;
-    }
-    return NULL;
-}
-esp_rmaker_attr_t *esp_rmaker_get_first_node_attribute()
-{
-    if (g_ra_handle) {
-        return g_ra_handle->node_attributes;
-    }
-    return NULL;
-}
-
-esp_rmaker_device_t *esp_rmaker_get_first_device_template()
-{
-    if (g_ra_handle) {
-        return g_ra_handle->device_templates;
-    }
-    return NULL;
-}
-
-esp_rmaker_param_t *esp_rmaker_get_first_param_template()
-{
-    if (g_ra_handle) {
-        return g_ra_handle->param_templates;
-    }
-    return NULL;
-}
-
-static esp_err_t __esp_rmaker_create_device(const char *dev_name, const char *type, esp_rmaker_param_callback_t cb, void *priv_data, bool is_service)
-{
-    ESP_RMAKER_CHECK_HANDLE(ESP_FAIL);
-    esp_rmaker_device_t *device = g_ra_handle->devices;
-    while(device) {
-        if (strcmp(device->name, dev_name) == 0) {
-            ESP_LOGE(TAG, "Device with name %s already exists", dev_name);
-            return ESP_ERR_INVALID_ARG;
-        }
-        if (device->next) {
-            device = device->next;
-        } else {
-            break;
-        }
-    }
-    esp_rmaker_device_t *new_device = calloc(1, sizeof(esp_rmaker_device_t));
-    if (!new_device) {
-        ESP_LOGE(TAG, "Failed to create device %s", dev_name);
-        return ESP_FAIL;
-    }
-    new_device->name = strdup(dev_name);
-    if (type) {
-        new_device->type = strdup(type);
-    }
-    new_device->cb = cb;
-    new_device->priv_data = priv_data;
-    new_device->is_service = is_service;
-    if (device) {
-        device->next = new_device;
-    } else {
-        g_ra_handle->devices = new_device;
-    }
-    ESP_LOGD(TAG, "Device %s created", dev_name);
-
-    return ESP_OK;
-}
-
-esp_err_t esp_rmaker_create_device(const char *dev_name, const char *type,
-        esp_rmaker_param_callback_t cb, void *priv_data)
-{
-    return __esp_rmaker_create_device(dev_name, type, cb, priv_data, false);
-}
-
-esp_err_t esp_rmaker_create_service(const char *serv_name, const char *type,
-        esp_rmaker_param_callback_t cb, void *priv_data)
-{
-    return __esp_rmaker_create_device(serv_name, type, cb, priv_data, true);
-}
-
-esp_rmaker_param_val_t esp_rmaker_bool(bool val)
-{
-    esp_rmaker_param_val_t param_val = {
-        .type = RMAKER_VAL_TYPE_BOOLEAN,
-        .val.b = val
-    };
-    return param_val;
-}
-
-esp_rmaker_param_val_t esp_rmaker_int(int val)
-{
-    esp_rmaker_param_val_t param_val = {
-        .type = RMAKER_VAL_TYPE_INTEGER,
-        .val.i = val
-    };
-    return param_val;
-}
-
-esp_rmaker_param_val_t esp_rmaker_float(float val)
-{
-    esp_rmaker_param_val_t param_val = {
-        .type = RMAKER_VAL_TYPE_FLOAT,
-        .val.f = val
-    };
-    return param_val;
-}
-
-esp_rmaker_param_val_t esp_rmaker_str(const char *val)
-{
-    esp_rmaker_param_val_t param_val = {
-        .type = RMAKER_VAL_TYPE_STRING,
-        .val.s = (char *)val
-    };
-    return param_val;
-}
-
-/* Add a new Device Attribute */
-esp_err_t esp_rmaker_device_add_attribute(const char *dev_name, const char *attr_name, const char *val)
-{
-    if (!dev_name || !attr_name || !val) {
-        return ESP_ERR_INVALID_ARG;
-    }
-    esp_rmaker_device_t *device = esp_rmaker_get_device(dev_name);
-    if (!device) {
-        ESP_LOGW(TAG, "Device %s not found", dev_name);
-        return ESP_ERR_INVALID_ARG;
-    }
-    esp_rmaker_attr_t *attr = device->attributes;
-    while(attr) {
-        if (strcmp(attr_name, attr->name) == 0) {
-            ESP_LOGE(TAG, "Attribute with name %s already exists in Device %s", attr_name, dev_name);
-            return ESP_ERR_INVALID_ARG;
-        }
-        if (attr->next) {
-            attr = attr->next;
-        } else {
-            break;
-        }
-    }
-    esp_rmaker_attr_t *new_attr = calloc(1, sizeof(esp_rmaker_attr_t));
-    if (!new_attr) {
-        return ESP_ERR_NO_MEM;
-    }
-    new_attr->name = strdup(attr_name);
-    new_attr->value = strdup(val);
-    if (attr) {
-        attr->next = new_attr;
-    } else {
-        device->attributes = new_attr;
-    }
-    ESP_LOGD(TAG, "Device attribute %s.%s created", dev_name, attr_name);
-    return ESP_OK;
-}
-
-/* Get param from names */
-esp_rmaker_param_t *esp_rmaker_get_param(const char *dev_name, const char *name)
-{
-    if (!dev_name || !name) {
-        return NULL;
-    }
-    ESP_RMAKER_CHECK_HANDLE(NULL);
-    esp_rmaker_device_t *device = esp_rmaker_get_device(dev_name);
-    if (!device) {
-        return NULL;
-    }
-    esp_rmaker_param_t *param = device->params;
-    while (param) {
-        if (strcmp(name, param->name) == 0) {
-            break;
-        }
-        param = param->next;
-    }
-    return param;
-}
-
-static esp_rmaker_param_t *esp_rmaker_get_param_by_val_type(const char *dev_name, const char *name, esp_rmaker_val_type_t param_type)
-{
-    esp_rmaker_param_t *param = esp_rmaker_get_param(dev_name, name);
-    if (!param) {
-        return NULL;
-    }
-    if (param->val.type == param_type) {
-        return param;
-    }
-    return NULL;
-}
-
-esp_err_t esp_rmaker_device_assign_primary_param(const char *dev_name, const char *name)
-{
-    esp_rmaker_param_t *param = esp_rmaker_get_param(dev_name, name);
-    if (param) {
-        param->parent->primary = param;
-        return ESP_OK;
-    }
-    return ESP_FAIL;
-}
-
-/* Internal. Update parameter */
-static esp_err_t __esp_rmaker_update_param(const char *dev_name, const char *param_name, esp_rmaker_param_val_t val, bool external)
-{
-    ESP_RMAKER_CHECK_HANDLE(ESP_FAIL);
-    esp_rmaker_param_t *param = esp_rmaker_get_param_by_val_type(dev_name, param_name, val.type);
-    if (param) {
-        switch (param->val.type) {
-            case RMAKER_VAL_TYPE_STRING: {
-                char *new_val = NULL;
-                if (val.val.s) {
-                    new_val = strdup(val.val.s);
-                    if (!new_val) {
-                        return ESP_FAIL;
-                    }
-                }
-                if (param->val.val.s) {
-                    free(param->val.val.s);
-                }
-                param->val.val.s = new_val;
-                break;
-            }
-            case RMAKER_VAL_TYPE_BOOLEAN:
-            case RMAKER_VAL_TYPE_INTEGER:
-            case RMAKER_VAL_TYPE_FLOAT:
-                param->val.val = val.val;
-                break;
-            default:
-                return ESP_FAIL;
-        }
-        if (param->prop_flags & PROP_FLAG_PERSIST) {
-            esp_rmaker_param_store_value(param);
-        }
-        if (external && g_ra_handle->mqtt_connected) {
-            ESP_LOGD(TAG, "Value Changed for %s-%s", dev_name, param_name);
-            param->flags |= RMAKER_PARAM_FLAG_VALUE_CHANGE;
-            if (param->prop_flags & PROP_FLAG_TIME_SERIES) {
-                esp_rmaker_report_ts_param(param);
-            }
-            esp_rmaker_report_param();
-        }
-        return ESP_OK;
-    }
-    ESP_LOGE(TAG, "Parameter %s - %s of type %d not found", dev_name, param_name, val.type);
-    return ESP_FAIL;
-}
-static esp_err_t esp_rmaker_update_param_internal(const char *dev_name, const char *param_name, esp_rmaker_param_val_t val)
-{
-    return __esp_rmaker_update_param(dev_name, param_name, val, false);
-}
-esp_err_t esp_rmaker_update_param(const char *dev_name, const char *param_name, esp_rmaker_param_val_t val)
-{
-    return __esp_rmaker_update_param(dev_name, param_name, val, true);
-}
-/* Internal. Add a new Parameter to a device */
-esp_err_t esp_rmaker_device_add_param(const char *dev_name, const char *name, esp_rmaker_param_val_t val,
-            uint8_t prop_flags)
-{
-    esp_rmaker_device_t *device = esp_rmaker_get_device(dev_name);
-    if (!device) {
-        ESP_LOGE(TAG, "Device %s not found", dev_name);
-        return ESP_FAIL;
-    }
-    esp_rmaker_param_t *param = device->params;
-    while(param) {
-        if (strcmp(name, param->name) == 0) {
-            ESP_LOGE(TAG, "Parameter with name %s already exists in Device %s", name, dev_name);
-            return ESP_ERR_INVALID_ARG;
-        }
-        if (param->next) {
-            param = param->next;
-        } else {
-            break;
-        }
-    }
-    esp_rmaker_param_t *new_param = calloc(1, sizeof(esp_rmaker_param_t));
-    if (!new_param) {
-        return ESP_ERR_NO_MEM;
-    }
-    new_param->name = strdup(name);
-    if (!new_param->name) {
-        goto add_param_error;
-    }
-    new_param->val.type = val.type;
-    new_param->prop_flags = prop_flags;
-    new_param->parent = device;
-    if (param) {
-        param->next = new_param;
-    } else {
-        device->params = new_param;
-    }
-    bool stored_val_found = false;
-    esp_rmaker_param_val_t stored_val;
-    if (prop_flags & PROP_FLAG_PERSIST) {
-        if (esp_rmaker_param_get_stored_value(new_param, &stored_val) == ESP_OK) {
-            stored_val_found = true;
-            val = stored_val;
-        }
-    }
-    esp_rmaker_update_param_internal(dev_name, name, val);
-    if (stored_val_found) {
-        if (device->cb) {
-            device->cb(device->name, new_param->name, val, device->priv_data);
-        }
-        if (val.type == RMAKER_VAL_TYPE_STRING) {
-            if (val.val.s) {
-                free(val.val.s);
-            }
-        }
-    }
-    ESP_LOGD(TAG, "Param %s - %s created", dev_name, name);
-    return ESP_OK;
-add_param_error:
-    if (new_param) {
-        if (new_param->name) {
-            free(new_param->name);
-        }
-        free(new_param);
-    }
-    return ESP_ERR_NO_MEM;
-}
-
-esp_err_t esp_rmaker_service_add_param(const char *serv_name, const char *name, esp_rmaker_param_val_t val,
-            uint8_t prop_flags)
-{
-    return esp_rmaker_device_add_param(serv_name, name, val, prop_flags);
-}
-
-esp_err_t esp_rmaker_param_add_bounds(const char *dev_name, const char *param_name,
-    esp_rmaker_param_val_t min, esp_rmaker_param_val_t max, esp_rmaker_param_val_t step)
-{
-    ESP_RMAKER_CHECK_HANDLE(ESP_FAIL);
-    esp_rmaker_param_t *param = esp_rmaker_get_param_by_val_type(dev_name, param_name, RMAKER_VAL_TYPE_INTEGER);
-    if (!param) {
-        param = esp_rmaker_get_param_by_val_type(dev_name, param_name, RMAKER_VAL_TYPE_FLOAT);
-        if (!param) {
-            ESP_LOGE(TAG, "Numeric parameter %s - %s not found", dev_name, param_name);
-            return ESP_FAIL;
-        }
-    }
-    if ((min.type != param->val.type) || (max.type != param->val.type) || (step.type != param->val.type)) {
-        ESP_LOGE(TAG, "Cannot set bounds for %s - %s because of value type mismatch", dev_name, param_name);
-        return ESP_FAIL;
-    }
-    param->min = min;
-    param->max = max;
-    param->step = step;
-    return ESP_OK;
-}
-
-esp_err_t esp_rmaker_param_add_type(const char *dev_name, const char *param_name, const char* type)
-{
-    ESP_RMAKER_CHECK_HANDLE(ESP_FAIL);
-    esp_rmaker_param_t *param = esp_rmaker_get_param(dev_name, param_name);
-    if (param) {
-        if (param->type) {
-            free(param->type);
-        }
-        param->type = strdup(type);
-        if (param->type) {
-            return ESP_OK;
-        }
-    }
-    return ESP_FAIL;
-}
-
-esp_err_t esp_rmaker_param_add_ui_type(const char *dev_name, const char *name, const char *ui_type)
-{
-    ESP_RMAKER_CHECK_HANDLE(ESP_FAIL);
-    esp_rmaker_param_t *param = esp_rmaker_get_param(dev_name, name);
-    if (!param) {
-        return ESP_FAIL;
-    }
-    if (param->ui_type) {
-        free(param->ui_type);
-    }
-    if ((param->ui_type = strdup(ui_type)) != NULL ){
-        return ESP_OK;
-    }
-    return ESP_FAIL;
+    return esp_rmaker_priv_data->node;
 }
 
 static esp_err_t esp_rmaker_report_node_config_and_state()
@@ -727,33 +279,34 @@ esp_err_t esp_rmaker_report_node_details()
     return esp_rmaker_queue_work(__esp_rmaker_report_node_config_and_state, NULL);
 }
 
-void esp_rmaker_handle_work_queue()
+static void esp_rmaker_handle_work_queue()
 {
     ESP_RMAKER_CHECK_HANDLE();
     esp_rmaker_work_queue_entry_t work_queue_entry;
-    BaseType_t ret = xQueueReceive(g_ra_handle->work_queue, &work_queue_entry, 0);
+    BaseType_t ret = xQueueReceive(esp_rmaker_priv_data->work_queue, &work_queue_entry, 0);
     while (ret == pdTRUE) {
         work_queue_entry.work_fn(work_queue_entry.priv_data);
-        ret = xQueueReceive(g_ra_handle->work_queue, &work_queue_entry, 0);
+        ret = xQueueReceive(esp_rmaker_priv_data->work_queue, &work_queue_entry, 0);
     }
 }
 
 static void esp_rmaker_task(void *param)
 {
     ESP_RMAKER_CHECK_HANDLE();
+    esp_rmaker_priv_data->state = ESP_RMAKER_STATE_STARTING;
     esp_err_t err;
     wifi_event_group = xEventGroupCreate();
     ESP_ERROR_CHECK(esp_event_handler_register(IP_EVENT, IP_EVENT_STA_GOT_IP, &esp_rmaker_event_handler, NULL)); 
     /* Wait for Wi-Fi connection */
     xEventGroupWaitBits(wifi_event_group, WIFI_CONNECTED_EVENT, false, true, portMAX_DELAY);
 
-    if (g_ra_handle->enable_time_sync) {
+    if (esp_rmaker_priv_data->enable_time_sync) {
 #ifdef CONFIG_MBEDTLS_HAVE_TIME_DATE
         esp_rmaker_time_wait_for_sync(portMAX_DELAY);
 #endif
     }
 #ifdef CONFIG_ESP_RMAKER_SELF_CLAIM
-    if (g_ra_handle->self_claim) {
+    if (esp_rmaker_priv_data->self_claim) {
         esp_rmaker_post_event(RMAKER_EVENT_CLAIM_STARTED, NULL, 0);
         err = esp_rmaker_self_claim_perform();
         if (err != ESP_OK) {
@@ -762,12 +315,12 @@ static void esp_rmaker_task(void *param)
             vTaskDelete(NULL);
         }
         esp_rmaker_post_event(RMAKER_EVENT_CLAIM_SUCCESSFUL, NULL, 0);
-        g_ra_handle->mqtt_config = esp_rmaker_get_mqtt_config();
-        if (!g_ra_handle->mqtt_config) {
+        esp_rmaker_priv_data->mqtt_config = esp_rmaker_get_mqtt_config();
+        if (!esp_rmaker_priv_data->mqtt_config) {
             ESP_LOGE(TAG, "Failed to initialise MQTT Config after claiming. Aborting");
             vTaskDelete(NULL);
         }
-        err = esp_rmaker_mqtt_init(g_ra_handle->mqtt_config);
+        err = esp_rmaker_mqtt_init(esp_rmaker_priv_data->mqtt_config);
         if (err != ESP_OK) {
             ESP_LOGE(TAG, "esp_rmaker_mqtt_init() returned %d. Aborting", err);
             vTaskDelete(NULL);
@@ -779,50 +332,46 @@ static void esp_rmaker_task(void *param)
         ESP_LOGE(TAG, "esp_rmaker_mqtt_connect() returned %d. Aborting", err);
         vTaskDelete(NULL);
     }
-    g_ra_handle->mqtt_connected = true;
+    esp_rmaker_priv_data->mqtt_connected = true;
+    esp_rmaker_priv_data->state = ESP_RMAKER_STATE_STARTED;
     if (esp_rmaker_report_node_config_and_state() != ESP_OK) {
         ESP_LOGE(TAG, "Aborting!!!");
         goto rmaker_end;
     }
-    if (esp_rmaker_register_for_get_params() != ESP_OK) {
+    if (esp_rmaker_register_for_set_params() != ESP_OK) {
         ESP_LOGE(TAG, "Aborting!!!");
         goto rmaker_end;
     }
-    while (!g_ra_handle->rmaker_stop) {
-        esp_rmaker_handle_work_queue(g_ra_handle);
+    while (esp_rmaker_priv_data->state != ESP_RMAKER_STATE_STOP_REQUESTED) {
+        esp_rmaker_handle_work_queue(esp_rmaker_priv_data);
         /* 2 sec delay to prevent spinning */
         vTaskDelay(2000 / portTICK_RATE_MS);
     }
 rmaker_end:
     esp_rmaker_mqtt_disconnect();
-    g_ra_handle->mqtt_connected = false;
-    g_ra_handle->rmaker_stop = false;
+    esp_rmaker_priv_data->mqtt_connected = false;
+    esp_rmaker_priv_data->state = ESP_RMAKER_STATE_INIT_DONE;
     vTaskDelete(NULL);
 }
 
 esp_err_t esp_rmaker_queue_work(esp_rmaker_work_fn_t work_fn, void *priv_data)
 {
-    ESP_RMAKER_CHECK_HANDLE(ESP_FAIL);
+    ESP_RMAKER_CHECK_HANDLE(ESP_ERR_INVALID_STATE);
     esp_rmaker_work_queue_entry_t work_queue_entry = {
         .work_fn = work_fn,
         .priv_data = priv_data,
     };
-    if (xQueueSend(g_ra_handle->work_queue, &work_queue_entry, 0) == pdTRUE) {
+    if (xQueueSend(esp_rmaker_priv_data->work_queue, &work_queue_entry, 0) == pdTRUE) {
         return ESP_OK;
     }
     return ESP_FAIL;
 }
 
-esp_rmaker_handle_t *esp_rmaker_get_handle()
-{
-    return g_ra_handle;
-}
-
 /* Start the ESP RainMaker Core Task */
 esp_err_t esp_rmaker_start()
 {
-    ESP_RMAKER_CHECK_HANDLE(ESP_FAIL);
-    if (g_ra_handle->enable_time_sync) {
+    ESP_RMAKER_CHECK_HANDLE(ESP_ERR_INVALID_STATE);
+    if (esp_rmaker_priv_data->enable_time_sync) {
         esp_rmaker_time_sync_init(NULL);
     }
     ESP_LOGI(TAG, "Starting RainMaker Core Task");
@@ -836,13 +385,8 @@ esp_err_t esp_rmaker_start()
 
 esp_err_t esp_rmaker_stop()
 {
-    ESP_RMAKER_CHECK_HANDLE(ESP_FAIL);
-    g_ra_handle->rmaker_stop = true;
+    ESP_RMAKER_CHECK_HANDLE(ESP_ERR_INVALID_STATE);
+    esp_rmaker_priv_data->state = ESP_RMAKER_STATE_STOP_REQUESTED;
     return ESP_OK;
 }
 
-char *esp_rmaker_get_node_id()
-{
-    ESP_RMAKER_CHECK_HANDLE(NULL);
-    return g_ra_handle->node_id;
-}

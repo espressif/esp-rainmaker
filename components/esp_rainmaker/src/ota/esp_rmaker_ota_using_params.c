@@ -17,6 +17,7 @@
 #include <esp_log.h>
 #include <esp_system.h>
 #include <esp_rmaker_core.h>
+#include <esp_rmaker_standard_types.h>
 #include <esp_rmaker_standard_params.h>
 #include <esp_rmaker_standard_services.h>
 #include <esp_rmaker_ota.h>
@@ -35,10 +36,13 @@ void esp_rmaker_ota_finish_using_params(esp_rmaker_ota_t *ota)
         ota->url = NULL;
     }
     ota->filesize = 0;
+    if (ota->transient_priv) {
+        ota->transient_priv = NULL;
+    }
     ota->ota_in_progress = false;
 }
-static esp_err_t esp_rmaker_ota_service_cb(const char *dev_name, const char *name,
-        esp_rmaker_param_val_t val, void *priv_data)
+static esp_err_t esp_rmaker_ota_service_cb(const esp_rmaker_device_t *device, const esp_rmaker_param_t *param,
+        const esp_rmaker_param_val_t val, void *priv_data, esp_rmaker_write_ctx_t *ctx)
 {
     esp_rmaker_ota_t *ota = (esp_rmaker_ota_t *)priv_data;
     if (!ota) {
@@ -49,9 +53,9 @@ static esp_err_t esp_rmaker_ota_service_cb(const char *dev_name, const char *nam
         ESP_LOGE(TAG, "OTA already in progress. Please try later.");
         return ESP_FAIL;
     }
-    if (strcmp(name, ESP_RMAKER_DEF_OTA_URL_NAME) == 0) {
+    if (strcmp(esp_rmaker_param_get_type(param), ESP_RMAKER_PARAM_OTA_URL) == 0) {
         ESP_LOGI(TAG, "Received value = %s for %s - %s",
-                val.val.s, dev_name, name);
+                val.val.s, esp_rmaker_device_get_name(device), esp_rmaker_param_get_name(param));
         if (ota->url) {
             free(ota->url);
             ota->url = NULL;
@@ -60,6 +64,7 @@ static esp_err_t esp_rmaker_ota_service_cb(const char *dev_name, const char *nam
         if (ota->url) {
             ota->filesize = 0;
             ota->ota_in_progress = true;
+            ota->transient_priv = (void *)device;
             if (esp_rmaker_queue_work(esp_rmaker_ota_common_cb, ota) != ESP_OK) {
                 esp_rmaker_ota_finish_using_params(ota);
             } else {
@@ -76,17 +81,27 @@ esp_err_t esp_rmaker_ota_report_status_using_params(esp_rmaker_ota_handle_t ota_
     if (!ota_handle) {
         return ESP_FAIL;
     }
-    esp_rmaker_update_param(ESP_RMAKER_OTA_SERV_NAME, ESP_RMAKER_DEF_OTA_INFO_NAME,
-            esp_rmaker_str(additional_info));
-    esp_rmaker_update_param(ESP_RMAKER_OTA_SERV_NAME, ESP_RMAKER_DEF_OTA_STATUS_NAME,
-            esp_rmaker_str(esp_rmaker_ota_status_to_string(status)));
+    esp_rmaker_ota_t *ota = (esp_rmaker_ota_t *)ota_handle;
+    const esp_rmaker_device_t *device = (esp_rmaker_device_t *)ota->transient_priv;
+    esp_rmaker_param_t *info_param = esp_rmaker_device_get_param_by_type(device, ESP_RMAKER_PARAM_OTA_INFO);
+    esp_rmaker_param_t *status_param = esp_rmaker_device_get_param_by_type(device, ESP_RMAKER_PARAM_OTA_STATUS);
+
+    esp_rmaker_param_update_and_report(info_param, esp_rmaker_str(additional_info));
+    esp_rmaker_param_update_and_report(status_param, esp_rmaker_str(esp_rmaker_ota_status_to_string(status)));
+    
     return ESP_OK;
 }
 
 /* Enable the ESP RainMaker specific OTA */
 esp_err_t esp_rmaker_ota_enable_using_params(esp_rmaker_ota_t *ota)
 {
-    esp_err_t err = esp_rmaker_create_ota_service(ESP_RMAKER_OTA_SERV_NAME, esp_rmaker_ota_service_cb, ota);
+    esp_rmaker_device_t *service = esp_rmaker_ota_service_create(ESP_RMAKER_OTA_SERV_NAME, ota);
+    if (!service) {
+        ESP_LOGE(TAG, "Failed to create OTA Service");
+        return ESP_FAIL;
+    }
+    esp_rmaker_device_add_cb(service, esp_rmaker_ota_service_cb, NULL);
+    esp_err_t err = esp_rmaker_node_add_device(esp_rmaker_get_node(), service);
     if (err == ESP_OK) {
         ESP_LOGI(TAG, "OTA enabled with Params");
     }

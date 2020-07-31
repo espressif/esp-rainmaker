@@ -23,22 +23,27 @@
 
 static const char *TAG = "app_main";
 
+esp_rmaker_device_t *fan_device;
+
 /* Callback to handle commands received from the RainMaker cloud */
-static esp_err_t common_callback(const char *dev_name, const char *name, esp_rmaker_param_val_t val, void *priv_data)
+static esp_err_t write_cb(const esp_rmaker_device_t *device, const esp_rmaker_param_t *param,
+            const esp_rmaker_param_val_t val, void *priv_data, esp_rmaker_write_ctx_t *ctx)
 {
-    if (strcmp(name, ESP_RMAKER_DEF_POWER_NAME) == 0) {
+    char *device_name = esp_rmaker_device_get_name(device);
+    char *param_name = esp_rmaker_param_get_name(param);
+    if (strcmp(param_name, ESP_RMAKER_DEF_POWER_NAME) == 0) {
         ESP_LOGI(TAG, "Received value = %s for %s - %s",
-                val.val.b? "true" : "false", dev_name, name);
+                val.val.b? "true" : "false", device_name, param_name);
         app_fan_set_power(val.val.b);
-    } else if (strcmp(name, "speed") == 0) {
+    } else if (strcmp(param_name, "speed") == 0) {
         ESP_LOGI(TAG, "Received value = %d for %s - %s",
-                val.val.i, dev_name, name);
+                val.val.i, device_name, param_name);
         app_fan_set_speed(val.val.i);
     } else {
         /* Silently ignoring invalid params */
         return ESP_OK;
     }
-    esp_rmaker_update_param(dev_name, name, val);
+    esp_rmaker_param_update_and_report(param, val);
     return ESP_OK;
 }
 
@@ -65,23 +70,20 @@ void app_main()
      * Note that this should be called after app_wifi_init() but before app_wifi_start()
      * */
     esp_rmaker_config_t rainmaker_cfg = {
-        .info = {
-            .name = "ESP RainMaker Device",
-            .type = "Fan",
-        },
         .enable_time_sync = false,
     };
-    err = esp_rmaker_init(&rainmaker_cfg);
-    if (err != ESP_OK) {
-        ESP_LOGE(TAG, "Could not initialise ESP RainMaker. Aborting!!!");
+    esp_rmaker_node_t *node = esp_rmaker_node_init(&rainmaker_cfg, "ESP RainMaker Device", "Fan");
+    if (!node) {
+        ESP_LOGE(TAG, "Could not initialise node. Aborting!!!");
         vTaskDelay(5000/portTICK_PERIOD_MS);
         abort();
     }
 
     /* Create a device and add the relevant parameters to it */
-    esp_rmaker_create_fan_device("Fan", common_callback, NULL, DEFAULT_POWER);
-
-    esp_rmaker_device_add_speed_param("Fan", "speed", DEFAULT_SPEED);
+    fan_device = esp_rmaker_fan_device_create("Fan", NULL, DEFAULT_POWER);
+    esp_rmaker_device_add_cb(fan_device, write_cb, NULL);
+    esp_rmaker_device_add_param(fan_device, esp_rmaker_speed_param_create("speed", DEFAULT_SPEED));
+    esp_rmaker_node_add_device(node, fan_device);
 
     /* Start the ESP RainMaker Agent */
     esp_rmaker_start();

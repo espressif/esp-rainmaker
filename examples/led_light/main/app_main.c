@@ -24,32 +24,37 @@
 
 static const char *TAG = "app_main";
 
+esp_rmaker_device_t *light_device;
+
 extern const char ota_server_cert[] asm("_binary_server_crt_start");
 
 /* Callback to handle commands received from the RainMaker cloud */
-static esp_err_t common_callback(const char *dev_name, const char *name, esp_rmaker_param_val_t val, void *priv_data)
+static esp_err_t write_cb(const esp_rmaker_device_t *device, const esp_rmaker_param_t *param,
+            const esp_rmaker_param_val_t val, void *priv_data, esp_rmaker_write_ctx_t *ctx)
 {
-    if (strcmp(name, ESP_RMAKER_DEF_POWER_NAME) == 0) {
+    const char *device_name = esp_rmaker_device_get_name(device);
+    const char *param_name = esp_rmaker_param_get_name(param);
+    if (strcmp(param_name, ESP_RMAKER_DEF_POWER_NAME) == 0) {
         ESP_LOGI(TAG, "Received value = %s for %s - %s",
-                val.val.b? "true" : "false", dev_name, name);
+                val.val.b? "true" : "false", device_name, param_name);
         app_light_set_power(val.val.b);
-    } else if (strcmp(name, "brightness") == 0) {
+    } else if (strcmp(param_name, "brightness") == 0) {
         ESP_LOGI(TAG, "Received value = %d for %s - %s",
-                val.val.i, dev_name, name);
+                val.val.i, device_name, param_name);
         app_light_set_brightness(val.val.i);
-    } else if (strcmp(name, "hue") == 0) {
+    } else if (strcmp(param_name, "hue") == 0) {
         ESP_LOGI(TAG, "Received value = %d for %s - %s",
-                val.val.i, dev_name, name);
+                val.val.i, device_name, param_name);
         app_light_set_hue(val.val.i);
-    } else if (strcmp(name, "saturation") == 0) {
+    } else if (strcmp(param_name, "saturation") == 0) {
         ESP_LOGI(TAG, "Received value = %d for %s - %s",
-                val.val.i, dev_name, name);
+                val.val.i, device_name, param_name);
         app_light_set_saturation(val.val.i);
     } else {
         /* Silently ignoring invalid params */
         return ESP_OK;
     }
-    esp_rmaker_update_param(dev_name, name, val);
+    esp_rmaker_param_update_and_report(param, val);
     return ESP_OK;
 }
 
@@ -76,25 +81,24 @@ void app_main()
      * Note that this should be called after app_wifi_init() but before app_wifi_start()
      * */
     esp_rmaker_config_t rainmaker_cfg = {
-        .info = {
-            .name = "ESP RainMaker Device",
-            .type = "Lightbulb",
-        },
         .enable_time_sync = false,
     };
-    err = esp_rmaker_init(&rainmaker_cfg);
-    if (err != ESP_OK) {
-        ESP_LOGE(TAG, "Could not initialise ESP RainMaker. Aborting!!!");
+    esp_rmaker_node_t *node = esp_rmaker_node_init(&rainmaker_cfg, "ESP RainMaker Device", "Lightbulb");
+    if (!node) {
+        ESP_LOGE(TAG, "Could not initialise node. Aborting!!!");
         vTaskDelay(5000/portTICK_PERIOD_MS);
         abort();
     }
 
     /* Create a device and add the relevant parameters to it */
-    esp_rmaker_create_lightbulb_device("Light", common_callback, NULL, DEFAULT_POWER);
+    light_device = esp_rmaker_lightbulb_device_create("Light", NULL, DEFAULT_POWER);
+    esp_rmaker_device_add_cb(light_device, write_cb, NULL);
 
-    esp_rmaker_device_add_brightness_param("Light", "brightness", DEFAULT_BRIGHTNESS);
-    esp_rmaker_device_add_hue_param("Light", "hue", DEFAULT_HUE);
-    esp_rmaker_device_add_saturation_param("Light", "saturation", DEFAULT_SATURATION);
+    esp_rmaker_device_add_param(light_device, esp_rmaker_brightness_param_create("brightness", DEFAULT_BRIGHTNESS));
+    esp_rmaker_device_add_param(light_device, esp_rmaker_hue_param_create("hue", DEFAULT_HUE));
+    esp_rmaker_device_add_param(light_device, esp_rmaker_saturation_param_create("saturation", DEFAULT_SATURATION));
+
+    esp_rmaker_node_add_device(node, light_device);
 
     /* Enable OTA */
     esp_rmaker_ota_config_t ota_config = {

@@ -23,10 +23,11 @@
 static const char *TAG = "app_main";
 
 /* Callback to handle commands received from the RainMaker cloud */
-static esp_err_t gpio_callback(const char *dev_name, const char *name, esp_rmaker_param_val_t val, void *priv_data)
+static esp_err_t write_cb(const esp_rmaker_device_t *device, const esp_rmaker_param_t *param,
+            const esp_rmaker_param_val_t val, void *priv_data, esp_rmaker_write_ctx_t *ctx)
 {
-    if (app_driver_set_gpio(name, val.val.b) == ESP_OK) {
-        esp_rmaker_update_param(dev_name, name, val);
+    if (app_driver_set_gpio(esp_rmaker_param_get_name(param), val.val.b) == ESP_OK) {
+        esp_rmaker_param_update_and_report(param, val);
     }
     return ESP_OK;
 }
@@ -53,31 +54,33 @@ void app_main()
     /* Initialize the ESP RainMaker Agent.
      * Note that this should be called after app_wifi_init() but before app_wifi_start()
      * */
-    /* Initialize the ESP RainMaker Agent.
-     * Note that this should be called after app_wifi_init() but before app_wifi_start()
-     * */
     esp_rmaker_config_t rainmaker_cfg = {
-        .info = {
-            .name = "ESP RainMaker Device",
-            .type = "ESP32-S2-Saola-1",
-        },
         .enable_time_sync = false,
     };
-    err = esp_rmaker_init(&rainmaker_cfg);
-    if (err != ESP_OK) {
-        ESP_LOGE(TAG, "Could not initialise ESP RainMaker. Aborting!!!");
+    esp_rmaker_node_t *node = esp_rmaker_node_init(&rainmaker_cfg, "ESP RainMaker Device", "ESP32-S2-Saola-1");
+    if (!node) {
+        ESP_LOGE(TAG, "Could not initialise node. Aborting!!!");
         vTaskDelay(5000/portTICK_PERIOD_MS);
         abort();
     }
 
     /* Create a device and add the relevant parameters to it */
-    esp_rmaker_create_device("ESP32-S2-Saola-1", NULL, gpio_callback, NULL);
-    esp_rmaker_device_add_param("ESP32-S2-Saola-1", "Red", esp_rmaker_bool(false), PROP_FLAG_READ | PROP_FLAG_WRITE);
-    esp_rmaker_param_add_ui_type("ESP32-S2-Saola-1", "Red", ESP_RMAKER_UI_TOGGLE);
-    esp_rmaker_device_add_param("ESP32-S2-Saola-1", "Green", esp_rmaker_bool(false), PROP_FLAG_READ | PROP_FLAG_WRITE);
-    esp_rmaker_param_add_ui_type("ESP32-S2-Saola-1", "Green", ESP_RMAKER_UI_TOGGLE);
-    esp_rmaker_device_add_param("ESP32-S2-Saola-1", "Blue", esp_rmaker_bool(false), PROP_FLAG_READ | PROP_FLAG_WRITE);
-    esp_rmaker_param_add_ui_type("ESP32-S2-Saola-1", "Blue", ESP_RMAKER_UI_TOGGLE);
+    esp_rmaker_device_t *gpio_device = esp_rmaker_device_create("ESP32-S2-Saola-1", NULL, NULL);
+    esp_rmaker_device_add_cb(gpio_device, write_cb, NULL);
+
+    esp_rmaker_param_t *red_param = esp_rmaker_param_create("Red", NULL, esp_rmaker_bool(false), PROP_FLAG_READ | PROP_FLAG_WRITE);
+    esp_rmaker_param_add_ui_type(red_param, ESP_RMAKER_UI_TOGGLE);
+    esp_rmaker_device_add_param(gpio_device, red_param);
+
+    esp_rmaker_param_t *green_param = esp_rmaker_param_create("Green", NULL, esp_rmaker_bool(false), PROP_FLAG_READ | PROP_FLAG_WRITE);
+    esp_rmaker_param_add_ui_type(green_param, ESP_RMAKER_UI_TOGGLE);
+    esp_rmaker_device_add_param(gpio_device, green_param);
+
+    esp_rmaker_param_t *blue_param = esp_rmaker_param_create("Blue", NULL, esp_rmaker_bool(false), PROP_FLAG_READ | PROP_FLAG_WRITE);
+    esp_rmaker_param_add_ui_type(blue_param, ESP_RMAKER_UI_TOGGLE);
+    esp_rmaker_device_add_param(gpio_device, blue_param);
+
+    esp_rmaker_node_add_device(node, gpio_device);
 
     /* Start the ESP RainMaker Agent */
     esp_rmaker_start();

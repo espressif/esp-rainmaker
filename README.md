@@ -1,5 +1,7 @@
 # ESP RainMaker (Beta)
 
+> Note: We have recently made some changes to the APIs. Please refer [this file](CHANGES.md) for details.
+
 ## Introduction
 
 ESP RainMaker is an end-to-end solution offered by Espressif to enable remote control and monitoring for ESP32-S2 and ESP32 based products without any configuration required in the Cloud. The primary components of this solution are:

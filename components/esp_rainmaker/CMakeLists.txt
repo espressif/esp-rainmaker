@@ -1,7 +1,9 @@
 # CORE
 set(core_srcs "src/core/esp_rmaker_core.c"
+        "src/core/esp_rmaker_node.c"
+        "src/core/esp_rmaker_device.c"
+        "src/core/esp_rmaker_param.c"
         "src/core/esp_rmaker_node_config.c"
-        "src/core/esp_rmaker_param_ops.c"
         "src/core/esp_rmaker_client_data.c"
         "src/core/esp_rmaker_time_sync.c"
         "src/core/esp_rmaker_storage.c"

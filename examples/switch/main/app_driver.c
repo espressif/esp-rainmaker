@@ -30,7 +30,6 @@
 static led_strip_t *strip;
 static bool g_power_state = DEFAULT_POWER;
 static const char *TAG = "app_driver";
-
 /* These values correspoind to H,S,V = 120,100,10 */
 #define DEFAULT_RED     0
 #define DEFAULT_GREEN   25
@@ -72,7 +71,9 @@ static void push_btn_cb(void *arg)
 {
     bool new_state = !g_power_state;
     app_driver_set_state(new_state);
-    esp_rmaker_update_param("Switch", "power", esp_rmaker_bool(new_state));
+    esp_rmaker_param_update_and_report(
+            esp_rmaker_device_get_param_by_name(switch_device, "power"),
+            esp_rmaker_bool(new_state));
 }
 
 static void button_press_3sec_cb(void *arg)

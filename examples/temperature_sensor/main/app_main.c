@@ -23,6 +23,8 @@
 
 static const char *TAG = "app_main";
 
+esp_rmaker_device_t *temp_sensor_device;
+
 void app_main()
 {
     /* Initialize Application specific hardware drivers and
@@ -46,21 +48,18 @@ void app_main()
      * Note that this should be called after app_wifi_init() but before app_wifi_start()
      * */
     esp_rmaker_config_t rainmaker_cfg = {
-        .info = {
-            .name = "ESP RainMaker Device",
-            .type = "Temperature Sensor",
-        },
         .enable_time_sync = false,
     };
-    err = esp_rmaker_init(&rainmaker_cfg);
-    if (err != ESP_OK) {
-        ESP_LOGE(TAG, "Could not initialise ESP RainMaker. Aborting!!!");
+    esp_rmaker_node_t *node = esp_rmaker_node_init(&rainmaker_cfg, "ESP RainMaker Device", "Temperature Sensor");
+    if (!node) {
+        ESP_LOGE(TAG, "Could not initialise node. Aborting!!!");
         vTaskDelay(5000/portTICK_PERIOD_MS);
         abort();
     }
 
     /* Create a device and add the relevant parameters to it */
-    esp_rmaker_create_temp_sensor_device("Temperature Sensor", NULL, NULL, app_get_current_temperature());
+    temp_sensor_device = esp_rmaker_temp_sensor_device_create("Temperature Sensor", NULL, app_get_current_temperature());
+    esp_rmaker_node_add_device(node, temp_sensor_device);
 
     /* Start the ESP RainMaker Agent */
     esp_rmaker_start();
