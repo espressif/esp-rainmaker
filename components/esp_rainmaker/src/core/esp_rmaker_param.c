@@ -75,6 +75,24 @@ esp_rmaker_param_val_t esp_rmaker_str(const char *val)
     return param_val;
 }
 
+esp_rmaker_param_val_t esp_rmaker_obj(const char *val)
+{
+    esp_rmaker_param_val_t param_val = {
+        .type = RMAKER_VAL_TYPE_OBJECT,
+        .val.s = (char *)val
+    };
+    return param_val;
+}
+
+esp_rmaker_param_val_t esp_rmaker_array(const char *val)
+{
+    esp_rmaker_param_val_t param_val = {
+        .type = RMAKER_VAL_TYPE_ARRAY,
+        .val.s = (char *)val
+    };
+    return param_val;
+}
+
 static esp_err_t esp_rmaker_report_params(uint8_t flags, bool init)
 {
     json_gen_str_t jstr;
@@ -158,8 +176,39 @@ static esp_err_t esp_rmaker_handle_get_params(_esp_rmaker_device_t *device, jpar
                 if (json_obj_get_strlen(jptr, param->name, &val_size) == 0) {
                     val_size++; /* For NULL termination */
                     new_val.val.s = calloc(1, val_size);
+                    if (!new_val.val.s) {
+                        return ESP_ERR_NO_MEM;
+                    }
                     json_obj_get_string(jptr, param->name, new_val.val.s, val_size);
                     new_val.type = RMAKER_VAL_TYPE_STRING;
+                    param_found = true;
+                }
+                break;
+            }
+            case RMAKER_VAL_TYPE_OBJECT: {
+                int val_size = 0;
+                if (json_obj_get_object_strlen(jptr, param->name, &val_size) == 0) {
+                    val_size++; /* For NULL termination */
+                    new_val.val.s = calloc(1, val_size);
+                    if (!new_val.val.s) {
+                        return ESP_ERR_NO_MEM;
+                    }
+                    json_obj_get_object_str(jptr, param->name, new_val.val.s, val_size);
+                    new_val.type = RMAKER_VAL_TYPE_OBJECT;
+                    param_found = true;
+                }
+                break;
+            }
+            case RMAKER_VAL_TYPE_ARRAY: {
+                int val_size = 0;
+                if (json_obj_get_array_strlen(jptr, param->name, &val_size) == 0) {
+                    val_size++; /* For NULL termination */
+                    new_val.val.s = calloc(1, val_size);
+                    if (!new_val.val.s) {
+                        return ESP_ERR_NO_MEM;
+                    }
+                    json_obj_get_array_str(jptr, param->name, new_val.val.s, val_size);
+                    new_val.type = RMAKER_VAL_TYPE_ARRAY;
                     param_found = true;
                 }
                 break;
@@ -177,11 +226,13 @@ static esp_err_t esp_rmaker_handle_get_params(_esp_rmaker_device_t *device, jpar
                 esp_rmaker_write_ctx_t ctx = {
                     .src = ESP_RMAKER_REQ_SRC_CLOUD,
                 };
-                if (device->write_cb((esp_rmaker_device_t *)device, (esp_rmaker_param_t *)param, new_val, device->priv_data, &ctx) != ESP_OK) {
+                if (device->write_cb((esp_rmaker_device_t *)device, (esp_rmaker_param_t *)param,
+                            new_val, device->priv_data, &ctx) != ESP_OK) {
                     ESP_LOGE(TAG, "Remote update to param %s - %s failed", device->name, param->name);
                 }
             }
-            if (new_val.type == RMAKER_VAL_TYPE_STRING) {
+            if ((new_val.type == RMAKER_VAL_TYPE_STRING) || (new_val.type == RMAKER_VAL_TYPE_OBJECT ||
+                        (new_val.type == RMAKER_VAL_TYPE_ARRAY))) {
                 if (new_val.val.s) {
                     free(new_val.val.s);
                 }
@@ -234,7 +285,8 @@ esp_err_t esp_rmaker_param_get_stored_value(_esp_rmaker_param_t *param, esp_rmak
     if (err != ESP_OK) {
         return err;
     }
-    if (param->val.type == RMAKER_VAL_TYPE_STRING) {
+    if ((param->val.type == RMAKER_VAL_TYPE_STRING) || (param->val.type == RMAKER_VAL_TYPE_OBJECT) ||
+                (param->val.type == RMAKER_VAL_TYPE_ARRAY)) {
         size_t len = 0;
         if ((err = nvs_get_str(handle, param->name, NULL, &len)) == ESP_OK) {
             char *s_val = calloc(1, len);
@@ -264,7 +316,8 @@ esp_err_t esp_rmaker_param_store_value(_esp_rmaker_param_t *param)
     if (err != ESP_OK) {
         return err;
     }
-    if (param->val.type == RMAKER_VAL_TYPE_STRING) {
+    if ((param->val.type == RMAKER_VAL_TYPE_STRING) || (param->val.type == RMAKER_VAL_TYPE_OBJECT) ||
+                (param->val.type == RMAKER_VAL_TYPE_ARRAY)) {
         /* Store only if value is not NULL */
         if (param->val.val.s) {
             err = nvs_set_str(handle, param->name, param->val.val.s);
@@ -324,7 +377,8 @@ esp_rmaker_param_t *esp_rmaker_param_create(const char *param_name, const char *
     }
     param->val.type = val.type;
     param->prop_flags = properties;
-    if (val.type == RMAKER_VAL_TYPE_STRING) {
+    if ((val.type == RMAKER_VAL_TYPE_STRING) || (val.type == RMAKER_VAL_TYPE_OBJECT) ||
+                (val.type == RMAKER_VAL_TYPE_ARRAY)) {
         if (val.val.s) {
              param->val.val.s = strdup(val.val.s);
              if (!param->val.val.s) {
@@ -392,7 +446,9 @@ esp_err_t esp_rmaker_param_update(const esp_rmaker_param_t *param, esp_rmaker_pa
         return ESP_ERR_INVALID_ARG;
     }
     switch (_param->val.type) {
-        case RMAKER_VAL_TYPE_STRING: {
+        case RMAKER_VAL_TYPE_STRING:
+        case RMAKER_VAL_TYPE_OBJECT:
+        case RMAKER_VAL_TYPE_ARRAY: {
             char *new_val = NULL;
             if (val.val.s) {
                 new_val = strdup(val.val.s);

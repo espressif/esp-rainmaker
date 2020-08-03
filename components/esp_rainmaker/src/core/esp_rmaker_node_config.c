@@ -83,6 +83,12 @@ esp_err_t esp_rmaker_report_value(const esp_rmaker_param_val_t *val, char *key, 
         case RMAKER_VAL_TYPE_STRING:
             json_gen_obj_set_string(jptr, key, val->val.s);
             break;
+        case RMAKER_VAL_TYPE_OBJECT:
+            json_gen_push_object_str(jptr, key, val->val.s);
+            break;
+        case RMAKER_VAL_TYPE_ARRAY:
+            json_gen_push_array_str(jptr, key, val->val.s);
+            break;
         default:
             break;
     }
@@ -103,6 +109,12 @@ esp_err_t esp_rmaker_report_data_type(esp_rmaker_val_type_t type, json_gen_str_t
             break;
         case RMAKER_VAL_TYPE_STRING:
             json_gen_obj_set_string(jptr, "data_type", "string");
+            break;
+        case RMAKER_VAL_TYPE_OBJECT:
+            json_gen_obj_set_string(jptr, "data_type", "object");
+            break;
+        case RMAKER_VAL_TYPE_ARRAY:
+            json_gen_obj_set_string(jptr, "data_type", "array");
             break;
         default:
             json_gen_obj_set_string(jptr, "data_type", "invalid");

@@ -129,7 +129,8 @@ esp_err_t esp_rmaker_device_add_param(const esp_rmaker_device_t *device, const e
     stored_val.type = _new_param->val.type;
     if (_new_param->prop_flags & PROP_FLAG_PERSIST) {
         if (esp_rmaker_param_get_stored_value(_new_param, &stored_val) == ESP_OK) {
-            if (_new_param->val.type == RMAKER_VAL_TYPE_STRING) {
+            if ((_new_param->val.type == RMAKER_VAL_TYPE_STRING) || (_new_param->val.type == RMAKER_VAL_TYPE_OBJECT)
+                    || (_new_param->val.type == RMAKER_VAL_TYPE_ARRAY)) {
                 if (_new_param->val.val.s) {
                     free(_new_param->val.val.s);
                 }
