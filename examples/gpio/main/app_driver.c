@@ -9,13 +9,9 @@
 
 #include <sdkconfig.h>
 #include <string.h>
-#include <freertos/FreeRTOS.h>
-#include <esp_system.h>
-#include <nvs_flash.h>
 #include <esp_log.h>
 
-#include <iot_button.h>
-
+#include <app_reset.h>
 #include "app_priv.h"
 
 #define RMT_TX_CHANNEL RMT_CHANNEL_0
@@ -27,6 +23,9 @@
 #define OUTPUT_GPIO_RED   16ULL
 #define OUTPUT_GPIO_GREEN 14ULL
 #define OUTPUT_GPIO_BLUE  15ULL
+
+#define WIFI_RESET_BUTTON_TIMEOUT       3
+#define FACTORY_RESET_BUTTON_TIMEOUT    10
 
 esp_err_t app_driver_set_gpio(const char *name, bool state)
 {
@@ -41,19 +40,11 @@ esp_err_t app_driver_set_gpio(const char *name, bool state)
     }
     return ESP_OK;
 }
-static void button_press_3sec_cb(void *arg)
-{
-    nvs_flash_deinit();
-    nvs_flash_erase();
-    esp_restart();
-}
 
 void app_driver_init()
 {
-    button_handle_t btn_handle = iot_button_create(BUTTON_GPIO, BUTTON_ACTIVE_LEVEL);
-    if (btn_handle) {
-        iot_button_add_on_press_cb(btn_handle, 3, button_press_3sec_cb, NULL);
-    }
+    app_reset_button_register(app_reset_button_create(BUTTON_GPIO, BUTTON_ACTIVE_LEVEL),
+                WIFI_RESET_BUTTON_TIMEOUT, FACTORY_RESET_BUTTON_TIMEOUT);
 
     /* Configure power */
     gpio_config_t io_conf = {

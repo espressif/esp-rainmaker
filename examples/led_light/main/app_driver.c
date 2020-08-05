@@ -8,10 +8,8 @@
 */
 
 #include <sdkconfig.h>
-#include <freertos/FreeRTOS.h>
-#include <esp_system.h>
 #include <esp_log.h>
-#include <nvs_flash.h>
+#include <esp_wifi.h>
 #include <driver/rmt.h>
 
 #include <iot_button.h>
@@ -20,6 +18,7 @@
 #include <esp_rmaker_standard_types.h> 
 #include <esp_rmaker_standard_params.h> 
 
+#include <app_reset.h>
 #include "app_priv.h"
 
 #define RMT_TX_CHANNEL RMT_CHANNEL_0
@@ -29,6 +28,8 @@
 /* This is the GPIO on which the power will be set */
 #define OUTPUT_GPIO    19
 
+#define WIFI_RESET_BUTTON_TIMEOUT       3
+#define FACTORY_RESET_BUTTON_TIMEOUT    10
 
 static uint16_t g_hue = DEFAULT_HUE;
 static uint16_t g_saturation = DEFAULT_SATURATION;
@@ -173,19 +174,14 @@ static void push_btn_cb(void *arg)
             esp_rmaker_bool(g_power));
 }
 
-static void button_press_3sec_cb(void *arg)
-{
-    nvs_flash_deinit();
-    nvs_flash_erase();
-    esp_restart();
-}
-
 void app_driver_init()
 {
     app_light_init();
     button_handle_t btn_handle = iot_button_create(BUTTON_GPIO, BUTTON_ACTIVE_LEVEL);
     if (btn_handle) {
-        iot_button_set_evt_cb(btn_handle, BUTTON_CB_RELEASE, push_btn_cb, "RELEASE");
-        iot_button_add_on_press_cb(btn_handle, 3, button_press_3sec_cb, NULL);
+        /* Register a callback for a button tap (short press) event */
+        iot_button_set_evt_cb(btn_handle, BUTTON_CB_TAP, push_btn_cb, NULL);
+        /* Register Wi-Fi reset and factory reset functionality on same button */
+        app_reset_button_register(btn_handle, WIFI_RESET_BUTTON_TIMEOUT, FACTORY_RESET_BUTTON_TIMEOUT);
     }
 }
