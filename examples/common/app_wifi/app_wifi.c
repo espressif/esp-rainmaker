@@ -5,6 +5,7 @@
    software is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
    CONDITIONS OF ANY KIND, either express or implied.
 */
+#include <string.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
 #include <freertos/event_groups.h>
@@ -20,6 +21,9 @@
 
 #include <esp_rmaker_user_mapping.h>
 #include <qrcode.h>
+#include <nvs.h>
+#include <nvs_flash.h>
+#include "app_wifi.h"
 
 static const char *TAG = "app_wifi";
 static const int WIFI_CONNECTED_EVENT = BIT0;
@@ -30,6 +34,9 @@ static EventGroupHandle_t wifi_event_group;
 #define PROV_TRANSPORT_SOFTAP   "softap"
 #define PROV_TRANSPORT_BLE      "ble"
 #define QRCODE_BASE_URL     "https://rainmaker.espressif.com/qrcode.html"
+
+#define CREDENTIALS_NAMESPACE   "rmaker_creds"
+#define RANDOM_NVS_KEY          "random"
 
 static void app_wifi_print_qr(const char *name, const char *pop, const char *transport)
 {
@@ -111,11 +118,64 @@ static void get_device_service_name(char *service_name, size_t max)
              ssid_prefix, eth_mac[3], eth_mac[4], eth_mac[5]);
 }
 
-static void get_device_pop(char *pop, size_t max)
+/* free the return value after use. */
+static char *read_random_bytes_from_nvs()
 {
-    uint8_t eth_mac[6];
-    esp_wifi_get_mac(WIFI_IF_STA, eth_mac);
-    snprintf(pop, max, "%02x%02x%02x%02x", eth_mac[2], eth_mac[3], eth_mac[4], eth_mac[5]);
+    nvs_handle handle;
+    esp_err_t err;
+    size_t required_size = 0;
+    void *value;
+
+    if ((err = nvs_open_from_partition(CONFIG_ESP_RMAKER_FACTORY_PARTITION_NAME, CREDENTIALS_NAMESPACE,
+                                NVS_READONLY, &handle)) != ESP_OK) {
+        ESP_LOGD(TAG, "NVS open for %s %s %s failed with error %d", CONFIG_ESP_RMAKER_FACTORY_PARTITION_NAME, CREDENTIALS_NAMESPACE, RANDOM_NVS_KEY, err);
+        return NULL;
+    }
+
+    if ((err = nvs_get_blob(handle, RANDOM_NVS_KEY, NULL, &required_size)) != ESP_OK) {
+        ESP_LOGD(TAG, "Failed to read key %s with error %d size %d", RANDOM_NVS_KEY, err, required_size);
+        nvs_close(handle);
+        return NULL;
+    }
+
+    value = calloc(required_size + 1, 1); /* + 1 for NULL termination */
+    if (value) {
+        nvs_get_blob(handle, RANDOM_NVS_KEY, value, &required_size);
+    }
+
+    nvs_close(handle);
+    return value;
+}
+
+static esp_err_t get_device_pop(char *pop, size_t max, app_wifi_pop_type_t pop_type)
+{
+    if (!pop || !max) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    if (pop_type == POP_TYPE_MAC) {
+        uint8_t eth_mac[6];
+        esp_err_t err = esp_wifi_get_mac(WIFI_IF_STA, eth_mac);
+        if (err == ESP_OK) {
+            snprintf(pop, max, "%02x%02x%02x%02x", eth_mac[2], eth_mac[3], eth_mac[4], eth_mac[5]);
+            return ESP_OK;
+        } else {
+            return err;
+        }
+    } else if (pop_type == POP_TYPE_RANDOM) {
+        char *nvs_pop = read_random_bytes_from_nvs();
+        if (!nvs_pop) {
+            return ESP_ERR_NOT_FOUND;
+        } else {
+            strncpy(pop, nvs_pop, max - 1);
+            pop[max - 1] = 0;
+            free(nvs_pop);
+            nvs_pop = NULL;
+            return ESP_OK;
+        }
+    } else {
+        return ESP_ERR_INVALID_ARG;
+    }
 }
 
 void app_wifi_init(void)
@@ -138,7 +198,7 @@ void app_wifi_init(void)
     ESP_ERROR_CHECK(esp_wifi_init(&cfg));
 }
 
-void app_wifi_start(void)
+esp_err_t app_wifi_start(app_wifi_pop_type_t pop_type)
 {
     /* Configuration for the provisioning manager */
     wifi_prov_mgr_config_t config = {
@@ -198,8 +258,12 @@ void app_wifi_start(void)
          *      - this should be a string with length > 0
          *      - NULL if not used
          */
-        char pop[15];
-        get_device_pop(pop, sizeof(pop));
+        char pop[9];
+        esp_err_t err = get_device_pop(pop, sizeof(pop), pop_type);
+        if (err != ESP_OK) {
+            ESP_LOGE(TAG, "Error: %d. Failed to get PoP from NVS, Please perform Claiming.", err);
+            return err;
+        }
 
         /* What is the service key (Wi-Fi password)
          * NULL = Open network
@@ -223,15 +287,27 @@ void app_wifi_start(void)
             0xb4, 0xdf, 0x5a, 0x1c, 0x3f, 0x6b, 0xf4, 0xbf,
             0xea, 0x4a, 0x82, 0x03, 0x04, 0x90, 0x1a, 0x02,
         };
-        wifi_prov_scheme_ble_set_service_uuid(custom_service_uuid);
+        err = wifi_prov_scheme_ble_set_service_uuid(custom_service_uuid);
+        if (err != ESP_OK) {
+            ESP_LOGE(TAG, "wifi_prov_scheme_ble_set_service_uuid failed %d", err);
+            return err;
+        }
 #endif /* CONFIG_APP_WIFI_PROV_TRANSPORT_BLE */
 
         /* Create endpoint for ESP Cloud User-Device Association */
-        esp_rmaker_user_mapping_endpoint_create();
+        err = esp_rmaker_user_mapping_endpoint_create();
+        if (err != ESP_OK) {
+            ESP_LOGE(TAG, "esp_rmaker_user_mapping_endpoint_create failed %d", err);
+            return err;
+        }
         /* Start provisioning service */
         ESP_ERROR_CHECK(wifi_prov_mgr_start_provisioning(security, pop, service_name, service_key));
         /* Register endpoint for ESP Cloud User-Device Association */
-        esp_rmaker_user_mapping_endpoint_register();
+        err = esp_rmaker_user_mapping_endpoint_register();
+        if (err != ESP_OK) {
+            ESP_LOGE(TAG, "esp_rmaker_user_mapping_endpoint_register failed %d", err);
+            return err;
+        }
         /* Print QR code for provisioning */
 #ifdef CONFIG_APP_WIFI_PROV_TRANSPORT_BLE
         app_wifi_print_qr(service_name, pop, PROV_TRANSPORT_BLE);
@@ -251,4 +327,5 @@ void app_wifi_start(void)
     }
     /* Wait for Wi-Fi connection */
     xEventGroupWaitBits(wifi_event_group, WIFI_CONNECTED_EVENT, false, true, portMAX_DELAY);
+    return ESP_OK;
 }

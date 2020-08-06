@@ -203,7 +203,49 @@ def gen_host_csr(private_key, common_name=None):
     csr = request.public_bytes(serialization.Encoding.PEM).decode("utf-8")
     return csr
 
-def save_claim_data(dest_filedir, node_id, private_key, node_cert, endpointinfo, node_info_csv):
+def gen_hex_str(octets=4):
+    """
+    Generate random hex string, it is used as PoP
+
+    :param octets: Number of octets in random hex string, length is (octets * 2)
+                    defaults to 4,
+    :type: octets: int
+
+    :return: random hex string on Success, None on Failure
+    :rtype: str|None
+    """
+    # Generate random hex string
+    return binascii.b2a_hex(os.urandom(octets)).decode()
+
+def save_random_hex_str(dest_filedir, hex_str):
+    """
+    Create file for random hex string and update node_info.csv
+
+    :param dest_filedir: Destination File Directory
+    :type dest_filedir: str
+
+    :param hex_str: Random hex string to write
+    :type hex_str: str
+
+    :raises Exception: If there is any issue when writing to file
+
+    :return: None on Success
+    :rtype: None
+    """
+    try:
+        log.debug("Writing random hex string at location: " +
+                  dest_filedir + 'random.info')
+        with open(dest_filedir + 'random.info', 'w+') as info_file:
+            info_file.write(hex_str)
+
+        with open(dest_filedir + 'node_info.csv', 'a') as info_file:
+            info_file.write('random,file,binary,' +
+                            dest_filedir + 'random.info')
+            info_file.write('\n')
+    except Exception as err:
+        log.error(err)
+
+def save_claim_data(dest_filedir, node_id, private_key, node_cert, endpointinfo, hex_str, node_info_csv):
     """
     Create files with claiming details
 
@@ -221,6 +263,9 @@ def save_claim_data(dest_filedir, node_id, private_key, node_cert, endpointinfo,
 
     :param endpointinfo: MQTT endpoint (data) to write to `endpoint.info` file
     :type port: str
+
+    :param hex_str: random hex string
+    :type hex_str: str
 
     :param node_info_csv: List of output csv file details (node information)
                           to write to `node_info.csv` file
@@ -264,6 +309,8 @@ def save_claim_data(dest_filedir, node_id, private_key, node_cert, endpointinfo,
             for input_line in node_info_csv:
                 info_file.write(input_line)
                 info_file.write("\n")
+
+        save_random_hex_str(dest_filedir, hex_str)
     except Exception as file_error:
         raise file_error
 
@@ -521,6 +568,35 @@ def verify_claim_data_binary_exists(userid, mac_addr, dest_filedir, output_bin_f
         return True
     return False
 
+def verify_key_data_exists(key, file_name):
+    """
+    Verify if an entry for the given key exists in the NVS CSV file
+
+    :param key: key to search in csv file
+    :type key: str
+
+    :param file_name: csv file name
+    :type file_name: str
+
+    :raises Exception: If there is any issue when reading file
+
+    :return: True|False
+    :rtype: Boolean
+    """
+    try:
+        with open(file_name, 'r') as file:
+            lines = file.readlines()
+            for line in lines:
+                row = [r.strip() for r in line.split(',')]
+                if row[0] == key:
+                    # row[3] has file name
+                    with open(row[3], 'r') as rfile:
+                        if rfile.read():
+                            return True
+            return False
+    except Exception as file_error:
+        raise file_error
+
 def flash_existing_data(port, bin_to_flash, address):
     # Flashing existing binary onto node
     if not port:
@@ -569,6 +645,7 @@ def claim(port=None, node_platform=None, mac_addr=None, secret_key=None, flash_a
     try:
         node_info = None
         private_key = None
+        hex_str = None
         secret_key_valid = None
         claim_data_binary_exists = False
         dest_filedir = None
@@ -607,7 +684,17 @@ def claim(port=None, node_platform=None, mac_addr=None, secret_key=None, flash_a
         # Verify existing data exists
         claim_data_binary_exists = verify_claim_data_binary_exists(userid, mac_addr, dest_filedir, output_bin_filename)
         if claim_data_binary_exists:
-            # Flash existing NVS binary onto node
+            # Check if random key exist in csv
+            random_key_exist_in_csv = verify_key_data_exists('random', dest_filedir + 'node_info.csv')
+            if not random_key_exist_in_csv:
+                # generate random key and add to csv
+                print('Random data does not exist, Creating new nvs binary. It will change your Wi-Fi Provisioning Pin')
+                log.info('Random data does not exist, Creating new nvs binary. It will change your Wi-Fi Provisioning Pin')
+                hex_str = gen_hex_str()
+                save_random_hex_str(dest_filedir, hex_str)
+                gen_nvs_partition_bin(dest_filedir, output_bin_filename)
+
+            # Flash NVS binary onto node
             flash_existing_data(port, nvs_bin_filename, flash_address)
             return
 
@@ -632,8 +719,11 @@ def claim(port=None, node_platform=None, mac_addr=None, secret_key=None, flash_a
         # Get MQTT endpoint
         endpointinfo = get_mqtt_endpoint()
 
+        # Generate random hex string
+        hex_str = gen_hex_str()
+
         # Create output claim files
-        save_claim_data(dest_filedir, node_info, private_key_bytes, node_cert, endpointinfo, node_info_csv)
+        save_claim_data(dest_filedir, node_info, private_key_bytes, node_cert, endpointinfo, hex_str, node_info_csv)
 
         # Generate nvs partition binary
         gen_nvs_partition_bin(dest_filedir, output_bin_filename)
