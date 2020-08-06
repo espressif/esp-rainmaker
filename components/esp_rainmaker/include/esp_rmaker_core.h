@@ -74,6 +74,10 @@ typedef enum {
     RMAKER_VAL_TYPE_FLOAT,
     /** NULL terminated string */
     RMAKER_VAL_TYPE_STRING,
+    /** NULL terminated JSON Object string Eg. {"name":"value"} */
+    RMAKER_VAL_TYPE_OBJECT,
+    /** NULL terminated JSON Array string Eg. [1,2,3] */
+    RMAKER_VAL_TYPE_ARRAY,
 } esp_rmaker_val_type_t;
 
 /** ESP RainMaker Value */
@@ -209,6 +213,33 @@ esp_rmaker_param_val_t esp_rmaker_float(float fval);
  * @return Value structure.
  */
 esp_rmaker_param_val_t esp_rmaker_str(const char *sval);
+
+/**
+ * Initialise a json object value
+ *
+ * @note the object will not be validated internally. it is the application's
+ * responsibility to ensure that the object is a valid json object.
+ * eg. esp_rmaker_obj("{\"name\":\"value\"}");
+ *
+ * param[in] val initialising value
+ *
+ * return value structure
+ */
+esp_rmaker_param_val_t esp_rmaker_obj(const char *val);
+
+/**
+ * Initialise a json array value
+ *
+ * @note the array will not be validated internally. it is the application's
+ * responsibility to ensure that the array is a valid json array.
+ * eg. esp_rmaker_array("[1,2,3]");
+ *
+ * param[in] val initialising value
+ *
+ * return value structure
+ */
+esp_rmaker_param_val_t esp_rmaker_array(const char *val);
+
 
 /** Initialize ESP RainMaker Node
  *

@@ -38,6 +38,10 @@ int json_obj_get_int64(jparse_ctx_t *jctx, char *name, int64_t *val);
 int json_obj_get_float(jparse_ctx_t *jctx, char *name, float *val);
 int json_obj_get_string(jparse_ctx_t *jctx, char *name, char *val, int size);
 int json_obj_get_strlen(jparse_ctx_t *jctx, char *name, int *strlen);
+int json_obj_get_object_str(jparse_ctx_t *jctx, char *name, char *val, int size);
+int json_obj_get_object_strlen(jparse_ctx_t *jctx, char *name, int *strlen);
+int json_obj_get_array_str(jparse_ctx_t *jctx, char *name, char *val, int size);
+int json_obj_get_array_strlen(jparse_ctx_t *jctx, char *name, int *strlen);
 
 int json_arr_get_array(jparse_ctx_t *jctx, uint32_t index);
 int json_arr_leave_array(jparse_ctx_t *jctx);

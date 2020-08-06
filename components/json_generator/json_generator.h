@@ -163,6 +163,25 @@ int json_gen_push_object(json_gen_str_t *jstr, char *name);
  */
 int json_gen_pop_object(json_gen_str_t *jstr);
 
+/** Push a JSON object string
+ *
+ * This adds a complete pre-formatted JSON object string to the JSON object.
+ *
+ * Eg. json_gen_push_object_str(jstr, "pre-formatted", "{\"a\":1,\"b\":2}");
+ * This will add "pre-formatted":{"a":1,"b":2}
+ *
+ * \param[in] jstr Pointer to the \ref json_gen_str_t structure initilised by
+ * json_gen_str_start()
+ * \param[in] name Name of the JSON object string
+ * \param[in] object_str The pre-formatted JSON object string
+ *
+ * \return 0 on Success
+ * \return -1 if buffer is out of space (possible only if no callback function
+ * is passed to json_gen_str_start(). Else, buffer will be flushed out and new data
+ * added after that.
+ */
+int json_gen_push_object_str(json_gen_str_t *jstr, char *name, char *object_str);
+
 /** Push a named JSON array
  *
  * This adds a JSON array like "name":[
@@ -192,6 +211,25 @@ int json_gen_push_array(json_gen_str_t *jstr, char *name);
  * added after that
  */
 int json_gen_pop_array(json_gen_str_t *jstr);
+
+/** Push a JSON array string
+ *
+ * This adds a complete pre-formatted JSON array string to the JSON object.
+ *
+ * Eg. json_gen_push_object_str(jstr, "pre-formatted", "[1,2,3]");
+ * This will add "pre-formatted":[1,2,3]
+ *
+ * \param[in] jstr Pointer to the \ref json_gen_str_t structure initilised by
+ * json_gen_str_start()
+ * \param[in] name Name of the JSON array string
+ * \param[in] array_str The pre-formatted JSON array string
+ *
+ * \return 0 on Success
+ * \return -1 if buffer is out of space (possible only if no callback function
+ * is passed to json_gen_str_start(). Else, buffer will be flushed out and new data
+ * added after that.
+ */
+int json_gen_push_array_str(json_gen_str_t *jstr, char *name, char *array_str);
 
 /** Add a boolean element to an object
  *
