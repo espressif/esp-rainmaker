@@ -17,6 +17,7 @@
 #include <ctype.h>
 #include <nvs_flash.h>
 #include <esp_log.h>
+#include <esp_wifi.h>
 #include <esp_console.h>
 #include <esp_system.h>
 #include <argtable3/argtable3.h>
@@ -28,6 +29,7 @@
 #include <freertos/task.h>
 #include <esp_timer.h>
 #include <lwip/sockets.h>
+#include <wifi_provisioning/manager.h>
 
 #include <esp_rmaker_core.h>
 #include <esp_rmaker_user_mapping.h>
@@ -323,10 +325,38 @@ static void register_get_node_id()
     esp_console_cmd_register(&cmd);
 }
 
+static int wifi_prov_handler(int argc, char** argv)
+{
+    if (argc < 2) {
+        printf("%s: Invalid Usage.\n", TAG);
+        return ESP_ERR_INVALID_ARG;
+    }
+    wifi_config_t wifi_config;
+    memset(&wifi_config, 0, sizeof(wifi_config));
+    memcpy(wifi_config.sta.ssid, argv[1], strlen(argv[1]));
+    if (argc == 3) {
+        memcpy(wifi_config.sta.password, argv[2], strlen(argv[2]));
+    }
+    wifi_prov_mgr_configure_sta(&wifi_config);
+    return ESP_OK;
+}
+
+static void register_wifi_prov()
+{
+    const esp_console_cmd_t cmd = {
+        .command = "wifi-prov",
+        .help = "Wi-Fi Provision the node. Usage: wifi-prov <ssid> [<passphrase>]",
+        .func = &wifi_prov_handler,
+    };
+    ESP_LOGI(TAG, "Registering command: %s", cmd.command);
+    esp_console_cmd_register(&cmd);
+}
+
 void register_commands()
 {
     register_generic_debug_commands();
     register_reset_to_factory();
     register_user_node_mapping();
     register_get_node_id();
+    register_wifi_prov();
 }
