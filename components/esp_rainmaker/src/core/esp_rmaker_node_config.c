@@ -156,7 +156,7 @@ static esp_err_t esp_rmaker_report_param_config(_esp_rmaker_param_t *param, json
     if (param->valid_str_list) {
         json_gen_push_array(jptr, "valid_strs");
         for (int i = 0; i < param->valid_str_list->str_list_cnt; i++) {
-            json_gen_arr_set_string(jptr, param->valid_str_list->str_list[i]);
+            json_gen_arr_set_string(jptr, (char *)param->valid_str_list->str_list[i]);
         }
         json_gen_pop_array(jptr);
     }
