@@ -27,16 +27,50 @@ typedef struct esp_rmaker_time_config {
 
 /** Reboot the chip after a delay
  *
- * This API just starts an esp_timer and executes a reboot from that.
- * Useful if you want to reboot after a delay, to allow other tasks to finish
- * their operations (Eg. MQTT publish to indicate OTA success)
+ * This API just starts a reboot timer and returns immediately.
+ * The actual reboot is trigerred asynchronously in the timer callback.
+ * This is useful if you want to reboot after a delay, to allow other tasks to finish
+ * their operations (Eg. MQTT publish to indicate OTA success). The \ref RMAKER_EVENT_REBOOT
+ * event is triggered when the reboot timer is started.
  *
- * @param[in] seconds Time in seconds after which the chip should reboot
+ * @param[in] seconds Time in seconds after which the chip should reboot.
  *
- * @return ESP_OK on success
- * @return error on failure
+ * @return ESP_OK on success.
+ * @return error on failure.
  */
 esp_err_t esp_rmaker_reboot(uint8_t seconds);
+
+/** Reset Wi-Fi credentials and reboot
+ *
+ * This will reset just the Wi-Fi credentials and trigger a reboot.
+ * This is useful when you want to keep all the entries in NVS memory
+ * intact, but just change the Wi-Fi credentials. The \ref RMAKER_EVENT_WIFI_RESET
+ * event is triggered after the reset.
+ *
+ * @note This function internally calls esp_rmaker_reboot() and returns
+ * immediately. The reboot happens asynchronously.
+ *
+ * @param[in] seconds Time in seconds after which the chip should reboot.
+ *
+ * @return ESP_OK on success.
+ * @return error on failure.
+ */
+esp_err_t esp_rmaker_wifi_reset(uint8_t seconds);
+
+/** Reset to factory defaults and reboot
+ *
+ * This will clear entire NVS partition and trigger a reboot.
+ * The \ref RMAKER_EVENT_FACTORY_RESET event is triggered after the reset.
+ *
+ * @note This function internally calls esp_rmaker_reboot() and returns.
+ * The reboot happens asynchronously.
+ *
+ * @param[in] seconds Time in seconds after which the chip should reboot.
+ *
+ * @return ESP_OK on success.
+ * @return error on failure.
+ */
+esp_err_t esp_rmaker_factory_reset(uint8_t seconds);
 
 /** Initialize time synchronization
  *
