@@ -18,6 +18,17 @@
 #include <json_generator.h>
 #include <esp_rmaker_core.h>
 #define RMAKER_PARAM_FLAG_VALUE_CHANGE   0x01
+typedef struct {
+    esp_rmaker_param_val_t min;
+    esp_rmaker_param_val_t max;
+    esp_rmaker_param_val_t step;
+} esp_rmaker_param_bounds_t;
+
+typedef struct {
+    uint8_t str_list_cnt;
+    const char **str_list;
+} esp_rmaker_param_valid_str_list_t;
+
 struct esp_rmaker_param {
     char *name;
     char *type;
@@ -25,9 +36,8 @@ struct esp_rmaker_param {
     uint8_t prop_flags;
     char *ui_type;
     esp_rmaker_param_val_t val;
-    esp_rmaker_param_val_t min;
-    esp_rmaker_param_val_t max;
-    esp_rmaker_param_val_t step;
+    esp_rmaker_param_bounds_t *bounds;
+    esp_rmaker_param_valid_str_list_t *valid_str_list;
     struct esp_rmaker_device *parent;
     struct esp_rmaker_param * next;
 };

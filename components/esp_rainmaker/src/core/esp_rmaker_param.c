@@ -411,10 +411,44 @@ esp_err_t esp_rmaker_param_add_bounds(const esp_rmaker_param_t *param,
         ESP_LOGE(TAG, "Cannot set bounds for %s because of value type mismatch.", _param->name);
         return ESP_ERR_INVALID_ARG;
     }
-    _param->min = min;
-    _param->max = max;
-    _param->step = step;
+    esp_rmaker_param_bounds_t *bounds = calloc(1, sizeof(esp_rmaker_param_bounds_t));
+    if (!bounds) {
+        ESP_LOGE(TAG, "Failed to allocate memory for parameter bounds.");
+        return ESP_ERR_NO_MEM;
+    }
+    bounds->min = min;
+    bounds->max = max;
+    bounds->step = step;
+    if (_param->bounds) {
+        free(_param->bounds);
+    }
+    _param->bounds = bounds;
     return ESP_OK;
+}
+
+esp_err_t esp_rmaker_param_add_valid_str_list(const esp_rmaker_param_t *param, const char *strs[], uint8_t count)
+{
+    if (!param) {
+        ESP_LOGE(TAG, "Param handle cannot be NULL.");
+        return ESP_ERR_INVALID_ARG;
+    }
+    _esp_rmaker_param_t *_param = (_esp_rmaker_param_t *)param;
+    if (_param->val.type != RMAKER_VAL_TYPE_STRING) {
+        ESP_LOGE(TAG, "Only string params can have valid strings array.");
+        return ESP_ERR_INVALID_ARG;
+    }
+    esp_rmaker_param_valid_str_list_t *valid_str_list = calloc(1, sizeof(esp_rmaker_param_valid_str_list_t));
+    if (!valid_str_list) {
+        ESP_LOGE(TAG, "Failed to allocate memory for valid strings array.");
+        return ESP_ERR_NO_MEM;
+    }
+    valid_str_list->str_list = strs;
+    valid_str_list->str_list_cnt = count;
+    if (_param->valid_str_list) {
+        free(_param->valid_str_list);
+    }
+    _param->valid_str_list = valid_str_list;
+  return ESP_OK;
 }
 
 esp_err_t esp_rmaker_param_add_ui_type(const esp_rmaker_param_t *param, const char *ui_type)

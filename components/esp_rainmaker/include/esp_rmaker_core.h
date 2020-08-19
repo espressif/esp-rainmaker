@@ -578,7 +578,9 @@ esp_err_t esp_rmaker_param_add_ui_type(const esp_rmaker_param_t *param, const ch
  *
  * This can be used to add bounds (min/max values) for a given integer parameter. Eg. brightness
  * will have bounds as 0 and 100 if it is a percentage.
- * Eg. esp_rmaker_param_add_bounds("Light", "brightness", esp_rmaker_int(0), esp_rmaker_int(100), esp_rmaker_int(5));
+ * Eg. esp_rmaker_param_add_bounds(brightness_param, esp_rmaker_int(0), esp_rmaker_int(100), esp_rmaker_int(5));
+ *
+ * @note The RainMaker core does not check the bounds. It is upto the application to handle it.
  *
  * @param[in] param Parameter handle.
  * @param[in] min Minimum allowed value.
@@ -590,6 +592,27 @@ esp_err_t esp_rmaker_param_add_ui_type(const esp_rmaker_param_t *param, const ch
  */
 esp_err_t esp_rmaker_param_add_bounds(const esp_rmaker_param_t *param,
     esp_rmaker_param_val_t min, esp_rmaker_param_val_t max, esp_rmaker_param_val_t step);
+
+/**
+ * Add a list of valid strings for a string parameter
+ *
+ * This can be used to add a list of valid strings for a given string parameter.
+ *
+ * Eg.
+ * static const char *valid_strs[] = {"None","Yes","No","Can't Say"};
+ * esp_rmaker_param_add_valid_str_list(param, valid_strs, 4);
+ *
+ * @note The RainMaker core does not check the values. It is upto the application to handle it.
+ *
+ * @param[in] param Parameter handle.
+ * @param[in] strs Pointer to an array of strings. Note that this memory should stay allocated
+ * throughout the lifetime of this parameter.
+ * @param[in] count Number of strings in the above array.
+ *
+ * @return ESP_OK on success.
+ * return error in case of failure.
+ */
+esp_err_t esp_rmaker_param_add_valid_str_list(const esp_rmaker_param_t *param, const char *strs[], uint8_t count);
 
 /** Update and report a parameter
  *

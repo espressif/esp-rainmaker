@@ -144,15 +144,21 @@ static esp_err_t esp_rmaker_report_param_config(_esp_rmaker_param_t *param, json
         json_gen_arr_set_string(jptr, "time_series");
     }
     json_gen_pop_array(jptr);
-    if ((param->min.type != RMAKER_VAL_TYPE_INVALID) || (param->max.type != RMAKER_VAL_TYPE_INVALID)) {
+    if (param->bounds) {
         json_gen_push_object(jptr, "bounds");
-        esp_rmaker_report_value(&param->min, "min", jptr);
-        esp_rmaker_report_value(&param->max, "max", jptr);
-        if (param->step.val.i) {
-            esp_rmaker_report_value(&param->step, "step", jptr);
+        esp_rmaker_report_value(&param->bounds->min, "min", jptr);
+        esp_rmaker_report_value(&param->bounds->max, "max", jptr);
+        if (param->bounds->step.val.i) {
+            esp_rmaker_report_value(&param->bounds->step, "step", jptr);
         }
         json_gen_pop_object(jptr);
-
+    }
+    if (param->valid_str_list) {
+        json_gen_push_array(jptr, "valid_strs");
+        for (int i = 0; i < param->valid_str_list->str_list_cnt; i++) {
+            json_gen_arr_set_string(jptr, param->valid_str_list->str_list[i]);
+        }
+        json_gen_pop_array(jptr);
     }
     if (param->ui_type) {
         json_gen_obj_set_string(jptr, "ui_type", param->ui_type);
