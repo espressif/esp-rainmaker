@@ -8,26 +8,23 @@
 */
 
 #include <sdkconfig.h>
-#include <esp_log.h>
-#include <driver/rmt.h>
 
 #include <iot_button.h>
-#include <led_strip.h>
 #include <esp_rmaker_core.h>
 #include <esp_rmaker_standard_params.h> 
 
 #include <app_reset.h>
+#include <ws2812_led.h>
 #include "app_priv.h"
 
-#define RMT_TX_CHANNEL RMT_CHANNEL_0
 /* This is the button that is used for toggling the power */
 #define BUTTON_GPIO          0
 #define BUTTON_ACTIVE_LEVEL  0
+
 /* This is the GPIO on which the power will be set */
 #define OUTPUT_GPIO    19
-static led_strip_t *strip;
 static bool g_power_state = DEFAULT_POWER;
-static const char *TAG = "app_driver";
+
 /* These values correspoind to H,S,V = 120,100,10 */
 #define DEFAULT_RED     0
 #define DEFAULT_GREEN   25
@@ -38,36 +35,18 @@ static const char *TAG = "app_driver";
 
 static void app_indicator_set(bool state)
 {
-    if (!strip) {
-        return;
-    }
     if (state) {
-        strip->set_pixel(strip, 0, DEFAULT_RED, DEFAULT_GREEN, DEFAULT_BLUE);
-        strip->refresh(strip, 100);
+        ws2812_led_set_rgb(DEFAULT_RED, DEFAULT_GREEN, DEFAULT_BLUE);
     } else {
-        strip->clear(strip, 100);
+        ws2812_led_clear();
     }
 }
 
 static void app_indicator_init(void)
 {
-    rmt_config_t config = RMT_DEFAULT_CONFIG_TX(CONFIG_APP_LED_GPIO, RMT_TX_CHANNEL);
-    // set counter clock to 40MHz
-    config.clk_div = 2;
-
-    ESP_ERROR_CHECK(rmt_config(&config));
-    ESP_ERROR_CHECK(rmt_driver_install(config.channel, 0, 0));
-
-    // install ws2812 driver
-    led_strip_config_t strip_config = LED_STRIP_DEFAULT_CONFIG(CONFIG_APP_LED_GPIO, (led_strip_dev_t)config.channel);
-    strip = led_strip_new_rmt_ws2812(&strip_config);
-    if (!strip) {
-        ESP_LOGE(TAG, "install WS2812 driver failed");
-        return;
-    }
+    ws2812_led_init();
     app_indicator_set(g_power_state);
 }
-
 static void push_btn_cb(void *arg)
 {
     bool new_state = !g_power_state;

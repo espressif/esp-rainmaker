@@ -1,0 +1,18 @@
+menu "WS2812 RGB LED"
+    visible if IDF_TARGET_ESP32S2
+
+    config WS2812_LED_ENABLE
+        bool "Enable RGB LED"
+        depends on IDF_TARGET_ESP32S2
+        default y 
+        help
+            Disable the WS2812 RGB LED.
+
+    config WS2812_LED_GPIO
+        int "WS2812 LED GPIO"
+        default 18
+        depends on WS2812_LED_ENABLE
+        help
+            Set the WS2812 RGB LED GPIO.
+
+endmenu
