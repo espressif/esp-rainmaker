@@ -18,6 +18,10 @@ The key features of ESP RainMaker are:
 2. Zero configuration required on the Cloud.
 3. Phone apps that dynamically render the UI as per the device information.
 
+## Supported ESP-IDF versions
+
+ESP RainMaker can work with ESP IDF 4.0 and above.
+
 ## Phone Apps
 
 ### Android

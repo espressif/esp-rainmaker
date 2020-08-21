@@ -12,6 +12,18 @@
 #include <esp_wifi.h>
 #include <esp_event.h>
 #include <esp_log.h>
+#include <esp_idf_version.h>
+#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(4, 1, 0)
+// Features supported in 4.1+
+#define ESP_NETIF_SUPPORTED
+#endif
+
+#ifdef ESP_NETIF_SUPPORTED
+#include <esp_netif.h>
+#else
+#include <tcpip_adapter.h>
+#endif
+
 #include <wifi_provisioning/manager.h>
 #ifdef CONFIG_APP_WIFI_PROV_TRANSPORT_BLE
 #include <wifi_provisioning/scheme_ble.h>
@@ -181,7 +193,11 @@ static esp_err_t get_device_pop(char *pop, size_t max, app_wifi_pop_type_t pop_t
 void app_wifi_init(void)
 {
     /* Initialize TCP/IP */
+#ifdef ESP_NETIF_SUPPORTED
     esp_netif_init();
+#else
+    tcpip_adapter_init();
+#endif
 
     /* Initialize the event loop */
     ESP_ERROR_CHECK(esp_event_loop_create_default());
@@ -193,7 +209,9 @@ void app_wifi_init(void)
     ESP_ERROR_CHECK(esp_event_handler_register(IP_EVENT, IP_EVENT_STA_GOT_IP, &event_handler, NULL));
 
     /* Initialize Wi-Fi including netif with default config */
+#ifdef ESP_NETIF_SUPPORTED
     esp_netif_create_default_wifi_sta();
+#endif
     wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
     ESP_ERROR_CHECK(esp_wifi_init(&cfg));
 }
@@ -236,7 +254,9 @@ esp_err_t app_wifi_start(app_wifi_pop_type_t pop_type)
     /* If device is not yet provisioned start provisioning service */
     if (!provisioned) {
         ESP_LOGI(TAG, "Starting provisioning");
+#ifdef ESP_NETIF_SUPPORTED
         esp_netif_create_default_wifi_ap();
+#endif
 
         /* What is the Device Service Name that we want
          * This translates to :
