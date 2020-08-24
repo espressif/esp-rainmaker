@@ -85,6 +85,14 @@ menu "ESP RainMaker Config"
         default 1 if ESP_RMAKER_MQTT_PORT_443
         default 2 if ESP_RMAKER_MQTT_PORT_8883
 
+    config ESP_RMAKER_DEF_TIMEZONE
+        string "Default Timezone"
+        default ""
+        help
+            Default Timezone to use. Eg. "Asia/Shanghai", "America/Los_Angeles".
+            Check documentation for complete list of valid values. This value
+            will be used only if no timezone is set using the C APIs.
+
     config ESP_RMAKER_SNTP_SERVER_NAME
         string "ESP RainMaker SNTP Server Name"
         default "pool.ntp.org"

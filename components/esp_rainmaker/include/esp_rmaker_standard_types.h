@@ -41,7 +41,8 @@ extern "C"
 #define ESP_RMAKER_PARAM_OTA_STATUS     "esp.param.ota_status"
 #define ESP_RMAKER_PARAM_OTA_INFO       "esp.param.ota_info"
 #define ESP_RMAKER_PARAM_OTA_URL        "esp.param.ota_url"
-
+#define ESP_RMAKER_PARAM_TIMEZONE       "esp.param.tz"
+#define ESP_RMAKER_PARAM_TIMEZONE_POSIX       "esp.param.tz_posix"
 
 /********** STANDARD DEVICE TYPES **********/
 
@@ -52,6 +53,7 @@ extern "C"
 
 /********** STANDARD SERVICE TYPES **********/
 #define ESP_RMAKER_SERVICE_OTA          "esp.service.ota"
+#define ESP_RMAKER_SERVICE_TIME         "esp.service.time"
 
 #ifdef __cplusplus
 }
