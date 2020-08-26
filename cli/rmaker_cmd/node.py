@@ -287,15 +287,13 @@ def claim_node(vars=None):
     :rtype: None
     """
     try:
-        if not vars['port'] and not vars['mac'] and not vars['platform'] and not vars['secret_key'] and not vars['addr']:
+        if not vars['port'] and not vars['mac'] and not vars['addr'] and not vars['platform']:
             sys.exit(vars['parser'].print_help())
         if vars['addr'] and not vars['port'] and not vars['platform']:
             sys.exit('Invalid. <port> or --platform argument is needed.')
-        if (vars['secret_key']) and not vars['platform']:
-            sys.exit('Invalid. --platform argument is missing.')
         if vars['port']:
-            if not vars['mac'] and not vars['platform'] and not vars['secret_key']:
-                claim(port=vars['port'], node_platform=vars['platform'], mac_addr=vars['mac'], secret_key=vars['secret_key'], flash_address=vars['addr'])
+            if not vars['mac'] and not vars['platform']:
+                claim(port=vars['port'], node_platform=vars['platform'], mac_addr=vars['mac'], flash_address=vars['addr'])
                 return
         if (vars['mac'] and not vars['platform']):
             sys.exit("Invalid. --platform argument needed.")
@@ -304,9 +302,7 @@ def claim_node(vars=None):
         if vars['mac']:
             if not re.match(r'([0-9A-F]:?){12}', vars['mac']):
                 sys.exit('Invalid MAC address.')
-        if vars['platform'].lower() == "esp32" and vars['secret_key']:
-            sys.exit("Invalid. --secret-key argument not applicable for esp32 platform")
-        claim(port=vars['port'], node_platform=vars['platform'], mac_addr=vars['mac'], secret_key=vars['secret_key'], flash_address=vars['addr'])
+        claim(port=vars['port'], node_platform=vars['platform'], mac_addr=vars['mac'], flash_address=vars['addr'])
     except Exception as claim_err:
         log.error(claim_err)
         return
