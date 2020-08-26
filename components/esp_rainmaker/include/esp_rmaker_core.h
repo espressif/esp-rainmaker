@@ -39,6 +39,14 @@ typedef enum {
     RMAKER_EVENT_CLAIM_SUCCESSFUL,
     /** Self Claiming Failed */
     RMAKER_EVENT_CLAIM_FAILED,
+    /** Node reboot has been triggered. The associated event data is the time in seconds
+     * (type: uint8_t) after which the node will reboot. Note that this time may not be
+     * accurate as the events are received asynchronously.*/
+    RMAKER_EVENT_REBOOT,
+    /** Wi-Fi credentials reset. Triggered after calling esp_rmaker_wifi_reset() */
+    RMAKER_EVENT_WIFI_RESET,
+    /** Node reset to factory defaults. Triggered after calling esp_rmaker_factory_reset() */
+    RMAKER_EVENT_FACTORY_RESET
 } esp_rmaker_event_t;
 
 /** ESP RainMaker Node information */
