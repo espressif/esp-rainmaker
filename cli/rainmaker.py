@@ -145,10 +145,6 @@ def main():
                               type=str,
                               help='Node MAC address in the format AABBCC112233.')
 
-    claim_parser.add_argument("--secret-key", metavar='<secret-key>',
-                              type=str,
-                              help='Unique secret key read from the efuse in the format 009b77a8a38d989e9e5c3ddd790cc619.\nRequired for esp32s2 only.')
-    
     claim_parser.add_argument("--addr", metavar='<flash-address>',
                               help='Address in the flash memory where the claim data will be written.\nDefault: 0x340000')
     claim_parser.set_defaults(func=claim_node, parser=claim_parser)

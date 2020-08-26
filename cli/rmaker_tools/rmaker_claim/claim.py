@@ -94,15 +94,15 @@ def get_node_platform_and_mac(port):
     :param port: Serial Port
     :type port: str
 
-    :return: Node Platform and Mac Address on Success
+    :return: Node Platform and MAC Address on Success
     :rtype: str
     """
     if not port:
-        sys.exit("<port> argument not provided. Cannot read platform and MAC address from node.")
+        sys.exit("<port> argument not provided. Cannot read MAC address from node.")
     sys.stdout = mystdout = StringIO()
     command = ['--port', port, 'chip_id']
     log.info("Running esptool command to get node\
-    platform and mac from device")
+        platform and mac from device")
     esptool.main(command)
     sys.stdout = sys.__stdout__
     # Finding chip type from output.
@@ -119,57 +119,6 @@ def get_node_platform_and_mac(port):
     log.debug("MAC address received: " + mac_addr)
     log.debug("Node platform is: " + platform)
     return platform, mac_addr
-
-def get_secret_key(port):
-    """
-    Generate Secret Key
-
-    :param port: Serial Port
-    :type port: str
-
-    :param esptool: esptool module
-    :type esptool: module
-
-    :return: Secret Key on Success
-    :rtype: str
-    """
-    if not port:
-        sys.exit("<port> argument not provided. Cannot read secret_key from node.")
-    esp = esptool.ESP32S2ROM(port)
-    esp.connect('default_reset')
-    for (name, idx, read_addr, _, _) in BLOCKS:
-        addrs = range(read_addr, read_addr + 32, 4)
-        secret = "".join(["%08x" % esp.read_reg(addr) for addr in addrs[0:4]])
-        secret = secret[6:8]+secret[4:6]+secret[2:4]+secret[0:2] +\
-            secret[14:16]+secret[12:14]+secret[10:12]+secret[8:10] +\
-            secret[22:24]+secret[20:22]+secret[18:20]+secret[16:18] +\
-            secret[30:32]+secret[28:30]+secret[26:28]+secret[24:26]
-    # Verify secret key exists
-    secret_key_tmp = secret.strip('0')
-    if not secret_key_tmp:
-        return False
-    return secret
-
-def gen_hmac_challenge_resp(secret_key, hmac_challenge):
-    """
-    Generate HMAC Challenge Response
-
-    :param secret_key: Secret Key to generate HMAC Challenge Response
-    :type secret_key: str
-
-    :param hmac_challenge: HMAC Challenge received in
-                           esp32s2 claim initate response
-    :type hmac_challenge: str
-
-    :return: HMAC Challenge Response on Success
-    :rtype: str
-    """
-    h = hmac.HMAC(bytes.fromhex(secret_key),
-                  hashes.SHA512(),
-                  backend=default_backend())
-    h.update(bytes(hmac_challenge, 'utf-8'))
-    hmac_challenge_response = binascii.hexlify(h.finalize()).decode()
-    return hmac_challenge_response
 
 def gen_host_csr(private_key, common_name=None):
     """
@@ -328,51 +277,20 @@ def gen_nvs_partition_bin(dest_filedir, output_bin_filename):
                 dest_filedir + output_bin_filename)
     nvs_partition_gen.generate(nvs_args)
 
-def set_claim_verify_data(claim_init_resp, private_key, mac_addr=None, secret_key=None):
-    # set claim verify data for node_platform = esp32
-    if not mac_addr and not secret_key:
-        # Generate CSR with common_name=node_id received in response
-        node_id = str(json.loads(
-            claim_init_resp.text)['node_id'])
-        print("Generating CSR")
-        log.info("Generating CSR")
-        csr = gen_host_csr(private_key, common_name=node_id)
-        if not csr:
-            raise Exception("CSR Not Generated. Claiming Failed")
-        log.info("CSR generated")
-        claim_verify_data = {"csr": csr}
-        # Save node id as node info to use while saving claim data
-        # in csv file
-        node_info = node_id
-    else:
-        # set claim verify data for node_platform = esp32s2
-        auth_id = str(json.loads(
-            claim_init_resp.text)['auth_id'])
-        hmac_challenge = str(json.loads(
-            claim_init_resp.text)['challenge'])
-        print("Generating CSR")
-        log.info("Generating CSR")
-        csr = gen_host_csr(private_key, common_name=mac_addr)
-        if not csr:
-            raise Exception("CSR Not Generated. Claiming Failed")
-        log.info("CSR generated")
-        log.info("Generating hmac challenge response")
-        hmac_challenge_response = gen_hmac_challenge_resp(
-            secret_key,
-            hmac_challenge)
-        hmac_challenge_response = hmac_challenge_response.strip('\n')
-        log.debug("Secret Key: " + secret_key)
-        log.debug("HMAC Challenge Response: " +
-                    hmac_challenge_response)
-        claim_verify_data = {"auth_id":
-                             auth_id,
-                             "challenge_response":
-                             hmac_challenge_response,
-                             "csr":
-                             csr}
-        # Save mac addr as node info to use while saving claim data
-        # in csv file
-        node_info = mac_addr
+def set_claim_verify_data(claim_init_resp, private_key):
+    # Generate CSR with common_name=node_id received in response
+    node_id = str(json.loads(
+        claim_init_resp.text)['node_id'])
+    print("Generating CSR")
+    log.info("Generating CSR")
+    csr = gen_host_csr(private_key, common_name=node_id)
+    if not csr:
+        raise Exception("CSR Not Generated. Claiming Failed")
+    log.info("CSR generated")
+    claim_verify_data = {"csr": csr}
+    # Save node id as node info to use while saving claim data
+    # in csv file
+    node_info = node_id
     return claim_verify_data, node_info
 
 def set_claim_initiate_data(mac_addr, node_platform):
@@ -448,7 +366,7 @@ def claim_initiate(claim_init_data, header):
         log.error("Please check the Internet connection.")
         exit(0)
 
-def start_claim_process(node_platform, mac_addr, private_key, secret_key=None):
+def start_claim_process(mac_addr, node_platform, private_key):
     log.info("Creating session")
     curr_session = session.Session()
     header = curr_session.request_header
@@ -460,10 +378,7 @@ def start_claim_process(node_platform, mac_addr, private_key, secret_key=None):
         claim_init_resp = claim_initiate(claim_init_data, header)
 
         # Set claim verify data
-        if node_platform == "esp32":
-            claim_verify_data, node_info = set_claim_verify_data(claim_init_resp, private_key)
-        else:
-            claim_verify_data, node_info = set_claim_verify_data(claim_init_resp, private_key, mac_addr=mac_addr, secret_key=secret_key)
+        claim_verify_data, node_info = set_claim_verify_data(claim_init_resp, private_key)
 
         # Perform claim verify request
         claim_verify_resp = claim_verify(claim_verify_data, header)
@@ -496,12 +411,6 @@ def generate_private_key():
         format=serialization.PrivateFormat.TraditionalOpenSSL,
         encryption_algorithm=serialization.NoEncryption())
     return private_key, private_key_bytes
-
-def verify_secret_key_exists(secret_key):
-    secret_key_tmp = secret_key.strip('0')
-    if not secret_key_tmp:
-        return False
-    return True
 
 def verify_mac_dir_exists(creds_dir, mac_addr):
     mac_dir = Path(path.expanduser(str(creds_dir) + '/' + mac_addr))
@@ -622,18 +531,19 @@ def set_csv_file_data(dest_filedir):
                     ]
     return node_info_csv
 
-def validate_secret_key(secret_key):
-    if not re.match(r'([0-9a-f]){32}', secret_key):
-        return False
-    return True
-
-def claim(port=None, node_platform=None, mac_addr=None, secret_key=None, flash_address=None):
+def claim(port=None, node_platform=None, mac_addr=None, flash_address=None):
     """
     Claim the node connected to the given serial port
     (Get cloud credentials)
 
     :param port: Serial Port
     :type port: str
+    
+    :param mac_addr: MAC Addr
+    :type mac_addr: str
+
+    :param flash_address: Flash Address
+    :type flash_address: str
 
     :raises Exception: If there is an HTTP issue while claiming
             SSLError: If there is an issue in SSL certificate validation
@@ -646,7 +556,6 @@ def claim(port=None, node_platform=None, mac_addr=None, secret_key=None, flash_a
         node_info = None
         private_key = None
         hex_str = None
-        secret_key_valid = None
         claim_data_binary_exists = False
         dest_filedir = None
         output_bin_filename = None
@@ -660,13 +569,6 @@ def claim(port=None, node_platform=None, mac_addr=None, secret_key=None, flash_a
         # Get node platform and mac addr if not provided
         if not node_platform and not mac_addr:
             node_platform, mac_addr = get_node_platform_and_mac(port)
-            # Node platform detected is esp32s2
-            if node_platform not in ["esp32"]:
-                # Get secret key
-                secret_key = get_secret_key(port)
-                # Set platform to esp32 if node does not have secret key
-                if not secret_key:
-                    node_platform="esp32"
 
         # Verify mac directory exists
         dest_filedir, output_bin_filename  = verify_mac_dir_exists(creds_dir, mac_addr)
@@ -698,13 +600,6 @@ def claim(port=None, node_platform=None, mac_addr=None, secret_key=None, flash_a
             flash_existing_data(port, nvs_bin_filename, flash_address)
             return
 
-        if node_platform not in ["esp32"]:
-            if not secret_key:
-                sys.exit("Invalid. --secret-key argument needed for platform {}.".format(node_platform))
-            secret_key_valid = validate_secret_key(secret_key)
-            if not secret_key_valid:
-                sys.exit('Invalid Secret Key.')
-
         start = time.time()
 
         # Generate private key
@@ -714,7 +609,7 @@ def claim(port=None, node_platform=None, mac_addr=None, secret_key=None, flash_a
         log.info("Claiming process started. This may take time.")
 
         # Start claim process
-        node_info, node_cert = start_claim_process(node_platform, mac_addr, private_key, secret_key=secret_key)
+        node_info, node_cert = start_claim_process(mac_addr, node_platform, private_key)
 
         # Get MQTT endpoint
         endpointinfo = get_mqtt_endpoint()
