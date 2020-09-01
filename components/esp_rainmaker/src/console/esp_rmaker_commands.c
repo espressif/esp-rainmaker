@@ -33,6 +33,7 @@
 
 #include <esp_rmaker_core.h>
 #include <esp_rmaker_user_mapping.h>
+#include <esp_rmaker_utils.h>
 
 #include <esp_rmaker_console_internal.h>
 
@@ -352,6 +353,55 @@ static void register_wifi_prov()
     esp_console_cmd_register(&cmd);
 }
 
+static int local_time_cli_handler(int argc, char *argv[])
+{
+    char local_time[64];
+    if (esp_rmaker_get_local_time_str(local_time, sizeof(local_time)) == ESP_OK) {
+        printf("%s: Current local time: %s\n", TAG, local_time);
+    } else {
+        printf("%s: Current local time (truncated): %s\n", TAG, local_time);
+    }
+    return ESP_OK;
+}
+
+static int tz_set_cli_handler(int argc, char *argv[])
+{
+    if (argc < 2) {
+        printf("%s: Invalid Usage.\n", TAG);
+        return ESP_ERR_INVALID_ARG;
+    }
+    if (strcmp(argv[1], "posix") == 0) {
+        if (argv[2]) {
+            esp_rmaker_time_set_timezone_posix(argv[2]);
+        } else {
+            printf("%s: Invalid Usage.\n", TAG);
+            return ESP_ERR_INVALID_ARG;
+        }
+    } else {
+        esp_rmaker_time_set_timezone(argv[1]);
+    }
+    return ESP_OK;
+}
+
+static void register_time_commands()
+{
+    const esp_console_cmd_t local_time_cmd = {
+        .command = "local-time",
+        .help = "Get the local time of device.",
+        .func = &local_time_cli_handler,
+    };
+    ESP_LOGI(TAG, "Registering command: %s", local_time_cmd.command);
+    esp_console_cmd_register(&local_time_cmd);
+
+    const esp_console_cmd_t tz_set_cmd = {
+        .command = "tz-set",
+        .help = "Set Timezone. Usage: tz-set [posix] <tz_string>.",
+        .func = &tz_set_cli_handler,
+    };
+    ESP_LOGI(TAG, "Registering command: %s", tz_set_cmd.command);
+    esp_console_cmd_register(&tz_set_cmd);
+}
+
 void register_commands()
 {
     register_generic_debug_commands();
@@ -359,4 +409,5 @@ void register_commands()
     register_user_node_mapping();
     register_get_node_id();
     register_wifi_prov();
+    register_time_commands();
 }
