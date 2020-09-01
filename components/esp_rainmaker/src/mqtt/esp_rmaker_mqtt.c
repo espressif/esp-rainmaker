@@ -19,8 +19,23 @@
 #include <freertos/event_groups.h>
 #include <esp_log.h>
 #include <mqtt_client.h>
-
 #include <esp_rmaker_mqtt.h>
+
+#include <esp_idf_version.h>
+#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(4, 1, 0)
+// Features supported in 4.1
+
+#ifdef CONFIG_ESP_RMAKER_MQTT_PORT_443
+#define ESP_RMAKER_MQTT_USE_PORT_443
+#endif
+
+#else
+
+#ifdef CONFIG_ESP_RMAKER_MQTT_PORT_443
+#warning "Port 443 not supported in idf versions below 4.1. Using 8883 instead."
+#endif
+
+#endif /* !IDF4.1 */
 
 static const char *TAG = "esp_rmaker_mqtt";
 
@@ -212,9 +227,9 @@ esp_err_t esp_rmaker_mqtt_disconnect(void)
     }
     return err;
 }
-#ifdef CONFIG_ESP_RMAKER_MQTT_PORT_443
+#ifdef ESP_RMAKER_MQTT_USE_PORT_443
 static const char *alpn_protocols[] = { "x-amzn-mqtt-ca", NULL };
-#endif /* CONFIG_ESP_RMAKER_MQTT_PORT_443 */
+#endif /* ESP_RMAKER_MQTT_USE_PORT_443 */
 esp_err_t esp_rmaker_mqtt_init(esp_rmaker_mqtt_config_t *config)
 {
     if (mqtt_data) {
@@ -229,13 +244,12 @@ esp_err_t esp_rmaker_mqtt_init(esp_rmaker_mqtt_config_t *config)
     mqtt_data->config = config;
     const esp_mqtt_client_config_t mqtt_client_cfg = {
         .host = config->mqtt_host,
-#ifdef CONFIG_ESP_RMAKER_MQTT_PORT_443
+#ifdef ESP_RMAKER_MQTT_USE_PORT_443
         .port = 443,
         .alpn_protos = alpn_protocols,
-#endif /* CONFIG_ESP_RMAKER_MQTT_PORT_443 */
-#ifdef CONFIG_ESP_RMAKER_MQTT_PORT_8883
+#else
         .port = 8883,
-#endif /* CONFIG_ESP_RMAKER_MQTT_PORT_8883 */
+#endif /* !ESP_RMAKER_MQTT_USE_PORT_443 */
         .cert_pem = (const char *)config->server_cert,
         .client_cert_pem = (const char *)config->client_cert,
         .client_key_pem = (const char *)config->client_key,

@@ -28,7 +28,7 @@ I (16073) app_main: Received value = true for Switch - power
 
 ### LED not working?
 
-The ESP32-S2-Saola-1 board has the RGB LED connected to GPIO 18. However, a few earlier boards may have it on GPIO 17. Please use `CONFIG_APP_LED_GPIO` to set the appropriate value.
+The ESP32-S2-Saola-1 board has the RGB LED connected to GPIO 18. However, a few earlier boards may have it on GPIO 17. Please use `CONFIG_WS2812_LED_GPIO` to set the appropriate value.
 
 ### Reset to Factory
 
