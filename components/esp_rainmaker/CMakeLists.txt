@@ -12,6 +12,12 @@ set(core_srcs "src/core/esp_rmaker_core.c"
         "src/core/esp_rmaker_utils.c"
         "src/core/esp_rmaker_user_mapping.c")
 
+
+if(CONFIG_ESP_RMAKER_ASSISTED_CLAIM)
+    list(APPEND core_srcs
+        "src/core/esp_rmaker_claim.c"
+        "src/core/esp_rmaker_claim.pb-c.c")
+endif()
 if(CONFIG_ESP_RMAKER_SELF_CLAIM)
     list(APPEND core_srcs
         "src/core/esp_rmaker_claim.c")

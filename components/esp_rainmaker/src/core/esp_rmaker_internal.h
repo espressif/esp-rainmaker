@@ -79,6 +79,7 @@ typedef struct {
 } _esp_rmaker_node_t;
 
 esp_rmaker_node_t *esp_rmaker_node_create(const char *name, const char *type);
+esp_err_t esp_rmaker_change_node_id(char *node_id, size_t len);
 esp_err_t esp_rmaker_report_value(const esp_rmaker_param_val_t *val, char *key, json_gen_str_t *jptr);
 esp_err_t esp_rmaker_report_data_type(esp_rmaker_val_type_t type, json_gen_str_t *jptr);
 esp_err_t esp_rmaker_report_node_config(void);
