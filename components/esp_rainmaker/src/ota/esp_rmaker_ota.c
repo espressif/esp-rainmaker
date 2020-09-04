@@ -28,6 +28,7 @@
 static const char *TAG = "esp_rmaker_ota";
 
 #define OTA_REBOOT_TIMER_SEC    10
+#define DEF_HTTP_BUFFER_SIZE    1024
 
 extern const char esp_rmaker_ota_def_cert[] asm("_binary_ota_server_crt_start");
 const char *ESP_RMAKER_OTA_DEFAULT_SERVER_CERT = esp_rmaker_ota_def_cert;
@@ -128,13 +129,20 @@ static esp_err_t esp_rmaker_ota_default_cb(esp_rmaker_ota_handle_t ota_handle, e
     if (!ota_data->url) {
         return ESP_FAIL;
     }
+    int buffer_size_tx = DEF_HTTP_BUFFER_SIZE;
+    /* In case received url is longer, we will increase the tx buffer size
+     * to accomodate the longer url and other headers.
+     */
+    if (strlen(ota_data->url) > buffer_size_tx) {
+        buffer_size_tx = strlen(ota_data->url) + 128;
+    }
     esp_err_t ota_finish_err = ESP_OK;
     esp_http_client_config_t config = {
         .url = ota_data->url,
         .cert_pem = ota_data->server_cert,
         .timeout_ms = 5000,
-        .buffer_size = 1024,
-        .buffer_size_tx = 1024
+        .buffer_size = DEF_HTTP_BUFFER_SIZE,
+        .buffer_size_tx = buffer_size_tx
     };
     config.skip_cert_common_name_check = true;
 #ifdef CONFIG_ESP_RMAKER_SKIP_COMMON_NAME_CHECK

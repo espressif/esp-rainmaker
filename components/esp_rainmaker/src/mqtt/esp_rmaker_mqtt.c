@@ -57,13 +57,19 @@ esp_rmaker_mqtt_data_t *mqtt_data;
 const int MQTT_CONNECTED_EVENT = BIT1;
 static EventGroupHandle_t mqtt_event_group;
 
+typedef struct {
+    char *data;
+    char *topic;
+} esp_rmaker_mqtt_long_data_t;
+
 static void esp_rmaker_mqtt_subscribe_callback(const char *topic, int topic_len, const char *data, int data_len)
 {
     esp_rmaker_mqtt_subscription_t **subscriptions = mqtt_data->subscriptions;
     int i;
     for (i = 0; i < MAX_MQTT_SUBSCRIPTIONS; i++) {
         if (subscriptions[i]) {
-            if (strncmp(topic, subscriptions[i]->topic, topic_len) == 0) {
+            if ((strncmp(topic, subscriptions[i]->topic, topic_len) == 0)
+                    && (topic_len == strlen(subscriptions[i]->topic))) {
                 subscriptions[i]->cb(subscriptions[i]->topic, (void *)data, data_len, subscriptions[i]->priv);
             }
         }
@@ -141,6 +147,53 @@ esp_err_t esp_rmaker_mqtt_publish(const char *topic, void *data, size_t data_len
     return ESP_OK;
 }
 
+static esp_rmaker_mqtt_long_data_t *esp_rmaker_mqtt_free_long_data(esp_rmaker_mqtt_long_data_t *long_data)
+{
+    if (long_data) {
+        if (long_data->topic) {
+            free(long_data->topic);
+        }
+        if (long_data->data) {
+            free(long_data->data);
+        }
+        free(long_data);
+    }
+    return NULL;
+}
+
+static esp_rmaker_mqtt_long_data_t *esp_rmaker_mqtt_manage_long_data(esp_rmaker_mqtt_long_data_t *long_data,
+        esp_mqtt_event_handle_t event)
+{
+    if (event->topic) {
+        /* This is new data. Free any earlier data, if present. */
+        esp_rmaker_mqtt_free_long_data(long_data);
+        long_data = calloc(1, sizeof(esp_rmaker_mqtt_long_data_t));
+        if (!long_data) {
+            ESP_LOGE(TAG, "Could not allocate memory for esp_rmaker_mqtt_long_data_t");
+            return NULL;
+        }
+        long_data->data = calloc(1, event->total_data_len);
+        if (!long_data->data) {
+            ESP_LOGE(TAG, "Could not allocate %d bytes for received data.", event->total_data_len);
+            return esp_rmaker_mqtt_free_long_data(long_data);
+        }
+        long_data->topic = strndup(event->topic, event->topic_len);
+        if (!long_data->topic) {
+            ESP_LOGE(TAG, "Could not allocate %d bytes for received topic.", event->topic_len);
+            return esp_rmaker_mqtt_free_long_data(long_data);
+        }
+    }
+    if (long_data) {
+        memcpy(long_data->data + event->current_data_offset, event->data, event->data_len);
+
+        if ((event->current_data_offset + event->data_len) == event->total_data_len) {
+            esp_rmaker_mqtt_subscribe_callback(long_data->topic, strlen(long_data->topic),
+                        long_data->data, event->total_data_len);
+            return esp_rmaker_mqtt_free_long_data(long_data);
+        }
+    }
+    return long_data;
+}
 
 static esp_err_t mqtt_event_handler(esp_mqtt_event_handle_t event)
 {
@@ -168,12 +221,27 @@ static esp_err_t mqtt_event_handler(esp_mqtt_event_handle_t event)
         case MQTT_EVENT_PUBLISHED:
             ESP_LOGD(TAG, "MQTT_EVENT_PUBLISHED, msg_id=%d", event->msg_id);
             break;
-        case MQTT_EVENT_DATA:
+        case MQTT_EVENT_DATA: {
             ESP_LOGD(TAG, "MQTT_EVENT_DATA");
-            ESP_LOGD(TAG, "TOPIC=%.*s\r\n", event->topic_len, event->topic);
+            static esp_rmaker_mqtt_long_data_t *long_data;
+            /* Topic can be NULL, for data longer than the MQTT buffer */
+            if (event->topic) {
+                ESP_LOGD(TAG, "TOPIC=%.*s\r\n", event->topic_len, event->topic);
+            }
             ESP_LOGD(TAG, "DATA=%.*s\r\n", event->data_len, event->data);
-            esp_rmaker_mqtt_subscribe_callback(event->topic, event->topic_len, event->data, event->data_len);
+            if (event->data_len == event->total_data_len) {
+                /* If long_data still exists, it means there was some issue getting the
+                 * long data, and so, it needs to be freed up.
+                 */
+                if (long_data) {
+                    long_data = esp_rmaker_mqtt_free_long_data(long_data);
+                }
+                esp_rmaker_mqtt_subscribe_callback(event->topic, event->topic_len, event->data, event->data_len);
+            } else {
+                long_data = esp_rmaker_mqtt_manage_long_data(long_data, event);
+            }
             break;
+        }
         case MQTT_EVENT_ERROR:
             ESP_LOGE(TAG, "MQTT_EVENT_ERROR");
             break;

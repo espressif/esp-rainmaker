@@ -107,6 +107,7 @@ static void ota_url_handler(const char *topic, void *payload, size_t payload_len
     char *url = NULL, *ota_job_id = NULL;
     int ret = json_parse_start(&jctx, (char *)payload, (int) payload_len);
     if (ret != 0) {
+        ESP_LOGE(TAG, "Invalid JSON received: %s", (char *)payload);
         esp_rmaker_ota_report_status(ota_handle, OTA_STATUS_FAILED, "Aborted. JSON Payload error");
         ota->ota_in_progress = false;
         return;
@@ -114,12 +115,14 @@ static void ota_url_handler(const char *topic, void *payload, size_t payload_len
     int len = 0;
     ret = json_obj_get_strlen(&jctx, "ota_job_id", &len);
     if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Aborted. OTA Updated ID not found in JSON");
         esp_rmaker_ota_report_status(ota_handle, OTA_STATUS_FAILED, "Aborted. OTA Updated ID not found in JSON");
         goto end;
     }
     len++; /* Increment for NULL character */
     ota_job_id = calloc(1, len);
     if (!ota_job_id) {
+        ESP_LOGE(TAG, "Aborted. OTA Updated ID memory allocation failed");
         esp_rmaker_ota_report_status(ota_handle, OTA_STATUS_FAILED, "Aborted. OTA Updated ID memory allocation failed");
         goto end;
     }
@@ -129,12 +132,14 @@ static void ota_url_handler(const char *topic, void *payload, size_t payload_len
     len = 0;
     ret = json_obj_get_strlen(&jctx, "url", &len);
     if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Aborted. URL not found in JSON");
         esp_rmaker_ota_report_status(ota_handle, OTA_STATUS_FAILED, "Aborted. URL not found in JSON");
         goto end;
     }
     len++; /* Increment for NULL character */
     url = calloc(1, len);
     if (!url) {
+        ESP_LOGE(TAG, "Aborted. URL memory allocation failed");
         esp_rmaker_ota_report_status(ota_handle, OTA_STATUS_FAILED, "Aborted. URL memory allocation failed");
         goto end;
     }
