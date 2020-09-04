@@ -233,7 +233,7 @@ class Service:
         :type: str | None
         """
         socket.setdefaulttimeout(100)
-        path = 'user/ota_image'
+        path = 'user/otaimage'
         request_payload = {
             'image_name': img_name,
             'base64_fwimage': fw_img
