@@ -27,3 +27,15 @@ esp_rmaker_device_t *esp_rmaker_ota_service_create(const char *serv_name, void *
     return service;
 }
 
+esp_rmaker_device_t *esp_rmaker_time_service_create(const char *serv_name, const char *timezone,
+        const char *timezone_posix, void *priv_data)
+{
+    esp_rmaker_device_t *service = esp_rmaker_service_create(serv_name, ESP_RMAKER_SERVICE_TIME, priv_data);
+    if (service) {
+        esp_rmaker_device_add_param(service, esp_rmaker_timezone_param_create(
+                ESP_RMAKER_DEF_TIMEZONE_NAME, timezone));
+        esp_rmaker_device_add_param(service, esp_rmaker_timezone_posix_param_create(
+                ESP_RMAKER_DEF_TIMEZONE_POSIX_NAME, timezone_posix));
+    }
+    return service;
+}

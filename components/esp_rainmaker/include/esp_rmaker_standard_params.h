@@ -41,6 +41,8 @@ extern "C"
 #define ESP_RMAKER_DEF_OTA_STATUS_NAME      "status"
 #define ESP_RMAKER_DEF_OTA_INFO_NAME        "info"
 #define ESP_RMAKER_DEF_OTA_URL_NAME         "url"
+#define ESP_RMAKER_DEF_TIMEZONE_NAME        "tz"
+#define ESP_RMAKER_DEF_TIMEZONE_POSIX_NAME  "tz_posix"
 
 /**
  * Create standard name param
@@ -216,6 +218,31 @@ esp_rmaker_param_t *esp_rmaker_ota_info_param_create(const char *param_name);
  */
 esp_rmaker_param_t *esp_rmaker_ota_url_param_create(const char *param_name);
 
+/**
+ * Create standard Timezone param
+ *
+ * This will create the standard timezone parameter.
+ *
+ * @param[in] param_name Name of the parameter
+ * @param[in] val Default Value of the parameter (Eg. "Asia/Shanghai"). Can be kept NULL.
+ *
+ * @return Parameter handle on success.
+ * @return NULL in case of failures.
+ */
+esp_rmaker_param_t *esp_rmaker_timezone_param_create(const char *param_name, const char *val);
+
+/**
+ * Create standard POSIX Timezone param
+ *
+ * This will create the standard posix timezone parameter.
+ *
+ * @param[in] param_name Name of the parameter
+ * @param[in] val Default Value of the parameter (Eg. "CST-8"). Can be kept NULL.
+ *
+ * @return Parameter handle on success.
+ * @return NULL in case of failures.
+ */
+esp_rmaker_param_t *esp_rmaker_timezone_posix_param_create(const char *param_name, const char *val);
 #ifdef __cplusplus
 }
 #endif

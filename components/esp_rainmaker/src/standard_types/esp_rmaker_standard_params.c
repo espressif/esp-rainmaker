@@ -138,3 +138,17 @@ esp_rmaker_param_t *esp_rmaker_ota_url_param_create(const char *param_name)
             esp_rmaker_str(""), PROP_FLAG_WRITE);
     return param;
 }
+
+esp_rmaker_param_t *esp_rmaker_timezone_param_create(const char *param_name, const char *val)
+{
+    esp_rmaker_param_t *param = esp_rmaker_param_create(param_name, ESP_RMAKER_PARAM_TIMEZONE,
+            esp_rmaker_str(val), PROP_FLAG_READ | PROP_FLAG_WRITE);
+    return param;
+}
+
+esp_rmaker_param_t *esp_rmaker_timezone_posix_param_create(const char *param_name, const char *val)
+{
+    esp_rmaker_param_t *param = esp_rmaker_param_create(param_name, ESP_RMAKER_PARAM_TIMEZONE_POSIX,
+            esp_rmaker_str(val), PROP_FLAG_READ | PROP_FLAG_WRITE);
+    return param;
+}
