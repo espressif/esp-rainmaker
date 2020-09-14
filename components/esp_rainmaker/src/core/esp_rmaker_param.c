@@ -34,7 +34,8 @@
 #define ESP_RMAKER_NVS_PART_NAME        "nvs"
 #define MAX_PUBLISH_TOPIC_LEN           64
 
-static char publish_payload[CONFIG_ESP_RMAKER_MAX_PARAM_DATA_SIZE];
+#define MAX_NODE_PARAMS_SIZE           CONFIG_ESP_RMAKER_MAX_PARAM_DATA_SIZE
+static char publish_payload[MAX_NODE_PARAMS_SIZE];
 static char publish_topic[MAX_PUBLISH_TOPIC_LEN];
 
 static const char *TAG = "esp_rmaker_param";
@@ -93,10 +94,10 @@ esp_rmaker_param_val_t esp_rmaker_array(const char *val)
     return param_val;
 }
 
-static esp_err_t esp_rmaker_report_params(uint8_t flags, bool init)
+static esp_err_t esp_rmaker_populate_params(char *buf, size_t buf_len, uint8_t flags, bool reset_flags)
 {
     json_gen_str_t jstr;
-    json_gen_str_start(&jstr, publish_payload, sizeof(publish_payload), NULL, NULL);
+    json_gen_str_start(&jstr, buf, buf_len, NULL, NULL);
     json_gen_start_object(&jstr);
     _esp_rmaker_device_t *device = esp_rmaker_node_get_first_device(esp_rmaker_get_node());
     while (device) {
@@ -109,7 +110,9 @@ static esp_err_t esp_rmaker_report_params(uint8_t flags, bool init)
                     device_added = true;
                 }
                 esp_rmaker_report_value(&param->val, param->name, &jstr);
-                param->flags &= ~flags;
+                if (reset_flags) {
+                    param->flags &= ~flags;
+                }
             }
             param = param->next;
         }
@@ -119,34 +122,63 @@ static esp_err_t esp_rmaker_report_params(uint8_t flags, bool init)
         device = device->next;
     }
     if (json_gen_end_object(&jstr) < 0) {
-        ESP_LOGE(TAG, "Buffer size %d not sufficient for Node Params.\n"
-                "Please increase CONFIG_ESP_RMAKER_MAX_PARAM_DATA_SIZE",
-                CONFIG_ESP_RMAKER_MAX_PARAM_DATA_SIZE);
+        return ESP_ERR_NO_MEM;
     }
     json_gen_str_end(&jstr);
-    /* Just checking if there is any data to send by comparing with a decent enough
-     * length as even the smallest possible data, Eg. '{"d":{"p":0}}' will be > 10 bytes
-     */
-    if (strlen(publish_payload) > 10) {
-        snprintf(publish_topic, sizeof(publish_topic), "node/%s/%s", esp_rmaker_get_node_id(),
-                init ? NODE_PARAMS_LOCAL_INIT_TOPIC_SUFFIX : NODE_PARAMS_LOCAL_TOPIC_SUFFIX);
-        ESP_LOGI(TAG, "Reporting params: %s", publish_payload);
-        esp_rmaker_mqtt_publish(publish_topic, publish_payload, strlen(publish_payload));
-    }
     return ESP_OK;
+}
+
+char *esp_rmaker_get_node_params(void)
+{
+    char *node_params = calloc(1, MAX_NODE_PARAMS_SIZE);
+    if (!node_params) {
+        ESP_LOGE(TAG, "Failed to allocate %d bytes for Node params.", MAX_NODE_PARAMS_SIZE);
+        return NULL;
+    }
+    if (esp_rmaker_populate_params(node_params, MAX_NODE_PARAMS_SIZE, 0, false) == ESP_OK) {
+        return node_params;
+    }
+    return NULL;
 }
 
 esp_err_t esp_rmaker_report_param_internal(void)
 {
-    return esp_rmaker_report_params(RMAKER_PARAM_FLAG_VALUE_CHANGE, false);
+    esp_err_t err = esp_rmaker_populate_params(publish_payload, sizeof(publish_payload),
+                RMAKER_PARAM_FLAG_VALUE_CHANGE, true);
+    if (err == ESP_OK) {
+        /* Just checking if there are indeed any params to report by comparing with a decent enough
+         * length as even the smallest possible data, Eg. '{"d":{"p":0}}' will be > 10 bytes.
+         */
+        if (strlen(publish_payload) > 10) {
+            snprintf(publish_topic, sizeof(publish_topic), "node/%s/%s",
+                    esp_rmaker_get_node_id(), NODE_PARAMS_LOCAL_TOPIC_SUFFIX);
+            ESP_LOGI(TAG, "Reporting params: %s", publish_payload);
+            esp_rmaker_mqtt_publish(publish_topic, publish_payload, strlen(publish_payload));
+        }
+        return ESP_OK;
+    }
+    return err;
 }
 
 esp_err_t esp_rmaker_report_node_state(void)
 {
-    return esp_rmaker_report_params(0, true);
+    esp_err_t err = esp_rmaker_populate_params(publish_payload, sizeof(publish_payload), 0, false);
+    if (err == ESP_OK) {
+        /* Just checking if there are indeed any params to report by comparing with a decent enough
+         * length as even the smallest possible data, Eg. '{"d":{"p":0}}' will be > 10 bytes.
+         */
+        if (strlen(publish_payload) > 10) {
+            snprintf(publish_topic, sizeof(publish_topic), "node/%s/%s",
+                    esp_rmaker_get_node_id(), NODE_PARAMS_LOCAL_INIT_TOPIC_SUFFIX);
+            ESP_LOGI(TAG, "Reporting params (init): %s", publish_payload);
+            esp_rmaker_mqtt_publish(publish_topic, publish_payload, strlen(publish_payload));
+        }
+        return ESP_OK;
+    }
+    return err;
 }
 
-static esp_err_t esp_rmaker_handle_get_params(_esp_rmaker_device_t *device, jparse_ctx_t *jptr)
+static esp_err_t esp_rmaker_device_set_params(_esp_rmaker_device_t *device, jparse_ctx_t *jptr, esp_rmaker_req_src_t src)
 {
     _esp_rmaker_param_t *param = device->params;
     while (param) {
@@ -224,7 +256,7 @@ static esp_err_t esp_rmaker_handle_get_params(_esp_rmaker_device_t *device, jpar
                 esp_rmaker_param_update_and_report((esp_rmaker_param_t *)param, new_val);
             } else if (device->write_cb) {
                 esp_rmaker_write_ctx_t ctx = {
-                    .src = ESP_RMAKER_REQ_SRC_CLOUD,
+                    .src = src,
                 };
                 if (device->write_cb((esp_rmaker_device_t *)device, (esp_rmaker_param_t *)param,
                             new_val, device->priv_data, &ctx) != ESP_OK) {
@@ -243,23 +275,28 @@ static esp_err_t esp_rmaker_handle_get_params(_esp_rmaker_device_t *device, jpar
     return ESP_OK;
 }
 
-static void esp_rmaker_set_params_callback(const char *topic, void *payload, size_t payload_len, void *priv_data)
+esp_err_t esp_rmaker_handle_set_params(char *data, size_t data_len, esp_rmaker_req_src_t src)
 {
+    ESP_LOGI(TAG, "Received params: %.*s", data_len, data);
     jparse_ctx_t jctx;
-    ESP_LOGI(TAG, "Received params: %.*s", payload_len, (char *)payload);
-    if (json_parse_start(&jctx, (char *)payload, payload_len) != 0) {
-        return;
+    if (json_parse_start(&jctx, data, data_len) != 0) {
+        return ESP_FAIL;
     }
     _esp_rmaker_device_t *device = esp_rmaker_node_get_first_device(esp_rmaker_get_node());
     while (device) {
         if (json_obj_get_object(&jctx, device->name) == 0) {
-            esp_rmaker_handle_get_params(device, &jctx);
+            esp_rmaker_device_set_params(device, &jctx, src);
             json_obj_leave_object(&jctx);
         }
         device = device->next;
     }
-
     json_parse_end(&jctx);
+    return ESP_OK;
+}
+
+static void esp_rmaker_set_params_callback(const char *topic, void *payload, size_t payload_len, void *priv_data)
+{
+    esp_rmaker_handle_set_params((char *)payload, payload_len, ESP_RMAKER_REQ_SRC_CLOUD);
 }
 
 esp_err_t esp_rmaker_register_for_set_params(void)

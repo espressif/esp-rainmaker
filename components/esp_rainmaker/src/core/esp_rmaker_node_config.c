@@ -214,24 +214,37 @@ static esp_err_t esp_rmaker_report_devices_or_services(json_gen_str_t *jptr, cha
     return ESP_OK;
 }
 
-esp_err_t esp_rmaker_report_node_config()
+char *esp_rmaker_get_node_config(void)
 {
-    char *publish_payload = calloc(1, MAX_NODE_CONFIG_SIZE);
-    if (!publish_payload) {
-        return ESP_FAIL;
+    char *node_config = calloc(1, MAX_NODE_CONFIG_SIZE);
+    if (!node_config) {
+        ESP_LOGE(TAG, "Failed to allocate %d bytes for node config", MAX_NODE_CONFIG_SIZE);
+        return NULL;
     }
     json_gen_str_t jstr;
-    json_gen_str_start(&jstr, publish_payload, MAX_NODE_CONFIG_SIZE, NULL, NULL);
+    json_gen_str_start(&jstr, node_config, MAX_NODE_CONFIG_SIZE, NULL, NULL);
     json_gen_start_object(&jstr);
     esp_rmaker_report_info(&jstr);
     esp_rmaker_report_node_attributes(&jstr);
     esp_rmaker_report_devices_or_services(&jstr, "devices");
     esp_rmaker_report_devices_or_services(&jstr, "services");
     if (json_gen_end_object(&jstr) < 0) {
+        free(node_config);
         ESP_LOGE(TAG, "Buffer size %d not sufficient for Node Config.", MAX_NODE_CONFIG_SIZE);
-        return ESP_FAIL;
+        return NULL;
     }
     json_gen_str_end(&jstr);
+    return node_config;
+}
+
+esp_err_t esp_rmaker_report_node_config()
+{
+    char *publish_payload = esp_rmaker_get_node_config();
+    if (!publish_payload) {
+        ESP_LOGE(TAG, "Could not get node configuration for reporting to cloud");
+        return ESP_FAIL;
+    }
+
     char publish_topic[100];
     snprintf(publish_topic, sizeof(publish_topic), "node/%s/%s", esp_rmaker_get_node_id(), NODE_CONFIG_TOPIC_SUFFIX);
     ESP_LOGI(TAG, "Reporting Node Configuration");
