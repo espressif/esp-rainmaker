@@ -8,7 +8,7 @@ menu "ESP RainMaker App Wi-Fi Provisioning"
 
     choice APP_WIFI_PROV_TRANSPORT
         bool "Provisioning Transport method"
-        default APP_WIFI_PROV_TRANSPORT_SOFTAP
+        default APP_WIFI_PROV_TRANSPORT_BLE
         help
             Wi-Fi provisioning component offers both, SoftAP and BLE transports. Choose any one.
 

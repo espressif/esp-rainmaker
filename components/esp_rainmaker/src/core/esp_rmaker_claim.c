@@ -23,51 +23,45 @@
 #include "mbedtls/md.h"
 #include "mbedtls/sha512.h"
 
-#include "soc/soc.h"
-#include "soc/efuse_reg.h"
-#include "esp_efuse.h"
-#include "esp_efuse.h"
-#include "esp_efuse_table.h"
-
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
 #include <freertos/event_groups.h>
 
+#include <wifi_provisioning/manager.h>
+#include <esp_event.h>
 #include <esp_tls.h>
 #include <esp_rmaker_core.h>
 #include <string.h>
 #include <esp_wifi.h>
 #include <esp_log.h>
 #include <esp_http_client.h>
-#include <esp_rmaker_storage.h>
-#include "esp_rmaker_client_data.h"
-
 #include <json_generator.h>
 #include <json_parser.h>
 
+#include "esp_rmaker_internal.h"
+#include "esp_rmaker_storage.h"
+#include "esp_rmaker_client_data.h"
+#include "esp_rmaker_claim.h"
+
 static const char *TAG = "esp_claim";
+#ifdef CONFIG_ESP_RMAKER_SELF_CLAIM
+#include "soc/soc.h"
+#include "soc/efuse_reg.h"
+#include "esp_efuse.h"
+#include "esp_efuse_table.h"
 
 #define CLAIM_BASE_URL      CONFIG_ESP_RMAKER_CLAIM_SERVICE_BASE_URL
 #define CLAIM_INIT_PATH     "claim/initiate"
 #define CLAIM_VERIFY_PATH   "claim/verify"
 
-#define CLAIM_PK_SIZE       2048
-
-#define MAX_CSR_SIZE        1024
-#define MAX_PAYLOAD_SIZE    3072
-
-typedef struct {
-    unsigned char csr[MAX_CSR_SIZE];
-    char payload[MAX_PAYLOAD_SIZE];
-    mbedtls_pk_context key;
-} esp_rmaker_claim_data_t;
-esp_rmaker_claim_data_t *g_claim_data;
-static EventGroupHandle_t self_claim_event_group;
-static const int SELF_CLAIM_TASK_BIT = BIT0;
-
 extern uint8_t claim_service_server_root_ca_pem_start[] asm("_binary_claim_service_server_crt_start");
 extern uint8_t claim_service_server_root_ca_pem_end[] asm("_binary_claim_service_server_crt_end");
+#endif /* CONFIG_ESP_RMAKER_SELF_CLAIM */
 
+#define CLAIM_PK_SIZE       2048
+
+static EventGroupHandle_t claim_event_group;
+static const int CLAIM_TASK_BIT = BIT0;
 static void escape_new_line(esp_rmaker_claim_data_t *data)
 {
     char *str = (char *)data->csr;
@@ -106,6 +100,167 @@ static void unescape_new_line(char *str)
     }
     *target_str = '\0';
 }
+
+static esp_err_t esp_rmaker_claim_generate_csr(esp_rmaker_claim_data_t *claim_data, const char *common_name)
+{
+    if (!claim_data || !common_name) {
+        ESP_LOGE(TAG, "claim_data or common_name cannot be NULL.");
+        return ESP_ERR_INVALID_ARG;
+    }
+    const char *pers = "gen_csr";
+    mbedtls_x509write_csr csr;
+    mbedtls_ctr_drbg_context ctr_drbg;
+    mbedtls_entropy_context entropy;
+
+    /* Generating CSR from the private key */
+    mbedtls_x509write_csr_init(&csr);
+    mbedtls_x509write_csr_set_md_alg(&csr, MBEDTLS_MD_SHA256);
+    mbedtls_ctr_drbg_init(&ctr_drbg);
+
+    ESP_LOGD(TAG, "Seeding the random number generator.");
+    mbedtls_entropy_init(&entropy);
+    int ret = mbedtls_ctr_drbg_seed( &ctr_drbg, mbedtls_entropy_func, &entropy, (const unsigned char *) pers, strlen(pers));
+    if (ret != 0) {
+        ESP_LOGE(TAG, "mbedtls_ctr_drbg_seed returned -0x%04x", -ret );
+        goto exit;
+    }
+    char subject_name[50];
+    snprintf(subject_name, sizeof(subject_name), "CN=%s", common_name);
+    ret = mbedtls_x509write_csr_set_subject_name(&csr, subject_name);
+    if (ret != 0) {
+        ESP_LOGE(TAG, "mbedtls_x509write_csr_set_subject_name returned %d", ret );
+        goto exit;
+    }
+
+    memset(claim_data->csr, 0, sizeof(claim_data->csr));
+    mbedtls_x509write_csr_set_key(&csr, &claim_data->key);
+    ESP_LOGD(TAG, "Generating PEM");
+    ret = mbedtls_x509write_csr_pem(&csr, claim_data->csr, sizeof(claim_data->csr), mbedtls_ctr_drbg_random, &ctr_drbg);
+    if (ret < 0) {
+        ESP_LOGE(TAG, "mbedtls_x509write_csr_pem returned -0x%04x", -ret );
+        goto exit;
+    }
+    ESP_LOGD(TAG, "CSR generated.");
+    claim_data->state = RMAKER_CLAIM_STATE_CSR_GENERATED;
+exit:
+
+    mbedtls_x509write_csr_free(&csr);
+    mbedtls_ctr_drbg_free(&ctr_drbg);
+    mbedtls_entropy_free(&entropy);
+
+    return ret;
+}
+
+static esp_err_t esp_rmaker_claim_generate_key(esp_rmaker_claim_data_t *claim_data)
+{
+    const char *pers = "gen_key";
+    mbedtls_entropy_context entropy;
+    mbedtls_ctr_drbg_context ctr_drbg;
+
+    mbedtls_pk_free(&claim_data->key);
+    mbedtls_pk_init(&claim_data->key);
+    mbedtls_ctr_drbg_init(&ctr_drbg);
+    memset(claim_data->payload, 0, sizeof(claim_data->payload));
+
+    ESP_LOGD(TAG, "Seeding the random number generator.");
+    mbedtls_entropy_init(&entropy);
+    int ret = mbedtls_ctr_drbg_seed( &ctr_drbg, mbedtls_entropy_func, &entropy, (const unsigned char *) pers, strlen(pers));
+    if (ret != 0) {
+        ESP_LOGE(TAG, "mbedtls_ctr_drbg_seed returned -0x%04x", -ret );
+        mbedtls_pk_free(&claim_data->key);
+        goto exit;
+    }
+
+    ESP_LOGW(TAG, "Generating the private key. This may take time." );
+    ret = mbedtls_pk_setup(&claim_data->key, mbedtls_pk_info_from_type(MBEDTLS_PK_RSA));
+    if (ret != 0) {
+        ESP_LOGE(TAG, "mbedtls_pk_setup returned -0x%04x", -ret );
+        mbedtls_pk_free(&claim_data->key);
+        goto exit;
+    }
+
+    ret = mbedtls_rsa_gen_key(mbedtls_pk_rsa(claim_data->key), mbedtls_ctr_drbg_random, &ctr_drbg, CLAIM_PK_SIZE, 65537); /* here, 65537 is the RSA exponent */
+    if (ret != 0) {
+        ESP_LOGE(TAG, "mbedtls_rsa_gen_key returned -0x%04x", -ret );
+        mbedtls_pk_free(&claim_data->key);
+        goto exit;
+    }
+
+    claim_data->state = RMAKER_CLAIM_STATE_PK_GENERATED;
+    ESP_LOGD(TAG, "Converting Private Key to PEM...");
+    ret = mbedtls_pk_write_key_pem(&claim_data->key, (unsigned char *)claim_data->payload, sizeof(claim_data->payload));
+    if (ret != 0) {
+        ESP_LOGE(TAG, "mbedtls_pk_write_key_pem returned -0x%04x", -ret );
+        mbedtls_pk_free(&claim_data->key);
+    }
+exit:
+    mbedtls_ctr_drbg_free(&ctr_drbg);
+    mbedtls_entropy_free(&entropy);
+    return ret;
+}
+
+/* Parse the Claim Init response and generate Claim Verify request
+ *
+ * Claim Verify Response format:
+ *  {"certificate":"<certificate>"}
+ */
+static esp_err_t handle_claim_verify_response(esp_rmaker_claim_data_t *claim_data)
+{
+    ESP_LOGD(TAG, "Claim Verify Response: %s", claim_data->payload);
+    jparse_ctx_t jctx;
+    if (json_parse_start(&jctx, claim_data->payload, strlen(claim_data->payload)) == 0) {
+        int required_len = 0;
+        if (json_obj_get_strlen(&jctx, "certificate", &required_len) == 0) {
+            required_len++; /* For NULL termination */
+            char *certificate =  calloc(1, required_len);
+            if (!certificate) {
+                json_parse_end(&jctx);
+                ESP_LOGE(TAG, "Failed to allocate %d bytes for certificate.", required_len);
+                return ESP_ERR_NO_MEM;
+            }
+            json_obj_get_string(&jctx, "certificate", certificate, required_len);
+            json_parse_end(&jctx);
+            unescape_new_line(certificate);
+            esp_err_t err = esp_rmaker_storage_set(ESP_RMAKER_CLIENT_CERT_NVS_KEY, certificate, strlen(certificate));
+            free(certificate);
+            return err;
+        } else {
+            ESP_LOGE(TAG, "Claim Verify Response invalid.");
+        }
+    }
+    ESP_LOGE(TAG, "Failed to parse Claim Verify Response.");
+    return ESP_FAIL;
+}
+
+static esp_err_t generate_claim_init_request(esp_rmaker_claim_data_t *claim_data)
+{
+    if (claim_data->state < RMAKER_CLAIM_STATE_PK_GENERATED) {
+        return ESP_ERR_INVALID_STATE;
+    }
+    uint8_t eth_mac[6];
+    esp_err_t err = esp_wifi_get_mac(WIFI_IF_STA, eth_mac);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Could not fetch MAC address. Please initialise Wi-Fi first");
+        return err;
+    }
+
+    snprintf(claim_data->payload, sizeof(claim_data->payload),
+            "{\"mac_addr\":\"%02X%02X%02X%02X%02X%02X\",\"platform\":\"%s\"}",
+            eth_mac[0], eth_mac[1], eth_mac[2], eth_mac[3], eth_mac[4], eth_mac[5], CONFIG_IDF_TARGET);
+    claim_data->payload_len = strlen(claim_data->payload);
+    claim_data->payload_offset = 0;
+    return ESP_OK;
+}
+
+void esp_rmaker_claim_data_free(esp_rmaker_claim_data_t *claim_data)
+{
+    if(claim_data) {
+        mbedtls_pk_free(&claim_data->key);
+        free(claim_data);
+    }
+}
+
+#ifdef CONFIG_ESP_RMAKER_SELF_CLAIM
 
 static esp_err_t read_hmac_key(uint32_t *out_hmac_key, size_t hmac_key_size)
 {
@@ -153,7 +308,7 @@ static esp_err_t hmac_challenge(const char* hmac_request, unsigned char *hmac_re
  * Claim Verify Request format
  *  {"auth_id":"<claim-id-from-init>", "challenge_response":"<64byte-response-in-hex>, "csr":"<csr-generated-earlier>"}
  */
-static esp_err_t handle_claim_init_response(esp_rmaker_claim_data_t *claim_data)
+static esp_err_t handle_self_claim_init_response(esp_rmaker_claim_data_t *claim_data)
 {
     ESP_LOGD(TAG, "Claim Init Response: %s", claim_data->payload);
     jparse_ctx_t jctx;
@@ -192,39 +347,6 @@ static esp_err_t handle_claim_init_response(esp_rmaker_claim_data_t *claim_data)
     ESP_LOGE(TAG, "Failed to parse Claim Init Response.");
     return ESP_FAIL;
 }
-/* Parse the Claim Init response and generate Claim Verify request
- *
- * Claim Verify Response format:
- *  {"certificate":"<certificate>"}
- */
-static esp_err_t handle_claim_verify_response(esp_rmaker_claim_data_t *claim_data)
-{
-    ESP_LOGD(TAG, "Claim Verify Response: %s", claim_data->payload);
-    jparse_ctx_t jctx;
-    if (json_parse_start(&jctx, claim_data->payload, strlen(claim_data->payload)) == 0) {
-        int required_len = 0;
-        if (json_obj_get_strlen(&jctx, "certificate", &required_len) == 0) {
-            required_len++; /* For NULL termination */
-            char *certificate =  calloc(1, required_len);
-            if (!certificate) {
-                json_parse_end(&jctx);
-                ESP_LOGE(TAG, "Failed to allocate %d bytes for certificate.", required_len);
-                return ESP_ERR_NO_MEM;
-            }
-            json_obj_get_string(&jctx, "certificate", certificate, required_len);
-            json_parse_end(&jctx);
-            unescape_new_line(certificate);
-            esp_err_t err = esp_rmaker_storage_set(ESP_RMAKER_CLIENT_CERT_NVS_KEY, certificate, strlen(certificate));
-            free(certificate);
-            return err;
-        } else {
-            ESP_LOGE(TAG, "Claim Verify Response invalid.");
-        }
-    }
-    ESP_LOGE(TAG, "Failed to parse Claim Verify Response.");
-    return ESP_FAIL;
-}
-
 static esp_err_t esp_rmaker_claim_perform_common(esp_rmaker_claim_data_t *claim_data, const char *path)
 {
     char url[100];
@@ -280,12 +402,22 @@ static esp_err_t esp_rmaker_claim_perform_common(esp_rmaker_claim_data_t *claim_
 }
 static esp_err_t esp_rmaker_claim_perform_init(esp_rmaker_claim_data_t *claim_data)
 {
-    esp_err_t err = esp_rmaker_claim_perform_common(claim_data, CLAIM_INIT_PATH);
+    esp_err_t err = generate_claim_init_request(claim_data);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to generate Claim init request");
+        return err;
+    }
+
+    err = esp_rmaker_claim_perform_common(claim_data, CLAIM_INIT_PATH);
     if (err != OK) {
         ESP_LOGE(TAG, "Claim Init Request Failed.");
         return err;
     }
-    err = handle_claim_init_response(claim_data);
+    claim_data->state = RMAKER_CLAIM_STATE_INIT;
+    err = handle_self_claim_init_response(claim_data);
+    if (err == ESP_OK) {
+        claim_data->state = RMAKER_CLAIM_STATE_INIT_DONE;
+    }
     return err;
 }
 
@@ -296,175 +428,390 @@ static esp_err_t esp_rmaker_claim_perform_verify(esp_rmaker_claim_data_t *claim_
         ESP_LOGE(TAG, "Claim Verify Failed.");
         return err;
     }
+    claim_data->state = RMAKER_CLAIM_STATE_VERIFY;
     err = handle_claim_verify_response(claim_data);
+    if (err == ESP_OK) {
+        claim_data->state = RMAKER_CLAIM_STATE_VERIFY_DONE;
+    }
     return err;
 }
 
-esp_err_t esp_rmaker_self_claim_perform(void)
+esp_err_t esp_rmaker_self_claim_perform(esp_rmaker_claim_data_t *claim_data)
 {
     ESP_LOGI(TAG, "Starting the Self Claim Process. This may take time.");
-    if (g_claim_data == NULL) {
+    if (claim_data == NULL) {
         ESP_LOGE(TAG, "Self claiming not initialised.");
         return ESP_ERR_INVALID_STATE;
     }
-    esp_err_t err = esp_rmaker_claim_perform_init(g_claim_data);
+    esp_err_t err = esp_rmaker_claim_perform_init(claim_data);
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "Claim Init Sequence Failed.");
         return err;
     }
-    err = esp_rmaker_claim_perform_verify(g_claim_data);
+    err = esp_rmaker_claim_perform_verify(claim_data);
     if (err == ESP_OK) {
         ESP_LOGI(TAG, "Self Claiming was successful. Certificate received.");
-        ESP_LOGW(TAG, "The first MQTT connection attempt may fail. The subsequent ones should work.");
     }
-    free(g_claim_data);
-    g_claim_data = NULL;
+    esp_rmaker_claim_data_free(claim_data);
     return err;
 }
-
-static esp_err_t generate_key(esp_rmaker_claim_data_t *claim_data)
+#endif /* CONFIG_ESP_RMAKER_SELF_CLAIM */
+#ifdef CONFIG_ESP_RMAKER_ASSISTED_CLAIM
+static EventGroupHandle_t claim_csr_event_group;
+static const int CLAIM_CSR_TASK_BIT = BIT1;
+static void esp_rmaker_claim_csr_task(void *args)
 {
-    const char *pers = "gen_key";
-    mbedtls_entropy_context entropy;
-    mbedtls_ctr_drbg_context ctr_drbg;
-
-    mbedtls_pk_free(&claim_data->key);
-    mbedtls_pk_init(&claim_data->key);
-    mbedtls_ctr_drbg_init(&ctr_drbg);
-    memset(claim_data->payload, 0, sizeof(claim_data->payload));
-
-    ESP_LOGD(TAG, "Seeding the random number generator.");
-    mbedtls_entropy_init(&entropy);
-    int ret = mbedtls_ctr_drbg_seed( &ctr_drbg, mbedtls_entropy_func, &entropy, (const unsigned char *) pers, strlen(pers));
-    if (ret != 0) {
-        ESP_LOGE(TAG, "mbedtls_ctr_drbg_seed returned -0x%04x", -ret );
-        mbedtls_pk_free(&claim_data->key);
-        goto exit;
+    esp_rmaker_claim_data_t *claim_data = (esp_rmaker_claim_data_t *)args;
+    esp_rmaker_claim_generate_csr(claim_data, esp_rmaker_get_node_id());
+    xEventGroupSetBits(claim_csr_event_group, CLAIM_CSR_TASK_BIT);
+    vTaskDelete(NULL);
+}
+static esp_err_t _esp_rmaker_claim_generate_csr(esp_rmaker_claim_data_t *claim_data)
+{
+    claim_csr_event_group = xEventGroupCreate();
+    if (!claim_csr_event_group) {
+        ESP_LOGE(TAG, "Couldn't create CSR event group.");
+        return ESP_ERR_NO_MEM;
     }
 
-    ESP_LOGD(TAG, "Generating the private key..." );
-    ret = mbedtls_pk_setup(&claim_data->key, mbedtls_pk_info_from_type(MBEDTLS_PK_RSA));
-    if (ret != 0) {
-        ESP_LOGE(TAG, "mbedtls_pk_setup returned -0x%04x", -ret );
-        mbedtls_pk_free(&claim_data->key);
-        goto exit;
+#define ESP_RMAKER_CLAIM_CSR_TASK_STACK_SIZE (10 * 1024)
+    if (xTaskCreate(&esp_rmaker_claim_csr_task, "claim_csr_task", ESP_RMAKER_CLAIM_CSR_TASK_STACK_SIZE,
+                    claim_data, (CONFIG_ESP_RMAKER_TASK_PRIORITY + 1), NULL) != pdPASS) {
+        ESP_LOGE(TAG, "Couldn't create CSR generation task");
+        vEventGroupDelete(claim_csr_event_group);
+        return ESP_ERR_NO_MEM;
     }
 
-    ret = mbedtls_rsa_gen_key(mbedtls_pk_rsa(claim_data->key), mbedtls_ctr_drbg_random, &ctr_drbg, CLAIM_PK_SIZE, 65537); /* here, 65537 is the RSA exponent */
-    if (ret != 0) {
-        ESP_LOGE(TAG, "mbedtls_rsa_gen_key returned -0x%04x", -ret );
-        mbedtls_pk_free(&claim_data->key);
-        goto exit;
+    /* Wait for claim init to complete */
+    xEventGroupWaitBits(claim_csr_event_group, CLAIM_CSR_TASK_BIT, false, true, portMAX_DELAY);
+    if (claim_data->state == RMAKER_CLAIM_STATE_CSR_GENERATED) {
+        return ESP_OK;
     }
+    return ESP_FAIL;
+}
+/* Parse the Claim Init response and generate Claim Verify request
+ *
+ * Claim Init Response format:
+ *  {"node_id":"<unique-node-id>"}
+ *
+ * Claim Verify Request format
+ *  {"csr":"<csr-generated>"}
+ */
+static esp_err_t handle_assisted_claim_init_response(esp_rmaker_claim_data_t *claim_data)
+{
+    ESP_LOGD(TAG, "Claim Init Response: %s", claim_data->payload);
+    jparse_ctx_t jctx;
+    if (json_parse_start(&jctx, claim_data->payload, strlen(claim_data->payload)) == 0) {
+        char node_id[64];
+        int ret = json_obj_get_string(&jctx, "node_id", node_id, sizeof(node_id));
+        json_parse_end(&jctx);
+        if (ret == 0) {
+            esp_rmaker_storage_set("node_id", node_id, strlen(node_id));
+            esp_rmaker_change_node_id(node_id, strlen(node_id));
+            /* We use _esp_rmaker_claim_generate_csr instead of esp_rmaker_claim_generate_csr()
+             * because the thread in whose context this function is called doesn't have
+             * enough stack memory to generate CSR. A new thread with larger stack is spawned
+             * to generate the CSR by the below function.
+             */
+            esp_err_t err = _esp_rmaker_claim_generate_csr(claim_data);
+            if (err != ESP_OK) {
+                ESP_LOGE(TAG, "Failed to generate CSR.");
+                return err;
+            }
+            escape_new_line(claim_data);
 
-    ESP_LOGD(TAG, "Converting Private Key to PEM...");
-    ret = mbedtls_pk_write_key_pem(&claim_data->key, (unsigned char *)claim_data->payload, sizeof(claim_data->payload));
-    if (ret != 0) {
-        ESP_LOGE(TAG, "mbedtls_pk_write_key_pem returned -0x%04x", -ret );
-        mbedtls_pk_free(&claim_data->key);
-        goto exit;
+            json_gen_str_t jstr;
+            json_gen_str_start(&jstr, claim_data->payload, sizeof(claim_data->payload), NULL, NULL);
+            json_gen_start_object(&jstr);
+            json_gen_obj_set_string(&jstr, "csr", (char *)claim_data->csr);
+            json_gen_end_object(&jstr);
+            json_gen_str_end(&jstr);
+            claim_data->payload_len = strlen(claim_data->payload);
+            claim_data->payload_offset = 0;
+            return ESP_OK;
+        } else {
+            ESP_LOGE(TAG, "Claim Init Response invalid.");
+        }
     }
-exit:
-    mbedtls_ctr_drbg_free(&ctr_drbg);
-    mbedtls_entropy_free(&entropy);
-    return ret;
+    ESP_LOGE(TAG, "Failed to parse Claim Init Response.");
+    return ESP_FAIL;
+}
+#include <esp_rmaker_claim.pb-c.h>
+#define CLAIM_FRAGMENT_SIZE 200
+esp_err_t esp_rmaker_assisted_claim_handle_start(RmakerClaim__RMakerClaimPayload *command,
+            RmakerClaim__RMakerClaimPayload *response, esp_rmaker_claim_data_t *claim_data)
+{
+    if (claim_data->state < RMAKER_CLAIM_STATE_PK_GENERATED) {
+        ESP_LOGE(TAG, "PK not created. Cannot proceed with Assisted Claiming.");
+        response->resppayload->status = RMAKER_CLAIM__RMAKER_CLAIM_STATUS__InvalidState;
+        return ESP_OK;
+    } 
+    if (generate_claim_init_request(claim_data) != ESP_OK) {
+        return ESP_OK;
+    }
+    RmakerClaim__PayloadBuf *payload_buf = response->resppayload->buf;
+    payload_buf->offset = 0;
+    payload_buf->totallen = claim_data->payload_len;
+    payload_buf->payload.data = (uint8_t *)claim_data->payload;
+    payload_buf->payload.len = claim_data->payload_len;
+    response->resppayload->status = RMAKER_CLAIM__RMAKER_CLAIM_STATUS__Success;
+    claim_data->state = RMAKER_CLAIM_STATE_INIT;
+    ESP_LOGI(TAG, "Assisted Claiming Started.");
+    return ESP_OK;
 }
 
-static esp_err_t generate_csr(esp_rmaker_claim_data_t *claim_data)
+/* Return ESP_OK if this is just an application layer error. The response content will
+ * indicate error to the client.
+ */
+ProtobufCBinaryData *esp_rmaker_assisted_claim_validate_data(RmakerClaim__PayloadBuf *recv_payload,
+        RmakerClaim__RMakerClaimPayload *response, esp_rmaker_claim_data_t *claim_data)
 {
-    const char *pers = "gen_csr";
-    mbedtls_x509write_csr csr;
-    mbedtls_ctr_drbg_context ctr_drbg;
-    mbedtls_entropy_context entropy;
-
-    /* Generating CSR from the private key */
-    mbedtls_x509write_csr_init(&csr);
-    mbedtls_x509write_csr_set_md_alg(&csr, MBEDTLS_MD_SHA256);
-    mbedtls_ctr_drbg_init(&ctr_drbg);
-
-    ESP_LOGD(TAG, "Seeding the random number generator.");
-    mbedtls_entropy_init(&entropy);
-    int ret = mbedtls_ctr_drbg_seed( &ctr_drbg, mbedtls_entropy_func, &entropy, (const unsigned char *) pers, strlen(pers));
-    if (ret != 0) {
-        ESP_LOGE(TAG, "mbedtls_ctr_drbg_seed returned -0x%04x", -ret );
-        goto exit;
+    if (recv_payload == NULL) {
+        ESP_LOGE(TAG, "Empty response received. Cannot proceed.");
+        response->resppayload->status = RMAKER_CLAIM__RMAKER_CLAIM_STATUS__InvalidParam;
+        return NULL;
     }
-    char subject_name[20];
-    snprintf(subject_name, sizeof(subject_name), "CN=%s", esp_rmaker_get_node_id());
-    ret = mbedtls_x509write_csr_set_subject_name(&csr, subject_name);
-    if (ret != 0) {
-        ESP_LOGE(TAG, "mbedtls_x509write_csr_set_subject_name returned %d", ret );
-        goto exit;
+    /* Read the command */
+    ProtobufCBinaryData *recv_payload_buf = &recv_payload->payload;
+    if (!recv_payload_buf) {
+        ESP_LOGE(TAG, "No data received. Cannot proceed.");
+        response->resppayload->status = RMAKER_CLAIM__RMAKER_CLAIM_STATUS__InvalidParam;
+        return NULL;
     }
-
-    memset(claim_data->csr, 0, sizeof(claim_data->csr));
-    mbedtls_x509write_csr_set_key(&csr, &claim_data->key);
-    ESP_LOGD(TAG, "Generating PEM");
-    ret = mbedtls_x509write_csr_pem(&csr, claim_data->csr, sizeof(claim_data->csr), mbedtls_ctr_drbg_random, &ctr_drbg);
-    if (ret < 0) {
-        ESP_LOGE(TAG, "mbedtls_x509write_csr_pem returned -0x%04x", -ret );
-        goto exit;
+    if ((recv_payload_buf->len + recv_payload->offset) > recv_payload->totallen) {
+        ESP_LOGE(TAG, "Received data exceeds total length.");
+        response->resppayload->status = RMAKER_CLAIM__RMAKER_CLAIM_STATUS__InvalidParam;
+        return NULL;
     }
-    ESP_LOGD(TAG, "CSR generated.");
-exit:
-
-    mbedtls_x509write_csr_free(&csr);
-    mbedtls_pk_free(&claim_data->key);
-    mbedtls_ctr_drbg_free(&ctr_drbg);
-    mbedtls_entropy_free(&entropy);
-
-    return ret;
+    if (recv_payload_buf->len >= sizeof(claim_data->payload)) {
+        ESP_LOGE(TAG, "Received data too long (%d bytes).", recv_payload_buf->len);
+        response->resppayload->status = RMAKER_CLAIM__RMAKER_CLAIM_STATUS__NoMemory;
+        return NULL;
+    }
+    return recv_payload_buf;
 }
 
-esp_err_t __esp_rmaker_self_claim_init(void)
+/* Return ESP_OK if this is just an application layer error. The response content will
+ * indicate error to the client.
+ */
+esp_err_t esp_rmaker_assisted_claim_handle_init(RmakerClaim__RMakerClaimPayload *command,
+            RmakerClaim__RMakerClaimPayload *response, esp_rmaker_claim_data_t *claim_data)
+{
+    if (claim_data->state < RMAKER_CLAIM_STATE_INIT) {
+        ESP_LOGE(TAG, "Claiming hasn't started. Cannot proceed with init handling.");
+        response->resppayload->status = RMAKER_CLAIM__RMAKER_CLAIM_STATUS__InvalidState;
+        return ESP_OK;
+    } else if (claim_data->state != RMAKER_CLAIM_STATE_INIT_DONE) {
+        if (command->payload_case != RMAKER_CLAIM__RMAKER_CLAIM_PAYLOAD__PAYLOAD_CMD_PAYLOAD) {
+             ESP_LOGE(TAG, "Invalid response received for Claim Init. Cannot proceed.");
+             response->resppayload->status = RMAKER_CLAIM__RMAKER_CLAIM_STATUS__InvalidParam;
+             return ESP_OK;
+        }
+        RmakerClaim__PayloadBuf *recv_payload = command->cmdpayload;
+        ProtobufCBinaryData *recv_payload_buf = esp_rmaker_assisted_claim_validate_data
+                                                    (recv_payload, response, claim_data);
+        if (!recv_payload_buf) {
+            ESP_LOGE(TAG, "Failed to get Claim Init Data.");
+            return ESP_OK;
+        }
+        if (recv_payload_buf->len != recv_payload->totallen) {
+            ESP_LOGE(TAG, "Claim Init Data length not equal to total length. Cannot proceed.");
+            response->resppayload->status = RMAKER_CLAIM__RMAKER_CLAIM_STATUS__InvalidParam;
+            return ESP_OK;
+        }
+        memset(claim_data->payload, 0, sizeof(claim_data->payload));
+        memcpy(claim_data->payload, recv_payload_buf->data, recv_payload_buf->len);
+        if (handle_assisted_claim_init_response(claim_data) != ESP_OK) {
+            response->resppayload->status = RMAKER_CLAIM__RMAKER_CLAIM_STATUS__InvalidParam;
+            ESP_LOGE(TAG, "Error handling Claim Init response.");
+            return ESP_OK;
+        } else {
+            claim_data->state = RMAKER_CLAIM_STATE_INIT_DONE;
+        }
+    }
+    RmakerClaim__PayloadBuf *payload_buf = response->resppayload->buf;
+    payload_buf->totallen = claim_data->payload_len;
+    payload_buf->offset = claim_data->payload_offset;
+
+    payload_buf->payload.data = (uint8_t *)claim_data->payload + claim_data->payload_offset;
+    payload_buf->payload.len = (claim_data->payload_len - claim_data->payload_offset) > CLAIM_FRAGMENT_SIZE ?
+            CLAIM_FRAGMENT_SIZE : (claim_data->payload_len - claim_data->payload_offset);
+
+    claim_data->payload_offset += payload_buf->payload.len;
+
+    response->resppayload->status = RMAKER_CLAIM__RMAKER_CLAIM_STATUS__Success;
+    
+    if (claim_data->payload_offset == claim_data->payload_len) {
+        ESP_LOGD(TAG, "Finished sending Claim Verify Payload.");
+        claim_data->state = RMAKER_CLAIM_STATE_VERIFY;
+    }
+    return ESP_OK;
+}
+/* Return ESP_OK if this is just an application layer error. The response content will
+ * indicate error to the client.
+ */
+esp_err_t esp_rmaker_assisted_claim_handle_verify(RmakerClaim__RMakerClaimPayload *command,
+            RmakerClaim__RMakerClaimPayload *response, esp_rmaker_claim_data_t *claim_data)
+{
+    if (claim_data->state < RMAKER_CLAIM_STATE_VERIFY) {
+        ESP_LOGE(TAG, "Invalid state. Cannot proceed with verify handling.");
+        response->resppayload->status = RMAKER_CLAIM__RMAKER_CLAIM_STATUS__InvalidState;
+        return ESP_OK;
+    }
+    if (command->payload_case != RMAKER_CLAIM__RMAKER_CLAIM_PAYLOAD__PAYLOAD_CMD_PAYLOAD) {
+        ESP_LOGE(TAG, "Invalid response received for Claim Verify. Cannot proceed.");
+        response->resppayload->status = RMAKER_CLAIM__RMAKER_CLAIM_STATUS__InvalidParam;
+        return ESP_OK;
+    }
+    RmakerClaim__PayloadBuf *recv_payload = command->cmdpayload;
+    ProtobufCBinaryData *recv_payload_buf = esp_rmaker_assisted_claim_validate_data
+                                                (recv_payload, response, claim_data);
+    if (!recv_payload_buf) {
+        ESP_LOGE(TAG, "Failed to get Claim Verify Data.");
+        return ESP_OK;
+    }
+    /* If offset is 0, this is the start of the fragmented data. */
+    if (recv_payload->offset == 0) {
+        memset(claim_data->payload, 0, sizeof(claim_data->payload));
+        claim_data->payload_offset = 0;
+        claim_data->payload_len = 0;
+    }
+    claim_data->payload_offset = recv_payload->offset;
+    memcpy(claim_data->payload + claim_data->payload_offset, recv_payload_buf->data, recv_payload_buf->len);
+    claim_data->payload_len += recv_payload_buf->len;
+
+    if ((recv_payload->offset + recv_payload_buf->len) == recv_payload->totallen) {
+        ESP_LOGD(TAG, "Received complete response of len = %d bytes for Claim Verify", recv_payload->totallen);
+        if (handle_claim_verify_response(claim_data) == ESP_OK) {
+            ESP_LOGI(TAG,"Assisted Claiming was Successful.");
+            claim_data->state = RMAKER_CLAIM_STATE_VERIFY_DONE;
+            if (claim_event_group) {
+                xEventGroupSetBits(claim_event_group, CLAIM_TASK_BIT);
+            }
+        } else {
+            response->resppayload->status = RMAKER_CLAIM__RMAKER_CLAIM_STATUS__InvalidParam;
+            return ESP_OK;
+        }
+    }
+    response->resppayload->status = RMAKER_CLAIM__RMAKER_CLAIM_STATUS__Success;
+    return ESP_OK;
+}
+
+esp_err_t esp_rmaker_claiming_handler(uint32_t session_id, const uint8_t *inbuf, ssize_t inlen, uint8_t **outbuf, ssize_t *outlen, void *priv_data)
+{
+    esp_rmaker_claim_data_t *claim_data = (esp_rmaker_claim_data_t *)priv_data;
+    if (!priv_data) {
+        ESP_LOGE(TAG, "Claim data cannot be NULL. Cannot proceed with Assisted Claiming.");
+        return ESP_ERR_INVALID_STATE;
+    }
+    RmakerClaim__RMakerClaimPayload *command;
+    command = rmaker_claim__rmaker_claim_payload__unpack(NULL, inlen, inbuf);
+
+    if (!command) {
+        ESP_LOGE(TAG, "No Claim command received");
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    /* Initialise the response objects */
+    RmakerClaim__RMakerClaimPayload response;
+    rmaker_claim__rmaker_claim_payload__init(&response);
+    response.msg = command->msg + 1;
+    response.payload_case = RMAKER_CLAIM__RMAKER_CLAIM_PAYLOAD__PAYLOAD_RESP_PAYLOAD;
+
+    RmakerClaim__RespPayload resppayload;
+    rmaker_claim__resp_payload__init(&resppayload);
+    resppayload.status = RMAKER_CLAIM__RMAKER_CLAIM_STATUS__Fail;
+    response.resppayload = &resppayload;
+
+    RmakerClaim__PayloadBuf payload_buf;
+    rmaker_claim__payload_buf__init(&payload_buf);
+    resppayload.buf = &payload_buf;
+
+    ESP_LOGD(TAG, "Received claim command: %d", command->msg);
+
+    /* Handle the received command */
+    switch (command->msg) {
+        case RMAKER_CLAIM__RMAKER_CLAIM_MSG_TYPE__TypeCmdClaimStart:
+            esp_rmaker_assisted_claim_handle_start(command, &response, claim_data);
+            break;
+        case RMAKER_CLAIM__RMAKER_CLAIM_MSG_TYPE__TypeCmdClaimInit:
+            esp_rmaker_assisted_claim_handle_init(command, &response, claim_data);
+            break;
+        case RMAKER_CLAIM__RMAKER_CLAIM_MSG_TYPE__TypeCmdClaimVerify:
+            esp_rmaker_assisted_claim_handle_verify(command, &response, claim_data);
+            break;
+        case RMAKER_CLAIM__RMAKER_CLAIM_MSG_TYPE__TypeCmdClaimAbort:
+            memset(claim_data->payload, 0, sizeof(claim_data->payload));
+            claim_data->payload_len = 0;
+            claim_data->payload_offset = 0;
+            /* Go back to RMAKER_CLAIM_STATE_PK_GENERATED, so that claim can restart */
+            claim_data->state = RMAKER_CLAIM_STATE_PK_GENERATED;
+            resppayload.status = RMAKER_CLAIM__RMAKER_CLAIM_STATUS__Success;
+            ESP_LOGW(TAG, "Assisted Claiming Aborted.");
+            break;
+        default:
+            break;
+    }
+    *outlen = rmaker_claim__rmaker_claim_payload__get_packed_size(&response);
+    *outbuf = (uint8_t *)malloc(*outlen);
+    rmaker_claim__rmaker_claim_payload__pack(&response, *outbuf);
+    rmaker_claim__rmaker_claim_payload__free_unpacked(command, NULL);
+    return ESP_OK;
+}
+#define CLAIM_ENDPOINT      "rmaker_claim"
+static void event_handler(void* arg, esp_event_base_t event_base,
+                          int event_id, void* event_data)
+{
+    if (event_base == WIFI_PROV_EVENT) {
+        switch (event_id) {
+            case WIFI_PROV_INIT: {
+                static const char *capabilities[] = {"claim"};
+                wifi_prov_mgr_set_app_info("rmaker", "1.0", capabilities, 1);
+                if (wifi_prov_mgr_endpoint_create(CLAIM_ENDPOINT) != ESP_OK) {
+                    ESP_LOGE(TAG, "Failed to create claim end point.");
+                }
+                break;
+            }
+            case WIFI_PROV_START:
+                if (wifi_prov_mgr_endpoint_register(CLAIM_ENDPOINT, esp_rmaker_claiming_handler, arg) != ESP_OK) {
+                    ESP_LOGE(TAG, "Failed to register claim end point.");
+                }
+                break;
+            default:
+                break;
+        }
+    }
+}
+#endif /* CONFIG_ESP_RMAKER_ASSISTED_CLAIM */
+esp_err_t __esp_rmaker_claim_init(esp_rmaker_claim_data_t *claim_data)
 {
     char hexstr[9];
     uint32_t my_random;
     esp_err_t err;
 
-    ESP_LOGI(TAG, "Initialising Self Claiming. This may take time.");
-    /* Check if the claim data structure is already allocated. If yes, free it */
-    if (g_claim_data) {
-        free(g_claim_data);
-        g_claim_data = NULL;
+    char *key = esp_rmaker_get_client_key();
+    if (key) {
+        mbedtls_pk_free(&claim_data->key);
+        mbedtls_pk_init(&claim_data->key);
+        if (mbedtls_pk_parse_key(&claim_data->key, (uint8_t *)key, strlen(key) + 1, NULL, 0) == 0) {
+            ESP_LOGI(TAG, "Private key already exists. No need to re-initialise it.");
+            claim_data->state = RMAKER_CLAIM_STATE_PK_GENERATED;
+        }
+        free(key);
     }
-    /* Allocate memory for the claim data */
-    g_claim_data = calloc(1, sizeof(esp_rmaker_claim_data_t));
-    if (!g_claim_data) {
-        ESP_LOGE(TAG, "Failed to allocate %d bytes for Claim data.", sizeof(esp_rmaker_claim_data_t));
-        return ESP_ERR_NO_MEM;
+    if (claim_data->state != RMAKER_CLAIM_STATE_PK_GENERATED) {
+        /* Generate the Private Key */
+        err = esp_rmaker_claim_generate_key(claim_data);
+        if (err != ESP_OK) {
+            ESP_LOGE(TAG, "Failed to generate private key.");
+            return err;
+        }
+        err = esp_rmaker_storage_set(ESP_RMAKER_CLIENT_KEY_NVS_KEY, claim_data->payload, strlen((char *)claim_data->payload));
+        if (err != ESP_OK) {
+            ESP_LOGE(TAG, "Failed to save private key to storage.");
+            return err;
+        }
     }
-
-    /* Check if the CSR is already available. If yes, just generate the payload for claim init
-     * and return from here instead of re-generating the key and CSR
-     */
-    void *csr = esp_rmaker_get_client_csr();
-    if (csr) {
-        snprintf(g_claim_data->payload, sizeof(g_claim_data->payload), "{\"mac_addr\":\"%s\",\"platform\":\"esp32s2\"}",
-                esp_rmaker_get_node_id());
-        strncpy((char *)g_claim_data->csr, csr, (sizeof(g_claim_data->csr) - 1));
-        g_claim_data->csr[sizeof(g_claim_data->csr) - 1] = 0;
-        free(csr);
-        ESP_LOGI(TAG, "CSR already exists. No need to re-initialise Claiming.");
-        return ESP_OK;
-    }
-    /* Generate the Private Key */
-    err = generate_key(g_claim_data);
-    if (err != ESP_OK) {
-        free(g_claim_data);
-        g_claim_data = NULL;
-        ESP_LOGE(TAG, "Failed to generate private key.");
-        return err;
-    }
-    /* Store the key in the storage */
-    ESP_LOGD(TAG, "Storing private key to NVS...");
-    err = esp_rmaker_storage_set(ESP_RMAKER_CLIENT_KEY_NVS_KEY, g_claim_data->payload, strlen((char *)g_claim_data->payload));
-    if (err != ESP_OK) {
-         ESP_LOGE(TAG, "Failed to store private key to storage.");
-        free(g_claim_data);
-        g_claim_data = NULL;
-    }
-
     /* Generate random hex string */
     memset(hexstr, 0, sizeof(hexstr));
     esp_fill_random(&my_random, sizeof(my_random));
@@ -473,74 +820,115 @@ esp_err_t __esp_rmaker_self_claim_init(void)
     /* Store the PoP in the storage */
     err = esp_rmaker_storage_set(ESP_RMAKER_CLIENT_RANDOM_NVS_KEY, hexstr, strlen(hexstr));
     if (err != ESP_OK) {
-        free(g_claim_data);
-        g_claim_data = NULL;
+        ESP_LOGE(TAG, "Failed to store random number to storage");
         return err;
     }
-
-    /* Generate CSR */
-    err = generate_csr(g_claim_data);
-    ESP_LOGD(TAG, "CSR generated successfully.");
+#ifdef CONFIG_ESP_RMAKER_SELF_CLAIM
+    err = esp_rmaker_claim_generate_csr(claim_data, esp_rmaker_get_node_id());
     if (err != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to generate CSR for Claiming");
-        free(g_claim_data);
-        g_claim_data = NULL;
+        ESP_LOGE(TAG, "Failed to generate CSR.");
         return err;
     }
-
-    /* New line characters from the CSR need to be removed and replaced with explicit \n for the claiming
+     /* New line characters from the CSR need to be removed and replaced with explicit \n for the claiming
      * service to parse properly. Make that change here and store the CSR in storage.
      */
-    escape_new_line(g_claim_data);
-    err = esp_rmaker_storage_set(ESP_RMAKER_CLIENT_CSR_NVS_KEY, g_claim_data->csr, strlen((char *)g_claim_data->csr));
-    if (err != ESP_OK) {
-        free(g_claim_data);
-        g_claim_data = NULL;
-        return err;
-    } else {
-        ESP_LOGI(TAG, "Self Claiming initialised successfully.");
-    }
-    snprintf(g_claim_data->payload, sizeof(g_claim_data->payload), "{\"mac_addr\":\"%s\",\"platform\":\"esp32s2\"}",
-            esp_rmaker_get_node_id());
+    escape_new_line(claim_data);
+#endif /* CONFIG_ESP_RMAKER_SELF_CLAIM */
     return err;
 }
 
-void esp_rmaker_self_claim_task(void *args)
+void esp_rmaker_claim_task(void *args)
 {
-    esp_err_t err = __esp_rmaker_self_claim_init();
-    if (args) {
-        *((esp_err_t *)args) = err;
+    if (!args) {
+        ESP_LOGE(TAG, "Arguments for claiming task cannot be NULL");
+        return;
     }
-    xEventGroupSetBits(self_claim_event_group, SELF_CLAIM_TASK_BIT);
+    esp_rmaker_claim_data_t *claim_data = calloc(1, sizeof(esp_rmaker_claim_data_t));
+    if (!claim_data) {
+        ESP_LOGE(TAG, "Failed to allocate memory for claim data.");
+        return;
+    }
+    if (__esp_rmaker_claim_init(claim_data) != ESP_OK) {
+        esp_rmaker_claim_data_free(claim_data);
+    } else {
+        *((esp_rmaker_claim_data_t **)args) = claim_data;
+    }
+    xEventGroupSetBits(claim_event_group, CLAIM_TASK_BIT);
     vTaskDelete(NULL);
 }
 
-esp_err_t esp_rmaker_self_claim_init(void)
+static esp_rmaker_claim_data_t *esp_rmaker_claim_init(void)
 {
-    self_claim_event_group = xEventGroupCreate();
-    if (!self_claim_event_group) {
+    static bool claim_init_done;
+    if (claim_init_done) {
+        ESP_LOGE(TAG, "Claim already initialised");
+        return NULL;
+    }
+    claim_event_group = xEventGroupCreate();
+    if (!claim_event_group) {
+        ESP_LOGE(TAG, "Couldn't create event group");
+        return NULL;
+    }
+    esp_rmaker_claim_data_t *claim_data = NULL;
+
+#define ESP_RMAKER_CLAIM_TASK_STACK_SIZE (10 * 1024)
+    /* Using tskIDLE_PRIORITY so that the time consuming tasks, especially
+     * PK generation does not trigger task WatchDog timer.
+     */
+    if (xTaskCreate(&esp_rmaker_claim_task, "claim_task", ESP_RMAKER_CLAIM_TASK_STACK_SIZE,
+                &claim_data, tskIDLE_PRIORITY, NULL) != pdPASS) {
+        ESP_LOGE(TAG, "Couldn't create Claim task");
+        vEventGroupDelete(claim_event_group);
+        return NULL;
+    }
+
+    /* Wait for claim init to complete */
+    xEventGroupWaitBits(claim_event_group, CLAIM_TASK_BIT, false, true, portMAX_DELAY);
+    vEventGroupDelete(claim_event_group);
+    claim_event_group = NULL;
+    return claim_data;
+}
+
+#ifdef CONFIG_ESP_RMAKER_SELF_CLAIM
+esp_rmaker_claim_data_t *esp_rmaker_self_claim_init(void)
+{
+    ESP_LOGI(TAG, "Initialising Self Claiming. This may take time.");
+    return esp_rmaker_claim_init();
+}
+#endif
+#ifdef CONFIG_ESP_RMAKER_ASSISTED_CLAIM
+esp_err_t esp_rmaker_assisted_claim_perform(esp_rmaker_claim_data_t *claim_data)
+{
+    if (claim_data == NULL) {
+        ESP_LOGE(TAG, "Assisted claiming not initialised.");
+        return ESP_ERR_INVALID_STATE;
+    }
+    claim_event_group = xEventGroupCreate();
+    if (!claim_event_group) {
         ESP_LOGE(TAG, "Couldn't create event group");
         return ESP_ERR_NO_MEM;
     }
-    esp_err_t *err = (esp_err_t *)calloc(1, sizeof(esp_err_t));
-    if (!err) {
-        ESP_LOGE(TAG, "Couldn't allocate err");
-        vEventGroupDelete(self_claim_event_group);
-        return ESP_ERR_NO_MEM;
+    /* Wait for assisted claim to complete */
+    ESP_LOGI(TAG, "Waiting for assisted claim to finish.");
+    xEventGroupWaitBits(claim_event_group, CLAIM_TASK_BIT, false, true, portMAX_DELAY);
+    esp_err_t err = ESP_FAIL;
+    if (claim_data->state == RMAKER_CLAIM_STATE_VERIFY_DONE) {
+        err = ESP_OK;
     }
-
-#define ESP_RMAKER_SELF_CLAIM_TASK_STACK_SIZE (10 * 1024)
-    if (xTaskCreate(&esp_rmaker_self_claim_task, "self_claim_task", ESP_RMAKER_SELF_CLAIM_TASK_STACK_SIZE, err, (CONFIG_ESP_RMAKER_TASK_PRIORITY + 1), NULL) != pdPASS) {
-        ESP_LOGE(TAG, "Couldn't create Self Claim task");
-        free(err);
-        vEventGroupDelete(self_claim_event_group);
-        return ESP_ERR_NO_MEM;
-    }
-
-    /* Wait for self claim to complete */
-    xEventGroupWaitBits(self_claim_event_group, SELF_CLAIM_TASK_BIT, false, true, portMAX_DELAY);
-    esp_err_t ret = *err;
-    free(err);
-    vEventGroupDelete(self_claim_event_group);
-    return ret;
+    esp_event_handler_unregister(WIFI_PROV_EVENT, WIFI_PROV_INIT, &event_handler);
+    esp_event_handler_unregister(WIFI_PROV_EVENT, WIFI_PROV_START, &event_handler);
+    esp_rmaker_claim_data_free(claim_data);
+    vEventGroupDelete(claim_event_group);
+    return err;
 }
+esp_rmaker_claim_data_t *esp_rmaker_assisted_claim_init(void)
+{
+    ESP_LOGI(TAG, "Initialising Assisted Claiming. This may take time.");
+    esp_rmaker_claim_data_t *claim_data = esp_rmaker_claim_init();
+    if (claim_data) {
+        esp_event_handler_register(WIFI_PROV_EVENT, WIFI_PROV_INIT, &event_handler, claim_data);
+        esp_event_handler_register(WIFI_PROV_EVENT, WIFI_PROV_START, &event_handler, claim_data);
+    }
+    return claim_data;
+}
+#endif
