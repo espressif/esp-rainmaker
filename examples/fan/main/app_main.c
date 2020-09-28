@@ -35,7 +35,7 @@ static esp_err_t write_cb(const esp_rmaker_device_t *device, const esp_rmaker_pa
         ESP_LOGI(TAG, "Received value = %s for %s - %s",
                 val.val.b? "true" : "false", device_name, param_name);
         app_fan_set_power(val.val.b);
-    } else if (strcmp(param_name, "speed") == 0) {
+    } else if (strcmp(param_name, ESP_RMAKER_DEF_SPEED_NAME) == 0) {
         ESP_LOGI(TAG, "Received value = %d for %s - %s",
                 val.val.i, device_name, param_name);
         app_fan_set_speed(val.val.i);
@@ -82,7 +82,7 @@ void app_main()
     /* Create a device and add the relevant parameters to it */
     fan_device = esp_rmaker_fan_device_create("Fan", NULL, DEFAULT_POWER);
     esp_rmaker_device_add_cb(fan_device, write_cb, NULL);
-    esp_rmaker_device_add_param(fan_device, esp_rmaker_speed_param_create("speed", DEFAULT_SPEED));
+    esp_rmaker_device_add_param(fan_device, esp_rmaker_speed_param_create(ESP_RMAKER_DEF_SPEED_NAME, DEFAULT_SPEED));
     esp_rmaker_node_add_device(node, fan_device);
 
     /* Start the ESP RainMaker Agent */

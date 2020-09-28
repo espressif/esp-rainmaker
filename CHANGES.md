@@ -1,5 +1,28 @@
 # Changes
 
+## 29-Sep-2020 (esp_rmaker_standard_types: Start default names of all standard params with capital letter)
+
+Default parameter names like name, power, etc. have been changed to Name, Power, etc. respectively, so that they look better in the phone app UIs.
+
+With this change, any user configured device name (the name set from phone apps), or any other persistent parameter for which a
+default name was used (Eg. power) will be affected, as the values will no more be found in the NVS storage.
+Please edit your application code accordingly if you want to stick with the old names.
+
+Eg. If you were using the standard lightbulb device API which internally creates power and name parameters
+```
+light_device = esp_rmaker_lightbulb_device_create("Light", NULL, DEFAULT_POWER);
+```
+
+Please change to below, if you want to stick with old parameter names "name" and "power".
+
+```
+light_device = esp_rmaker_device_create("Light", ESP_RMAKER_DEVICE_LIGHTBULB, NULL);
+esp_rmaker_device_add_param(light_device, esp_rmaker_name_param_create("name", "Light"));
+esp_rmaker_param_t *power_param = esp_rmaker_power_param_create("power", DEFAULT_POWER);
+esp_rmaker_device_add_param(light_device, power_param);
+esp_rmaker_device_assign_primary_param(light_device, power_param);
+```
+
 ## 5-Aug-2020 (wifi_provisioning: Use a random pop instead of creating it from MAC address)
 
 Till date, the last 4 bytes of the MAC address were being used to generate the 8 character Proof of Possession (PoP) PIN for Wi-Fi provisioning. This is not secure enough because MAC address is a public information and can also be sniffed easily by devices in vicinity. A minor risk in this is that somebody else in the vicinity can provision your device, but a major risk is a man in the middle attack, wherein someone in vicinity can read the data being exchanged between a phone and the device and get the Wi-Fi credentials.

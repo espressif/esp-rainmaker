@@ -38,15 +38,15 @@ static esp_err_t write_cb(const esp_rmaker_device_t *device, const esp_rmaker_pa
         ESP_LOGI(TAG, "Received value = %s for %s - %s",
                 val.val.b? "true" : "false", device_name, param_name);
         app_light_set_power(val.val.b);
-    } else if (strcmp(param_name, "brightness") == 0) {
+    } else if (strcmp(param_name, ESP_RMAKER_DEF_BRIGHTNESS_NAME) == 0) {
         ESP_LOGI(TAG, "Received value = %d for %s - %s",
                 val.val.i, device_name, param_name);
         app_light_set_brightness(val.val.i);
-    } else if (strcmp(param_name, "hue") == 0) {
+    } else if (strcmp(param_name, ESP_RMAKER_DEF_HUE_NAME) == 0) {
         ESP_LOGI(TAG, "Received value = %d for %s - %s",
                 val.val.i, device_name, param_name);
         app_light_set_hue(val.val.i);
-    } else if (strcmp(param_name, "saturation") == 0) {
+    } else if (strcmp(param_name, ESP_RMAKER_DEF_SATURATION_NAME) == 0) {
         ESP_LOGI(TAG, "Received value = %d for %s - %s",
                 val.val.i, device_name, param_name);
         app_light_set_saturation(val.val.i);
@@ -94,9 +94,9 @@ void app_main()
     light_device = esp_rmaker_lightbulb_device_create("Light", NULL, DEFAULT_POWER);
     esp_rmaker_device_add_cb(light_device, write_cb, NULL);
 
-    esp_rmaker_device_add_param(light_device, esp_rmaker_brightness_param_create("brightness", DEFAULT_BRIGHTNESS));
-    esp_rmaker_device_add_param(light_device, esp_rmaker_hue_param_create("hue", DEFAULT_HUE));
-    esp_rmaker_device_add_param(light_device, esp_rmaker_saturation_param_create("saturation", DEFAULT_SATURATION));
+    esp_rmaker_device_add_param(light_device, esp_rmaker_brightness_param_create(ESP_RMAKER_DEF_BRIGHTNESS_NAME, DEFAULT_BRIGHTNESS));
+    esp_rmaker_device_add_param(light_device, esp_rmaker_hue_param_create(ESP_RMAKER_DEF_HUE_NAME, DEFAULT_HUE));
+    esp_rmaker_device_add_param(light_device, esp_rmaker_saturation_param_create(ESP_RMAKER_DEF_SATURATION_NAME, DEFAULT_SATURATION));
 
     esp_rmaker_node_add_device(node, light_device);
 

@@ -13,6 +13,8 @@
 #include <esp_log.h>
 
 #include <esp_rmaker_core.h>
+#include <esp_rmaker_standard_params.h>
+
 #include <hap.h>
 #include <hap_apple_servs.h>
 #include <hap_apple_chars.h>
@@ -91,7 +93,7 @@ static int switch_write(hap_write_data_t write_data[], int count,
             hap_char_update_val(write->hc, &(write->val));
             /* Report to RainMaker */
             esp_rmaker_param_update_and_report(
-                esp_rmaker_device_get_param_by_name(switch_device, "power"),
+                esp_rmaker_device_get_param_by_name(switch_device, ESP_RMAKER_DEF_POWER_NAME),
                 esp_rmaker_bool(write->val.b));
 
             *(write->status) = HAP_STATUS_SUCCESS;
