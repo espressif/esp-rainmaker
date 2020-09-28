@@ -488,6 +488,30 @@ esp_err_t esp_rmaker_param_add_valid_str_list(const esp_rmaker_param_t *param, c
   return ESP_OK;
 }
 
+esp_err_t esp_rmaker_param_add_array_max_count(const esp_rmaker_param_t *param, int count)
+{
+    if (!param) {
+        ESP_LOGE(TAG, "Param handle cannot be NULL.");
+        return ESP_ERR_INVALID_ARG;
+    }
+    _esp_rmaker_param_t *_param = (_esp_rmaker_param_t *)param;
+    if (_param->val.type != RMAKER_VAL_TYPE_ARRAY) {
+        ESP_LOGE(TAG, "Only array params can have max count.");
+        return ESP_ERR_INVALID_ARG;
+    }
+    esp_rmaker_param_bounds_t *bounds = calloc(1, sizeof(esp_rmaker_param_bounds_t));
+    if (!bounds) {
+        ESP_LOGE(TAG, "Failed to allocate memory for parameter bounds.");
+        return ESP_ERR_NO_MEM;
+    }
+    bounds->max = esp_rmaker_int(count);
+    if (_param->bounds) {
+        free(_param->bounds);
+    }
+    _param->bounds = bounds;
+    return ESP_OK;
+}
+
 esp_err_t esp_rmaker_param_add_ui_type(const esp_rmaker_param_t *param, const char *ui_type)
 {
     if (!param || !ui_type) {
