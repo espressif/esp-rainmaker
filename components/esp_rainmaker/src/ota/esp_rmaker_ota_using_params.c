@@ -27,7 +27,7 @@
 
 static const char *TAG = "esp_rmaker_ota_using_params";
 
-#define ESP_RMAKER_OTA_SERV_NAME    "ota"
+#define ESP_RMAKER_OTA_SERV_NAME    "OTA"
 
 void esp_rmaker_ota_finish_using_params(esp_rmaker_ota_t *ota)
 {

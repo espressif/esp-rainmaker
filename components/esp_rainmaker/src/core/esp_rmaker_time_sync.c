@@ -25,7 +25,7 @@ static const char *TAG = "esp_rmaker_time_sync";
 
 #define ESP_RMAKER_NVS_PART_NAME            "nvs"
 
-#define ESP_RMAKER_TIME_SERV_NAME           "time"
+#define ESP_RMAKER_TIME_SERV_NAME           "Time"
 #define ESP_RMAKER_NVS_TIME_NAMESPACE       "rmaker_time"
 #define ESP_RMAKER_TZ_POSIX_NVS_NAME        "tz_posix"
 #define ESP_RMAKER_TZ_NVS_NAME              "tz"

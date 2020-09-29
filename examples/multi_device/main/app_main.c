@@ -40,10 +40,10 @@ static esp_err_t write_cb(const esp_rmaker_device_t *device, const esp_rmaker_pa
         if (strcmp(device_name, "Switch") == 0) {
             app_driver_set_state(val.val.b);
         }
-    } else if (strcmp(param_name, "brightness") == 0) {
+    } else if (strcmp(param_name, ESP_RMAKER_DEF_BRIGHTNESS_NAME) == 0) {
         ESP_LOGI(TAG, "Received value = %d for %s - %s",
                 val.val.i, device_name, param_name);
-    } else if (strcmp(param_name, "speed") == 0) {
+    } else if (strcmp(param_name, ESP_RMAKER_DEF_SPEED_NAME) == 0) {
         ESP_LOGI(TAG, "Received value = %d for %s - %s",
                 val.val.i, device_name, param_name);
     } else {
@@ -96,17 +96,18 @@ void app_main()
     light_device = esp_rmaker_lightbulb_device_create("Light", NULL, DEFAULT_LIGHT_POWER);
     esp_rmaker_device_add_cb(light_device, write_cb, NULL);
     
-    esp_rmaker_device_add_param(light_device, esp_rmaker_brightness_param_create("brightness", DEFAULT_LIGHT_BRIGHTNESS));
+    esp_rmaker_device_add_param(light_device,
+            esp_rmaker_brightness_param_create(ESP_RMAKER_DEF_BRIGHTNESS_NAME, DEFAULT_LIGHT_BRIGHTNESS));
     
-    esp_rmaker_device_add_attribute(light_device, "serial_number", "012345");
-    esp_rmaker_device_add_attribute(light_device, "mac", "xx:yy:zz:aa:bb:cc");
+    esp_rmaker_device_add_attribute(light_device, "Serial Number", "012345");
+    esp_rmaker_device_add_attribute(light_device, "MAC", "xx:yy:zz:aa:bb:cc");
 
     esp_rmaker_node_add_device(node, light_device);
     
     /* Create a Fan device and add the relevant parameters to it */
     fan_device = esp_rmaker_fan_device_create("Fan", NULL, DEFAULT_FAN_POWER);
     esp_rmaker_device_add_cb(fan_device, write_cb, NULL);
-    esp_rmaker_device_add_param(fan_device, esp_rmaker_speed_param_create("speed", DEFAULT_FAN_SPEED));
+    esp_rmaker_device_add_param(fan_device, esp_rmaker_speed_param_create(ESP_RMAKER_DEF_SPEED_NAME, DEFAULT_FAN_SPEED));
     esp_rmaker_node_add_device(node, fan_device);
     
     /* Create a Temperature Sensor device and add the relevant parameters to it */

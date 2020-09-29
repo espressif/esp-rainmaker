@@ -32,7 +32,7 @@ esp_rmaker_device_t *switch_device;
 static esp_err_t write_cb(const esp_rmaker_device_t *device, const esp_rmaker_param_t *param,
             const esp_rmaker_param_val_t val, void *priv_data, esp_rmaker_write_ctx_t *ctx)
 {
-    if (strcmp(esp_rmaker_param_get_name(param), "power") == 0) {
+    if (strcmp(esp_rmaker_param_get_name(param), ESP_RMAKER_DEF_POWER_NAME) == 0) {
         ESP_LOGI(TAG, "Received value = %s for %s - %s",
                 val.val.b? "true" : "false", esp_rmaker_device_get_name(device),
                 esp_rmaker_param_get_name(param));
@@ -128,12 +128,12 @@ void app_main()
      * user friendly custom name from the phone apps. All devices are recommended to have this
      * parameter.
      */
-    esp_rmaker_device_add_param(switch_device, esp_rmaker_name_param_create("name", "Switch"));
+    esp_rmaker_device_add_param(switch_device, esp_rmaker_name_param_create(ESP_RMAKER_DEF_NAME_PARAM, "Switch"));
 
     /* Add the standard power parameter (type: esp.param.power), which adds a boolean param
      * with a toggle switch ui-type.
      */
-    esp_rmaker_param_t *power_param = esp_rmaker_power_param_create("power", DEFAULT_POWER);
+    esp_rmaker_param_t *power_param = esp_rmaker_power_param_create(ESP_RMAKER_DEF_POWER_NAME, DEFAULT_POWER);
     esp_rmaker_device_add_param(switch_device, power_param);
 
     /* Assign the power parameter as the primary, so that it can be controlled from the

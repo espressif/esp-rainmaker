@@ -28,21 +28,22 @@ extern "C"
  * @note These names are not mandatory. You can use the ESP RainMaker Core APIs
  * to create your own parameters with custom names, if required.
  */
-#define ESP_RMAKER_DEF_NAME_PARAM           "name"
-#define ESP_RMAKER_DEF_POWER_NAME           "power"
-#define ESP_RMAKER_DEF_BRIGHTNESS_NAME      "brightness"
-#define ESP_RMAKER_DEF_HUE_NAME             "hue"
-#define ESP_RMAKER_DEF_SATURATION_NAME      "saturation"
-#define ESP_RMAKER_DEF_INTENSITY_NAME       "intensity"
-#define ESP_RMAKER_DEF_CCT_NAME             "cct"
-#define ESP_RMAKER_DEF_DIRECTION_NAME       "direction"
-#define ESP_RMAKER_DEF_SPEED_NAME           "speed"
-#define ESP_RMAKER_DEF_TEMPERATURE_NAME     "temperature"
-#define ESP_RMAKER_DEF_OTA_STATUS_NAME      "status"
-#define ESP_RMAKER_DEF_OTA_INFO_NAME        "info"
-#define ESP_RMAKER_DEF_OTA_URL_NAME         "url"
-#define ESP_RMAKER_DEF_TIMEZONE_NAME        "tz"
-#define ESP_RMAKER_DEF_TIMEZONE_POSIX_NAME  "tz_posix"
+
+#define ESP_RMAKER_DEF_NAME_PARAM           "Name"
+#define ESP_RMAKER_DEF_POWER_NAME           "Power"
+#define ESP_RMAKER_DEF_BRIGHTNESS_NAME      "Brightness"
+#define ESP_RMAKER_DEF_HUE_NAME             "Hue"
+#define ESP_RMAKER_DEF_SATURATION_NAME      "Saturation"
+#define ESP_RMAKER_DEF_INTENSITY_NAME       "Intensity"
+#define ESP_RMAKER_DEF_CCT_NAME             "CCT"
+#define ESP_RMAKER_DEF_DIRECTION_NAME       "Direction"
+#define ESP_RMAKER_DEF_SPEED_NAME           "Speed"
+#define ESP_RMAKER_DEF_TEMPERATURE_NAME     "Temperature"
+#define ESP_RMAKER_DEF_OTA_STATUS_NAME      "Status"
+#define ESP_RMAKER_DEF_OTA_INFO_NAME        "Info"
+#define ESP_RMAKER_DEF_OTA_URL_NAME         "URL"
+#define ESP_RMAKER_DEF_TIMEZONE_NAME        "TZ"
+#define ESP_RMAKER_DEF_TIMEZONE_POSIX_NAME  "TZ-POSIX"
 
 /**
  * Create standard name param
