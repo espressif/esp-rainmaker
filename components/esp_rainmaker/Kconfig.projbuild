@@ -109,6 +109,15 @@ menu "ESP RainMaker Config"
         help
             Default SNTP Server which is used for time synchronization.
 
+    config ESP_RMAKER_DISABLE_USER_MAPPING_PROV
+        bool "Disable User Mapping during Provisioning"
+        default n
+        help
+            The handlers for User Node Mapping are now registered internally by ESP RainMaker core,
+            by registering to appropriate Wi-Fi Provisioning events. If your application code also
+            has the calls to create and register the user mapping handlers, enable this config
+            option to prevent duplication.
+
     choice ESP_RMAKER_CONSOLE_UART_NUM
         prompt "UART for console input"
         default ESP_RMAKER_CONSOLE_UART_NUM_0

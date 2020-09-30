@@ -144,6 +144,9 @@ static esp_err_t esp_rmaker_deinit_priv_data(esp_rmaker_priv_data_t *rmaker_priv
     if (rmaker_priv_data->work_queue) {
         vQueueDelete(rmaker_priv_data->work_queue);
     }
+#ifndef CONFIG_ESP_RMAKER_DISABLE_USER_MAPPING_PROV
+    esp_rmaker_user_mapping_prov_deinit();
+#endif
 #ifdef ESP_RMAKER_CLAIM_ENABLED
     if (rmaker_priv_data->claim_data) {
         esp_rmaker_claim_data_free(rmaker_priv_data->claim_data);
@@ -221,6 +224,14 @@ static esp_err_t esp_rmaker_init(const esp_rmaker_config_t *config)
         ESP_LOGE(TAG, "ESP RainMaker Queue Creation Failed");
         return ESP_ERR_NO_MEM;
     }
+#ifndef CONFIG_ESP_RMAKER_DISABLE_USER_MAPPING_PROV
+    if (esp_rmaker_user_mapping_prov_init()) {
+        esp_rmaker_deinit_priv_data(esp_rmaker_priv_data);
+        esp_rmaker_priv_data = NULL;
+        ESP_LOGE(TAG, "Could not initialise User-Node mapping.");
+        return ESP_FAIL;
+    }
+#endif /* !CONFIG_ESP_RMAKER_DISABLE_USER_MAPPING_PROV */
     esp_rmaker_priv_data->mqtt_config = esp_rmaker_get_mqtt_config();
     if (!esp_rmaker_priv_data->mqtt_config) {
 #ifdef ESP_RMAKER_CLAIM_ENABLED
