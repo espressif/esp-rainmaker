@@ -136,6 +136,8 @@ typedef enum {
     ESP_RMAKER_REQ_SRC_INIT,
     /** Request received from cloud */
     ESP_RMAKER_REQ_SRC_CLOUD,
+    /** Request received when a schedule has triggered */
+    ESP_RMAKER_REQ_SRC_SCHEDULE,
 } esp_rmaker_req_src_t;
 
 /** Write request Context */
@@ -621,6 +623,20 @@ esp_err_t esp_rmaker_param_add_bounds(const esp_rmaker_param_t *param,
  * return error in case of failure.
  */
 esp_err_t esp_rmaker_param_add_valid_str_list(const esp_rmaker_param_t *param, const char *strs[], uint8_t count);
+
+/** Add max count for an array parameter
+ *
+ * This can be used to put a limit on the maximum number of elements in an array.
+ *
+ * @note The RainMaker core does not check the values. It is upto the application to handle it.
+ *
+ * @param[in] param Parameter handle.
+ * @param[in] count Max number of elements allowed in the array.
+ *
+ * @return ESP_OK on success.
+ * return error in case of failure.
+ */
+esp_err_t esp_rmaker_param_add_array_max_count(const esp_rmaker_param_t *param, int count);
 
 /** Update and report a parameter
  *

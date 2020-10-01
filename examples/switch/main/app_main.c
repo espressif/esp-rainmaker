@@ -19,6 +19,7 @@
 #include <esp_rmaker_standard_params.h>
 #include <esp_rmaker_standard_devices.h>
 #include <esp_rmaker_ota.h>
+#include <esp_rmaker_schedule.h>
 #include <esp_rmaker_console.h>
 
 #include <app_wifi.h>
@@ -149,6 +150,9 @@ void app_main()
         .server_cert = ESP_RMAKER_OTA_DEFAULT_SERVER_CERT,
     };
     esp_rmaker_ota_enable(&ota_config, OTA_USING_PARAMS);
+
+    /* Enable scheduling */
+    esp_rmaker_schedule_enable();
 
     /* Start the ESP RainMaker Agent */
     esp_rmaker_start();

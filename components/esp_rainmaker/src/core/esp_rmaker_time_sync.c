@@ -177,7 +177,7 @@ esp_err_t esp_rmaker_time_sync_init(esp_rmaker_time_config_t *config)
     sntp_setoperatingmode(SNTP_OPMODE_POLL);
     sntp_setservername(0, sntp_server_name);
     sntp_init();
-    if (config->sync_time_cb) {
+    if (config && config->sync_time_cb) {
         sntp_set_time_sync_notification_cb(config->sync_time_cb);
     } else {
         sntp_set_time_sync_notification_cb(esp_rmaker_time_sync_cb);

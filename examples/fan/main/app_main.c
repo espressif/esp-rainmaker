@@ -16,6 +16,7 @@
 #include <esp_rmaker_core.h>
 #include <esp_rmaker_standard_params.h>
 #include <esp_rmaker_standard_devices.h>
+#include <esp_rmaker_schedule.h>
 
 #include <app_wifi.h>
 
@@ -84,6 +85,9 @@ void app_main()
     esp_rmaker_device_add_cb(fan_device, write_cb, NULL);
     esp_rmaker_device_add_param(fan_device, esp_rmaker_speed_param_create(ESP_RMAKER_DEF_SPEED_NAME, DEFAULT_SPEED));
     esp_rmaker_node_add_device(node, fan_device);
+
+    /* Enable scheduling */
+    esp_rmaker_schedule_enable();
 
     /* Start the ESP RainMaker Agent */
     esp_rmaker_start();

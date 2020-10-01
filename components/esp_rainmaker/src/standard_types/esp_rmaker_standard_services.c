@@ -39,3 +39,14 @@ esp_rmaker_device_t *esp_rmaker_time_service_create(const char *serv_name, const
     }
     return service;
 }
+
+esp_rmaker_device_t *esp_rmaker_create_schedule_service(const char *serv_name, esp_rmaker_device_write_cb_t write_cb,
+        esp_rmaker_device_read_cb_t read_cb, int max_schedules, void *priv_data)
+{
+    esp_rmaker_device_t *service = esp_rmaker_service_create(serv_name, ESP_RMAKER_SERVICE_SCHEDULE, priv_data);
+    if (service) {
+        esp_rmaker_device_add_cb(service, write_cb, read_cb);
+        esp_rmaker_device_add_param(service, esp_rmaker_schedules_param_create(ESP_RMAKER_DEF_SCHEDULE_NAME, max_schedules));
+    }
+    return service;
+}
