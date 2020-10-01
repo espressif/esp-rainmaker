@@ -14,12 +14,14 @@
 
 #include <string.h>
 #include <esp_log.h>
+#include <esp_event.h>
 #include <wifi_provisioning/manager.h>
 #include <json_generator.h>
 #include <esp_rmaker_core.h>
+#include <esp_rmaker_user_mapping.h>
 #include <esp_rmaker_mqtt.h>
-
 #include "esp_rmaker_user_mapping.pb-c.h"
+#include "esp_rmaker_internal.h"
 
 static const char *TAG = "esp_rmaker_user_mapping";
 
@@ -41,6 +43,28 @@ static void esp_rmaker_user_mapping_cleanup_data(esp_rmaker_user_mapping_data_t 
             free(data->secret_key);
         }
         free(data);
+    }
+}
+
+static void esp_rmaker_user_mapping_event_handler(void* arg, esp_event_base_t event_base,
+                          int event_id, void* event_data)
+{
+    if (event_base == WIFI_PROV_EVENT) {
+        switch (event_id) {
+            case WIFI_PROV_INIT: {
+                if (esp_rmaker_user_mapping_endpoint_create() != ESP_OK) {
+                    ESP_LOGE(TAG, "Failed to create user mapping end point.");
+                }
+                break;
+            }
+            case WIFI_PROV_START:
+                if (esp_rmaker_user_mapping_endpoint_register() != ESP_OK) {
+                    ESP_LOGE(TAG, "Failed to register user mapping end point.");
+                }
+                break;
+            default:
+                break;
+        }
     }
 }
 
@@ -86,6 +110,7 @@ esp_err_t esp_rmaker_start_user_node_mapping(char *user_id, char *secret_key)
     if (esp_rmaker_queue_work(esp_rmaker_user_mapping_cb, data) != ESP_OK) {
         goto user_mapping_error;
     }
+    esp_rmaker_user_mapping_prov_deinit();
     return ESP_OK;
 
 user_mapping_error:
@@ -141,13 +166,31 @@ int esp_rmaker_user_mapping_handler(uint32_t session_id, const uint8_t *inbuf, s
     rainmaker__rmaker_config_payload__free_unpacked(data, NULL);
     return ESP_OK;
 }
-esp_err_t esp_rmaker_user_mapping_endpoint_create()
+esp_err_t esp_rmaker_user_mapping_endpoint_create(void)
 {
     esp_err_t err = wifi_prov_mgr_endpoint_create(USER_MAPPING_ENDPOINT);
     return err;
 }
 
-esp_err_t esp_rmaker_user_mapping_endpoint_register()
+esp_err_t esp_rmaker_user_mapping_endpoint_register(void)
 {
     return wifi_prov_mgr_endpoint_register(USER_MAPPING_ENDPOINT, esp_rmaker_user_mapping_handler, NULL);
+}
+
+esp_err_t esp_rmaker_user_mapping_prov_init(void)
+{
+    int ret = ESP_OK;
+    ret = esp_event_handler_register(WIFI_PROV_EVENT, WIFI_PROV_INIT, &esp_rmaker_user_mapping_event_handler, NULL);
+    if (ret != ESP_OK) {
+        return ret;
+    }
+    ret = esp_event_handler_register(WIFI_PROV_EVENT, WIFI_PROV_START, &esp_rmaker_user_mapping_event_handler, NULL);
+    return ret;
+}
+
+esp_err_t esp_rmaker_user_mapping_prov_deinit(void)
+{
+    esp_event_handler_unregister(WIFI_PROV_EVENT, WIFI_PROV_INIT, &esp_rmaker_user_mapping_event_handler);
+    esp_event_handler_unregister(WIFI_PROV_EVENT, WIFI_PROV_START, &esp_rmaker_user_mapping_event_handler);
+    return ESP_OK;
 }

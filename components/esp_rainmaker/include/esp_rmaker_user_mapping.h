@@ -29,7 +29,7 @@ extern "C"
  * @return ESP_OK on success
  * @return error on failure
  */
-esp_err_t esp_rmaker_user_mapping_endpoint_create();
+esp_err_t esp_rmaker_user_mapping_endpoint_create(void);
 
 /**
  * Register User Mapping Endpoint
@@ -41,7 +41,7 @@ esp_err_t esp_rmaker_user_mapping_endpoint_create();
  * @return ESP_OK on success
  * @return error on failure
  */
-esp_err_t esp_rmaker_user_mapping_endpoint_register();
+esp_err_t esp_rmaker_user_mapping_endpoint_register(void);
 
 /** Add User-Node mapping
  *

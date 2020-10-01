@@ -31,7 +31,6 @@
 #include <wifi_provisioning/scheme_softap.h>
 #endif /* CONFIG_APP_WIFI_PROV_TRANSPORT_BLE */
 
-#include <esp_rmaker_user_mapping.h>
 #include <qrcode.h>
 #include <nvs.h>
 #include <nvs_flash.h>
@@ -314,20 +313,8 @@ esp_err_t app_wifi_start(app_wifi_pop_type_t pop_type)
         }
 #endif /* CONFIG_APP_WIFI_PROV_TRANSPORT_BLE */
 
-        /* Create endpoint for ESP Cloud User-Device Association */
-        err = esp_rmaker_user_mapping_endpoint_create();
-        if (err != ESP_OK) {
-            ESP_LOGE(TAG, "esp_rmaker_user_mapping_endpoint_create failed %d", err);
-            return err;
-        }
         /* Start provisioning service */
         ESP_ERROR_CHECK(wifi_prov_mgr_start_provisioning(security, pop, service_name, service_key));
-        /* Register endpoint for ESP Cloud User-Device Association */
-        err = esp_rmaker_user_mapping_endpoint_register();
-        if (err != ESP_OK) {
-            ESP_LOGE(TAG, "esp_rmaker_user_mapping_endpoint_register failed %d", err);
-            return err;
-        }
         /* Print QR code for provisioning */
 #ifdef CONFIG_APP_WIFI_PROV_TRANSPORT_BLE
         app_wifi_print_qr(service_name, pop, PROV_TRANSPORT_BLE);
