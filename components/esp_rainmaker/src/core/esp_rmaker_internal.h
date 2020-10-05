@@ -99,6 +99,7 @@ char *esp_rmaker_get_node_params(void);
 esp_err_t esp_rmaker_handle_set_params(char *data, size_t data_len, esp_rmaker_req_src_t src);
 esp_err_t esp_rmaker_user_mapping_prov_init(void);
 esp_err_t esp_rmaker_user_mapping_prov_deinit(void);
+esp_err_t esp_rmaker_start_local_ctrl_service(const char *serv_name);
 static inline esp_err_t esp_rmaker_post_event(esp_rmaker_event_t event_id, void* data, size_t data_size)
 {
     return esp_event_post(RMAKER_EVENT, event_id, data, data_size, portMAX_DELAY);

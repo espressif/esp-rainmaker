@@ -13,6 +13,8 @@ set(core_srcs "src/core/esp_rmaker_core.c"
         "src/core/esp_rmaker_user_mapping.c"
         "src/core/esp_rmaker_schedule.c")
 
+set(priv_req protobuf-c json_parser json_generator wifi_provisioning nvs_flash esp_http_client app_update esp-tls mbedtls mqtt esp_https_ota console esp_local_ctrl esp_https_server mdns esp_schedule)
+
 
 if(CONFIG_ESP_RMAKER_ASSISTED_CLAIM)
     list(APPEND core_srcs
@@ -22,6 +24,11 @@ endif()
 if(CONFIG_ESP_RMAKER_SELF_CLAIM)
     list(APPEND core_srcs
         "src/core/esp_rmaker_claim.c")
+endif()
+
+if(CONFIG_ESP_RMAKER_LOCAL_CTRL_ENABLE)
+    list(APPEND core_srcs
+        "src/core/esp_rmaker_local_ctrl.c")
 endif()
 
 set(core_priv_includes "src/core")
@@ -49,7 +56,7 @@ idf_component_register(SRCS ${core_srcs} ${mqtt_srcs} ${ota_srcs} ${standard_typ
                        INCLUDE_DIRS "include"
                        PRIV_INCLUDE_DIRS ${core_priv_includes} ${ota_priv_includes} ${console_priv_includes}
                        REQUIRES
-                       PRIV_REQUIRES protobuf-c json_parser json_generator wifi_provisioning nvs_flash esp_http_client app_update esp-tls mqtt esp_https_ota console esp_schedule)
+                       PRIV_REQUIRES ${priv_req})
 
 target_add_binary_data(${COMPONENT_TARGET} "server_certs/mqtt_server.crt" TEXT)
 target_add_binary_data(${COMPONENT_TARGET} "server_certs/claim_service_server.crt" TEXT)

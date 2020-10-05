@@ -144,6 +144,8 @@ typedef enum {
     ESP_RMAKER_REQ_SRC_CLOUD,
     /** Request received when a schedule has triggered */
     ESP_RMAKER_REQ_SRC_SCHEDULE,
+    /** Request received from a local controller */
+    ESP_RMAKER_REQ_SRC_LOCAL,
 } esp_rmaker_req_src_t;
 
 /** Write request Context */

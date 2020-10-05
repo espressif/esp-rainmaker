@@ -118,6 +118,20 @@ menu "ESP RainMaker Config"
             has the calls to create and register the user mapping handlers, enable this config
             option to prevent duplication.
 
+    config ESP_RMAKER_LOCAL_CTRL_ENABLE
+        bool "ESP RainMaker Local Control"
+        default y
+        select ESP_HTTPS_SERVER_ENABLE
+        help
+            Enabling this allows to discover and control the node over local Wi-Fi network.
+
+    config ESP_RMAKER_LOCAL_CTRL_HTTP_PORT
+        int "Local Control HTTP Port"
+        default 8080
+        depends on ESP_RMAKER_LOCAL_CTRL_ENABLE
+        help
+            The port number to be used for http for local control.
+
     choice ESP_RMAKER_CONSOLE_UART_NUM
         prompt "UART for console input"
         default ESP_RMAKER_CONSOLE_UART_NUM_0
