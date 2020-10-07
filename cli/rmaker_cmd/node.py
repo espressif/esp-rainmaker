@@ -19,6 +19,7 @@ import sys
 import time
 import requests
 import base64
+import re
 from pathlib import Path
 
 try:
@@ -57,6 +58,241 @@ def get_nodes(vars=None):
             return
         for key in nodes.keys():
             print(nodes[key].get_nodeid())
+    return
+
+
+def _display_dict(data):
+    log.debug("Display dict....")
+    log.debug("Data: {}".format(data))
+    
+    # Display dictionary
+    for key, val in data.items():
+        log.debug("key: {}, val: {}".format(key, val))
+        if isinstance(val, str):
+            # The string data is displayed
+            log.debug("val is str")
+            print("{}: {}".format(key, val), end='')
+        elif isinstance(val, list):
+            # If val is a list
+            # values are displayed one after the other
+            log.debug("val is list")
+            print("\n{}: ".format(key), end='')
+            first_item = val.pop(0)
+            print("{}".format(first_item), end='')
+            for i in val:
+                print(", {}".format(i), end='')
+        elif isinstance(val, dict):
+            # If val is a dict
+            # only the val(dict) is dislayed
+            # key(of val) is not displayed
+            log.debug("val is dict")
+            _display_dict(val)
+        else:
+            log.debug("in else")
+            print("{}: {}".format(key, str(val), end=''))
+
+
+def _display_json(node_info):
+    log.debug("Display json....")
+    # Set to type list
+    log.debug("Node info received: {}".format(node_info))
+    if not isinstance(node_info, list):
+        node_info = [ node_info ]
+    log.debug("Node info set: {}".format(node_info))
+    print("-"*40)
+    # Display json
+    for data in node_info:
+        _display_dict(data)
+        print("\n", end='')
+        print("-"*40)
+
+
+def _check_user_input(node_ids_str):
+    log.debug("Check user input....")
+    # Check user input format
+    input_pattern = re.compile("^[0-9A-Za-z]+(,[0-9A-Za-z]+)*$")
+    result = input_pattern.match(node_ids_str)
+    log.debug("User input result: {}".format(result))
+    if result is None:
+        sys.exit("Invalid format. Expected: <nodeid>,<nodeid>,...")
+    return True         
+
+
+def _display_status(json_resp):
+    log.debug("Displaying status....")
+    resp_keys = json_resp.keys()
+    log.debug("Response keys: {}".format(resp_keys))
+    # Print status
+    if 'status' in resp_keys:
+        print("Status:", json_resp['status'])
+    # Print error code
+    if 'error_code' in resp_keys:
+        print("Error", json_resp['error_code'], ": ", end='')
+    # Print description
+    if 'description' in resp_keys:
+        print(json_resp['description'])
+
+
+def list_shared_nodes(vars=None):
+    """
+    List shared nodes
+    
+    :param vars: `node` as key - Node Id for the node
+                 (if provided)
+    :type vars: dict
+
+    :raises Exception: If there is an issue
+                       while getting shared nodes
+
+    :return: None on Success
+    :rtype: None
+    """
+    try:
+        log.debug("Get shared nodes")
+
+        n = node.Node(vars['node'], session.Session())
+        log.debug("Node id received from user: {}".format(vars['node']))
+
+        # API
+        node_json_resp = n.get_shared_nodes()
+        log.debug("Get shared nodes response: {}".format(node_json_resp))
+    
+    except Exception as get_node_status_err:
+        log.error(get_node_status_err)
+    else:
+        try:
+            # Display result
+            log.debug("Displaying status")
+            _display_status(node_json_resp)
+        except AttributeError as err:
+            log.debug("Error: {}".format(err))
+            _display_json(node_json_resp)
+    
+    log.debug("Get shared nodes successful")
+    
+    return
+
+
+def add_shared_nodes(vars=None):
+    """
+    Add shared nodes
+    
+    :param vars: `nodes` as key - Node Id for the node
+    :type vars: dict
+
+    :param vars: `email` as key - Email address of the user
+    :type vars: dict
+
+    :raises Exception: If there is an issue
+                       while setting nodes to share
+
+    :return: None on Success
+    :rtype: None
+    """
+    try:
+        log.debug("Set shared nodes")
+
+        # Remove any spaces if exist
+        node_ids = vars['nodes'].strip()
+        
+        # Check user input format
+        ret_status = _check_user_input(node_ids)
+        
+        # Create list from node ids string
+        node_id_list = node_ids.split(',')
+        log.debug("Node ids list: {}".format(node_id_list))
+        
+        # Get email-id
+        email_id = vars['email']
+        log.debug("Email-id set: {}".format(email_id))
+        
+        # Create API data dictionary
+        api_data = {}
+        api_data['nodes'] = node_id_list
+        api_data['email'] = email_id
+        n = node.Node(None, session.Session())
+        log.debug("API data set: {}".format(api_data))
+        
+        # API
+        node_json_resp = n.set_shared_nodes(api_data)
+        log.debug("Set shared nodes response: {}".format(node_json_resp))
+    
+    except Exception as get_node_status_err:
+        log.error(get_node_status_err)
+    else:
+        try:
+            # Display result
+            log.debug("Displaying status")
+            if not isinstance(node_json_resp, dict):
+                print(node_json_resp)
+            else:
+                _display_status(node_json_resp)
+        except AttributeError as err:
+            log.debug("Error: {}".format(err))
+            log.debug("Displaying status")
+            _display_json(node_json_resp) 
+    
+    log.debug("Set shared nodes successful")
+    
+    return
+
+
+def remove_shared_nodes(vars=None):
+    """
+    Remove shared nodes
+    
+    :param vars: `nodes` as key - Node Id for the node
+    :type vars: dict
+
+    :param vars: `email` as key - Email address of the user
+    :type vars: dict
+
+    :raises Exception: If there is an issue
+                       while removing shared nodes
+
+    :return: None on Success
+    :rtype: None
+    """
+    try:
+        log.debug("Removing shared nodes")
+
+        # Remove any spaces if exist
+        node_ids = vars['nodes'].strip()
+        
+        # Check user input format
+        ret_status = _check_user_input(node_ids)
+        
+        # Get email-id
+        email_id = vars['email']
+        log.debug("Email-id set to: {}".format(email_id))
+        
+        # Create API data dictionary
+        api_data = {}
+        api_data['nodes'] = node_ids
+        api_data['email'] = email_id
+        n = node.Node(None, session.Session())
+        log.debug("API data set to: {}".format(api_data))
+        
+        # API call to remove the shared nodes
+        node_json_resp = n.remove_shared_nodes(api_data)
+        log.debug("Remove shared nodes response: {}".format(node_json_resp))
+    
+    except Exception as get_node_status_err:
+        log.error(get_node_status_err)
+    else:
+        try:
+            log.debug("Displaying status")
+            # Display result
+            if not isinstance(node_json_resp, dict):
+                print(node_json_resp)
+            else:
+                _display_status(node_json_resp)
+        except AttributeError as err:
+            log.debug("Error: {}".format(err))
+            _display_json(node_json_resp) 
+    
+    log.debug("Removing shared nodes successful")
+    
     return
 
 

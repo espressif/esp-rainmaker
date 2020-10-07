@@ -16,9 +16,7 @@
 
 import sys
 import argparse
-from rmaker_cmd.node import get_nodes, get_node_config, get_node_status,\
-                            set_params, get_params, remove_node,\
-                            get_mqtt_host, claim_node, ota_upgrade
+from rmaker_cmd.node import *
 from rmaker_cmd.user import signup, login, forgot_password,\
                             get_user_details, logout
 from rmaker_cmd.provision import provision
@@ -43,6 +41,7 @@ def main():
                                          help="Login to ESP Rainmaker")
     login_parser.add_argument('--email',
                               type=str,
+                              metavar='<email>',
                               help='Email address of the user')
     login_parser.set_defaults(func=login)
 
@@ -64,6 +63,7 @@ def main():
                                                   with the user')
     getnodes_parser.set_defaults(func=get_nodes)
 
+    # Node Config
     getnodeconfig_parser = subparsers.add_parser('getnodeconfig',
                                                  help='Get node configuration')
     getnodeconfig_parser.add_argument('nodeid',
@@ -178,6 +178,63 @@ def main():
     user_info_parser = subparsers.add_parser("getuserinfo",
                                          help="Get details of current (logged-in) user")
     user_info_parser.set_defaults(func=get_user_details)
+    # Node Sharing
+    shared_node_parser = subparsers.add_parser('sharing',
+                                               help='Node Sharing Operations')
+
+    shared_node_subparser = shared_node_parser.add_subparsers(dest="sharing_ops")
+    
+    get_shared_node_parser = shared_node_subparser.add_parser('list',
+                                                              help='List shared nodes details '
+                                                              'for current (logged in) user',
+                                                              formatter_class=argparse.RawTextHelpFormatter)
+
+    get_shared_node_parser.add_argument('--node',
+                                    type=str,
+                                    metavar='<node_id>',
+                                    help='Node Id of the node')
+    get_shared_node_parser.set_defaults(func=list_shared_nodes)
+
+    set_shared_node_parser = shared_node_subparser.add_parser('add',
+                                                              help='Add nodes for sharing with '
+                                                              'a particular user',
+                                                              formatter_class=argparse.RawTextHelpFormatter)
+
+    set_shared_node_parser.add_argument('--email',
+                                    type=str,
+                                    metavar='<email>',
+                                    help='Email address of secondary user',
+                                    required=True)
+    
+    set_shared_node_parser.add_argument('--nodes',
+                                    type=str,
+                                    metavar='<node_ids>',
+                                    help="Node Id's of nodes to share\n"
+                                    "format: <nodeid1>,<nodeid2>,...",
+                                    required=True)
+    
+    set_shared_node_parser.set_defaults(func=add_shared_nodes)
+
+    remove_shared_node_parser = shared_node_subparser.add_parser('remove',
+                                                              help='Remove nodes shared with '
+                                                              'a particular user',
+                                                              formatter_class=argparse.RawTextHelpFormatter)
+
+    remove_shared_node_parser.add_argument('--email',
+                                    type=str,
+                                    metavar='<email>',
+                                    help='Email address of secondary user',
+                                    required=True)
+    
+    remove_shared_node_parser.add_argument('--nodes',
+                                    type=str,
+                                    metavar='<node_ids>',
+                                    help="Node Id's of nodes to remove sharing\n"
+                                    "format: <nodeid1>,<nodeid2>,...",
+                                    required=True)
+    
+    remove_shared_node_parser.set_defaults(func=remove_shared_nodes)
+
 
     args = parser.parse_args()
 
@@ -190,7 +247,13 @@ def main():
         except Exception as err:
             log.error(err)
     else:
-        parser.print_help()
+        try:
+            if 'sharing_ops' in vars(args):
+                shared_node_parser.print_help()
+            else:
+                parser.print_help()
+        except AttributeError:
+            parser.print_help()
 
 
 if __name__ == '__main__':
