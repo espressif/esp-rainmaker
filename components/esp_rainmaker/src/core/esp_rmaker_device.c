@@ -136,11 +136,19 @@ esp_err_t esp_rmaker_device_add_param(const esp_rmaker_device_t *device, const e
                 }
             }
             _new_param->val = stored_val;
-            if (_device->write_cb && (_new_param->type && strcmp(_new_param->type, ESP_RMAKER_PARAM_NAME) != 0)) {
-                esp_rmaker_write_ctx_t ctx = {
-                    .src = ESP_RMAKER_REQ_SRC_INIT,
-                };
-                _device->write_cb(device, param, stored_val, _device->priv_data, &ctx);
+            /* The device callback should be invoked once with the stored value, so
+             * that applications can do initialisations as required.
+             */
+            if (_device->write_cb) {
+                /* However, the callback should be invoked, only if the parameter is not
+                 * of type ESP_RMAKER_PARAM_NAME, as it has special handling internally.
+                 */
+                if (!(_new_param->type && strcmp(_new_param->type, ESP_RMAKER_PARAM_NAME) == 0)) {
+                    esp_rmaker_write_ctx_t ctx = {
+                        .src = ESP_RMAKER_REQ_SRC_INIT,
+                    };
+                    _device->write_cb(device, param, stored_val, _device->priv_data, &ctx);
+                }
             }
         } else {
             esp_rmaker_param_store_value(_new_param);
