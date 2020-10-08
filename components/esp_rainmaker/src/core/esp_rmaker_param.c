@@ -394,6 +394,7 @@ esp_rmaker_param_t *esp_rmaker_param_create(const char *param_name, const char *
 {
     if (!param_name) {
         ESP_LOGE(TAG, "Param name is mandatory");
+        return NULL;
     }
     _esp_rmaker_param_t *param = calloc(1, sizeof(_esp_rmaker_param_t));
     if (!param) {
