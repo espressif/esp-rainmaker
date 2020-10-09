@@ -57,6 +57,7 @@ static esp_rmaker_device_t *__esp_rmaker_device_create(const char *name, const c
 {
     if (!name) {
         ESP_LOGE(TAG, "%s name is mandatory", is_service ? "Service":"Device");
+        return NULL;
     }
     _esp_rmaker_device_t *_device = calloc(1, sizeof(_esp_rmaker_device_t));
     if (!_device) {
@@ -97,7 +98,7 @@ esp_rmaker_device_t *esp_rmaker_service_create(const char *name, const char *typ
 esp_err_t esp_rmaker_device_add_param(const esp_rmaker_device_t *device, const esp_rmaker_param_t *param)
 {
     if (!device || !param) {
-        ESP_LOGE(TAG, "Device or Parameter handle cannot be NULL");
+        ESP_LOGE(TAG, "Device or Param handle cannot be NULL");
         return ESP_ERR_INVALID_ARG;
     }
     _esp_rmaker_device_t *_device = (_esp_rmaker_device_t *)device;
@@ -207,6 +208,7 @@ esp_err_t esp_rmaker_device_assign_primary_param(const esp_rmaker_device_t *devi
 {
     if (!device || !param) {
         ESP_LOGE(TAG,"Device or Param handle cannot be NULL");
+        return ESP_ERR_INVALID_ARG;
     }
     ((_esp_rmaker_device_t *)device)->primary = (_esp_rmaker_param_t *)param;
     return ESP_OK;

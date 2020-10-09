@@ -348,7 +348,15 @@ static void esp_rmaker_task(void *param)
     esp_rmaker_priv_data->state = ESP_RMAKER_STATE_STARTING;
     esp_err_t err;
     wifi_event_group = xEventGroupCreate();
-    ESP_ERROR_CHECK(esp_event_handler_register(IP_EVENT, IP_EVENT_STA_GOT_IP, &esp_rmaker_event_handler, esp_rmaker_priv_data)); 
+    if (!wifi_event_group) {
+        ESP_LOGE(TAG, "Failed to create event group. Aborting");
+        goto rmaker_err;
+    }
+    err = esp_event_handler_register(IP_EVENT, IP_EVENT_STA_GOT_IP, &esp_rmaker_event_handler, esp_rmaker_priv_data);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to register event handler. Error: %d. Aborting", err);
+        goto rmaker_err;
+    }
     /* Assisted claiming needs to be done before Wi-Fi connection */
 #ifdef CONFIG_ESP_RMAKER_ASSISTED_CLAIM
     if (esp_rmaker_priv_data->need_claim) {
@@ -357,7 +365,8 @@ static void esp_rmaker_task(void *param)
         if (err != ESP_OK) {
             esp_rmaker_post_event(RMAKER_EVENT_CLAIM_FAILED, NULL, 0);
             ESP_LOGE(TAG, "esp_rmaker_self_claim_perform() returned %d. Aborting", err);
-            vTaskDelete(NULL);
+            esp_event_handler_unregister(IP_EVENT, IP_EVENT_STA_GOT_IP, &esp_rmaker_event_handler);
+            goto rmaker_err;
         }
         esp_rmaker_priv_data->claim_data = NULL;
         esp_rmaker_post_event(RMAKER_EVENT_CLAIM_SUCCESSFUL, NULL, 0);
@@ -366,6 +375,8 @@ static void esp_rmaker_task(void *param)
     /* Wait for Wi-Fi connection */
     xEventGroupWaitBits(wifi_event_group, WIFI_CONNECTED_EVENT, false, true, portMAX_DELAY);
     vEventGroupDelete(wifi_event_group);
+    wifi_event_group = NULL;
+    esp_event_handler_unregister(IP_EVENT, IP_EVENT_STA_GOT_IP, &esp_rmaker_event_handler);
 
     if (esp_rmaker_priv_data->enable_time_sync) {
 #ifdef CONFIG_MBEDTLS_HAVE_TIME_DATE
@@ -380,7 +391,7 @@ static void esp_rmaker_task(void *param)
         if (err != ESP_OK) {
             esp_rmaker_post_event(RMAKER_EVENT_CLAIM_FAILED, NULL, 0);
             ESP_LOGE(TAG, "esp_rmaker_self_claim_perform() returned %d. Aborting", err);
-            vTaskDelete(NULL);
+            goto rmaker_err;
         }
         esp_rmaker_priv_data->claim_data = NULL;
         esp_rmaker_post_event(RMAKER_EVENT_CLAIM_SUCCESSFUL, NULL, 0);
@@ -391,12 +402,12 @@ static void esp_rmaker_task(void *param)
         esp_rmaker_priv_data->mqtt_config = esp_rmaker_get_mqtt_config();
         if (!esp_rmaker_priv_data->mqtt_config) {
             ESP_LOGE(TAG, "Failed to initialise MQTT Config after claiming. Aborting");
-            vTaskDelete(NULL);
+            goto rmaker_err;
         }
         err = esp_rmaker_mqtt_init(esp_rmaker_priv_data->mqtt_config);
         if (err != ESP_OK) {
             ESP_LOGE(TAG, "esp_rmaker_mqtt_init() returned %d. Aborting", err);
-            vTaskDelete(NULL);
+            goto rmaker_err;
         }
         esp_rmaker_priv_data->need_claim = false;
     }
@@ -404,7 +415,7 @@ static void esp_rmaker_task(void *param)
     err = esp_rmaker_mqtt_connect();
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "esp_rmaker_mqtt_connect() returned %d. Aborting", err);
-        vTaskDelete(NULL);
+        goto rmaker_err;
     }
     esp_rmaker_priv_data->mqtt_connected = true;
     esp_rmaker_priv_data->state = ESP_RMAKER_STATE_STARTED;
@@ -424,6 +435,11 @@ static void esp_rmaker_task(void *param)
 rmaker_end:
     esp_rmaker_mqtt_disconnect();
     esp_rmaker_priv_data->mqtt_connected = false;
+rmaker_err:
+    if (wifi_event_group) {
+        vEventGroupDelete(wifi_event_group);
+    }
+    wifi_event_group = NULL;
     esp_rmaker_priv_data->state = ESP_RMAKER_STATE_INIT_DONE;
     vTaskDelete(NULL);
 }

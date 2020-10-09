@@ -185,16 +185,23 @@ esp_err_t esp_rmaker_node_add_attribute(const esp_rmaker_node_t *node, const cha
     while(attr && attr->next) {
         if (strcmp(attr->name, attr_name) == 0) {
             ESP_LOGE(TAG, "Node attribute with name %s already exists.", attr_name);
+            return ESP_FAIL;
         }
         attr = attr->next;
     }
     esp_rmaker_attr_t *new_attr = calloc(1, sizeof(esp_rmaker_attr_t));
     if (!new_attr) {
         ESP_LOGE(TAG, "Failed to create node attribute %s.", attr_name);
-        return ESP_FAIL;
+        return ESP_ERR_NO_MEM;
     }
     new_attr->name = strdup(attr_name);
     new_attr->value = strdup(value);
+    if (!new_attr->name || !new_attr->value) {
+        ESP_LOGE(TAG, "Failed to allocate memory for name/value for attribute %s.", attr_name);
+        esp_rmaker_attribute_delete(new_attr);
+        return ESP_ERR_NO_MEM;
+    }
+
     if (attr) {
         attr->next = new_attr;
     } else {
