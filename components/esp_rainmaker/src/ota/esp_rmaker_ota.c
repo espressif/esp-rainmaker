@@ -210,12 +210,18 @@ static esp_err_t esp_rmaker_ota_default_cb(esp_rmaker_ota_handle_t ota_handle, e
             count = 0;
         }
     }
+    if (err != ESP_OK) {
+        char description[40];
+        snprintf(description, sizeof(description), "OTA failed: Error %s", esp_err_to_name(err));
+        esp_rmaker_ota_report_status(ota_handle, OTA_STATUS_FAILED, description);
+    }
 
     if (esp_https_ota_is_complete_data_received(https_ota_handle) != true) {
         // the OTA image was not completely received and user can customise the response to this situation.
         ESP_LOGE(TAG, "Complete data was not received.");
+    } else {
+        esp_rmaker_ota_report_status(ota_handle, OTA_STATUS_IN_PROGRESS, "Firmware Image download complete");
     }
-    esp_rmaker_ota_report_status(ota_handle, OTA_STATUS_IN_PROGRESS, "Firmware Image download complete");
 ota_end:
     esp_wifi_set_ps(ps_type);
     ota_finish_err = esp_https_ota_finish(https_ota_handle);
