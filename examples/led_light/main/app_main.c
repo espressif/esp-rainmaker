@@ -107,7 +107,13 @@ void app_main()
     };
     esp_rmaker_ota_enable(&ota_config, OTA_USING_PARAMS);
 
-    /* Enable scheduling */
+    /* Enable scheduling
+     * Please note that you also need to set the timezone for schedules to work correctly.
+     * Simplest option is to use the CONFIG_ESP_RMAKER_DEF_TIMEZONE config option.
+     * Else, you can set the timezone using the API call `esp_rmaker_time_set_timezone("Asia/Shanghai");`
+     * For more information on the various ways of setting timezone, please check
+     * https://rainmaker.espressif.com/docs/time-service.html.
+     */
     esp_rmaker_schedule_enable();
 
     /* Start the ESP RainMaker Agent */

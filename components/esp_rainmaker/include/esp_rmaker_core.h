@@ -495,7 +495,7 @@ char *esp_rmaker_device_get_name(const esp_rmaker_device_t *device);
  * @return NULL terminated device type string on success.
  * @return NULL in case of failure, or if the type wasn't provided while creating the device.
  */
-char *esp_rmaker_device_get_name(const esp_rmaker_device_t *device);
+char *esp_rmaker_device_get_type(const esp_rmaker_device_t *device);
 
 /**
  * Add a parameter to a device/service

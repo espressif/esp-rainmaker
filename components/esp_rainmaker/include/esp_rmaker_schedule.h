@@ -26,6 +26,8 @@ extern "C"
  *
  * It is recommended to set the timezone while using schedules. Check [here](https://rainmaker.espressif.com/docs/time-service.html#time-zone) for more information on timezones
  *
+ * @note This API should be called after esp_rmaker_node_init() but before esp_rmaker_start().
+ *
  * @return ESP_OK on success.
  * @return error in case of failure.
  */

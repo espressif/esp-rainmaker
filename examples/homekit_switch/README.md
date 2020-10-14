@@ -1,6 +1,6 @@
 # HomeKit Switch Example
 
-This example demonstrates ESP RaimMaker + HomeKit integration using the [esp-homekit-sdk](https://github.com/espressif/esp-homekit-sdk).
+This example demonstrates ESP RainMaker + HomeKit integration using the [esp-homekit-sdk](https://github.com/espressif/esp-homekit-sdk).
 
 ## Setup
 
