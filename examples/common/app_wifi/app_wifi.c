@@ -120,43 +120,54 @@ static void wifi_init_sta()
     ESP_ERROR_CHECK(esp_wifi_start());
 }
 
-static void get_device_service_name(char *service_name, size_t max)
-{
-    uint8_t eth_mac[6];
-    const char *ssid_prefix = "PROV_";
-    esp_wifi_get_mac(WIFI_IF_STA, eth_mac);
-    snprintf(service_name, max, "%s%02X%02X%02X",
-             ssid_prefix, eth_mac[3], eth_mac[4], eth_mac[5]);
-}
-
 /* free the return value after use. */
-static char *read_random_bytes_from_nvs()
+static esp_err_t read_random_bytes_from_nvs(uint8_t **random_bytes, size_t *len)
 {
     nvs_handle handle;
     esp_err_t err;
-    size_t required_size = 0;
-    void *value;
+    *len = 0;
 
     if ((err = nvs_open_from_partition(CONFIG_ESP_RMAKER_FACTORY_PARTITION_NAME, CREDENTIALS_NAMESPACE,
                                 NVS_READONLY, &handle)) != ESP_OK) {
         ESP_LOGD(TAG, "NVS open for %s %s %s failed with error %d", CONFIG_ESP_RMAKER_FACTORY_PARTITION_NAME, CREDENTIALS_NAMESPACE, RANDOM_NVS_KEY, err);
-        return NULL;
+        return ESP_FAIL;
     }
 
-    if ((err = nvs_get_blob(handle, RANDOM_NVS_KEY, NULL, &required_size)) != ESP_OK) {
-        ESP_LOGD(TAG, "Failed to read key %s with error %d size %d", RANDOM_NVS_KEY, err, required_size);
+    if ((err = nvs_get_blob(handle, RANDOM_NVS_KEY, NULL, len)) != ESP_OK) {
+        ESP_LOGD(TAG, "Error %d. Failed to read key %s.", err, RANDOM_NVS_KEY);
         nvs_close(handle);
-        return NULL;
+        return ESP_ERR_NOT_FOUND;
     }
 
-    value = calloc(required_size + 1, 1); /* + 1 for NULL termination */
-    if (value) {
-        nvs_get_blob(handle, RANDOM_NVS_KEY, value, &required_size);
+    *random_bytes = calloc(*len, 1);
+    if (*random_bytes) {
+        nvs_get_blob(handle, RANDOM_NVS_KEY, *random_bytes, len);
+        nvs_close(handle);
+        return ESP_OK;
     }
-
     nvs_close(handle);
-    return value;
+    return ESP_ERR_NO_MEM;
 }
+
+static esp_err_t get_device_service_name(char *service_name, size_t max)
+{
+    uint8_t *nvs_random;
+    const char *ssid_prefix = "PROV_";
+    size_t nvs_random_size = 0;
+    if ((read_random_bytes_from_nvs(&nvs_random, &nvs_random_size) != ESP_OK) || nvs_random_size < 3) {
+        uint8_t eth_mac[6];
+        esp_wifi_get_mac(WIFI_IF_STA, eth_mac);
+        snprintf(service_name, max, "%s%02x%02x%02x", ssid_prefix, eth_mac[3], eth_mac[4], eth_mac[5]);
+    } else {
+        snprintf(service_name, max, "%s%02x%02x%02x", ssid_prefix, nvs_random[nvs_random_size - 3],
+                nvs_random[nvs_random_size - 2], nvs_random[nvs_random_size - 1]);
+    }
+    if (nvs_random) {
+        free(nvs_random);
+    }
+    return ESP_OK;
+}
+
 
 static esp_err_t get_device_pop(char *pop, size_t max, app_wifi_pop_type_t pop_type)
 {
@@ -174,14 +185,13 @@ static esp_err_t get_device_pop(char *pop, size_t max, app_wifi_pop_type_t pop_t
             return err;
         }
     } else if (pop_type == POP_TYPE_RANDOM) {
-        char *nvs_pop = read_random_bytes_from_nvs();
-        if (!nvs_pop) {
+        uint8_t *nvs_random;
+        size_t nvs_random_size = 0;
+        if ((read_random_bytes_from_nvs(&nvs_random, &nvs_random_size) != ESP_OK) || nvs_random_size < 4) {
             return ESP_ERR_NOT_FOUND;
         } else {
-            strncpy(pop, nvs_pop, max - 1);
-            pop[max - 1] = 0;
-            free(nvs_pop);
-            nvs_pop = NULL;
+            snprintf(pop, max, "%02x%02x%02x%02x", nvs_random[0], nvs_random[1], nvs_random[2], nvs_random[3]);
+            free(nvs_random);
             return ESP_OK;
         }
     } else {

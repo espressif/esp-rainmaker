@@ -152,7 +152,7 @@ def gen_host_csr(private_key, common_name=None):
     csr = request.public_bytes(serialization.Encoding.PEM).decode("utf-8")
     return csr
 
-def gen_hex_str(octets=4):
+def gen_hex_str(octets=64):
     """
     Generate random hex string, it is used as PoP
 
@@ -188,7 +188,7 @@ def save_random_hex_str(dest_filedir, hex_str):
             info_file.write(hex_str)
 
         with open(dest_filedir + 'node_info.csv', 'a') as info_file:
-            info_file.write('random,file,binary,' +
+            info_file.write('random,file,hex2bin,' +
                             dest_filedir + 'random.info')
             info_file.write('\n')
     except Exception as err:
