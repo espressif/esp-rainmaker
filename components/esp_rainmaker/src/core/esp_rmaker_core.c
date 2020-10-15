@@ -80,11 +80,11 @@ typedef struct {
 
 static esp_rmaker_priv_data_t *esp_rmaker_priv_data;
 
-static char *esp_rmaker_populate_node_id()
+static char *esp_rmaker_populate_node_id(bool use_claiming)
 {
     char *node_id = esp_rmaker_storage_get("node_id");
 #ifdef ESP_RMAKER_CLAIM_ENABLED
-    if (!node_id) {
+    if (!node_id && use_claiming) {
         uint8_t eth_mac[6];
         esp_err_t err = esp_wifi_get_mac(WIFI_IF_STA, eth_mac);
         if (err != ESP_OK) {
@@ -188,8 +188,34 @@ char *esp_rmaker_get_node_id(void)
     }
     return NULL;
 }
+
+static esp_err_t esp_rmaker_mqtt_data_init(esp_rmaker_priv_data_t *rmaker_priv_data, bool use_claiming)
+{
+    rmaker_priv_data->mqtt_config = esp_rmaker_get_mqtt_config();
+    if (rmaker_priv_data->mqtt_config) {
+        return ESP_OK;
+    }
+#ifdef ESP_RMAKER_CLAIM_ENABLED
+    if (use_claiming) {
+#ifdef CONFIG_ESP_RMAKER_SELF_CLAIM
+        rmaker_priv_data->claim_data = esp_rmaker_self_claim_init();
+#endif
+#ifdef CONFIG_ESP_RMAKER_ASSISTED_CLAIM
+        rmaker_priv_data->claim_data = esp_rmaker_assisted_claim_init();
+#endif
+        if (!rmaker_priv_data->claim_data) {
+            ESP_LOGE(TAG, "Failed to initialise Claiming.");
+            return ESP_FAIL;
+        } else {
+            rmaker_priv_data->need_claim = true;
+            return ESP_OK;
+        }
+    }
+#endif /* ESP_RMAKER_CLAIM_ENABLED */
+    return ESP_FAIL;
+}
 /* Initialize ESP RainMaker */
-static esp_err_t esp_rmaker_init(const esp_rmaker_config_t *config)
+static esp_err_t esp_rmaker_init(const esp_rmaker_config_t *config, bool use_claiming)
 {
     if (esp_rmaker_priv_data) {
         ESP_LOGE(TAG, "ESP RainMaker already initialised");
@@ -209,7 +235,7 @@ static esp_err_t esp_rmaker_init(const esp_rmaker_config_t *config)
         return ESP_ERR_NO_MEM;
     }
 
-    esp_rmaker_priv_data->node_id = esp_rmaker_populate_node_id();
+    esp_rmaker_priv_data->node_id = esp_rmaker_populate_node_id(use_claiming);
     if (!esp_rmaker_priv_data->node_id) {
         esp_rmaker_deinit_priv_data(esp_rmaker_priv_data);
         esp_rmaker_priv_data = NULL;
@@ -232,34 +258,19 @@ static esp_err_t esp_rmaker_init(const esp_rmaker_config_t *config)
         return ESP_FAIL;
     }
 #endif /* !CONFIG_ESP_RMAKER_DISABLE_USER_MAPPING_PROV */
-    esp_rmaker_priv_data->mqtt_config = esp_rmaker_get_mqtt_config();
-    if (!esp_rmaker_priv_data->mqtt_config) {
-#ifdef ESP_RMAKER_CLAIM_ENABLED
-#ifdef CONFIG_ESP_RMAKER_SELF_CLAIM
-        esp_rmaker_priv_data->claim_data = esp_rmaker_self_claim_init();
-#endif
-#ifdef CONFIG_ESP_RMAKER_ASSISTED_CLAIM
-        esp_rmaker_priv_data->claim_data = esp_rmaker_assisted_claim_init();
-#endif
-        if (!esp_rmaker_priv_data->claim_data) {
-            esp_rmaker_deinit_priv_data(esp_rmaker_priv_data);
-            esp_rmaker_priv_data = NULL;
-            ESP_LOGE(TAG, "Failed to initialise Claiming.");
-            return ESP_FAIL;
-        }
-        esp_rmaker_priv_data->need_claim = true;
-#else
+    if (esp_rmaker_mqtt_data_init(esp_rmaker_priv_data, use_claiming) != ESP_OK) {
         esp_rmaker_deinit_priv_data(esp_rmaker_priv_data);
         esp_rmaker_priv_data = NULL;
         ESP_LOGE(TAG, "Failed to initialise MQTT Config. Please perform \"claiming\" using RainMaker CLI.");
         return ESP_FAIL;
-#endif /* !ESP_RMAKER_CLAIM_ENABLED */
     } else {
-        if (esp_rmaker_mqtt_init(esp_rmaker_priv_data->mqtt_config) != ESP_OK) {
-            esp_rmaker_deinit_priv_data(esp_rmaker_priv_data);
-            esp_rmaker_priv_data = NULL;
-            ESP_LOGE(TAG, "Failed to initialise MQTT");
-            return ESP_FAIL;
+        if (!esp_rmaker_priv_data->need_claim) {
+            if (esp_rmaker_mqtt_init(esp_rmaker_priv_data->mqtt_config) != ESP_OK) {
+                esp_rmaker_deinit_priv_data(esp_rmaker_priv_data);
+                esp_rmaker_priv_data = NULL;
+                ESP_LOGE(TAG, "Failed to initialise MQTT");
+                return ESP_FAIL;
+            }
         }
     }
     esp_rmaker_priv_data->enable_time_sync = config->enable_time_sync;
@@ -285,7 +296,7 @@ static esp_err_t esp_rmaker_register_node(const esp_rmaker_node_t *node)
 
 esp_rmaker_node_t *esp_rmaker_node_init(const esp_rmaker_config_t *config, const char *name, const char *type)
 {
-    esp_err_t err = esp_rmaker_init(config);
+    esp_err_t err = esp_rmaker_init(config, true);
     if (err != ESP_OK) {
         return NULL;
     }
