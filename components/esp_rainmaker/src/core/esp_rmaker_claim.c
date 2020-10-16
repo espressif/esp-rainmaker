@@ -44,6 +44,9 @@
 #include "esp_rmaker_claim.h"
 
 static const char *TAG = "esp_claim";
+
+#define ESP_RMAKER_RANDOM_NUMBER_LEN    64
+
 #ifdef CONFIG_ESP_RMAKER_SELF_CLAIM
 #include "soc/soc.h"
 #include "soc/efuse_reg.h"
@@ -785,8 +788,7 @@ static void event_handler(void* arg, esp_event_base_t event_base,
 #endif /* CONFIG_ESP_RMAKER_ASSISTED_CLAIM */
 esp_err_t __esp_rmaker_claim_init(esp_rmaker_claim_data_t *claim_data)
 {
-    char hexstr[9];
-    uint32_t my_random;
+    uint8_t random_bytes[ESP_RMAKER_RANDOM_NUMBER_LEN];
     esp_err_t err;
 
     char *key = esp_rmaker_get_client_key();
@@ -812,15 +814,13 @@ esp_err_t __esp_rmaker_claim_init(esp_rmaker_claim_data_t *claim_data)
             return err;
         }
     }
-    /* Generate random hex string */
-    memset(hexstr, 0, sizeof(hexstr));
-    esp_fill_random(&my_random, sizeof(my_random));
-    snprintf(hexstr, sizeof(hexstr), "%08x", my_random);
+    /* Generate random bytes for general purpose use */
+    esp_fill_random(&random_bytes, sizeof(random_bytes));
 
     /* Store the PoP in the storage */
-    err = esp_rmaker_storage_set(ESP_RMAKER_CLIENT_RANDOM_NVS_KEY, hexstr, strlen(hexstr));
+    err = esp_rmaker_storage_set(ESP_RMAKER_CLIENT_RANDOM_NVS_KEY, random_bytes, sizeof(random_bytes));
     if (err != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to store random number to storage");
+        ESP_LOGE(TAG, "Failed to store random bytes to storage.");
         return err;
     }
 #ifdef CONFIG_ESP_RMAKER_SELF_CLAIM
