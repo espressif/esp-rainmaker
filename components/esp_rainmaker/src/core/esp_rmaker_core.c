@@ -264,7 +264,10 @@ static esp_err_t esp_rmaker_init(const esp_rmaker_config_t *config, bool use_cla
         ESP_LOGE(TAG, "Failed to initialise MQTT Config. Please perform \"claiming\" using RainMaker CLI.");
         return ESP_FAIL;
     } else {
-        if (!esp_rmaker_priv_data->need_claim) {
+#ifdef ESP_RMAKER_CLAIM_ENABLED
+        if (!esp_rmaker_priv_data->need_claim)
+#endif /* ESP_RMAKER_CLAIM_ENABLED */
+        {
             if (esp_rmaker_mqtt_init(esp_rmaker_priv_data->mqtt_config) != ESP_OK) {
                 esp_rmaker_deinit_priv_data(esp_rmaker_priv_data);
                 esp_rmaker_priv_data = NULL;
