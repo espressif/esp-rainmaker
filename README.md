@@ -18,6 +18,20 @@ The key features of ESP RainMaker are:
 2. Zero configuration required on the Cloud.
 3. Phone apps that dynamically render the UI as per the device information.
 
+## Get ESP RainMaker
+
+Please clone this repository using the below command:
+
+```
+git clone --recursive https://github.com/espressif/esp-rainmaker.git
+```
+
+> Note the --recursive option. This is required to pull in the JSON dependencies into esp-rainmaker. In case you have already cloned the repository without this option, execute this to pull in the submodules: `git submodule update --init --recursive`
+
+Please check the ESP RainMaker documentation [here](https://rainmaker.espressif.com/docs/get-started.html) to get started.
+
+Each example has its own README with additional information about using the example.
+
 ## Supported ESP-IDF versions
 
 ESP RainMaker can work with ESP IDF 4.0 and above.
@@ -33,12 +47,6 @@ ESP RainMaker can work with ESP IDF 4.0 and above.
 ### iOS
 - [Apple App Store](https://apps.apple.com/app/esp-rainmaker/id1497491540)
 - [Source Code](https://github.com/espressif/esp-rainmaker-ios)
-
-## Documentation
-
-Please check the ESP RainMaker documentation [here](http://rainmaker.espressif.com/docs/get-started.html) to get started.
-
-Each example has its own README with additional information about using the example.
 
 ### API Documentation Build Status
 

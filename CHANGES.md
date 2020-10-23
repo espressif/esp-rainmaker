@@ -1,5 +1,10 @@
 # Changes
 
+## 16-Oct-2020 (json: Use upstream json_generator and json_parser as submodules)
+
+To get these submodules, you will now have to execute `git submodule update --init --recursive` once.
+
+For new clones, use `git clone --recursive https://github.com/espressif/esp-rainmaker.git`
 ## 16-Oct-2020 (app_wifi: Changes in SSID and PoP generation for Provisioning)
 
 The PoP for Wi-Fi provisioning was being fetched from a random 8 character hex string stored in the fctry partition.

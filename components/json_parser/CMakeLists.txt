@@ -1,5 +1,3 @@
-idf_component_register(SRCS ./json_parser.c ./jsmn/src/jsmn-changed.c
-                       INCLUDE_DIRS ./ ./jsmn/include
-                       REQUIRES
-                       PRIV_REQUIRES )
-
+idf_component_register(SRCS "upstream/src/json_parser.c"
+                    INCLUDE_DIRS "upstream/include" "upstream"
+                    )
