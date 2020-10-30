@@ -69,6 +69,15 @@ static void event_handler(void* arg, esp_event_base_t event_base,
             case RMAKER_EVENT_FACTORY_RESET:
                 ESP_LOGI(TAG, "Node reset to factory defaults.");
                 break;
+            case RMAKER_EVENT_MQTT_CONNECTED:
+                ESP_LOGI(TAG, "MQTT Connected.");
+                break;
+            case RMAKER_EVENT_MQTT_DISCONNECTED:
+                ESP_LOGI(TAG, "MQTT Disconnected.");
+                break;
+            case RMAKER_EVENT_MQTT_PUBLISHED:
+                ESP_LOGI(TAG, "MQTT Published. Msg id: %d.", *((int *)event_data));
+                break;
             default:
                 ESP_LOGW(TAG, "Unhandled RainMaker Event: %d", event_id);
         }
