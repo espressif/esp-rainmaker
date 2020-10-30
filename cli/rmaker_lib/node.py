@@ -17,7 +17,7 @@ import json
 import socket
 from rmaker_lib import serverconfig, configmanager
 from requests.exceptions import Timeout, ConnectionError,\
-                                RequestException
+                                RequestException, HTTPError
 from rmaker_lib.exceptions import NetworkError, InvalidClassInput, SSLError,\
                                   RequestTimeoutError
 from rmaker_lib.logger import log
@@ -38,12 +38,12 @@ class Node:
         """
         Instantiate node with nodeid and session object.
         """
-        log.info("Initialising node with nodeid : " + nodeid)
+        log.info("Initialising node with nodeid : " + str(nodeid))
         self.__nodeid = nodeid
         self.__session = session
         try:
             self.request_header = {'content-type': 'application/json',
-                                     'Authorization': session.id_token}
+                                   'Authorization': session.id_token}
         except AttributeError:
             raise InvalidClassInput(session, 'Invalid Session Input.\
                                               Expected: type <session object>.\
@@ -378,3 +378,181 @@ class Node:
             return response['request_status']
         return None
 
+    def get_shared_nodes(self):
+        """
+        Get shared nodes
+        
+        :raises SSLError: If there is an SSL issue
+        :raises HTTPError: If the HTTP response is an HTTPError
+        :raises NetworkError: If there is a network connection issue
+        :raises Timeout: If there is a timeout issue
+        :raises RequestException: If there is an issue during
+                                  the HTTP request
+        :raises Exception: If there is an HTTP issue while getting shared nodes
+                           or JSON format issue in HTTP response
+
+        :return: HTTP response on Success
+        :rtype: dict
+        """
+        try:
+            socket.setdefaulttimeout(10)
+            log.debug("Getting shared nodes of the node with nodeid : " +
+                    str(self.__nodeid))
+            path = 'user/nodes/sharing'
+            if self.__nodeid is not None:
+                query_parameters = 'node_id=' + self.__nodeid
+                log.debug("Get shared nodes query params : " + query_parameters)
+                url = serverconfig.HOST + path + '?' + query_parameters
+            else:
+                url = serverconfig.HOST + path
+            try:
+                log.debug("Get shared nodes request url : " + url)
+                log.debug("Request headers set: {}".format(self.request_header))
+                response = requests.get(url=url,
+                                        headers=self.request_header,
+                                        verify=configmanager.CERT_FILE,
+                                        timeout=(5.0, 5.0))
+                log.debug("Get shared nodes response : " + response.text)
+
+            except HTTPError as http_err:
+                log.debug(http_err)
+                return json.loads(http_err.response.text)
+            except requests.exceptions.SSLError:
+                raise SSLError
+            except requests.exceptions.ConnectionError:
+                raise NetworkError
+            except Timeout as time_err:
+                log.debug(time_err)
+                raise RequestTimeoutError
+            except RequestException as get_nodes_params_err:
+                log.debug(get_nodes_params_err)
+                raise get_nodes_params_err
+
+            response = json.loads(response.text)
+            log.debug("Received shared nodes successfully.")
+            
+            return response
+        
+        except Exception as err:
+            log.debug(err)
+            return response.text
+
+
+    def set_shared_nodes(self, data):
+        """
+        Set nodes to share
+
+        :param data: Data containing user email-id
+                     and nodes to set
+        :type data: dict
+        
+        :raises SSLError: If there is an SSL issue
+        :raises HTTPError: If the HTTP response is an HTTPError
+        :raises NetworkError: If there is a network connection issue
+        :raises Timeout: If there is a timeout issue
+        :raises RequestException: If there is an issue during
+                                  the HTTP request
+        :raises Exception: If there is an HTTP issue while setting shared nodes
+                           or JSON format issue in HTTP response
+
+        :return: HTTP response on Success
+        :rtype: dict
+        """
+        try:
+            socket.setdefaulttimeout(10)
+            log.debug("Setting shared nodes")
+            path = 'user/nodes/sharing'
+            url = serverconfig.HOST + path
+            try:
+                log.debug("Set shared nodes request url: {}".format(url))
+                log.debug("Request headers set: {}".format(self.request_header))
+                log.debug("Set shared nodes data: {}".format(data))
+                response = requests.put(url=url,
+                                        headers=self.request_header,
+                                        data=json.dumps(data),
+                                        verify=configmanager.CERT_FILE,
+                                        timeout=(5.0, 5.0))
+                log.debug("Set shared nodes response : " + response.text)
+
+            except HTTPError as http_err:
+                log.debug(http_err)
+                return json.loads(http_err.response.text)
+            except requests.exceptions.SSLError:
+                raise SSLError
+            except requests.exceptions.ConnectionError:
+                raise NetworkError
+            except Timeout as time_err:
+                log.debug(time_err)
+                raise RequestTimeoutError
+            except RequestException as get_nodes_params_err:
+                log.debug(get_nodes_params_err)
+                raise get_nodes_params_err
+
+            response = json.loads(response.text)
+            log.debug("Received shared nodes successfully.")
+            
+            return response
+        
+        except Exception as err:
+            log.debug(err)
+            return response.text
+    
+    
+    def remove_shared_nodes(self, data):
+        """
+        Remove nodes shared
+
+        :param data: Data containing user email-id
+                     and nodes to remove
+        :type data: dict
+        
+        :raises SSLError: If there is an SSL issue
+        :raises HTTPError: If the HTTP response is an HTTPError
+        :raises NetworkError: If there is a network connection issue
+        :raises Timeout: If there is a timeout issue
+        :raises RequestException: If there is an issue during
+                                  the HTTP request
+        :raises Exception: If there is an HTTP issue while removing shared nodes
+                           or JSON format issue in HTTP response
+
+        :return: HTTP response on Success
+        :rtype: dict
+        """
+        try:
+            socket.setdefaulttimeout(10)
+            log.debug("Removing shared nodes")
+            path = 'user/nodes/sharing'
+            query_parameters = 'nodes=' + data['nodes'] + '&' + 'email=' + data['email']
+            log.debug("Remove shared nodes query params: {}".format(query_parameters))
+            url = serverconfig.HOST + path + '?' + query_parameters
+            try:
+                log.debug("Remove shared nodes request url: {}".format(url))
+                log.debug("Request headers set: {}".format(self.request_header))
+                response = requests.delete(url=url,
+                                           headers=self.request_header,
+                                           verify=configmanager.CERT_FILE,
+                                           timeout=(5.0, 5.0))
+                log.debug("Set shared nodes response : " + response.text)
+
+            except HTTPError as http_err:
+                log.debug(http_err)
+                return json.loads(http_err.response.text)
+            except requests.exceptions.SSLError:
+                raise SSLError
+            except requests.exceptions.ConnectionError:
+                raise NetworkError
+            except Timeout as time_err:
+                log.debug(time_err)
+                raise RequestTimeoutError
+            except RequestException as get_nodes_params_err:
+                log.debug(get_nodes_params_err)
+                raise get_nodes_params_err
+
+            response = json.loads(response.text)
+            log.debug("Received shared nodes successfully.")
+            
+            return response
+        
+        except Exception as err:
+            log.debug(err)
+            return response.text
