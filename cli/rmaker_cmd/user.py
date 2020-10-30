@@ -15,13 +15,13 @@
 import sys
 import re
 import getpass
+import json
 try:
-    from rmaker_lib import user
+    from rmaker_lib import user, configmanager, session
     from rmaker_lib.logger import log
 except ImportError as err:
     print("Failed to import ESP Rainmaker library. " + str(err))
     raise err
-
 
 from rmaker_cmd.browserlogin import browser_login
 
@@ -72,20 +72,102 @@ def login(vars=None):
 
     :raises Exception: If there is any issue in login for user
 
-    :return: None on Success
+    :return: None on Success and Failure
     :rtype: None
     """
     log.info('Signing in the user. Username  ' + str(vars['email']))
+    config = configmanager.Config()
+    
+    # Set email-id
+    email_id = vars['email']
+    log.info('Logging in user: {}'.format(email_id))
+    
+    # Check user current creds exist
+    resp_filename = config.check_user_creds_exists()
+    
+    # If current creds exist, ask user for ending current session
+    if resp_filename:      
+        
+        # Get email-id of current logged-in user
+        curr_email_id = config.get_token_attribute('email')
+        log.info('Logging out user: {}'.format(curr_email_id))
+        
+        # Get user input
+        input_resp = config.get_input_to_end_session(curr_email_id)
+        if not input_resp:
+            return
+        
+        # Remove current login creds
+        ret_val = config.remove_curr_login_creds(curr_creds_file=resp_filename)
+        if ret_val is None:
+            print("Failed to end previous login session. Exiting.")
+            return
+    else:
+        log.debug("Current login creds not found at path: {}".format(resp_filename))
+
     if vars['email'] is None:
         browser_login()
         return
-    u = user.User(vars['email'])
     try:
+        u = user.User(vars['email'])
         u.login()
+        print('Login Successful')
     except Exception as login_err:
         log.error(login_err)
-    else:
-        print('Login Successful')
+
+
+def logout(vars=None):
+    """
+    Logout of the current session.
+
+    :raises Exception: If there is any issue in logout for user
+
+    :return: None on Success and Failure
+    :rtype: None
+    """
+    log.info('Logging out current logged-in user')
+
+    # Removing the creds stored locally
+    log.debug("Removing creds stored locally, invalidating token")
+    config = configmanager.Config()
+    
+    # Get email-id of current logged-in user
+    email_id = config.get_token_attribute('email')
+    log.info('Logging out user: {}'.format(email_id))
+
+    # Ask user for ending current session   
+    # Get user input
+    input_resp = config.get_input_to_end_session(email_id)
+    if not input_resp:
+        return
+    
+    # Call Logout API
+    try:
+        curr_session = session.Session()
+        status_resp = curr_session.logout()
+        log.debug("Logout API successful")
+    except Exception as logout_err:
+        log.error(logout_err)
+        return
+
+    # Check API status in response
+    if 'status' in status_resp and status_resp['status'] == 'failure':
+        print("Logout from ESP RainMaker Failed. Exiting.")
+        print("[{}]:{}".format(status_resp['error_code'], status_resp['description']))
+        return   
+    
+    # Remove current login creds
+    ret_val = config.remove_curr_login_creds()
+    if ret_val is None:
+        print("Logout from ESP RainMaker Failed. Exiting.")
+        return
+    
+    # Logout is successful
+    print("Logged out from ESP RainMaker")
+    log.debug('Logout Successful')
+    log.debug("Local creds removed successfully")
+    
+    return
 
 
 def forgot_password(vars=None):
@@ -102,8 +184,44 @@ def forgot_password(vars=None):
     :rtype: None
     """
     log.info('Changing user password. Username ' + vars['email'])
+    config = configmanager.Config()
+    
+    # Get email-id if present
+    try:
+        email_id = config.get_token_attribute('email')
+    except Exception:
+        email_id = None
+    
+    # If current logged-in user is same as
+    # the email-id given as user input
+    # end current session
+    # (invalidate current logged-in user token)
+    log.debug("Current user email-id: {}, user input email-id: {}".format(email_id, vars['email']))
+    if email_id and email_id == vars['email']:
+        log.debug("Ending current session for user: {}".format(email_id))
+        
+        # Check user current creds exist
+        resp_filename = config.check_user_creds_exists()
+        if not resp_filename:
+            log.debug("Current login creds not found at path: {}".format(resp_filename))
+            log.error("User not logged in")
+            return
+
+        # If current creds exist, ask user for ending current session   
+        # Get user input
+        input_resp = config.get_input_to_end_session(email_id)
+        if not input_resp:
+            return
+        
+        # Remove current login creds
+        ret_val = config.remove_curr_login_creds(curr_creds_file=resp_filename)
+        if ret_val is None:
+            print("Failed to end previous login session. Exiting.")
+            return
+    
     u = user.User(vars['email'])
     status = False
+    
     try:
         status = u.forgot_password()
     except Exception as forgot_pwd_err:
@@ -161,3 +279,25 @@ def get_password():
 
     log.error('Maximum attempts to change password over. Please try again.')
     sys.exit(1)
+
+
+def get_user_details(vars=None):
+    """
+    Get details of current logged-in user
+    """
+    try:
+        # Get user details
+        log.debug('Getting details of current logged-in user')
+        curr_session = session.Session()
+        user_info = curr_session.get_user_details()
+        log.debug("User details received")
+    except Exception as err:
+        log.error(err)
+    else:
+        # Print API response output
+        for key, val in user_info.items():
+            if key == "user_name":
+                key = key + " (email)"
+            title = key.replace("_", " ").title()
+            print("{}: {}".format(title, val))
+    return

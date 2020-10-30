@@ -203,11 +203,6 @@ class Config:
             token_payload += '=' * (4 - len(token_payload) % 4)
         try:
             str_token_payload = base64.b64decode(token_payload).decode("utf-8")
-            # If user is logged in through github then to extend session
-            # we need 'cognito:username' (Github generated username) as email
-            if attribute_name == 'email':
-                if 'identities' in json.loads(str_token_payload):
-                    return json.loads(str_token_payload)['cognito:username']
             attribute_value = json.loads(str_token_payload)[attribute_name]
         except Exception:
             raise InvalidConfigError
@@ -376,4 +371,44 @@ class Config:
         if 'accesstoken' in response and 'idtoken' in response:
             log.info("User session extended successfully.")
             return response['accesstoken'], response['idtoken']
+        return None
+
+    def check_user_creds_exists(self):
+        '''
+        Check if user creds exist
+        '''
+        curr_login_creds_file = os.path.expanduser(HOME_DIRECTORY + CONFIG_FILE)
+        if os.path.exists(curr_login_creds_file):
+            return curr_login_creds_file
+        else:
+            return False
+
+    def get_input_to_end_session(self, email_id):
+        '''
+        Get input(y/n) from user to end current session
+        '''
+        while True:
+            user_input = input("This will end your current session for {}. Do you want to continue (Y/N)? :".format(email_id))
+            if user_input not in ["Y", "y", "N", "n"]:
+                print("Please provide Y/N only")
+                continue
+            elif user_input in ["N", "n"]:
+                return False
+            else:
+                break
+        return True
+
+    def remove_curr_login_creds(self, curr_creds_file=None):
+        '''
+        Remove current login creds
+        '''
+        log.info("Removing current login creds")
+        if not curr_creds_file:
+            curr_creds_file = os.path.expanduser(HOME_DIRECTORY + CONFIG_FILE)
+        try:
+            os.remove(curr_creds_file)
+            log.info("Previous login session ended. Removing current login creds...Success...")
+            return True
+        except Exception as e:
+            log.debug("Removing current login creds from path {}. Failed: {}".format(curr_creds_file, e))
         return None
