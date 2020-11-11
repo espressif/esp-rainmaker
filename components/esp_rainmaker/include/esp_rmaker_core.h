@@ -46,7 +46,13 @@ typedef enum {
     /** Wi-Fi credentials reset. Triggered after calling esp_rmaker_wifi_reset() */
     RMAKER_EVENT_WIFI_RESET,
     /** Node reset to factory defaults. Triggered after calling esp_rmaker_factory_reset() */
-    RMAKER_EVENT_FACTORY_RESET
+    RMAKER_EVENT_FACTORY_RESET,
+    /** Connected to MQTT Broker */
+    RMAKER_EVENT_MQTT_CONNECTED,
+    /** Disconnected from MQTT Broker */
+    RMAKER_EVENT_MQTT_DISCONNECTED,
+    /** MQTT message published successfully */
+    RMAKER_EVENT_MQTT_PUBLISHED,
 } esp_rmaker_event_t;
 
 /** ESP RainMaker Node information */
