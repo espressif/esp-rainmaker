@@ -33,6 +33,9 @@ extern const char ota_server_cert[] asm("_binary_server_crt_start");
 static esp_err_t write_cb(const esp_rmaker_device_t *device, const esp_rmaker_param_t *param,
             const esp_rmaker_param_val_t val, void *priv_data, esp_rmaker_write_ctx_t *ctx)
 {
+    if (ctx) {
+        ESP_LOGI(TAG, "Received write request via : %s", esp_rmaker_device_cb_src_to_str(ctx->src));
+    }
     const char *device_name = esp_rmaker_device_get_name(device);
     const char *param_name = esp_rmaker_param_get_name(param);
     if (strcmp(param_name, ESP_RMAKER_DEF_POWER_NAME) == 0) {

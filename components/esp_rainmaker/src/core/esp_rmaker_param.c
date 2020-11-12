@@ -40,6 +40,22 @@ static char publish_topic[MAX_PUBLISH_TOPIC_LEN];
 
 static const char *TAG = "esp_rmaker_param";
 
+
+static const char *cb_srcs[ESP_RMAKER_REQ_SRC_MAX] = {
+    [ESP_RMAKER_REQ_SRC_INIT] = "Init",
+    [ESP_RMAKER_REQ_SRC_CLOUD] = "Cloud",
+    [ESP_RMAKER_REQ_SRC_SCHEDULE] = "Schedule",
+    [ESP_RMAKER_REQ_SRC_LOCAL] = "Local",
+};
+
+const char *esp_rmaker_device_cb_src_to_str(esp_rmaker_req_src_t src)
+{
+    if ((src >= 0) && (src < ESP_RMAKER_REQ_SRC_MAX)) {
+        return cb_srcs[src];
+    }
+    return NULL;
+}
+
 esp_rmaker_param_val_t esp_rmaker_bool(bool val)
 {
     esp_rmaker_param_val_t param_val = {
