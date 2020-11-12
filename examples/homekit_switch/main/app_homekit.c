@@ -30,7 +30,7 @@ static hap_char_t *on_char;
 static void app_homekit_show_qr(void)
 {
 #ifdef CONFIG_EXAMPLE_USE_HARDCODED_SETUP_CODE
-#define QRCODE_BASE_URL     "https://api.qrserver.com/v1/create-qr-code/"
+#define QRCODE_BASE_URL     "https://espressif.github.io/esp-homekit-sdk/qrcode.html"
     char *setup_payload =  esp_hap_get_setup_payload(CONFIG_EXAMPLE_SETUP_CODE,
             CONFIG_EXAMPLE_SETUP_ID, false, HAP_CID_SWITCH);
     if (setup_payload) {
