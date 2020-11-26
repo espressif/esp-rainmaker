@@ -426,6 +426,12 @@ static void esp_rmaker_task(void *param)
         esp_rmaker_priv_data->need_claim = false;
     }
 #endif /* ESP_RMAKER_CLAIM_ENABLED */
+#ifdef CONFIG_ESP_RMAKER_LOCAL_CTRL_ENABLE
+    if (esp_rmaker_start_local_ctrl_service(esp_rmaker_get_node_id()) != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to start local control service. Aborting!!!");
+        vTaskDelete(NULL);
+    }
+#endif /* CONFIG_ESP_RMAKER_LOCAL_CTRL_ENABLE */
     err = esp_rmaker_mqtt_connect();
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "esp_rmaker_mqtt_connect() returned %d. Aborting", err);

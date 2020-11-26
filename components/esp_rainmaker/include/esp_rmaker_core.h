@@ -144,6 +144,12 @@ typedef enum {
     ESP_RMAKER_REQ_SRC_CLOUD,
     /** Request received when a schedule has triggered */
     ESP_RMAKER_REQ_SRC_SCHEDULE,
+    /** Request received from a local controller */
+    ESP_RMAKER_REQ_SRC_LOCAL,
+    /** This will always be the last value. Any value equal to or
+     * greater than this should be considered invalid.
+     */
+    ESP_RMAKER_REQ_SRC_MAX,
 } esp_rmaker_req_src_t;
 
 /** Write request Context */
@@ -193,6 +199,28 @@ typedef esp_err_t (*esp_rmaker_device_write_cb_t)(const esp_rmaker_device_t *dev
  */
 typedef esp_err_t (*esp_rmaker_device_read_cb_t)(const esp_rmaker_device_t *device, const esp_rmaker_param_t *param,
         void *priv_data, esp_rmaker_read_ctx_t *ctx);
+
+/** Convert device callback source to string
+ *
+ * Device read/write callback can be via different sources. This is a helper API
+ * to give the source in string format for printing.
+ *
+ * Example Usage:
+ * @code{c}
+ * static esp_err_t write_cb(const esp_rmaker_device_t *device, const esp_rmaker_param_t *param,
+ * const esp_rmaker_param_val_t val, void *priv_data, esp_rmaker_write_ctx_t *ctx)
+{
+    if (ctx) {
+        ESP_LOGI(TAG, "Received write request via : %s", esp_rmaker_device_cb_src_to_str(ctx->src));
+    }
+ * @endcode
+ *
+ * @param[in] src The src field as received in the callback context.
+ *
+ * @return NULL terminated source string on success
+ * @return NULL on failure
+ */
+const char *esp_rmaker_device_cb_src_to_str(esp_rmaker_req_src_t src);
 
 /**
  * Initialise a Boolean value
