@@ -276,6 +276,9 @@ static esp_err_t esp_rmaker_init(const esp_rmaker_config_t *config, bool use_cla
             }
         }
     }
+#ifdef CONFIG_ESP_RMAKER_LOCAL_CTRL_ENABLE
+    esp_rmaker_init_local_ctrl_service();
+#endif
     esp_rmaker_priv_data->enable_time_sync = config->enable_time_sync;
     esp_rmaker_post_event(RMAKER_EVENT_INIT_DONE, NULL, 0);
     esp_rmaker_priv_data->state = ESP_RMAKER_STATE_INIT_DONE;
