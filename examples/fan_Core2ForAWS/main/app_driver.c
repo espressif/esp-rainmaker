@@ -98,7 +98,7 @@ esp_err_t app_fan_init(void)
     lv_label_set_text(fan_state_label, "Fan On/Off:");
 
     sw1 = lv_switch_create(lv_scr_act(), NULL);
-    lv_obj_set_size(sw1, 60, 20);
+    lv_obj_set_size(sw1, 140, 30);
     lv_obj_align(sw1, fan_state_label, LV_ALIGN_OUT_BOTTOM_LEFT, 0, 5);
     lv_obj_set_event_cb(sw1, sw1_event_handler);
     lv_switch_on(sw1, LV_ANIM_OFF);
@@ -108,7 +108,7 @@ esp_err_t app_fan_init(void)
     lv_label_set_text(fan_speed_label, "Fan Speed:");
 
     strength_slider = lv_slider_create(lv_scr_act(), NULL);
-    lv_obj_set_width(strength_slider, 260);
+    lv_obj_set_size(strength_slider, 260, 30);
     lv_obj_align(strength_slider, fan_speed_label, LV_ALIGN_OUT_BOTTOM_LEFT, 0, 5);
     lv_obj_set_event_cb(strength_slider, strength_slider_event_cb);
     lv_slider_set_value(strength_slider, 0, LV_ANIM_OFF);
@@ -119,8 +119,13 @@ esp_err_t app_fan_init(void)
     app_fan_set_power(g_power);
     return ESP_OK;
 }
+static void initTask(void *arg)
+{
+    app_fan_init();
+    vTaskDelete(NULL);
+}
 
 void app_driver_init()
 {
-    app_fan_init();
+    xTaskCreatePinnedToCore(initTask, "init_fan", 4096*2, NULL, 4, NULL, 1);
 }
