@@ -15,22 +15,21 @@
 #include <esp_rmaker_standard_params.h> 
 
 #include <app_reset.h>
-#include <sk6812.h>
-#include <axp192.h>
+#include <core2forAWS.h>
+#include <lvgl/lvgl.h>
 #include "app_priv.h"
-
-/* This is the GPIO on which the power will be set */
-#define OUTPUT_GPIO    25
-static pixel_settings_t px;
-
-#define WIFI_RESET_BUTTON_TIMEOUT       3
-#define FACTORY_RESET_BUTTON_TIMEOUT    10
 
 static uint16_t g_hue = DEFAULT_HUE;
 static uint16_t g_saturation = DEFAULT_SATURATION;
 static uint16_t g_value = DEFAULT_BRIGHTNESS;
 static bool g_power = DEFAULT_POWER;
 
+extern SemaphoreHandle_t xGuiSemaphore;
+extern SemaphoreHandle_t spi_mutex;
+static lv_obj_t * brightness_slider;
+static lv_obj_t * hue_slider;
+static lv_obj_t * saturation_slider;
+static lv_obj_t *sw1;
 /**
  * @brief Simple helper function, converting HSV color space to RGB color space
  *
@@ -88,21 +87,18 @@ esp_err_t app_light_set_led(uint32_t hue, uint32_t saturation, uint32_t brightne
 {
     /* Whenever this function is called, light power will be ON */
     if (!g_power) {
-        g_power = true;
-        esp_rmaker_param_update_and_report(
-                esp_rmaker_device_get_param_by_type(light_device, ESP_RMAKER_PARAM_POWER),
-                esp_rmaker_bool(g_power));
+        return 0;
     }
-    px.brightness = brightness;
     uint32_t r, g, b, color;
     hsv2rgb(hue, saturation, brightness, &r, &g, &b);
     for (int i = 0; i < 10; i++) {
         r = r & 0xff; g = g & 0xff; b = b & 0xff;
         color = 0;
         color = (r << 24) | (g << 16) | (b << 8);
-        np_set_pixel_color(&px, i, color);
     }
-    np_show(&px, RMT_CHANNEL_0);
+    Core2ForAWS_Sk6812_SetSideColor(0, color);
+    Core2ForAWS_Sk6812_SetSideColor(1, color);
+    Core2ForAWS_Sk6812_Show();
     return 0;
 }
 
@@ -111,9 +107,11 @@ esp_err_t app_light_set_power(bool power)
     g_power = power;
     if (power) {
         app_light_set_led(g_hue, g_saturation, g_value);
+        lv_switch_on(sw1, LV_ANIM_OFF);
     } else {
-        np_clear(&px);
-        np_show(&px, RMT_CHANNEL_0);
+        Core2ForAWS_Sk6812_Clear();
+        Core2ForAWS_Sk6812_Show();
+        lv_switch_off(sw1, LV_ANIM_OFF);
     }
     return ESP_OK;
 }
@@ -121,101 +119,124 @@ esp_err_t app_light_set_power(bool power)
 esp_err_t app_light_set_brightness(uint16_t brightness)
 {
     g_value = brightness;
+    lv_slider_set_value(brightness_slider, g_value, LV_ANIM_OFF);
     return app_light_set_led(g_hue, g_saturation, g_value);
 }
 esp_err_t app_light_set_hue(uint16_t hue)
 {
     g_hue = hue;
+    lv_slider_set_value(hue_slider, g_hue, LV_ANIM_OFF);
     return app_light_set_led(g_hue, g_saturation, g_value);
 }
 esp_err_t app_light_set_saturation(uint16_t saturation)
 {
     g_saturation = saturation;
+    lv_slider_set_value(saturation_slider, g_saturation, LV_ANIM_OFF);
     return app_light_set_led(g_hue, g_saturation, g_value);
 }
 
-esp_err_t app_light_init(void)
+static void slider_event_cb(lv_obj_t * slider, lv_event_t event)
 {
-    px.pixel_count = 10;
-    px.brightness = g_value;
-    sprintf(px.color_order, "GRBW");
-    px.nbits = 24;
-    px.timings.t0h = (350);
-    px.timings.t0l = (800);
-    px.timings.t1h = (600);
-    px.timings.t1l = (700);
-    px.timings.reset = 80000;
-    px.pixels = (uint8_t *)malloc((px.nbits / 8) * px.pixel_count);
-    neopixel_init(GPIO_NUM_25, RMT_CHANNEL_0);
-    if (g_power) {
-        app_light_set_led(g_hue, g_saturation, g_value);
-    } else {
-        np_clear(&px);
-        np_show(&px, RMT_CHANNEL_0);
+    if (event != LV_EVENT_RELEASED) {
+        return;
     }
-    return ESP_OK;
+
+    if (slider == brightness_slider) {
+        g_value = lv_slider_get_value(slider);
+        esp_rmaker_param_update_and_report(
+            esp_rmaker_device_get_param_by_type(light_device, ESP_RMAKER_PARAM_BRIGHTNESS),
+            esp_rmaker_int(g_value));
+    } else if (slider == hue_slider) {
+        g_hue = lv_slider_get_value(slider);
+        esp_rmaker_param_update_and_report(
+            esp_rmaker_device_get_param_by_type(light_device, ESP_RMAKER_PARAM_HUE),
+            esp_rmaker_int(g_hue));
+    } else if (slider == saturation_slider) {
+        g_saturation = lv_slider_get_value(slider);
+        esp_rmaker_param_update_and_report(
+            esp_rmaker_device_get_param_by_type(light_device, ESP_RMAKER_PARAM_SATURATION),
+            esp_rmaker_int(g_saturation));
+    }
+    app_light_set_led(g_hue, g_saturation, g_value);
 }
 
-static void push_btn_cb(void *arg)
+static void sw1_event_handler(lv_obj_t * obj, lv_event_t event)
 {
-    app_light_set_power(!g_power);
+    if(event == LV_EVENT_VALUE_CHANGED) {
+        app_light_set_power(lv_switch_get_state(obj));
+    } else {
+        return;
+    }
+
     esp_rmaker_param_update_and_report(
             esp_rmaker_device_get_param_by_type(light_device, ESP_RMAKER_PARAM_POWER),
             esp_rmaker_bool(g_power));
 }
-void Core2ForAWS_PMU_SetPowerIn(uint8_t mode) {
-    if (mode) {
-        Axp192_SetGPIO0Mode(0);
-        Axp192_EnableExten(0);
-    } else {
-        Axp192_EnableExten(1);
-        Axp192_SetGPIO0Mode(1);
-    }
+
+
+esp_err_t app_light_init(void)
+{
+    spi_mutex = xSemaphoreCreateMutex();
+
+    Core2ForAWS_Init();
+    FT6336U_Init();
+    Core2ForAWS_LCD_Init();
+    Core2ForAWS_Button_Init();
+    Core2ForAWS_Sk6812_Init();
+
+    xSemaphoreTake(xGuiSemaphore, portMAX_DELAY);
+    lv_obj_t * light_state_label = lv_label_create(lv_scr_act(), NULL);
+    lv_obj_set_pos(light_state_label, 30, 25);
+    lv_label_set_text(light_state_label, "Light On/Off:");
+
+    sw1 = lv_switch_create(lv_scr_act(), NULL);
+    lv_obj_set_size(sw1, 140, 30);
+    lv_obj_align(sw1, light_state_label, LV_ALIGN_OUT_BOTTOM_LEFT, 0, 5);
+    lv_obj_set_event_cb(sw1, sw1_event_handler);
+    lv_switch_on(sw1, LV_ANIM_OFF);
+
+    lv_obj_t * light_hsv_label = lv_label_create(lv_scr_act(), NULL);
+    lv_obj_align(light_hsv_label, sw1, LV_ALIGN_OUT_BOTTOM_LEFT, 0, 25);
+    lv_label_set_text(light_hsv_label, "Light Brightness, Hue, Saturation:");
+
+    brightness_slider = lv_slider_create(lv_scr_act(), NULL);
+    lv_obj_set_size(brightness_slider, 260, 20);
+    lv_obj_align(brightness_slider, light_hsv_label, LV_ALIGN_OUT_BOTTOM_LEFT, 0, 10);
+    lv_obj_set_event_cb(brightness_slider, slider_event_cb);
+    lv_slider_set_value(brightness_slider, 0, LV_ANIM_OFF);
+    lv_slider_set_range(brightness_slider, 0, 100);
+
+    hue_slider = lv_slider_create(lv_scr_act(), NULL);
+    lv_obj_set_size(hue_slider, 260, 20);
+    lv_obj_align(hue_slider, brightness_slider, LV_ALIGN_OUT_BOTTOM_LEFT, 0, 10);
+    lv_obj_set_event_cb(hue_slider, slider_event_cb);
+    lv_slider_set_value(hue_slider, 0, LV_ANIM_OFF);
+    lv_slider_set_range(hue_slider, 0, 360);
+
+    saturation_slider = lv_slider_create(lv_scr_act(), NULL);
+    lv_obj_set_size(saturation_slider, 260, 20);
+    lv_obj_align(saturation_slider, hue_slider, LV_ALIGN_OUT_BOTTOM_LEFT, 0, 10);
+    lv_obj_set_event_cb(saturation_slider, slider_event_cb);
+    lv_slider_set_value(saturation_slider, 0, LV_ANIM_OFF);
+    lv_slider_set_range(saturation_slider, 0, 100);
+
+
+    xSemaphoreGive(xGuiSemaphore);
+    app_light_set_hue(g_hue);
+    app_light_set_saturation(g_saturation);
+    app_light_set_brightness(g_value);
+
+    return ESP_OK;
 }
 
-void Core2ForAWS_PMU_Init(uint16_t ldo2_volt, uint16_t ldo3_volt, uint16_t dc2_volt, uint16_t dc3_volt) {
-    uint8_t value = 0x00;
-    value |= (ldo2_volt > 0) << AXP192_LDO2_EN_BIT;
-    value |= (ldo3_volt > 0) << AXP192_LDO3_EN_BIT;
-    value |= (dc2_volt > 0) << AXP192_DC2_EN_BIT;
-    value |= (dc3_volt > 0) << AXP192_DC3_EN_BIT;
-    value |= 0x01 << AXP192_DC1_EN_BIT;
-
-    Axp192_Init();
-
-    // value |= 0x01 << AXP192_EXT_EN_BIT;
-    Axp192_SetLDO23Volt(ldo2_volt, ldo3_volt);
-    // Axp192_SetDCDC1Volt(3300);
-    Axp192_SetDCDC2Volt(dc2_volt);
-    Axp192_SetDCDC3Volt(dc3_volt);
-    Axp192_SetVoffVolt(3000);
-    Axp192_SetChargeCurrent(CHARGE_Current_100mA);
-    Axp192_SetChargeVoltage(CHARGE_VOLT_4200mV);
-    Axp192_EnableCharge(1);
-    Axp192_SetPressStartupTime(STARTUP_128mS);
-    Axp192_SetPressPoweroffTime(POWEROFF_4S);
-    Axp192_EnableLDODCExt(value);
-    Axp192_SetGPIO4Mode(1);
-    Axp192_SetGPIO2Mode(1);
-    Axp192_SetGPIO2Level(0);
-
-    Axp192_SetGPIO0Volt(3300);
-    Axp192_SetAdc1Enable(0xfe);
-    Axp192_SetGPIO1Mode(1);
-    Core2ForAWS_PMU_SetPowerIn(0);
+static void initTask(void *arg)
+{
+    app_light_init();
+    vTaskDelete(NULL);
 }
+
 
 void app_driver_init()
 {
-    Core2ForAWS_PMU_Init(3300, 0, 0, 2700);   
-    app_light_init();
-#if 0
-    button_handle_t btn_handle = iot_button_create(BUTTON_GPIO, BUTTON_ACTIVE_LEVEL);
-    if (btn_handle) {
-        /* Register a callback for a button tap (short press) event */
-        iot_button_set_evt_cb(btn_handle, BUTTON_CB_TAP, push_btn_cb, NULL);
-        /* Register Wi-Fi reset and factory reset functionality on same button */
-        app_reset_button_register(btn_handle, WIFI_RESET_BUTTON_TIMEOUT, FACTORY_RESET_BUTTON_TIMEOUT);
-    }
-#endif
+    xTaskCreatePinnedToCore(initTask, "init_light", 4096*2, NULL, 4, NULL, 1);
 }

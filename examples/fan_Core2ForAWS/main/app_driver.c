@@ -64,10 +64,10 @@ esp_err_t app_fan_set_speed(uint8_t speed)
 
 static void strength_slider_event_cb(lv_obj_t * slider, lv_event_t event)
 {
-
-    if(event == LV_EVENT_VALUE_CHANGED) {
-        app_fan_set_speed(lv_slider_get_value(slider));
+    if (event != LV_EVENT_RELEASED) {
+        return;
     }
+    app_fan_set_speed(lv_slider_get_value(slider));
     esp_rmaker_param_update_and_report(
             esp_rmaker_device_get_param_by_type(fan_device, ESP_RMAKER_PARAM_SPEED),
             esp_rmaker_int(g_speed));
@@ -77,6 +77,8 @@ static void sw1_event_handler(lv_obj_t * obj, lv_event_t event)
 {
     if(event == LV_EVENT_VALUE_CHANGED) {
         app_fan_set_power(lv_switch_get_state(obj));
+    } else {
+        return;
     }
     esp_rmaker_param_update_and_report(
             esp_rmaker_device_get_param_by_type(fan_device, ESP_RMAKER_PARAM_POWER),
