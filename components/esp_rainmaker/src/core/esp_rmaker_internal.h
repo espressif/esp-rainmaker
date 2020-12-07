@@ -116,3 +116,4 @@ static inline esp_err_t esp_rmaker_post_event(esp_rmaker_event_t event_id, void*
     return esp_event_post(RMAKER_EVENT, event_id, data, data_size, portMAX_DELAY);
 }
 esp_rmaker_state_t esp_rmaker_get_state(void);
+esp_err_t esp_rmaker_cmd_response_enable(void);

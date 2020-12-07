@@ -137,8 +137,9 @@ static void esp_rmaker_event_handler(void* arg, esp_event_base_t event_base,
     } else if (event_base == RMAKER_EVENT &&
             (event_id == RMAKER_EVENT_USER_NODE_MAPPING_DONE ||
             event_id == RMAKER_EVENT_USER_NODE_MAPPING_RESET)) {
-        esp_rmaker_params_mqtt_init();
         esp_event_handler_unregister(RMAKER_EVENT, event_id, &esp_rmaker_event_handler);
+        esp_rmaker_params_mqtt_init();
+        esp_rmaker_cmd_response_enable();
     }
 }
 
@@ -320,6 +321,11 @@ static void esp_rmaker_task(void *data)
     }
     if (esp_rmaker_user_node_mapping_get_state() == ESP_RMAKER_USER_MAPPING_DONE) {
         err = esp_rmaker_params_mqtt_init();
+        if (err != ESP_OK) {
+            ESP_LOGE(TAG, "Aborting!!!");
+            goto rmaker_end;
+        }
+        err = esp_rmaker_cmd_response_enable();
         if (err != ESP_OK) {
             ESP_LOGE(TAG, "Aborting!!!");
             goto rmaker_end;
