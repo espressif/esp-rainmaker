@@ -788,8 +788,7 @@ static void event_handler(void* arg, esp_event_base_t event_base,
 #endif /* CONFIG_ESP_RMAKER_ASSISTED_CLAIM */
 esp_err_t __esp_rmaker_claim_init(esp_rmaker_claim_data_t *claim_data)
 {
-    uint8_t random_bytes[ESP_RMAKER_RANDOM_NUMBER_LEN];
-    esp_err_t err;
+    esp_err_t err = ESP_OK;
 
     char *key = esp_rmaker_get_client_key();
     if (key) {
@@ -814,14 +813,22 @@ esp_err_t __esp_rmaker_claim_init(esp_rmaker_claim_data_t *claim_data)
             return err;
         }
     }
-    /* Generate random bytes for general purpose use */
-    esp_fill_random(&random_bytes, sizeof(random_bytes));
+    /* Check if the general purpose random bytes are already present in the storage */
+    char *stored_random_bytes = esp_rmaker_storage_get(ESP_RMAKER_CLIENT_RANDOM_NVS_KEY);
+    if (stored_random_bytes == NULL) {
+        /* Generate random bytes for general purpose use */
+        uint8_t random_bytes[ESP_RMAKER_RANDOM_NUMBER_LEN];
+        esp_fill_random(&random_bytes, sizeof(random_bytes));
 
-    /* Store the PoP in the storage */
-    err = esp_rmaker_storage_set(ESP_RMAKER_CLIENT_RANDOM_NVS_KEY, random_bytes, sizeof(random_bytes));
-    if (err != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to store random bytes to storage.");
-        return err;
+        /* Store the PoP in the storage */
+        err = esp_rmaker_storage_set(ESP_RMAKER_CLIENT_RANDOM_NVS_KEY, random_bytes, sizeof(random_bytes));
+        if (err != ESP_OK) {
+            ESP_LOGE(TAG, "Failed to store random bytes to storage.");
+            return err;
+        }
+    } else {
+        /* Free the copy of the random bytes as it isn't required here. */
+        free(stored_random_bytes);
     }
 #ifdef CONFIG_ESP_RMAKER_SELF_CLAIM
     err = esp_rmaker_claim_generate_csr(claim_data, esp_rmaker_get_node_id());
