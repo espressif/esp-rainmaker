@@ -754,6 +754,7 @@ cleanup:
         json_arr_leave_object(&jctx);
         current_schedule++;
     }
+    json_parse_end(&jctx);
     return ESP_OK;
 }
 
