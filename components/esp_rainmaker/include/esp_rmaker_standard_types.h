@@ -24,7 +24,7 @@ extern "C"
 #define ESP_RMAKER_UI_SLIDER            "esp.ui.slider"
 #define ESP_RMAKER_UI_DROPDOWN          "esp.ui.dropdown"
 #define ESP_RMAKER_UI_TEXT              "esp.ui.text"
-
+#define ESP_RMAKER_UI_HUE_SLIDER        "esp.ui.hue-slider"
 
 /********** STANDARD PARAM TYPES **********/
 

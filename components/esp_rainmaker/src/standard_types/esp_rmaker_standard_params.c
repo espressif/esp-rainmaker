@@ -50,7 +50,7 @@ esp_rmaker_param_t *esp_rmaker_hue_param_create(const char *param_name, int val)
     esp_rmaker_param_t *param = esp_rmaker_param_create(param_name, ESP_RMAKER_PARAM_HUE,
             esp_rmaker_int(val), PROP_FLAG_READ | PROP_FLAG_WRITE);
     if (param) {
-        esp_rmaker_param_add_ui_type(param, ESP_RMAKER_UI_SLIDER);
+        esp_rmaker_param_add_ui_type(param, ESP_RMAKER_UI_HUE_SLIDER);
         esp_rmaker_param_add_bounds(param, esp_rmaker_int(0), esp_rmaker_int(360), esp_rmaker_int(1));
     }
     return param;
