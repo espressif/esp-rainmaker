@@ -17,7 +17,7 @@ menu "ESP RainMaker Config"
 
     config ESP_RMAKER_ASSISTED_CLAIM
         bool "Use Assisted Claiming"
-        depends on IDF_TARGET_ESP32 && BT_ENABLED
+        depends on BT_ENABLED
         select MBEDTLS_HARDWARE_MPI
         default y
         help
