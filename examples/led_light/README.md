@@ -6,7 +6,7 @@ Follow the ESP RainMaker Documentation [Get Started](https://rainmaker.espressif
 
 ## What to expect in this example?
 
-- This example uses the BOOT button and RGB LED on the ESP32-S2-Saola-1 board to demonstrate a lightbulb.
+- This example uses the BOOT button and RGB LED on the ESP32-S2-Saola-1/ESP32-C3-DevKitC board to demonstrate a lightbulb.
 - The LED acts as a lightbulb with hue, saturation and brightness.
 - Pressing the BOOT button will toggle the power state of the lightbulb. This will also reflect on the phone app.
 - Toggling the button on the phone app should toggle the LED on your board, and also print messages like these on the ESP32-S2 monitor:

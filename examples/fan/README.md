@@ -6,7 +6,7 @@ Follow the ESP RainMaker Documentation [Get Started](https://rainmaker.espressif
 
 ## What to expect in this example?
 
-- This example uses the BOOT button and RGB LED on the ESP32-S2-Saola-1 board to demonstrate a fan.
+- This example uses the BOOT button and RGB LED on the ESP32-S2-Saola-1/ESP32-C3-DevKitC board to demonstrate a fan.
 - The LED brightness indicates the speed of the Fan.
 - Pressing the BOOT button will increase the speed by 1. The speed will cycle from 0 to 5 and then come back to 0.
 - Toggling the button on the phone app should toggle the LED on your board, and also print messages like these on the ESP32-S2 monitor:
