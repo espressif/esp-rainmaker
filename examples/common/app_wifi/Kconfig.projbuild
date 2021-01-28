@@ -25,4 +25,10 @@ menu "ESP RainMaker App Wi-Fi Provisioning"
         default 1 if APP_WIFI_PROV_TRANSPORT_SOFTAP
         default 2 if APP_WIFI_PROV_TRANSPORT_BLE
 
+    config APP_WIFI_SHOW_DEMO_INTRO_TEXT
+        bool "Show intro text for demos"
+        default n
+        help
+            Show some intro text for demos in order to help users understand more about ESP RainMaker.
+
 endmenu
