@@ -1,10 +1,34 @@
 # Changes
 
+## 1-Feb-2021 (esp_rmaker: Moved out some generic modules from esp_rainmaker component)
+
+Some generic code has been moved out of the esp_rainmaker repo and included as submodules at
+components/rmaker_common and cli/.
+
+To get these submodules, you will now have to execute `git submodule update --init --recursive` once.
+
+For new clones, use `git clone --recursive https://github.com/espressif/esp-rainmaker.git`
+
+### RainMaker Events
+
+As part of the above changes, the following events have changed
+
+- RMAKER_EVENT_MQTT_CONNECTED -> RMAKER_MQTT_EVENT_CONNECTED
+- RMAKER_EVENT_MQTT_DISCONNECTED -> RMAKER_MQTT_EVENT_DISCONNECTED
+- RMAKER_EVENT_MQTT_PUBLISHED -> RMAKER_MQTT_EVENT_PUBLISHED
+
+Moreover, the event base for the MQTT events has changed from `RMAKER_EVENT` to `RMAKER_COMMON_EVENT`. The base has similarly changed even for the following:
+
+- RMAKER_EVENT_REBOOT
+- RMAKER_EVENT_WIFI_RESET
+- RMAKER_EVENT_FACTORY_RESET
+
 ## 16-Oct-2020 (json: Use upstream json_generator and json_parser as submodules)
 
 To get these submodules, you will now have to execute `git submodule update --init --recursive` once.
 
 For new clones, use `git clone --recursive https://github.com/espressif/esp-rainmaker.git`
+
 ## 16-Oct-2020 (app_wifi: Changes in SSID and PoP generation for Provisioning)
 
 The PoP for Wi-Fi provisioning was being fetched from a random 8 character hex string stored in the fctry partition.

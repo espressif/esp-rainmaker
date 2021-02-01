@@ -16,6 +16,7 @@
 #include <string.h>
 #include <esp_log.h>
 #include <esp_system.h>
+#include <esp_rmaker_work_queue.h>
 #include <esp_rmaker_core.h>
 #include <esp_rmaker_standard_types.h>
 #include <esp_rmaker_standard_params.h>
@@ -65,7 +66,7 @@ static esp_err_t esp_rmaker_ota_service_cb(const esp_rmaker_device_t *device, co
             ota->filesize = 0;
             ota->ota_in_progress = true;
             ota->transient_priv = (void *)device;
-            if (esp_rmaker_queue_work(esp_rmaker_ota_common_cb, ota) != ESP_OK) {
+            if (esp_rmaker_work_queue_add_task(esp_rmaker_ota_common_cb, ota) != ESP_OK) {
                 esp_rmaker_ota_finish_using_params(ota);
             } else {
                 return ESP_OK;

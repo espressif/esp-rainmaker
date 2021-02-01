@@ -26,8 +26,10 @@ extern "C"
 
 #define MAX_VERSION_STRING_LEN  16
 
+/** @cond **/
 /** ESP RainMaker Event Base */
 ESP_EVENT_DECLARE_BASE(RMAKER_EVENT);
+/** @endcond **/
 
 /** ESP RainMaker Events */
 typedef enum {
@@ -39,20 +41,6 @@ typedef enum {
     RMAKER_EVENT_CLAIM_SUCCESSFUL,
     /** Self Claiming Failed */
     RMAKER_EVENT_CLAIM_FAILED,
-    /** Node reboot has been triggered. The associated event data is the time in seconds
-     * (type: uint8_t) after which the node will reboot. Note that this time may not be
-     * accurate as the events are received asynchronously.*/
-    RMAKER_EVENT_REBOOT,
-    /** Wi-Fi credentials reset. Triggered after calling esp_rmaker_wifi_reset() */
-    RMAKER_EVENT_WIFI_RESET,
-    /** Node reset to factory defaults. Triggered after calling esp_rmaker_factory_reset() */
-    RMAKER_EVENT_FACTORY_RESET,
-    /** Connected to MQTT Broker */
-    RMAKER_EVENT_MQTT_CONNECTED,
-    /** Disconnected from MQTT Broker */
-    RMAKER_EVENT_MQTT_DISCONNECTED,
-    /** MQTT message published successfully */
-    RMAKER_EVENT_MQTT_PUBLISHED,
 } esp_rmaker_event_t;
 
 /** ESP RainMaker Node information */
@@ -703,12 +691,6 @@ char *esp_rmaker_param_get_name(const esp_rmaker_param_t *param);
  */
 char *esp_rmaker_param_get_type(const esp_rmaker_param_t *param);
 
-/** Prototype for ESP RainMaker Work Queue Function
- *
- * @param[in] priv_data The private data associated with the work function.
- */
-typedef void (*esp_rmaker_work_fn_t)(void *priv_data);
-
 /** Report the node details to the cloud
  *
  * This API reports node details i.e. the node configuration and values of all the parameters to the ESP RainMaker cloud.
@@ -722,18 +704,6 @@ typedef void (*esp_rmaker_work_fn_t)(void *priv_data);
  * @return error in case of failure.
  */
 esp_err_t esp_rmaker_report_node_details(void);
-
-/** Queue execution of a function in ESP RainMaker's context
- *
- * This API queues a work function for execution in the ESP RainMaker Task's context.
- *
- * @param[in] work_fn The Work function to be queued.
- * @param[in] priv_data Private data to be passed to the work function.
- *
- * @return ESP_OK on success.
- * @return error in case of failure.
- */
-esp_err_t esp_rmaker_queue_work(esp_rmaker_work_fn_t work_fn, void *priv_data);
 
 #ifdef __cplusplus
 }

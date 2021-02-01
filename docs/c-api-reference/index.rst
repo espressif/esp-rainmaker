@@ -9,3 +9,4 @@ C API Reference
    rainmaker_mqtt.rst
    rainmaker_ota.rst
    rainmaker_console.rst
+   rainmaker_common.rst

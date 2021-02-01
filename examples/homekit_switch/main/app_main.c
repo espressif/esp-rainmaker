@@ -20,6 +20,7 @@
 #include <esp_rmaker_standard_devices.h>
 #include <esp_rmaker_ota.h>
 #include <esp_rmaker_console.h>
+#include <esp_rmaker_common_events.h>
 
 #include "app_wifi_with_homekit.h"
 #include "app_priv.h"
@@ -62,6 +63,11 @@ static void event_handler(void* arg, esp_event_base_t event_base,
             case RMAKER_EVENT_CLAIM_FAILED:
                 ESP_LOGI(TAG, "RainMaker Claim Failed.");
                 break;
+            default:
+                ESP_LOGW(TAG, "Unhandled RainMaker Event: %d", event_id);
+        }
+    } else if (event_base == RMAKER_COMMON_EVENT) {
+        switch (event_id) {
             case RMAKER_EVENT_REBOOT:
                 ESP_LOGI(TAG, "Rebooting in %d seconds.", *((uint8_t *)event_data));
                 break;
@@ -72,7 +78,7 @@ static void event_handler(void* arg, esp_event_base_t event_base,
                 ESP_LOGI(TAG, "Node reset to factory defaults.");
                 break;
             default:
-                ESP_LOGW(TAG, "Unhandled RainMaker Event: %d", event_id);
+                ESP_LOGW(TAG, "Unhandled RainMaker Common Event: %d", event_id);
         }
     } else {
         ESP_LOGW(TAG, "Invalid event received!");

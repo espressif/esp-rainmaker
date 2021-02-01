@@ -17,6 +17,7 @@
 #include <json_generator.h>
 #include <esp_log.h>
 #include <esp_system.h>
+#include <esp_rmaker_work_queue.h>
 #include <esp_rmaker_core.h>
 #include <esp_rmaker_ota.h>
 
@@ -60,7 +61,8 @@ esp_err_t esp_rmaker_ota_report_status_using_topics(esp_rmaker_ota_handle_t ota_
 
     char publish_topic[100];
     snprintf(publish_topic, sizeof(publish_topic), "node/%s/%s", node_id, OTASTATUS_TOPIC_SUFFIX);
-    esp_err_t err = esp_rmaker_mqtt_publish(publish_topic, publish_payload, strlen(publish_payload));
+    esp_err_t err = esp_rmaker_mqtt_publish(publish_topic, publish_payload, strlen(publish_payload),
+                        RMAKER_MQTT_QOS1, NULL);
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "esp_rmaker_mqtt_publish_data returned error %d",err);
         return ESP_FAIL;
@@ -157,7 +159,7 @@ static void ota_url_handler(const char *topic, void *payload, size_t payload_len
     ota->url = url;
     ota->filesize = filesize;
     ota->ota_in_progress = true;
-    if (esp_rmaker_queue_work(esp_rmaker_ota_common_cb, ota) != ESP_OK) {
+    if (esp_rmaker_work_queue_add_task(esp_rmaker_ota_common_cb, ota) != ESP_OK) {
         esp_rmaker_ota_finish_using_topics(ota);
     }
     return;
@@ -185,7 +187,8 @@ static void esp_rmaker_ota_fetch(void *priv)
     json_gen_str_end(&jstr);
     char publish_topic[100];
     snprintf(publish_topic, sizeof(publish_topic), "node/%s/%s", esp_rmaker_get_node_id(), OTAFETCH_TOPIC_SUFFIX);
-    esp_err_t err = esp_rmaker_mqtt_publish(publish_topic, publish_payload, strlen(publish_payload));
+    esp_err_t err = esp_rmaker_mqtt_publish(publish_topic, publish_payload, strlen(publish_payload),
+                        RMAKER_MQTT_QOS1, NULL);
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "OTA Fetch Publish Error %d", err);
     }
@@ -201,7 +204,7 @@ static esp_err_t esp_rmaker_ota_subscribe(void *priv_data)
     ESP_LOGI(TAG, "Subscribing to: %s", subscribe_topic);
     /* First unsubscribe, in case there is a stale subscription */
     esp_rmaker_mqtt_unsubscribe(subscribe_topic);
-    esp_err_t err = esp_rmaker_mqtt_subscribe(subscribe_topic, ota_url_handler, priv_data);
+    esp_err_t err = esp_rmaker_mqtt_subscribe(subscribe_topic, ota_url_handler, RMAKER_MQTT_QOS1, priv_data);
     if(err != ESP_OK) {
         ESP_LOGE(TAG, "OTA URL Subscription Error %d", err);
     }
@@ -232,7 +235,7 @@ static void esp_rmaker_ota_work_fn(void *priv_data)
 /* Enable the ESP RainMaker specific OTA */
 esp_err_t esp_rmaker_ota_enable_using_topics(esp_rmaker_ota_t *ota)
 {
-    esp_err_t err = esp_rmaker_queue_work(esp_rmaker_ota_work_fn, ota);
+    esp_err_t err = esp_rmaker_work_queue_add_task(esp_rmaker_ota_work_fn, ota);
     if (err == ESP_OK) {
         ESP_LOGI(TAG, "OTA enabled with Topics");
     }
