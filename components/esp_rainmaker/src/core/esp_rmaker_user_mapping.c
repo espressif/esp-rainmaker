@@ -17,6 +17,7 @@
 #include <esp_event.h>
 #include <wifi_provisioning/manager.h>
 #include <json_generator.h>
+#include <esp_rmaker_work_queue.h>
 #include <esp_rmaker_core.h>
 #include <esp_rmaker_user_mapping.h>
 #include <esp_rmaker_mqtt.h>
@@ -86,7 +87,7 @@ static void esp_rmaker_user_mapping_cb(void *priv_data)
     json_gen_str_end(&jstr);
     char publish_topic[100];
     snprintf(publish_topic, sizeof(publish_topic), "node/%s/%s", node_id, USER_MAPPING_TOPIC_SUFFIX);
-    esp_err_t err = esp_rmaker_mqtt_publish(publish_topic, publish_payload, strlen(publish_payload));
+    esp_err_t err = esp_rmaker_mqtt_publish(publish_topic, publish_payload, strlen(publish_payload), RMAKER_MQTT_QOS1, NULL);
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "MQTT Publish Error %d", err);
     }
@@ -107,7 +108,7 @@ esp_err_t esp_rmaker_start_user_node_mapping(char *user_id, char *secret_key)
     if (!data->secret_key) {
         goto user_mapping_error;
     }
-    if (esp_rmaker_queue_work(esp_rmaker_user_mapping_cb, data) != ESP_OK) {
+    if (esp_rmaker_work_queue_add_task(esp_rmaker_user_mapping_cb, data) != ESP_OK) {
         goto user_mapping_error;
     }
     esp_rmaker_user_mapping_prov_deinit();

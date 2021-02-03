@@ -21,10 +21,12 @@
 #include <esp_wifi.h>
 #include <esp_event.h>
 
+#include <esp_rmaker_factory.h>
+#include <esp_rmaker_work_queue.h>
+
 #include <esp_rmaker_core.h>
 #include <esp_rmaker_utils.h>
 #include "esp_rmaker_internal.h"
-#include "esp_rmaker_storage.h"
 #include "esp_rmaker_mqtt.h"
 #include "esp_rmaker_claim.h"
 #include "esp_rmaker_client_data.h"
@@ -32,15 +34,11 @@
 static const int WIFI_CONNECTED_EVENT = BIT0;
 static EventGroupHandle_t wifi_event_group;
 
-
 ESP_EVENT_DEFINE_BASE(RMAKER_EVENT);
 
 static const char *TAG = "esp_rmaker_core";
 
-#define ESP_RMAKER_TASK_QUEUE_SIZE           8
 
-#define ESP_RMAKER_TASK_STACK       CONFIG_ESP_RMAKER_TASK_STACK
-#define ESP_RMAKER_TASK_PRIORITY    CONFIG_ESP_RMAKER_TASK_PRIORITY
 #if defined(CONFIG_ESP_RMAKER_SELF_CLAIM) || defined(CONFIG_ESP_RMAKER_ASSISTED_CLAIM)
 #define ESP_RMAKER_CLAIM_ENABLED
 #endif
@@ -70,7 +68,7 @@ typedef struct {
     bool enable_time_sync;
     esp_rmaker_state_t state;
     bool mqtt_connected;
-    esp_rmaker_mqtt_config_t *mqtt_config;
+    esp_rmaker_mqtt_conn_params_t *mqtt_conn_params;
 #ifdef ESP_RMAKER_CLAIM_ENABLED
     bool need_claim;
     esp_rmaker_claim_data_t *claim_data;
@@ -82,7 +80,7 @@ static esp_rmaker_priv_data_t *esp_rmaker_priv_data;
 
 static char *esp_rmaker_populate_node_id(bool use_claiming)
 {
-    char *node_id = esp_rmaker_storage_get("node_id");
+    char *node_id = esp_rmaker_factory_get("node_id");
 #ifdef ESP_RMAKER_CLAIM_ENABLED
     if (!node_id && use_claiming) {
         uint8_t eth_mac[6];
@@ -141,9 +139,7 @@ static esp_err_t esp_rmaker_deinit_priv_data(esp_rmaker_priv_data_t *rmaker_priv
     if (!rmaker_priv_data) {
         return ESP_ERR_INVALID_ARG;
     }
-    if (rmaker_priv_data->work_queue) {
-        vQueueDelete(rmaker_priv_data->work_queue);
-    }
+    esp_rmaker_work_queue_deinit();
 #ifndef CONFIG_ESP_RMAKER_DISABLE_USER_MAPPING_PROV
     esp_rmaker_user_mapping_prov_deinit();
 #endif
@@ -152,9 +148,9 @@ static esp_err_t esp_rmaker_deinit_priv_data(esp_rmaker_priv_data_t *rmaker_priv
         esp_rmaker_claim_data_free(rmaker_priv_data->claim_data);
     }
 #endif
-    if (rmaker_priv_data->mqtt_config) {
-        esp_rmaker_clean_mqtt_config(rmaker_priv_data->mqtt_config);
-        free(rmaker_priv_data->mqtt_config);
+    if (rmaker_priv_data->mqtt_conn_params) {
+        esp_rmaker_clean_mqtt_conn_params(rmaker_priv_data->mqtt_conn_params);
+        free(rmaker_priv_data->mqtt_conn_params);
     }
     if (rmaker_priv_data->node_id) {
         free(rmaker_priv_data->node_id);
@@ -189,142 +185,6 @@ char *esp_rmaker_get_node_id(void)
     return NULL;
 }
 
-static esp_err_t esp_rmaker_mqtt_data_init(esp_rmaker_priv_data_t *rmaker_priv_data, bool use_claiming)
-{
-    rmaker_priv_data->mqtt_config = esp_rmaker_get_mqtt_config();
-    if (rmaker_priv_data->mqtt_config) {
-        return ESP_OK;
-    }
-#ifdef ESP_RMAKER_CLAIM_ENABLED
-    if (use_claiming) {
-#ifdef CONFIG_ESP_RMAKER_SELF_CLAIM
-        rmaker_priv_data->claim_data = esp_rmaker_self_claim_init();
-#endif
-#ifdef CONFIG_ESP_RMAKER_ASSISTED_CLAIM
-        rmaker_priv_data->claim_data = esp_rmaker_assisted_claim_init();
-#endif
-        if (!rmaker_priv_data->claim_data) {
-            ESP_LOGE(TAG, "Failed to initialise Claiming.");
-            return ESP_FAIL;
-        } else {
-            rmaker_priv_data->need_claim = true;
-            return ESP_OK;
-        }
-    }
-#endif /* ESP_RMAKER_CLAIM_ENABLED */
-    return ESP_FAIL;
-}
-/* Initialize ESP RainMaker */
-static esp_err_t esp_rmaker_init(const esp_rmaker_config_t *config, bool use_claiming)
-{
-    if (esp_rmaker_priv_data) {
-        ESP_LOGE(TAG, "ESP RainMaker already initialised");
-        return ESP_ERR_INVALID_STATE;
-    }
-    if (!config) {
-        ESP_LOGE(TAG, "RainMaker config missing. Cannot initialise");
-        return ESP_ERR_INVALID_ARG;
-    }
-    if (esp_rmaker_storage_init() != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to initialise storage");
-        return ESP_FAIL;
-    }
-    esp_rmaker_priv_data = calloc(1, sizeof(esp_rmaker_priv_data_t));
-    if (!esp_rmaker_priv_data) {
-        ESP_LOGE(TAG, "Failed to allocate memory");
-        return ESP_ERR_NO_MEM;
-    }
-
-    esp_rmaker_priv_data->node_id = esp_rmaker_populate_node_id(use_claiming);
-    if (!esp_rmaker_priv_data->node_id) {
-        esp_rmaker_deinit_priv_data(esp_rmaker_priv_data);
-        esp_rmaker_priv_data = NULL;
-        ESP_LOGE(TAG, "Failed to initialise Node Id. Please perform \"claiming\" using RainMaker CLI.");
-        return ESP_ERR_NO_MEM;
-    }
-
-    esp_rmaker_priv_data->work_queue = xQueueCreate(ESP_RMAKER_TASK_QUEUE_SIZE, sizeof(esp_rmaker_work_queue_entry_t));
-    if (!esp_rmaker_priv_data->work_queue) {
-        esp_rmaker_deinit_priv_data(esp_rmaker_priv_data);
-        esp_rmaker_priv_data = NULL;
-        ESP_LOGE(TAG, "ESP RainMaker Queue Creation Failed");
-        return ESP_ERR_NO_MEM;
-    }
-#ifndef CONFIG_ESP_RMAKER_DISABLE_USER_MAPPING_PROV
-    if (esp_rmaker_user_mapping_prov_init()) {
-        esp_rmaker_deinit_priv_data(esp_rmaker_priv_data);
-        esp_rmaker_priv_data = NULL;
-        ESP_LOGE(TAG, "Could not initialise User-Node mapping.");
-        return ESP_FAIL;
-    }
-#endif /* !CONFIG_ESP_RMAKER_DISABLE_USER_MAPPING_PROV */
-    if (esp_rmaker_mqtt_data_init(esp_rmaker_priv_data, use_claiming) != ESP_OK) {
-        esp_rmaker_deinit_priv_data(esp_rmaker_priv_data);
-        esp_rmaker_priv_data = NULL;
-        ESP_LOGE(TAG, "Failed to initialise MQTT Config. Please perform \"claiming\" using RainMaker CLI.");
-        return ESP_FAIL;
-    } else {
-#ifdef ESP_RMAKER_CLAIM_ENABLED
-        if (!esp_rmaker_priv_data->need_claim)
-#endif /* ESP_RMAKER_CLAIM_ENABLED */
-        {
-            if (esp_rmaker_mqtt_init(esp_rmaker_priv_data->mqtt_config) != ESP_OK) {
-                esp_rmaker_deinit_priv_data(esp_rmaker_priv_data);
-                esp_rmaker_priv_data = NULL;
-                ESP_LOGE(TAG, "Failed to initialise MQTT");
-                return ESP_FAIL;
-            }
-        }
-    }
-#ifdef CONFIG_ESP_RMAKER_LOCAL_CTRL_ENABLE
-    esp_rmaker_init_local_ctrl_service();
-#endif
-    esp_rmaker_priv_data->enable_time_sync = config->enable_time_sync;
-    esp_rmaker_post_event(RMAKER_EVENT_INIT_DONE, NULL, 0);
-    esp_rmaker_priv_data->state = ESP_RMAKER_STATE_INIT_DONE;
-    return ESP_OK;
-}
-
-static esp_err_t esp_rmaker_register_node(const esp_rmaker_node_t *node)
-{
-    ESP_RMAKER_CHECK_HANDLE(ESP_ERR_INVALID_STATE);
-    if (esp_rmaker_priv_data->node) {
-        ESP_LOGE(TAG, "A node has already been registered. Cannot register another.");
-        return ESP_ERR_INVALID_STATE;
-    }
-    if (!node) {
-        ESP_LOGE(TAG, "Node handle cannot be NULL.");
-        return ESP_ERR_INVALID_ARG;
-    }
-    esp_rmaker_priv_data->node = node;
-    return ESP_OK;
-}
-
-esp_rmaker_node_t *esp_rmaker_node_init(const esp_rmaker_config_t *config, const char *name, const char *type)
-{
-    esp_err_t err = esp_rmaker_init(config, true);
-    if (err != ESP_OK) {
-        return NULL;
-    }
-    esp_rmaker_node_t *node = esp_rmaker_node_create(name, type);
-    if (!node) {
-        ESP_LOGE(TAG, "Failed to create node");
-        return NULL;
-    }
-    err = esp_rmaker_register_node(node);
-    if (err != ESP_OK) {
-        free(node);
-        return NULL;
-    }
-    return node;
-}
-
-const esp_rmaker_node_t *esp_rmaker_get_node()
-{
-    ESP_RMAKER_CHECK_HANDLE(NULL);
-    return esp_rmaker_priv_data->node;
-}
-
 static esp_err_t esp_rmaker_report_node_config_and_state()
 {
     if (esp_rmaker_report_node_config() != ESP_OK) {
@@ -345,21 +205,11 @@ static void __esp_rmaker_report_node_config_and_state(void *data)
 
 esp_err_t esp_rmaker_report_node_details()
 {
-    return esp_rmaker_queue_work(__esp_rmaker_report_node_config_and_state, NULL);
+    return esp_rmaker_work_queue_add_task(__esp_rmaker_report_node_config_and_state, NULL);
 }
 
-static void esp_rmaker_handle_work_queue()
-{
-    ESP_RMAKER_CHECK_HANDLE();
-    esp_rmaker_work_queue_entry_t work_queue_entry;
-    BaseType_t ret = xQueueReceive(esp_rmaker_priv_data->work_queue, &work_queue_entry, 0);
-    while (ret == pdTRUE) {
-        work_queue_entry.work_fn(work_queue_entry.priv_data);
-        ret = xQueueReceive(esp_rmaker_priv_data->work_queue, &work_queue_entry, 0);
-    }
-}
 
-static void esp_rmaker_task(void *param)
+static void esp_rmaker_task(void *data)
 {
     ESP_RMAKER_CHECK_HANDLE();
     esp_rmaker_priv_data->state = ESP_RMAKER_STATE_STARTING;
@@ -416,12 +266,12 @@ static void esp_rmaker_task(void *param)
 #endif
 #ifdef ESP_RMAKER_CLAIM_ENABLED
     if (esp_rmaker_priv_data->need_claim) {
-        esp_rmaker_priv_data->mqtt_config = esp_rmaker_get_mqtt_config();
-        if (!esp_rmaker_priv_data->mqtt_config) {
+        esp_rmaker_priv_data->mqtt_conn_params = esp_rmaker_get_mqtt_conn_params();
+        if (!esp_rmaker_priv_data->mqtt_conn_params) {
             ESP_LOGE(TAG, "Failed to initialise MQTT Config after claiming. Aborting");
             goto rmaker_err;
         }
-        err = esp_rmaker_mqtt_init(esp_rmaker_priv_data->mqtt_config);
+        err = esp_rmaker_mqtt_init(esp_rmaker_priv_data->mqtt_conn_params);
         if (err != ESP_OK) {
             ESP_LOGE(TAG, "esp_rmaker_mqtt_init() returned %d. Aborting", err);
             goto rmaker_err;
@@ -450,11 +300,8 @@ static void esp_rmaker_task(void *param)
         ESP_LOGE(TAG, "Aborting!!!");
         goto rmaker_end;
     }
-    while (esp_rmaker_priv_data->state != ESP_RMAKER_STATE_STOP_REQUESTED) {
-        esp_rmaker_handle_work_queue(esp_rmaker_priv_data);
-        /* 2 sec delay to prevent spinning */
-        vTaskDelay(2000 / portTICK_RATE_MS);
-    }
+    return;
+
 rmaker_end:
     esp_rmaker_mqtt_disconnect();
     esp_rmaker_priv_data->mqtt_connected = false;
@@ -464,33 +311,159 @@ rmaker_err:
     }
     wifi_event_group = NULL;
     esp_rmaker_priv_data->state = ESP_RMAKER_STATE_INIT_DONE;
-    vTaskDelete(NULL);
 }
 
-esp_err_t esp_rmaker_queue_work(esp_rmaker_work_fn_t work_fn, void *priv_data)
+
+static esp_err_t esp_rmaker_mqtt_conn_params_init(esp_rmaker_priv_data_t *rmaker_priv_data, bool use_claiming)
 {
-    ESP_RMAKER_CHECK_HANDLE(ESP_ERR_INVALID_STATE);
-    esp_rmaker_work_queue_entry_t work_queue_entry = {
-        .work_fn = work_fn,
-        .priv_data = priv_data,
-    };
-    if (xQueueSend(esp_rmaker_priv_data->work_queue, &work_queue_entry, 0) == pdTRUE) {
+    rmaker_priv_data->mqtt_conn_params = esp_rmaker_get_mqtt_conn_params();
+    if (rmaker_priv_data->mqtt_conn_params) {
         return ESP_OK;
     }
+#ifdef ESP_RMAKER_CLAIM_ENABLED
+    if (use_claiming) {
+#ifdef CONFIG_ESP_RMAKER_SELF_CLAIM
+        rmaker_priv_data->claim_data = esp_rmaker_self_claim_init();
+#endif
+#ifdef CONFIG_ESP_RMAKER_ASSISTED_CLAIM
+        rmaker_priv_data->claim_data = esp_rmaker_assisted_claim_init();
+#endif
+        if (!rmaker_priv_data->claim_data) {
+            ESP_LOGE(TAG, "Failed to initialise Claiming.");
+            return ESP_FAIL;
+        } else {
+            rmaker_priv_data->need_claim = true;
+            return ESP_OK;
+        }
+    }
+#endif /* ESP_RMAKER_CLAIM_ENABLED */
     return ESP_FAIL;
+}
+/* Initialize ESP RainMaker */
+static esp_err_t esp_rmaker_init(const esp_rmaker_config_t *config, bool use_claiming)
+{
+    if (esp_rmaker_priv_data) {
+        ESP_LOGE(TAG, "ESP RainMaker already initialised");
+        return ESP_ERR_INVALID_STATE;
+    }
+    if (!config) {
+        ESP_LOGE(TAG, "RainMaker config missing. Cannot initialise");
+        return ESP_ERR_INVALID_ARG;
+    }
+    if (esp_rmaker_factory_init() != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to initialise storage");
+        return ESP_FAIL;
+    }
+    esp_rmaker_priv_data = calloc(1, sizeof(esp_rmaker_priv_data_t));
+    if (!esp_rmaker_priv_data) {
+        ESP_LOGE(TAG, "Failed to allocate memory");
+        return ESP_ERR_NO_MEM;
+    }
+
+    esp_rmaker_priv_data->node_id = esp_rmaker_populate_node_id(use_claiming);
+    if (!esp_rmaker_priv_data->node_id) {
+        esp_rmaker_deinit_priv_data(esp_rmaker_priv_data);
+        esp_rmaker_priv_data = NULL;
+        ESP_LOGE(TAG, "Failed to initialise Node Id. Please perform \"claiming\" using RainMaker CLI.");
+        return ESP_ERR_NO_MEM;
+    }
+
+    if (esp_rmaker_work_queue_init() != ESP_OK) {
+        esp_rmaker_deinit_priv_data(esp_rmaker_priv_data);
+        esp_rmaker_priv_data = NULL;
+        ESP_LOGE(TAG, "ESP RainMaker Queue Creation Failed");
+        return ESP_ERR_NO_MEM;
+    }
+#ifndef CONFIG_ESP_RMAKER_DISABLE_USER_MAPPING_PROV
+    if (esp_rmaker_user_mapping_prov_init()) {
+        esp_rmaker_deinit_priv_data(esp_rmaker_priv_data);
+        esp_rmaker_priv_data = NULL;
+        ESP_LOGE(TAG, "Could not initialise User-Node mapping.");
+        return ESP_FAIL;
+    }
+#endif /* !CONFIG_ESP_RMAKER_DISABLE_USER_MAPPING_PROV */
+    if (esp_rmaker_mqtt_conn_params_init(esp_rmaker_priv_data, use_claiming) != ESP_OK) {
+        esp_rmaker_deinit_priv_data(esp_rmaker_priv_data);
+        esp_rmaker_priv_data = NULL;
+        ESP_LOGE(TAG, "Failed to initialise MQTT Params. Please perform \"claiming\" using RainMaker CLI.");
+        return ESP_FAIL;
+    } else {
+#ifdef ESP_RMAKER_CLAIM_ENABLED
+        if (!esp_rmaker_priv_data->need_claim)
+#endif /* ESP_RMAKER_CLAIM_ENABLED */
+        {
+            if (esp_rmaker_mqtt_init(esp_rmaker_priv_data->mqtt_conn_params) != ESP_OK) {
+                esp_rmaker_deinit_priv_data(esp_rmaker_priv_data);
+                esp_rmaker_priv_data = NULL;
+                ESP_LOGE(TAG, "Failed to initialise MQTT");
+                return ESP_FAIL;
+            }
+        }
+    }
+#ifdef CONFIG_ESP_RMAKER_LOCAL_CTRL_ENABLE
+    esp_rmaker_init_local_ctrl_service();
+#endif
+    esp_rmaker_priv_data->enable_time_sync = config->enable_time_sync;
+    esp_rmaker_post_event(RMAKER_EVENT_INIT_DONE, NULL, 0);
+    esp_rmaker_priv_data->state = ESP_RMAKER_STATE_INIT_DONE;
+
+    /* Adding the RainMaker Task to the queue so that it is will be the first function
+     * to be executed when the Work Queue task begins.
+     */
+    esp_rmaker_work_queue_add_task(esp_rmaker_task, NULL);
+    return ESP_OK;
+}
+
+static esp_err_t esp_rmaker_register_node(const esp_rmaker_node_t *node)
+{
+    ESP_RMAKER_CHECK_HANDLE(ESP_ERR_INVALID_STATE);
+    if (esp_rmaker_priv_data->node) {
+        ESP_LOGE(TAG, "A node has already been registered. Cannot register another.");
+        return ESP_ERR_INVALID_STATE;
+    }
+    if (!node) {
+        ESP_LOGE(TAG, "Node handle cannot be NULL.");
+        return ESP_ERR_INVALID_ARG;
+    }
+    esp_rmaker_priv_data->node = node;
+    return ESP_OK;
+}
+
+esp_rmaker_node_t *esp_rmaker_node_init(const esp_rmaker_config_t *config, const char *name, const char *type)
+{
+    esp_err_t err = esp_rmaker_init(config, true);
+    if (err != ESP_OK) {
+        return NULL;
+    }
+    esp_rmaker_node_t *node = esp_rmaker_node_create(name, type);
+    if (!node) {
+        ESP_LOGE(TAG, "Failed to create node");
+        return NULL;
+    }
+    err = esp_rmaker_register_node(node);
+    if (err != ESP_OK) {
+        free(node);
+        return NULL;
+    }
+    return node;
+}
+
+const esp_rmaker_node_t *esp_rmaker_get_node()
+{
+    ESP_RMAKER_CHECK_HANDLE(NULL);
+    return esp_rmaker_priv_data->node;
 }
 
 /* Start the ESP RainMaker Core Task */
-esp_err_t esp_rmaker_start()
+esp_err_t esp_rmaker_start(void)
 {
     ESP_RMAKER_CHECK_HANDLE(ESP_ERR_INVALID_STATE);
     if (esp_rmaker_priv_data->enable_time_sync) {
         esp_rmaker_time_sync_init(NULL);
     }
-    ESP_LOGI(TAG, "Starting RainMaker Core Task");
-    if (xTaskCreate(&esp_rmaker_task, "esp_rmaker_task", ESP_RMAKER_TASK_STACK,
-                NULL, ESP_RMAKER_TASK_PRIORITY, NULL) != pdPASS) {
-        ESP_LOGE(TAG, "Couldn't create RainMaker core task");
+    ESP_LOGI(TAG, "Starting RainMaker Work Queue task");
+    if (esp_rmaker_work_queue_start() != ESP_OK) {
+        ESP_LOGE(TAG, "Couldn't create RainMaker Work Queue task");
         return ESP_FAIL;
     }
     return ESP_OK;

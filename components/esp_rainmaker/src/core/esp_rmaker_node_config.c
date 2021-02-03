@@ -248,7 +248,8 @@ esp_err_t esp_rmaker_report_node_config()
     char publish_topic[100];
     snprintf(publish_topic, sizeof(publish_topic), "node/%s/%s", esp_rmaker_get_node_id(), NODE_CONFIG_TOPIC_SUFFIX);
     ESP_LOGI(TAG, "Reporting Node Configuration");
-    esp_err_t ret = esp_rmaker_mqtt_publish(publish_topic, publish_payload, strlen(publish_payload));
+    esp_err_t ret = esp_rmaker_mqtt_publish(publish_topic, publish_payload, strlen(publish_payload),
+                        RMAKER_MQTT_QOS1, NULL);
     free(publish_payload);
     return ret;
 }

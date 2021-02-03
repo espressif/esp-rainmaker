@@ -26,7 +26,7 @@ Please clone this repository using the below command:
 git clone --recursive https://github.com/espressif/esp-rainmaker.git
 ```
 
-> Note the --recursive option. This is required to pull in the JSON dependencies into esp-rainmaker. In case you have already cloned the repository without this option, execute this to pull in the submodules: `git submodule update --init --recursive`
+> Note the --recursive option. This is required to pull in the various dependencies into esp-rainmaker. In case you have already cloned the repository without this option, execute this to pull in the submodules: `git submodule update --init --recursive`
 
 Please check the ESP RainMaker documentation [here](https://rainmaker.espressif.com/docs/get-started.html) to get started.
 

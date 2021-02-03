@@ -13,7 +13,7 @@
 // limitations under the License.
 #pragma once
 #include <stdint.h>
-#include <esp_rmaker_mqtt.h>
+#include <esp_rmaker_mqtt_glue.h>
 
 #define ESP_RMAKER_CLIENT_CERT_NVS_KEY   "client_cert"
 #define ESP_RMAKER_CLIENT_KEY_NVS_KEY    "client_key"
@@ -25,5 +25,5 @@ char *esp_rmaker_get_client_cert();
 char *esp_rmaker_get_client_key();
 char *esp_rmaker_get_client_csr();
 char *esp_rmaker_get_mqtt_host();
-esp_rmaker_mqtt_config_t *esp_rmaker_get_mqtt_config();
-void esp_rmaker_clean_mqtt_config(esp_rmaker_mqtt_config_t *mqtt_config);
+esp_rmaker_mqtt_conn_params_t *esp_rmaker_get_mqtt_conn_params();
+void esp_rmaker_clean_mqtt_conn_params(esp_rmaker_mqtt_conn_params_t *mqtt_conn_params);

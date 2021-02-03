@@ -19,6 +19,7 @@
 #include <freertos/FreeRTOS.h>
 #include <freertos/timers.h>
 #include <json_parser.h>
+#include <esp_rmaker_work_queue.h>
 #include <esp_rmaker_core.h>
 #include <esp_rmaker_utils.h>
 #include <esp_rmaker_internal.h>
@@ -26,7 +27,6 @@
 #include <esp_rmaker_standard_types.h>
 #include <esp_rmaker_schedule.h>
 #include <esp_schedule.h>
-
 
 #define MAX_ID_LEN 8
 #define MAX_NAME_LEN 32
@@ -293,7 +293,7 @@ static void esp_rmaker_schedule_trigger_work_cb(void *priv_data)
 static void esp_rmaker_schedule_trigger_common_cb(esp_schedule_handle_t handle, void *priv_data)
 {
     /* Adding to work queue to change the context from timer's task. */
-    esp_rmaker_queue_work(esp_rmaker_schedule_trigger_work_cb, priv_data);
+    esp_rmaker_work_queue_add_task(esp_rmaker_schedule_trigger_work_cb, priv_data);
 }
 
 static void esp_rmaker_schedule_timestamp_common_cb(esp_schedule_handle_t handle, uint32_t next_timestamp, void *priv_data)
@@ -418,7 +418,7 @@ static void esp_rmaker_schedule_timesync_timer_work_cb(void *priv_data)
 
 static void esp_rmaker_schedule_timesync_timer_cb(TimerHandle_t timer)
 {
-    esp_rmaker_queue_work(esp_rmaker_schedule_timesync_timer_work_cb, NULL);
+    esp_rmaker_work_queue_add_task(esp_rmaker_schedule_timesync_timer_work_cb, NULL);
 }
 
 static esp_err_t esp_rmaker_schedule_timesync_timer_init(void)

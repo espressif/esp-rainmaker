@@ -22,6 +22,8 @@
 #include <esp_rmaker_schedule.h>
 #include <esp_rmaker_console.h>
 
+#include <esp_rmaker_common_events.h>
+
 #include <app_wifi.h>
 
 #include "app_priv.h"
@@ -63,6 +65,11 @@ static void event_handler(void* arg, esp_event_base_t event_base,
             case RMAKER_EVENT_CLAIM_FAILED:
                 ESP_LOGI(TAG, "RainMaker Claim Failed.");
                 break;
+            default:
+                ESP_LOGW(TAG, "Unhandled RainMaker Event: %d", event_id);
+        }
+    } else if (event_base == RMAKER_COMMON_EVENT) {
+        switch (event_id) {
             case RMAKER_EVENT_REBOOT:
                 ESP_LOGI(TAG, "Rebooting in %d seconds.", *((uint8_t *)event_data));
                 break;
@@ -72,17 +79,17 @@ static void event_handler(void* arg, esp_event_base_t event_base,
             case RMAKER_EVENT_FACTORY_RESET:
                 ESP_LOGI(TAG, "Node reset to factory defaults.");
                 break;
-            case RMAKER_EVENT_MQTT_CONNECTED:
+            case RMAKER_MQTT_EVENT_CONNECTED:
                 ESP_LOGI(TAG, "MQTT Connected.");
                 break;
-            case RMAKER_EVENT_MQTT_DISCONNECTED:
+            case RMAKER_MQTT_EVENT_DISCONNECTED:
                 ESP_LOGI(TAG, "MQTT Disconnected.");
                 break;
-            case RMAKER_EVENT_MQTT_PUBLISHED:
+            case RMAKER_MQTT_EVENT_PUBLISHED:
                 ESP_LOGI(TAG, "MQTT Published. Msg id: %d.", *((int *)event_data));
                 break;
             default:
-                ESP_LOGW(TAG, "Unhandled RainMaker Event: %d", event_id);
+                ESP_LOGW(TAG, "Unhandled RainMaker Common Event: %d", event_id);
         }
     } else {
         ESP_LOGW(TAG, "Invalid event received!");

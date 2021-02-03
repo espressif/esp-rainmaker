@@ -67,11 +67,6 @@ struct esp_rmaker_device {
 typedef struct esp_rmaker_device _esp_rmaker_device_t;
 
 typedef struct {
-    esp_rmaker_work_fn_t work_fn;
-    void *priv_data;
-} esp_rmaker_work_queue_entry_t;
-
-typedef struct {
     char *node_id;
     esp_rmaker_node_info_t *info;
     esp_rmaker_attr_t *attributes;
@@ -88,7 +83,6 @@ _esp_rmaker_device_t *esp_rmaker_node_get_first_device(const esp_rmaker_node_t *
 esp_rmaker_attr_t *esp_rmaker_node_get_first_attribute(const esp_rmaker_node_t *node);
 esp_err_t esp_rmaker_register_for_set_params(void);
 esp_err_t esp_rmaker_report_param_internal(void);
-esp_err_t esp_rmaker_queue_report_param(esp_rmaker_work_fn_t work_fn, void *priv_data);
 esp_err_t esp_rmaker_param_get_stored_value(_esp_rmaker_param_t *param, esp_rmaker_param_val_t *val);
 esp_err_t esp_rmaker_param_store_value(_esp_rmaker_param_t *param);
 esp_err_t esp_rmaker_node_delete(const esp_rmaker_node_t *node);

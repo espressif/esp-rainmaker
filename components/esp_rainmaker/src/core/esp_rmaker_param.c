@@ -169,7 +169,7 @@ esp_err_t esp_rmaker_report_param_internal(void)
             snprintf(publish_topic, sizeof(publish_topic), "node/%s/%s",
                     esp_rmaker_get_node_id(), NODE_PARAMS_LOCAL_TOPIC_SUFFIX);
             ESP_LOGI(TAG, "Reporting params: %s", publish_payload);
-            esp_rmaker_mqtt_publish(publish_topic, publish_payload, strlen(publish_payload));
+            esp_rmaker_mqtt_publish(publish_topic, publish_payload, strlen(publish_payload), RMAKER_MQTT_QOS1, NULL);
         }
         return ESP_OK;
     }
@@ -187,7 +187,7 @@ esp_err_t esp_rmaker_report_node_state(void)
             snprintf(publish_topic, sizeof(publish_topic), "node/%s/%s",
                     esp_rmaker_get_node_id(), NODE_PARAMS_LOCAL_INIT_TOPIC_SUFFIX);
             ESP_LOGI(TAG, "Reporting params (init): %s", publish_payload);
-            esp_rmaker_mqtt_publish(publish_topic, publish_payload, strlen(publish_payload));
+            esp_rmaker_mqtt_publish(publish_topic, publish_payload, strlen(publish_payload), RMAKER_MQTT_QOS1, NULL);
         }
         return ESP_OK;
     }
@@ -320,7 +320,7 @@ esp_err_t esp_rmaker_register_for_set_params(void)
     char subscribe_topic[100];
     snprintf(subscribe_topic, sizeof(subscribe_topic), "node/%s/%s",
                 esp_rmaker_get_node_id(), NODE_PARAMS_REMOTE_TOPIC_SUFFIX);
-    esp_err_t err = esp_rmaker_mqtt_subscribe(subscribe_topic, esp_rmaker_set_params_callback, NULL);
+    esp_err_t err = esp_rmaker_mqtt_subscribe(subscribe_topic, esp_rmaker_set_params_callback, RMAKER_MQTT_QOS1, NULL);
     if(err != ESP_OK) {
         ESP_LOGE(TAG, "Failed to subscribe to %s. Error %d", subscribe_topic, err);
         return ESP_FAIL;
