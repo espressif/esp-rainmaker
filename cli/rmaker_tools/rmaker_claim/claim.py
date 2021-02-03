@@ -234,27 +234,27 @@ def save_claim_data(dest_filedir, node_id, private_key, node_cert, endpointinfo,
                   'node.info')
         # Create files for each claim data - node info, node key,
         # node cert, endpoint info
-        with open(dest_filedir+'node.info', 'w+') as info_file:
+        with open(str(dest_filedir+'node.info'), 'w+') as info_file:
             info_file.write(node_id)
 
         log.debug("Writing node info at location: " +
                   dest_filedir + 'node.key')
-        with open(dest_filedir+'node.key', 'wb+') as info_file:
+        with open(str(dest_filedir+'node.key'), 'wb+') as info_file:
             info_file.write(private_key)
 
         log.debug("Writing node info at location: " +
                   dest_filedir + 'node.crt')
-        with open(dest_filedir+'node.crt', 'w+') as info_file:
+        with open(str(dest_filedir+'node.crt'), 'w+') as info_file:
             info_file.write(node_cert)
 
         log.debug("Writing node info at location: " +
                   dest_filedir + 'endpoint.info')
-        with open(dest_filedir+'endpoint.info', 'w+') as info_file:
+        with open(str(dest_filedir+'endpoint.info'), 'w+') as info_file:
             info_file.write(endpointinfo)
 
         log.debug("Writing node info at location: " +
                   dest_filedir + 'node_info.csv')
-        with open(dest_filedir+'node_info.csv', 'w+') as info_file:
+        with open(str(dest_filedir+'node_info.csv'), 'w+') as info_file:
             for input_line in node_info_csv:
                 info_file.write(input_line)
                 info_file.write("\n")
@@ -413,19 +413,19 @@ def generate_private_key():
     return private_key, private_key_bytes
 
 def verify_mac_dir_exists(creds_dir, mac_addr):
-    mac_dir = Path(path.expanduser(str(creds_dir) + '/' + mac_addr))
+    mac_dir = Path(path.expanduser(str(creds_dir) + '/' + str(mac_addr)))
     if mac_dir.exists():
         dest_filedir = str(mac_dir) + '/'
-        output_bin_filename = mac_addr + '.bin'
+        output_bin_filename = str(mac_addr) + '.bin'
         return dest_filedir, output_bin_filename
     return False, False
 
 def create_mac_dir(creds_dir, mac_addr):
     # Create MAC directory
-    mac_dir = Path(path.expanduser(str(creds_dir) + '/' + mac_addr))
-    os.makedirs(path.expanduser(mac_dir))
+    mac_dir = Path(path.expanduser(str(creds_dir) + '/' + str(mac_addr)))
+    os.makedirs(path.expanduser(str(mac_dir)))
     log.debug("Creating new directory " + str(mac_dir))
-    output_bin_filename = mac_addr + '.bin'
+    output_bin_filename = str(mac_addr) + '.bin'
     dest_filedir = str(mac_dir) + '/'
     return dest_filedir, output_bin_filename
 
@@ -439,10 +439,10 @@ def create_config_dir():
         str(Path(path.expanduser(
             configmanager.CONFIG_DIRECTORY))) +
         '/claim_data/' +
-        userid
+        str(userid)
         ))
     if not creds_dir.exists():
-        os.makedirs(path.expanduser(creds_dir))
+        os.makedirs(path.expanduser(str(creds_dir)))
         log.debug("Creating new directory " + str(creds_dir))
     return userid, creds_dir
 
@@ -459,10 +459,10 @@ def verify_claim_data_binary_exists(userid, mac_addr, dest_filedir, output_bin_f
     # Set config mac addr path
     mac_addr_config_path = str(Path(path.expanduser(
         configmanager.CONFIG_DIRECTORY))) + '/claim_data/' +\
-        userid +\
+        str(userid) +\
         '/' +\
-        mac_addr +\
-        '/' + output_bin_filename
+        str(mac_addr) +\
+        '/' + str(output_bin_filename)
     # Check if claim data for node exists in CONFIG directory
     log.debug("Checking if claim data for node exists in directory: " +
             configmanager.HOME_DIRECTORY +
