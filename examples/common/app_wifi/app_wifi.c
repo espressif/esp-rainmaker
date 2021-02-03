@@ -163,7 +163,7 @@ static void wifi_init_sta()
     ESP_ERROR_CHECK(esp_wifi_start());
 }
 
-/* free the return value after use. */
+/* Free random_bytes after use only if function returns ESP_OK */
 static esp_err_t read_random_bytes_from_nvs(uint8_t **random_bytes, size_t *len)
 {
     nvs_handle handle;
@@ -194,7 +194,7 @@ static esp_err_t read_random_bytes_from_nvs(uint8_t **random_bytes, size_t *len)
 
 static esp_err_t get_device_service_name(char *service_name, size_t max)
 {
-    uint8_t *nvs_random;
+    uint8_t *nvs_random = NULL;
     const char *ssid_prefix = "PROV_";
     size_t nvs_random_size = 0;
     if ((read_random_bytes_from_nvs(&nvs_random, &nvs_random_size) != ESP_OK) || nvs_random_size < 3) {
