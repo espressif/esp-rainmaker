@@ -6,7 +6,7 @@ Follow the ESP RainMaker Documentation [Get Started](https://rainmaker.espressif
 
 ## What to expect in this example?
 
-- This example uses esp timer and the RGB LED on the ESP32-S2-Saola-1 board to demonstrate a temperature sensor.
+- This example uses esp timer and the RGB LED on the ESP32-S2-Saola-1/ESP32-C3-DevKitC board to demonstrate a temperature sensor.
 - The temperature value is changed by 0.5 every minute.
 - It starts at some default value (25.0) and goes on increasing till 99.5. Then it starts reducing till it comes to 0.5. The cycle keeps repeating.
 - The LED color indicates the temperature.

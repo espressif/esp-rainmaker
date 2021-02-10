@@ -165,7 +165,6 @@ esp_err_t app_homekit_start(bool init_state)
      * and hap_set_setup_id() APIs, as has been done here.
      */
 #ifdef CONFIG_EXAMPLE_USE_HARDCODED_SETUP_CODE
-#define QRCODE_BASE_URL     "https://api.qrserver.com/v1/create-qr-code/"
     /* Unique Setup code of the format xxx-xx-xxx. Default: 111-22-333 */
     hap_set_setup_code(CONFIG_EXAMPLE_SETUP_CODE);
     /* Unique four character Setup Id. Default: ES32 */

@@ -60,7 +60,7 @@ void app_main()
     esp_rmaker_config_t rainmaker_cfg = {
         .enable_time_sync = false,
     };
-    esp_rmaker_node_t *node = esp_rmaker_node_init(&rainmaker_cfg, "ESP RainMaker Device", "ESP32-S2-Saola-1");
+    esp_rmaker_node_t *node = esp_rmaker_node_init(&rainmaker_cfg, "ESP RainMaker Device", "GPIO-Device");
     if (!node) {
         ESP_LOGE(TAG, "Could not initialise node. Aborting!!!");
         vTaskDelay(5000/portTICK_PERIOD_MS);
@@ -68,7 +68,7 @@ void app_main()
     }
 
     /* Create a device and add the relevant parameters to it */
-    esp_rmaker_device_t *gpio_device = esp_rmaker_device_create("ESP32-S2-Saola-1", NULL, NULL);
+    esp_rmaker_device_t *gpio_device = esp_rmaker_device_create("GPIO-Device", NULL, NULL);
     esp_rmaker_device_add_cb(gpio_device, write_cb, NULL);
 
     esp_rmaker_param_t *red_param = esp_rmaker_param_create("Red", NULL, esp_rmaker_bool(false), PROP_FLAG_READ | PROP_FLAG_WRITE);
