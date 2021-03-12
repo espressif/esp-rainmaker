@@ -120,7 +120,7 @@ esp_err_t esp_rmaker_change_node_id(char *node_id, size_t len)
 
 /* Event handler for catching system events */
 static void esp_rmaker_event_handler(void* arg, esp_event_base_t event_base,
-                          int event_id, void* event_data)
+                          int32_t event_id, void* event_data)
 {
     if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP) {
 #ifdef CONFIG_ESP_RMAKER_ASSISTED_CLAIM

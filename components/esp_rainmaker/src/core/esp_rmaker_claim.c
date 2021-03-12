@@ -765,7 +765,7 @@ esp_err_t esp_rmaker_claiming_handler(uint32_t session_id, const uint8_t *inbuf,
 }
 #define CLAIM_ENDPOINT      "rmaker_claim"
 static void event_handler(void* arg, esp_event_base_t event_base,
-                          int event_id, void* event_data)
+                          int32_t event_id, void* event_data)
 {
     if (event_base == WIFI_PROV_EVENT) {
         switch (event_id) {

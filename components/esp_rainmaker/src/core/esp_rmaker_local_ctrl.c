@@ -186,7 +186,7 @@ static esp_err_t __esp_rmaker_start_local_ctrl_service(const char *serv_name)
 }
 
 static void esp_rmaker_local_ctrl_prov_event_handler(void* arg, esp_event_base_t event_base,
-                          int event_id, void* event_data)
+                          int32_t event_id, void* event_data)
 {
     ESP_LOGI(TAG, "Event %d", event_id);
     if (event_base == WIFI_PROV_EVENT) {

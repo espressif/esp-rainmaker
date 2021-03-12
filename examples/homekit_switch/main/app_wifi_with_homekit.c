@@ -69,7 +69,7 @@ static void app_wifi_print_qr(const char *name, const char *pop, const char *tra
 
 /* Event handler for catching system events */
 static void event_handler(void* arg, esp_event_base_t event_base,
-                          int event_id, void* event_data)
+                          int32_t event_id, void* event_data)
 {
     if (event_base == WIFI_PROV_EVENT) {
         switch (event_id) {
