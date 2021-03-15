@@ -48,7 +48,7 @@ static void esp_rmaker_user_mapping_cleanup_data(esp_rmaker_user_mapping_data_t 
 }
 
 static void esp_rmaker_user_mapping_event_handler(void* arg, esp_event_base_t event_base,
-                          int event_id, void* event_data)
+                          int32_t event_id, void* event_data)
 {
     if (event_base == WIFI_PROV_EVENT) {
         switch (event_id) {

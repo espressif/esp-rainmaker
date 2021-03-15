@@ -49,7 +49,7 @@ static esp_err_t write_cb(const esp_rmaker_device_t *device, const esp_rmaker_pa
 }
 /* Event handler for catching RainMaker events */
 static void event_handler(void* arg, esp_event_base_t event_base,
-                          int event_id, void* event_data)
+                          int32_t event_id, void* event_data)
 {
     if (event_base == RMAKER_EVENT) {
         switch (event_id) {
