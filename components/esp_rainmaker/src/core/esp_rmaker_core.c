@@ -282,7 +282,7 @@ static void esp_rmaker_task(void *data)
 #ifdef CONFIG_ESP_RMAKER_LOCAL_CTRL_ENABLE
     if (esp_rmaker_start_local_ctrl_service(esp_rmaker_get_node_id()) != ESP_OK) {
         ESP_LOGE(TAG, "Failed to start local control service. Aborting!!!");
-        vTaskDelete(NULL);
+        goto rmaker_err;
     }
 #endif /* CONFIG_ESP_RMAKER_LOCAL_CTRL_ENABLE */
     err = esp_rmaker_mqtt_connect();
