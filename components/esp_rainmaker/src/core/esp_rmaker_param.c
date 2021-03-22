@@ -601,7 +601,8 @@ esp_err_t esp_rmaker_param_report(const esp_rmaker_param_t *param)
 esp_err_t esp_rmaker_param_update_and_report(const esp_rmaker_param_t *param, esp_rmaker_param_val_t val)
 {
     esp_err_t err = esp_rmaker_param_update(param, val);
-    if (err == ESP_OK) {
+    /** Report parameter only if the RainMaker has started */
+    if ((err == ESP_OK) && (esp_rmaker_get_state() == ESP_RMAKER_STATE_STARTED)) {
         err = esp_rmaker_param_report(param);
     }
     return err;

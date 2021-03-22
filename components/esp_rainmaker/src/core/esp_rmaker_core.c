@@ -53,14 +53,6 @@ static const char *TAG = "esp_rmaker_core";
 
 #define ESP_CLAIM_NODE_ID_SIZE  12
 
-typedef enum {
-    ESP_RMAKER_STATE_DEINIT = 0,
-    ESP_RMAKER_STATE_INIT_DONE,
-    ESP_RMAKER_STATE_STARTING,
-    ESP_RMAKER_STATE_STARTED,
-    ESP_RMAKER_STATE_STOP_REQUESTED,
-} esp_rmaker_state_t;
-
 /* Handle to maintain internal information (will move to an internal file) */
 typedef struct {
     char *node_id;
@@ -77,6 +69,14 @@ typedef struct {
 } esp_rmaker_priv_data_t;
 
 static esp_rmaker_priv_data_t *esp_rmaker_priv_data;
+
+esp_rmaker_state_t esp_rmaker_get_state(void)
+{
+    if (esp_rmaker_priv_data) {
+        return esp_rmaker_priv_data->state;
+    }
+    return ESP_RMAKER_STATE_DEINIT;
+}
 
 static char *esp_rmaker_populate_node_id(bool use_claiming)
 {
