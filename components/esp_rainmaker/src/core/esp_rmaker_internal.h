@@ -18,6 +18,15 @@
 #include <json_generator.h>
 #include <esp_rmaker_core.h>
 #define RMAKER_PARAM_FLAG_VALUE_CHANGE   0x01
+
+typedef enum {
+    ESP_RMAKER_STATE_DEINIT = 0,
+    ESP_RMAKER_STATE_INIT_DONE,
+    ESP_RMAKER_STATE_STARTING,
+    ESP_RMAKER_STATE_STARTED,
+    ESP_RMAKER_STATE_STOP_REQUESTED,
+} esp_rmaker_state_t;
+
 typedef struct {
     esp_rmaker_param_val_t min;
     esp_rmaker_param_val_t max;
@@ -99,3 +108,4 @@ static inline esp_err_t esp_rmaker_post_event(esp_rmaker_event_t event_id, void*
 {
     return esp_event_post(RMAKER_EVENT, event_id, data, data_size, portMAX_DELAY);
 }
+esp_rmaker_state_t esp_rmaker_get_state(void);

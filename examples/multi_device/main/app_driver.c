@@ -7,6 +7,8 @@
 */
 
 #include <sdkconfig.h>
+#include <freertos/FreeRTOS.h>
+#include <freertos/timers.h>
 
 #include <iot_button.h>
 #include <esp_rmaker_core.h>
@@ -33,7 +35,7 @@
 
 static bool g_power_state = DEFAULT_SWITCH_POWER;
 static float g_temperature = DEFAULT_TEMPERATURE;
-static esp_timer_handle_t sensor_timer;
+static TimerHandle_t sensor_timer;
 
 static void app_sensor_update(void *priv)
 {
@@ -57,13 +59,10 @@ float app_get_current_temperature()
 esp_err_t app_sensor_init(void)
 {
     g_temperature = DEFAULT_TEMPERATURE;
-    esp_timer_create_args_t sensor_timer_conf = {
-        .callback = app_sensor_update,
-        .dispatch_method = ESP_TIMER_TASK,
-        .name = "app_sensor_update_tm"
-    };
-    if (esp_timer_create(&sensor_timer_conf, &sensor_timer) == ESP_OK) {
-        esp_timer_start_periodic(sensor_timer, REPORTING_PERIOD * 1000000U);
+    sensor_timer = xTimerCreate("app_sensor_update_tm", (REPORTING_PERIOD * 1000) / portTICK_PERIOD_MS,
+                            pdTRUE, NULL, app_sensor_update);
+    if (sensor_timer) {
+        xTimerStart(sensor_timer, 0);
         return ESP_OK;
     }
     return ESP_FAIL;

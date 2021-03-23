@@ -7,6 +7,8 @@
    CONDITIONS OF ANY KIND, either express or implied.
 */
 
+#include <freertos/FreeRTOS.h>
+#include <freertos/timers.h>
 #include <sdkconfig.h>
 #include <esp_rmaker_core.h>
 #include <esp_rmaker_standard_types.h> 
@@ -22,7 +24,7 @@
 /* This is the GPIO on which the power will be set */
 #define OUTPUT_GPIO    19
 
-static esp_timer_handle_t sensor_timer;
+static TimerHandle_t sensor_timer;
 
 #define DEFAULT_SATURATION  100
 #define DEFAULT_BRIGHTNESS  50
@@ -35,7 +37,7 @@ static uint16_t g_saturation = DEFAULT_SATURATION;
 static uint16_t g_value = DEFAULT_BRIGHTNESS;
 static float g_temperature;
 
-static void app_sensor_update(void *priv)
+static void app_sensor_update(TimerHandle_t handle)
 {
     static float delta = 0.5;
     g_temperature += delta;
@@ -62,14 +64,12 @@ esp_err_t app_sensor_init(void)
     if (err != ESP_OK) {
         return err;
     }
+
     g_temperature = DEFAULT_TEMPERATURE;
-    esp_timer_create_args_t sensor_timer_conf = {
-        .callback = app_sensor_update,
-        .dispatch_method = ESP_TIMER_TASK,
-        .name = "app_sensor_update_tm"
-    };
-    if (esp_timer_create(&sensor_timer_conf, &sensor_timer) == ESP_OK) {
-        esp_timer_start_periodic(sensor_timer, REPORTING_PERIOD * 1000000U);
+    sensor_timer = xTimerCreate("app_sensor_update_tm", (REPORTING_PERIOD * 1000) / portTICK_PERIOD_MS,
+                            pdTRUE, NULL, app_sensor_update);
+    if (sensor_timer) {
+        xTimerStart(sensor_timer, 0);
         g_hue = (100 - g_temperature) * 2;
         ws2812_led_set_hsv(g_hue, g_saturation, g_value);
         return ESP_OK;
