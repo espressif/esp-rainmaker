@@ -104,7 +104,7 @@ typedef struct {
      * The certificate to be passed to the OTA callback for server authentication.
      * This is mandatory, unless you have disabled it in ESP HTTPS OTA config option.
      * If you are using the ESP RainMaker OTA Service, you can just set this to
-     * `ESP_RMAKER_DEFAULT_OTA_SERVER_CERT`.
+     * `ESP_RMAKER_OTA_DEFAULT_SERVER_CERT`.
      */
     const char *server_cert;
     /** Private Data.
