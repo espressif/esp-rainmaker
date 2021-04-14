@@ -144,7 +144,6 @@ static esp_err_t esp_rmaker_ota_default_cb(esp_rmaker_ota_handle_t ota_handle, e
         .buffer_size = DEF_HTTP_BUFFER_SIZE,
         .buffer_size_tx = buffer_size_tx
     };
-    config.skip_cert_common_name_check = true;
 #ifdef CONFIG_ESP_RMAKER_SKIP_COMMON_NAME_CHECK
     config.skip_cert_common_name_check = true;
 #endif
