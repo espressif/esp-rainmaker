@@ -160,3 +160,24 @@ esp_rmaker_param_t *esp_rmaker_schedules_param_create(const char *param_name, in
     esp_rmaker_param_add_array_max_count(param, max_schedules);
     return param;
 }
+
+esp_rmaker_param_t *esp_rmaker_reboot_param_create(const char *param_name)
+{
+    esp_rmaker_param_t *param = esp_rmaker_param_create(param_name, ESP_RMAKER_PARAM_REBOOT,
+            esp_rmaker_bool(false), PROP_FLAG_READ | PROP_FLAG_WRITE);
+    return param;
+}
+
+esp_rmaker_param_t *esp_rmaker_factory_reset_param_create(const char *param_name)
+{
+    esp_rmaker_param_t *param = esp_rmaker_param_create(param_name, ESP_RMAKER_PARAM_FACTORY_RESET,
+            esp_rmaker_bool(false), PROP_FLAG_READ | PROP_FLAG_WRITE);
+    return param;
+}
+
+esp_rmaker_param_t *esp_rmaker_wifi_reset_param_create(const char *param_name)
+{
+    esp_rmaker_param_t *param = esp_rmaker_param_create(param_name, ESP_RMAKER_PARAM_WIFI_RESET,
+            esp_rmaker_bool(false), PROP_FLAG_READ | PROP_FLAG_WRITE);
+    return param;
+}

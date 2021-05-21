@@ -63,6 +63,8 @@ static esp_err_t esp_rmaker_time_add_service(const char *tz, const char *tz_posi
     esp_err_t err = esp_rmaker_node_add_device(esp_rmaker_get_node(), service);
     if (err == ESP_OK) {
         ESP_LOGI(TAG, "Time service enabled");
+    } else {
+        esp_rmaker_device_delete(service);
     }
     return err;
 }
