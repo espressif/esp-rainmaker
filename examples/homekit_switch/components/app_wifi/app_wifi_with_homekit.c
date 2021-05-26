@@ -35,7 +35,11 @@
 #include <qrcode.h>
 #include <nvs.h>
 #include <nvs_flash.h>
-#include "app_wifi.h"
+#include "app_wifi_with_homekit.h"
+
+#ifdef CONFIG_APP_WIFI_USE_WAC_PROVISIONING
+#include <hap_wac.h>
+#endif /* CONFIG_APP_WIFI_USE_WAC_PROVISIONING */
 
 static const char *TAG = "app_wifi";
 static const int WIFI_CONNECTED_EVENT = BIT0;
@@ -67,6 +71,28 @@ static void app_wifi_print_qr(const char *name, const char *pop, const char *tra
     ESP_LOGI(TAG, "If QR code is not visible, copy paste the below URL in a browser.\n%s?data=%s", QRCODE_BASE_URL, payload);
 }
 
+#ifdef CONFIG_APP_WIFI_USE_WAC_PROVISIONING
+#ifdef CONFIG_APP_WIFI_PROV_TRANSPORT_SOFTAP
+static void app_wac_softap_start(char *ssid)
+{
+}
+#else
+static void app_wac_softap_start(char *ssid)
+{
+    hap_wifi_softap_start(ssid);
+}
+#endif /* ! CONFIG_APP_WIFI_PROV_TRANSPORT_SOFTAP */
+static void app_wac_softap_stop(void)
+{
+    hap_wifi_softap_stop();
+}
+static void app_wac_sta_connect(wifi_config_t *wifi_cfg)
+{
+    wifi_prov_mgr_configure_sta(wifi_cfg);
+}
+#endif /* CONFIG_APP_WIFI_USE_WAC_PROVISIONING */
+
+
 /* Event handler for catching system events */
 static void event_handler(void* arg, esp_event_base_t event_base,
                           int32_t event_id, void* event_data)
@@ -96,6 +122,9 @@ static void event_handler(void* arg, esp_event_base_t event_base,
                 ESP_LOGI(TAG, "Provisioning successful");
                 break;
             case WIFI_PROV_END:
+#ifdef CONFIG_APP_WIFI_USE_WAC_PROVISIONING
+                hap_wac_stop();
+#endif
                 /* De-initialize manager once provisioning is finished */
                 wifi_prov_mgr_deinit();
                 break;
@@ -104,14 +133,42 @@ static void event_handler(void* arg, esp_event_base_t event_base,
         }
     } else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_START) {
         esp_wifi_connect();
+    } else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_CONNECTED) {
+#ifdef ESP_NETIF_SUPPORTED
+        esp_netif_create_ip6_linklocal((esp_netif_t *)arg);
+#else
+        tcpip_adapter_create_ip6_linklocal(TCPIP_ADAPTER_IF_STA);
+#endif
     } else if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP) {
         ip_event_got_ip_t* event = (ip_event_got_ip_t*) event_data;
         ESP_LOGI(TAG, "Connected with IP Address:" IPSTR, IP2STR(&event->ip_info.ip));
         /* Signal main application to continue execution */
         xEventGroupSetBits(wifi_event_group, WIFI_CONNECTED_EVENT);
+    } else if (event_base == IP_EVENT && event_id == IP_EVENT_GOT_IP6) {
+        ip_event_got_ip6_t *event = (ip_event_got_ip6_t *)event_data;
+        ESP_LOGI(TAG, "Connected with IPv6 Address:" IPV6STR, IPV62STR(event->ip6_info.ip));
     } else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_DISCONNECTED) {
         ESP_LOGI(TAG, "Disconnected. Connecting to the AP again...");
         esp_wifi_connect();
+#ifdef CONFIG_APP_WIFI_USE_WAC_PROVISIONING
+    } else if (event_base == HAP_WAC_EVENT) {
+        switch (event_id) {
+            case HAP_WAC_EVENT_REQ_SOFTAP_START:
+                app_wac_softap_start((char *)event_data);
+                break;
+            case HAP_WAC_EVENT_REQ_SOFTAP_STOP:
+                app_wac_softap_stop();
+                break;
+            case HAP_WAC_EVENT_RECV_CRED:
+                app_wac_sta_connect((wifi_config_t *)event_data);
+                break;
+            case HAP_WAC_EVENT_STOPPED:
+                ESP_LOGI(TAG, "WAC Stopped");
+                break;
+            default:
+                break;
+        }
+#endif /* CONFIG_APP_WIFI_USE_WAC_PROVISIONING */
     }
 }
 
@@ -120,44 +177,54 @@ static void wifi_init_sta()
     ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
     ESP_ERROR_CHECK(esp_wifi_start());
 }
-
-static void get_device_service_name(char *service_name, size_t max)
-{
-    uint8_t eth_mac[6];
-    const char *ssid_prefix = "PROV_";
-    esp_wifi_get_mac(WIFI_IF_STA, eth_mac);
-    snprintf(service_name, max, "%s%02X%02X%02X",
-             ssid_prefix, eth_mac[3], eth_mac[4], eth_mac[5]);
-}
-
-/* free the return value after use. */
-static char *read_random_bytes_from_nvs()
+/* Free random_bytes after use only if function returns ESP_OK */
+static esp_err_t read_random_bytes_from_nvs(uint8_t **random_bytes, size_t *len)
 {
     nvs_handle handle;
     esp_err_t err;
-    size_t required_size = 0;
-    void *value;
+    *len = 0;
 
     if ((err = nvs_open_from_partition(CONFIG_ESP_RMAKER_FACTORY_PARTITION_NAME, CREDENTIALS_NAMESPACE,
                                 NVS_READONLY, &handle)) != ESP_OK) {
         ESP_LOGD(TAG, "NVS open for %s %s %s failed with error %d", CONFIG_ESP_RMAKER_FACTORY_PARTITION_NAME, CREDENTIALS_NAMESPACE, RANDOM_NVS_KEY, err);
-        return NULL;
+        return ESP_FAIL;
     }
 
-    if ((err = nvs_get_blob(handle, RANDOM_NVS_KEY, NULL, &required_size)) != ESP_OK) {
-        ESP_LOGD(TAG, "Failed to read key %s with error %d size %d", RANDOM_NVS_KEY, err, required_size);
+    if ((err = nvs_get_blob(handle, RANDOM_NVS_KEY, NULL, len)) != ESP_OK) {
+        ESP_LOGD(TAG, "Error %d. Failed to read key %s.", err, RANDOM_NVS_KEY);
         nvs_close(handle);
-        return NULL;
+        return ESP_ERR_NOT_FOUND;
     }
 
-    value = calloc(required_size + 1, 1); /* + 1 for NULL termination */
-    if (value) {
-        nvs_get_blob(handle, RANDOM_NVS_KEY, value, &required_size);
+    *random_bytes = calloc(*len, 1);
+    if (*random_bytes) {
+        nvs_get_blob(handle, RANDOM_NVS_KEY, *random_bytes, len);
+        nvs_close(handle);
+        return ESP_OK;
     }
-
     nvs_close(handle);
-    return value;
+    return ESP_ERR_NO_MEM;
 }
+
+static esp_err_t get_device_service_name(char *service_name, size_t max)
+{
+    uint8_t *nvs_random = NULL;
+    const char *ssid_prefix = "PROV_";
+    size_t nvs_random_size = 0;
+    if ((read_random_bytes_from_nvs(&nvs_random, &nvs_random_size) != ESP_OK) || nvs_random_size < 3) {
+        uint8_t eth_mac[6];
+        esp_wifi_get_mac(WIFI_IF_STA, eth_mac);
+        snprintf(service_name, max, "%s%02x%02x%02x", ssid_prefix, eth_mac[3], eth_mac[4], eth_mac[5]);
+    } else {
+        snprintf(service_name, max, "%s%02x%02x%02x", ssid_prefix, nvs_random[nvs_random_size - 3],
+                nvs_random[nvs_random_size - 2], nvs_random[nvs_random_size - 1]);
+    }
+    if (nvs_random) {
+        free(nvs_random);
+    }
+    return ESP_OK;
+}
+
 
 static esp_err_t get_device_pop(char *pop, size_t max, app_wifi_pop_type_t pop_type)
 {
@@ -175,14 +242,13 @@ static esp_err_t get_device_pop(char *pop, size_t max, app_wifi_pop_type_t pop_t
             return err;
         }
     } else if (pop_type == POP_TYPE_RANDOM) {
-        char *nvs_pop = read_random_bytes_from_nvs();
-        if (!nvs_pop) {
+        uint8_t *nvs_random;
+        size_t nvs_random_size = 0;
+        if ((read_random_bytes_from_nvs(&nvs_random, &nvs_random_size) != ESP_OK) || nvs_random_size < 4) {
             return ESP_ERR_NOT_FOUND;
         } else {
-            strncpy(pop, nvs_pop, max - 1);
-            pop[max - 1] = 0;
-            free(nvs_pop);
-            nvs_pop = NULL;
+            snprintf(pop, max, "%02x%02x%02x%02x", nvs_random[0], nvs_random[1], nvs_random[2], nvs_random[3]);
+            free(nvs_random);
             return ESP_OK;
         }
     } else {
@@ -203,15 +269,21 @@ void app_wifi_with_homekit_init(void)
     ESP_ERROR_CHECK(esp_event_loop_create_default());
     wifi_event_group = xEventGroupCreate();
 
-    /* Register our event handler for Wi-Fi, IP and Provisioning related events */
-    ESP_ERROR_CHECK(esp_event_handler_register(WIFI_PROV_EVENT, ESP_EVENT_ANY_ID, &event_handler, NULL));
-    ESP_ERROR_CHECK(esp_event_handler_register(WIFI_EVENT, ESP_EVENT_ANY_ID, &event_handler, NULL));
-    ESP_ERROR_CHECK(esp_event_handler_register(IP_EVENT, IP_EVENT_STA_GOT_IP, &event_handler, NULL));
-
     /* Initialize Wi-Fi including netif with default config */
 #ifdef ESP_NETIF_SUPPORTED
-    esp_netif_create_default_wifi_sta();
+    esp_netif_t *wifi_netif = esp_netif_create_default_wifi_sta();
 #endif
+
+    /* Register our event handler for Wi-Fi, IP and Provisioning related events */
+#ifdef ESP_NETIF_SUPPORTED
+    ESP_ERROR_CHECK(esp_event_handler_register(WIFI_EVENT, ESP_EVENT_ANY_ID, &event_handler, wifi_netif));
+#else
+    ESP_ERROR_CHECK(esp_event_handler_register(WIFI_EVENT, ESP_EVENT_ANY_ID, &event_handler, NULL));
+#endif
+    ESP_ERROR_CHECK(esp_event_handler_register(WIFI_PROV_EVENT, ESP_EVENT_ANY_ID, &event_handler, NULL));
+    ESP_ERROR_CHECK(esp_event_handler_register(IP_EVENT, IP_EVENT_STA_GOT_IP, &event_handler, NULL));
+    ESP_ERROR_CHECK(esp_event_handler_register(IP_EVENT, IP_EVENT_GOT_IP6, &event_handler, NULL));
+
     wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
     ESP_ERROR_CHECK(esp_wifi_init(&cfg));
 }
@@ -326,6 +398,10 @@ esp_err_t app_wifi_with_homekit_start(app_wifi_pop_type_t pop_type)
         app_wifi_print_qr(service_name, pop, PROV_TRANSPORT_SOFTAP);
 #endif /* CONFIG_APP_WIFI_PROV_TRANSPORT_BLE */
         ESP_LOGI(TAG, "Provisioning Started. Name : %s, POP : %s", service_name, pop);
+#ifdef CONFIG_APP_WIFI_USE_WAC_PROVISIONING
+        esp_event_handler_register(HAP_WAC_EVENT, ESP_EVENT_ANY_ID, &event_handler, NULL);
+        hap_wac_start();
+#endif /* CONFIG_APP_WIFI_USE_WAC_PROVISIONING */
     } else {
         ESP_LOGI(TAG, "Already provisioned, starting Wi-Fi STA");
 
