@@ -533,6 +533,19 @@ esp_err_t esp_rmaker_node_remove_device(const esp_rmaker_node_t *node, const esp
  */
 esp_err_t esp_rmaker_device_add_attribute(const esp_rmaker_device_t *device, const char *attr_name, const char *val);
 
+/** Add a Device subtype
+ *
+ * This can be something like esp.subtype.rgb-light for a device of type esp.device.lightbulb.
+ * This would primarily be used by the phone apps to render different icons for the same device type.
+ *
+ * @param[in] device Device handle.
+ * @param[in] subtype String describing the sub type.
+ *
+ * @return ESP_OK if the subtype was added successfully.
+ * @return error in case of failure.
+ */
+esp_err_t esp_rmaker_device_add_subtype(const esp_rmaker_device_t *device, const char *subtype);
+
 /** Get device name from handle
  *
  * @param[in] device Device handle.

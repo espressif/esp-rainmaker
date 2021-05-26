@@ -184,6 +184,9 @@ static esp_err_t esp_rmaker_report_devices_or_services(json_gen_str_t *jptr, cha
             if (device->type) {
                 json_gen_obj_set_string(jptr, "type", device->type);
             }
+            if (device->subtype) {
+                json_gen_obj_set_string(jptr, "subtype", device->subtype);
+            }
             if (device->attributes) {
                 json_gen_push_array(jptr, "attributes");
                 esp_rmaker_attr_t *attr = device->attributes;

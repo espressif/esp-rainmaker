@@ -63,6 +63,7 @@ typedef struct esp_rmaker_attr esp_rmaker_attr_t;
 struct esp_rmaker_device {
     char *name;
     char *type;
+    char *subtype;
     esp_rmaker_device_write_cb_t write_cb;
     esp_rmaker_device_read_cb_t read_cb;
     void *priv_data;
