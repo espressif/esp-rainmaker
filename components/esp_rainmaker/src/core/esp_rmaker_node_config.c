@@ -20,7 +20,6 @@
 #include "esp_rmaker_mqtt.h"
 
 #define NODE_CONFIG_TOPIC_SUFFIX        "config"
-#define MAX_NODE_CONFIG_SIZE            CONFIG_ESP_RMAKER_MAX_NODE_CONFIG_SIZE
 
 static const char *TAG = "esp_rmaker_node_config";
 static esp_err_t esp_rmaker_report_info(json_gen_str_t *jptr)
@@ -214,26 +213,40 @@ static esp_err_t esp_rmaker_report_devices_or_services(json_gen_str_t *jptr, cha
     return ESP_OK;
 }
 
-char *esp_rmaker_get_node_config(void)
+int __esp_rmaker_get_node_config(char *buf, size_t buf_size)
 {
-    char *node_config = calloc(1, MAX_NODE_CONFIG_SIZE);
-    if (!node_config) {
-        ESP_LOGE(TAG, "Failed to allocate %d bytes for node config", MAX_NODE_CONFIG_SIZE);
-        return NULL;
-    }
     json_gen_str_t jstr;
-    json_gen_str_start(&jstr, node_config, MAX_NODE_CONFIG_SIZE, NULL, NULL);
+    json_gen_str_start(&jstr, buf, buf_size, NULL, NULL);
     json_gen_start_object(&jstr);
     esp_rmaker_report_info(&jstr);
     esp_rmaker_report_node_attributes(&jstr);
     esp_rmaker_report_devices_or_services(&jstr, "devices");
     esp_rmaker_report_devices_or_services(&jstr, "services");
     if (json_gen_end_object(&jstr) < 0) {
-        free(node_config);
-        ESP_LOGE(TAG, "Buffer size %d not sufficient for Node Config.", MAX_NODE_CONFIG_SIZE);
+        return -1;
+    }
+    return json_gen_str_end(&jstr);
+}
+
+char *esp_rmaker_get_node_config(void)
+{
+    /* Setting buffer to NULL and size to 0 just to get the required buffer size */
+    int req_size = __esp_rmaker_get_node_config(NULL, 0);
+    if (req_size < 0) {
+        ESP_LOGE(TAG, "Failed to get required size for Node config JSON.");
         return NULL;
     }
-    json_gen_str_end(&jstr);
+    char *node_config = calloc(1, req_size);
+    if (!node_config) {
+        ESP_LOGE(TAG, "Failed to allocate %d bytes for node config", req_size);
+        return NULL;
+    }
+    if (__esp_rmaker_get_node_config(node_config, req_size) < 0) {
+        free(node_config);
+        ESP_LOGE(TAG, "Failed to generate Node config JSON.");
+        return NULL;
+    }
+    ESP_LOGD(TAG, "Generated Node config of length %d", req_size);
     return node_config;
 }
 
@@ -247,7 +260,8 @@ esp_err_t esp_rmaker_report_node_config()
 
     char publish_topic[100];
     snprintf(publish_topic, sizeof(publish_topic), "node/%s/%s", esp_rmaker_get_node_id(), NODE_CONFIG_TOPIC_SUFFIX);
-    ESP_LOGI(TAG, "Reporting Node Configuration");
+    ESP_LOGI(TAG, "Reporting Node Configuration of length %d bytes.", strlen(publish_payload));
+    ESP_LOGD(TAG, "%s", publish_payload);
     esp_err_t ret = esp_rmaker_mqtt_publish(publish_topic, publish_payload, strlen(publish_payload),
                         RMAKER_MQTT_QOS1, NULL);
     free(publish_payload);

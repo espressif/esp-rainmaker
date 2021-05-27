@@ -33,8 +33,6 @@
 #define MAX_OPERATION_LEN 10
 #define TIME_SYNC_DELAY 10          /* 10 seconds */
 #define MAX_SCHEDULES CONFIG_ESP_RMAKER_SCHEDULING_MAX_SCHEDULES
-#define MAX_SCHEDULE_REPORT_SIZE (CONFIG_ESP_RMAKER_MAX_PARAM_DATA_SIZE - 100)      /* '100' is a (random) margin
-                                                    for overhead as this will be encapsulated in another object */
 
 static const char *TAG = "esp_rmaker_schedule";
 
@@ -758,16 +756,12 @@ cleanup:
     return ESP_OK;
 }
 
-static char *esp_rmaker_schedule_get_params()
+static esp_err_t __esp_rmaker_schedule_get_params(char *buf, size_t *buf_size)
 {
-    char *data = calloc(1, MAX_SCHEDULE_REPORT_SIZE);
-    if (!data) {
-        ESP_LOGE(TAG, "Failed to allocate %d bytes for schedule", MAX_SCHEDULE_REPORT_SIZE);
-        return NULL;
-    }
+    esp_err_t err = ESP_OK;
     esp_rmaker_schedule_t *schedule = schedule_priv_data->schedule_list;
     json_gen_str_t jstr;
-    json_gen_str_start(&jstr, data, MAX_SCHEDULE_REPORT_SIZE, NULL, NULL);
+    json_gen_str_start(&jstr, buf, *buf_size, NULL, NULL);
     json_gen_start_array(&jstr);
     while (schedule) {
         json_gen_start_object(&jstr);
@@ -807,12 +801,32 @@ static char *esp_rmaker_schedule_get_params()
         schedule = schedule->next;
     }
     if (json_gen_end_array(&jstr) < 0) {
-        ESP_LOGE(TAG, "Buffer size %d not sufficient for reporting Schedule Params.\n"
-                "Please increase CONFIG_ESP_RMAKER_MAX_PARAM_DATA_SIZE", MAX_SCHEDULE_REPORT_SIZE);
+        ESP_LOGE(TAG, "Buffer size %d not sufficient for reporting Schedule Params.", *buf_size);
+        err = ESP_ERR_NO_MEM;
+    }
+    *buf_size = json_gen_str_end(&jstr);
+    return err;
+}
+
+static char *esp_rmaker_schedule_get_params(void)
+{
+    size_t req_size = 0;
+    esp_err_t err = __esp_rmaker_schedule_get_params(NULL, &req_size);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to get required size for schedules JSON.");
+        return NULL;
+    }
+    char *data = calloc(1, req_size);
+    if (!data) {
+        ESP_LOGE(TAG, "Failed to allocate %d bytes for schedule.", req_size);
+        return NULL;
+    }
+    err = __esp_rmaker_schedule_get_params(data, &req_size);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Error occured while trying to populate schedules JSON.");
         free(data);
         return NULL;
     }
-    json_gen_str_end(&jstr);
     return data;
 }
 
