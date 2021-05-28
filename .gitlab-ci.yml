@@ -150,10 +150,10 @@ before_script:
 - echo Building homekit_switch app - Started
 - echo Running idf.py
 - idf.py build
-- echo Running make
-- rm -rf build/ sdkconfig
-- make defconfig
-- make $MAKEFLAGS
+# - echo Running make
+# - rm -rf build/ sdkconfig
+# - make defconfig
+# - make $MAKEFLAGS
 - echo Building homekit_switch app - Done
 # Building homekit_switch app - Done
 # Copying homekit_switch.bin to esp-rainmaker-bins-${CI_JOB_ID}/
