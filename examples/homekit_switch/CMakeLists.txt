@@ -7,7 +7,7 @@ if(NOT DEFINED ENV{HOMEKIT_PATH})
 endif(NOT DEFINED ENV{HOMEKIT_PATH})
 
 # Add RainMaker components and other common application components
-set(EXTRA_COMPONENT_DIRS ${CMAKE_CURRENT_LIST_DIR}/../../components ${CMAKE_CURRENT_LIST_DIR}/../common $ENV{HOMEKIT_PATH}/components/homekit)
+set(EXTRA_COMPONENT_DIRS $ENV{HOMEKIT_PATH}/components/homekit ${CMAKE_CURRENT_LIST_DIR}/../../components ${CMAKE_CURRENT_LIST_DIR}/../common)
 
 set(PROJECT_VER "1.0")
 include($ENV{IDF_PATH}/tools/cmake/project.cmake)
