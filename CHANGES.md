@@ -1,5 +1,34 @@
 # Changes
 
+## 28-May-2021 (esp_rmaker_core: Add a system service for reboot/reset)
+
+The reboot/reset API prototypes have changed from
+
+```
+esp_err_t esp_rmaker_reboot(uint8_t seconds);
+esp_err_t esp_rmaker_wifi_reset(uint8_t seconds);
+esp_err_t esp_rmaker_factory_reset(uint8_t seconds);
+```
+To
+
+```
+esp_err_t esp_rmaker_reboot(int8_t seconds);
+esp_err_t esp_rmaker_wifi_reset(int8_t reset_seconds, int8_t reboot_seconds);
+esp_err_t esp_rmaker_factory_reset(int8_t reset_seconds, int8_t reboot_seconds);
+```
+
+- The behavior of `esp_rmaker_reboot()` has changed such that passing a value of 0 would trigger
+an immediate reboot without starting any timer.
+- The `esp_rmaker_wifi_reset()` and `esp_rmaker_factory_reset()` APIs have been modified such that
+they now accept 2 time values. The `reset_seconds` specify the time after which the reset should trigger
+and the `reboot_seconds` specify the time after which the reboot should trigger, after the reset
+was done.
+- `reboot_seconds` is similar to the earlier `seconds` argument, but it allows for 0 and negative values.
+0 indicates that the reboot should happen immediately after reset and negative value indicates that the
+reboot should be skipped.
+
+Please refer the [API documentation](https://docs.espressif.com/projects/esp-rainmaker/en/latest/c-api-reference/rainmaker_common.html#utilities) for additional details.
+
 ## 1-Feb-2021 (esp_rmaker: Moved out some generic modules from esp_rainmaker component)
 
 Some generic code has been moved out of the esp_rainmaker repo and included as submodules at

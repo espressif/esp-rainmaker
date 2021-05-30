@@ -6,6 +6,7 @@ set(core_srcs "src/core/esp_rmaker_core.c"
         "src/core/esp_rmaker_node_config.c"
         "src/core/esp_rmaker_client_data.c"
         "src/core/esp_rmaker_time_service.c"
+        "src/core/esp_rmaker_system_service.c"
         "src/core/esp_rmaker_user_mapping.pb-c.c"
         "src/core/esp_rmaker_user_mapping.c"
         "src/core/esp_rmaker_schedule.c")

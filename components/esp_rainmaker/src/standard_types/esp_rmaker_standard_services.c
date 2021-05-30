@@ -50,3 +50,8 @@ esp_rmaker_device_t *esp_rmaker_create_schedule_service(const char *serv_name, e
     }
     return service;
 }
+
+esp_rmaker_device_t *esp_rmaker_create_system_service(const char *serv_name, void *priv_data)
+{
+    return esp_rmaker_service_create(serv_name, ESP_RMAKER_SERVICE_SYSTEM, priv_data);
+}

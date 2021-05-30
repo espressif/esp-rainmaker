@@ -45,6 +45,9 @@ extern "C"
 #define ESP_RMAKER_DEF_TIMEZONE_NAME        "TZ"
 #define ESP_RMAKER_DEF_TIMEZONE_POSIX_NAME  "TZ-POSIX"
 #define ESP_RMAKER_DEF_SCHEDULE_NAME        "Schedules"
+#define ESP_RMAKER_DEF_REBOOT_NAME          "Reboot"
+#define ESP_RMAKER_DEF_FACTORY_RESET_NAME   "Factory-Reset"
+#define ESP_RMAKER_DEF_WIFI_RESET_NAME      "Wi-Fi-Reset"
 
 /**
  * Create standard name param
@@ -247,7 +250,7 @@ esp_rmaker_param_t *esp_rmaker_timezone_param_create(const char *param_name, con
 esp_rmaker_param_t *esp_rmaker_timezone_posix_param_create(const char *param_name, const char *val);
 
 /**
- * Create standard schedules param
+ * Create standard Schedules param
  *
  * This will create the standard schedules parameter. Default value
  * is set internally.
@@ -259,6 +262,45 @@ esp_rmaker_param_t *esp_rmaker_timezone_posix_param_create(const char *param_nam
  * @return NULL in case of failures.
  */
 esp_rmaker_param_t *esp_rmaker_schedules_param_create(const char *param_name, int max_schedules);
+
+/**
+ * Create standard Reboot param
+ *
+ * This will create the standard reboot parameter.
+ * Set value to true (via write param) for the action to trigger.
+ *
+ * @param[in] param_name Name of the parameter
+ *
+ * @return Parameter handle on success.
+ * @return NULL in case of failures.
+ */
+esp_rmaker_param_t *esp_rmaker_reboot_param_create(const char *param_name);
+
+/**
+ * Create standard Factory Reset param
+ *
+ * This will create the standard factory reset parameter.
+ * Set value to true (via write param) for the action to trigger.
+ *
+ * @param[in] param_name Name of the parameter
+ *
+ * @return Parameter handle on success.
+ * @return NULL in case of failures.
+ */
+esp_rmaker_param_t *esp_rmaker_factory_reset_param_create(const char *param_name);
+
+/**
+ * Create standard Wi-Fi Reset param
+ *
+ * This will create the standard Wi-Fi Reset parameter.
+ * Set value to true (via write param) for the action to trigger.
+ *
+ * @param[in] param_name Name of the parameter
+ *
+ * @return Parameter handle on success.
+ * @return NULL in case of failures.
+ */
+esp_rmaker_param_t *esp_rmaker_wifi_reset_param_create(const char *param_name);
 
 #ifdef __cplusplus
 }

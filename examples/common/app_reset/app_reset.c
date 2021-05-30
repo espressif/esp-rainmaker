@@ -21,7 +21,7 @@ static const char *TAG = "app_reset";
 
 static void wifi_reset_trigger(void *arg)
 {
-    esp_rmaker_wifi_reset(REBOOT_DELAY);
+    esp_rmaker_wifi_reset(0, REBOOT_DELAY);
 }
 
 static void wifi_reset_indicate(void *arg)
@@ -31,7 +31,7 @@ static void wifi_reset_indicate(void *arg)
 
 static void factory_reset_trigger(void *arg)
 {
-    esp_rmaker_factory_reset(REBOOT_DELAY);
+    esp_rmaker_factory_reset(0, REBOOT_DELAY);
 }
 
 static void factory_reset_indicate(void *arg)
