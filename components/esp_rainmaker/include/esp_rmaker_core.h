@@ -742,6 +742,19 @@ char *esp_rmaker_param_get_name(const esp_rmaker_param_t *param);
  */
 char *esp_rmaker_param_get_type(const esp_rmaker_param_t *param);
 
+/** Get parameter value
+ *
+ * This gives the parameter value that is stored in the RainMaker core.
+ *
+ * @note This does not call any explicit functions to read value from hardware/driver.
+ *
+ * @param[in] param Parameter handle
+ *
+ * @return Pointer to parameter value on success.
+ * @return NULL in case of failure.
+ */
+esp_rmaker_param_val_t *esp_rmaker_param_get_val(esp_rmaker_param_t *param);
+
 /** Report the node details to the cloud
  *
  * This API reports node details i.e. the node configuration and values of all the parameters to the ESP RainMaker cloud.
