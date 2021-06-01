@@ -30,6 +30,7 @@
 
 #define MAX_ID_LEN 8
 #define MAX_NAME_LEN 32
+#define MAX_INFO_LEN 128
 #define MAX_OPERATION_LEN 10
 #define TIME_SYNC_DELAY 10          /* 10 seconds */
 #define MAX_SCHEDULES CONFIG_ESP_RMAKER_SCHEDULING_MAX_SCHEDULES
@@ -74,8 +75,12 @@ typedef struct esp_rmaker_schedule_action {
 typedef struct esp_rmaker_schedule {
     char name[MAX_NAME_LEN + 1];        /* +1 for NULL termination */
     char id[MAX_ID_LEN + 1];            /* +1 for NULL termination */
+    /* Info is used to store additional information, it is limited to 128 bytes. */
+    char *info;
     /* Index is used in the callback to get back the schedule. */
     int32_t index;
+    /* Flags are used to identify the schedule. Eg. timing, countdown */
+    uint32_t flags;
     bool enabled;
     esp_schedule_handle_t handle;
     esp_rmaker_schedule_action_t action;
@@ -123,6 +128,9 @@ static void esp_rmaker_schedule_free(esp_rmaker_schedule_t *schedule)
     }
     if (schedule->action.data) {
         free(schedule->action.data);
+    }
+    if (schedule->info) {
+        free(schedule->info);
     }
     free(schedule);
 }
@@ -612,6 +620,37 @@ static esp_err_t esp_rmaker_schedule_parse_trigger(jparse_ctx_t *jctx, esp_rmake
     return ESP_OK;
 }
 
+static esp_err_t esp_rmaker_schedule_parse_info_and_flags(jparse_ctx_t *jctx, char **info, uint32_t *flags)
+{
+    char _info[MAX_INFO_LEN + 1] = {0};  /* +1 for NULL termination */
+    int _flags = 0;
+
+    int err_code = json_obj_get_string(jctx, "info", _info, sizeof(_info));
+    if (err_code == OS_SUCCESS) {
+        if (*info) {
+            free(*info);
+            *info = NULL;
+        }
+
+        if (strlen(_info) > 0) {
+            /* +1 for NULL termination */
+            *info = (char *)calloc(1, strlen(_info) + 1);
+            if (*info) {
+                strncpy(*info, _info, strlen(_info));
+            }
+        }
+    }
+
+    err_code = json_obj_get_int(jctx, "flags", &_flags);
+    if (err_code == OS_SUCCESS) {
+        if (flags) {
+            *flags = _flags;
+        }
+    }
+
+    return ESP_OK;
+}
+
 static esp_rmaker_schedule_t *esp_rmaker_schedule_find_or_create(jparse_ctx_t *jctx, char *id, schedule_operation_t operation)
 {
     char name[MAX_NAME_LEN + 1] = {0};      /* +1 for NULL termination */
@@ -763,6 +802,9 @@ static esp_err_t esp_rmaker_schedule_parse_json(void *data, size_t data_len, esp
             /* Get trigger */
             /* There is only one trigger for now. If more triggers are added, then they should be parsed here in a loop */
             esp_rmaker_schedule_parse_trigger(&jctx, &schedule->trigger);
+
+            /* Get info and flags */
+            esp_rmaker_schedule_parse_info_and_flags(&jctx, &schedule->info, &schedule->flags);
         }
 
         /* Perform operation */
@@ -790,6 +832,13 @@ static esp_err_t __esp_rmaker_schedule_get_params(char *buf, size_t *buf_size)
         json_gen_obj_set_string(&jstr, "name", schedule->name);
         json_gen_obj_set_string(&jstr, "id", schedule->id);
         json_gen_obj_set_bool(&jstr, "enabled", schedule->enabled);
+        /* If info and flags is not zero, add it. */
+        if (schedule->info != NULL) {
+            json_gen_obj_set_string(&jstr, "info", schedule->info);
+        }
+        if (schedule->flags != 0) {
+            json_gen_obj_set_int(&jstr, "flags", schedule->flags);
+        }
 
         /* Add action */
         json_gen_push_object_str(&jstr, "action", schedule->action.data);
