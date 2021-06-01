@@ -32,13 +32,6 @@ menu "ESP RainMaker Config"
         help
             ESP RainMaker MQTT Host name.
 
-    config ESP_RMAKER_MAX_NODE_CONFIG_SIZE
-        int "Maximum Node Config size"
-        default 2048
-        range 512 65536
-        help
-            Maximum size of the payload for reporting Node configuration.
-
     config ESP_RMAKER_MAX_PARAM_DATA_SIZE
         int "Maximum Parameters' data size"
         default 1024
@@ -136,8 +129,8 @@ menu "ESP RainMaker Config"
 
         config ESP_RMAKER_SCHEDULING_MAX_SCHEDULES
             int "Maximum schedules"
-            default 5
-            range 1 20
+            default 10
+            range 1 50
             help
                 Maximum Number of schedules allowed. The json size for report params increases as the number of schedules increases.
 

@@ -33,9 +33,12 @@
 
 #define ESP_RMAKER_NVS_PART_NAME        "nvs"
 #define MAX_PUBLISH_TOPIC_LEN           64
+#define RMAKER_PARAMS_SIZE_MARGIN       50
 
-#define MAX_NODE_PARAMS_SIZE           CONFIG_ESP_RMAKER_MAX_PARAM_DATA_SIZE
-static char publish_payload[MAX_NODE_PARAMS_SIZE];
+static size_t max_node_params_size = CONFIG_ESP_RMAKER_MAX_PARAM_DATA_SIZE;
+/* This buffer will be allocated once and will be reused for all param updates.
+ * It may be reallocated if the params size becomes too large */
+static char *node_params_buf;
 static char publish_topic[MAX_PUBLISH_TOPIC_LEN];
 
 static const char *TAG = "esp_rmaker_param";
@@ -110,10 +113,11 @@ esp_rmaker_param_val_t esp_rmaker_array(const char *val)
     return param_val;
 }
 
-static esp_err_t esp_rmaker_populate_params(char *buf, size_t buf_len, uint8_t flags, bool reset_flags)
+static esp_err_t esp_rmaker_populate_params(char *buf, size_t *buf_len, uint8_t flags, bool reset_flags)
 {
+    esp_err_t err = ESP_OK;
     json_gen_str_t jstr;
-    json_gen_str_start(&jstr, buf, buf_len, NULL, NULL);
+    json_gen_str_start(&jstr, buf, *buf_len, NULL, NULL);
     json_gen_start_object(&jstr);
     _esp_rmaker_device_t *device = esp_rmaker_node_get_first_device(esp_rmaker_get_node());
     while (device) {
@@ -138,38 +142,86 @@ static esp_err_t esp_rmaker_populate_params(char *buf, size_t buf_len, uint8_t f
         device = device->next;
     }
     if (json_gen_end_object(&jstr) < 0) {
-        return ESP_ERR_NO_MEM;
+        err = ESP_ERR_NO_MEM;
     }
-    json_gen_str_end(&jstr);
-    return ESP_OK;
+    *buf_len = json_gen_str_end(&jstr);
+    return err;
 }
 
+/* This function does not use the node_params_buf since this is for external use
+ * and we do not want __esp_rmaker_allocate_and_populate_params to overwrite
+ * the buffer.
+ */
 char *esp_rmaker_get_node_params(void)
 {
-    char *node_params = calloc(1, MAX_NODE_PARAMS_SIZE);
-    if (!node_params) {
-        ESP_LOGE(TAG, "Failed to allocate %d bytes for Node params.", MAX_NODE_PARAMS_SIZE);
+    size_t req_size = 0;
+    /* Passing NULL pointer to find the required buffer size */
+    esp_err_t err = esp_rmaker_populate_params(NULL, &req_size, 0, false);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to get required size for Node params JSON.");
         return NULL;
     }
-    if (esp_rmaker_populate_params(node_params, MAX_NODE_PARAMS_SIZE, 0, false) == ESP_OK) {
-        return node_params;
+    /* Keeping some margin just in case some param value changes in between */
+    req_size += RMAKER_PARAMS_SIZE_MARGIN;
+    char *node_params = calloc(1, req_size);
+    if (!node_params) {
+        ESP_LOGE(TAG, "Failed to allocate %d bytes for Node params.", req_size);
+        return NULL;
     }
-    return NULL;
+    err = esp_rmaker_populate_params(node_params, &req_size, 0, false);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to generate Node params JSON.");
+        free(node_params);
+        return NULL;
+    }
+    return node_params;
+}
+
+static esp_err_t esp_rmaker_allocate_and_populate_params(uint8_t flags, bool reset_flags)
+{
+    /* node_params_buf will be NULL during the first publish */
+    if (!node_params_buf) {
+        node_params_buf = calloc(1, max_node_params_size);
+        if (!node_params_buf) {
+            ESP_LOGE(TAG, "Failed to allocate %d bytes for Node params.", max_node_params_size);
+            return ESP_ERR_NO_MEM;
+        }
+    }
+    /* Typically, max_node_params_size should be sufficient for the parameters */
+    size_t req_size = max_node_params_size;
+    esp_err_t err = esp_rmaker_populate_params(node_params_buf, &req_size, flags, reset_flags);
+    /* If the max_node_params_size was insufficient, we will re-allocate new buffer */
+    if (err == ESP_ERR_NO_MEM) {
+        ESP_LOGW(TAG, "%d bytes not sufficient for Node params. Reallocating %d bytes.",
+                max_node_params_size, req_size + RMAKER_PARAMS_SIZE_MARGIN);
+        max_node_params_size = req_size + RMAKER_PARAMS_SIZE_MARGIN; /* Keeping some margin since paramater value size can change */
+        free(node_params_buf);
+        node_params_buf = calloc(1, max_node_params_size);
+        if (!node_params_buf) {
+            ESP_LOGE(TAG, "Failed to allocate %d bytes for Node params.", max_node_params_size);
+            return ESP_ERR_NO_MEM;
+        }
+        req_size = max_node_params_size;
+        err = esp_rmaker_populate_params(node_params_buf, &req_size, flags, reset_flags);
+        if (err != ESP_OK) {
+            ESP_LOGE(TAG, "Failed to populate node parameters.");
+        }
+    }
+    return err;
 }
 
 esp_err_t esp_rmaker_report_param_internal(void)
 {
-    esp_err_t err = esp_rmaker_populate_params(publish_payload, sizeof(publish_payload),
-                RMAKER_PARAM_FLAG_VALUE_CHANGE, true);
+    esp_err_t err = esp_rmaker_allocate_and_populate_params(RMAKER_PARAM_FLAG_VALUE_CHANGE, true);
     if (err == ESP_OK) {
         /* Just checking if there are indeed any params to report by comparing with a decent enough
          * length as even the smallest possible data, Eg. '{"d":{"p":0}}' will be > 10 bytes.
          */
-        if (strlen(publish_payload) > 10) {
+        if (strlen(node_params_buf) > 10) {
             snprintf(publish_topic, sizeof(publish_topic), "node/%s/%s",
                     esp_rmaker_get_node_id(), NODE_PARAMS_LOCAL_TOPIC_SUFFIX);
-            ESP_LOGI(TAG, "Reporting params: %s", publish_payload);
-            esp_rmaker_mqtt_publish(publish_topic, publish_payload, strlen(publish_payload), RMAKER_MQTT_QOS1, NULL);
+            ESP_LOGI(TAG, "Reporting params: %s", node_params_buf);
+            esp_rmaker_mqtt_publish(publish_topic, node_params_buf, strlen(node_params_buf), RMAKER_MQTT_QOS1, NULL);
         }
         return ESP_OK;
     }
@@ -178,16 +230,16 @@ esp_err_t esp_rmaker_report_param_internal(void)
 
 esp_err_t esp_rmaker_report_node_state(void)
 {
-    esp_err_t err = esp_rmaker_populate_params(publish_payload, sizeof(publish_payload), 0, false);
+    esp_err_t err = esp_rmaker_allocate_and_populate_params(0, false);
     if (err == ESP_OK) {
         /* Just checking if there are indeed any params to report by comparing with a decent enough
          * length as even the smallest possible data, Eg. '{"d":{"p":0}}' will be > 10 bytes.
          */
-        if (strlen(publish_payload) > 10) {
+        if (strlen(node_params_buf) > 10) {
             snprintf(publish_topic, sizeof(publish_topic), "node/%s/%s",
                     esp_rmaker_get_node_id(), NODE_PARAMS_LOCAL_INIT_TOPIC_SUFFIX);
-            ESP_LOGI(TAG, "Reporting params (init): %s", publish_payload);
-            esp_rmaker_mqtt_publish(publish_topic, publish_payload, strlen(publish_payload), RMAKER_MQTT_QOS1, NULL);
+            ESP_LOGI(TAG, "Reporting params (init): %s", node_params_buf);
+            esp_rmaker_mqtt_publish(publish_topic, node_params_buf, strlen(node_params_buf), RMAKER_MQTT_QOS1, NULL);
         }
         return ESP_OK;
     }
