@@ -40,10 +40,13 @@ typedef enum trigger_type {
     TRIGGER_TYPE_INVALID = 0,
     TRIGGER_TYPE_DAYS_OF_WEEK,
     TRIGGER_TYPE_DATE,
+    TRIGGER_TYPE_RELATIVE,
 } trigger_type_t;
 
 typedef struct esp_rmaker_schedule_trigger {
     trigger_type_t type;
+    /* Relative Seconds */
+    uint16_t relative_seconds;
     /* Minutes from 12am */
     uint16_t minutes;
     struct {
@@ -227,7 +230,12 @@ static bool esp_rmaker_schedule_is_expired(esp_rmaker_schedule_t *schedule)
     time(&current_timestamp);
     localtime_r(&current_timestamp, &current_time);
 
-    if (schedule->trigger.type == TRIGGER_TYPE_DAYS_OF_WEEK) {
+    if (schedule->trigger.type == TRIGGER_TYPE_RELATIVE) {
+        if (schedule->trigger.next_timestamp > 0 && schedule->trigger.next_timestamp <= current_timestamp) {
+            /* Relative seconds based schedule has expired */
+            return true;
+        }
+    } else if (schedule->trigger.type == TRIGGER_TYPE_DAYS_OF_WEEK) {
         if (schedule->trigger.day.repeat_days == 0) {
             if (schedule->trigger.next_timestamp > 0 && schedule->trigger.next_timestamp <= current_timestamp) {
                 /* One time schedule has expired */
@@ -312,26 +320,34 @@ static esp_err_t esp_rmaker_schedule_prepare_config(esp_rmaker_schedule_t *sched
         return ESP_ERR_INVALID_ARG;
     }
 
-    int hours = schedule->trigger.minutes / 60;
-    int minutes = schedule->trigger.minutes % 60;
-    schedule_config->trigger.hours = hours;
-    schedule_config->trigger.minutes = minutes;
-    schedule_config->trigger_cb = esp_rmaker_schedule_trigger_common_cb;
+    if (schedule->trigger.type == TRIGGER_TYPE_RELATIVE) {
+        schedule_config->trigger.next_scheduled_time_utc = (time_t)schedule->trigger.next_timestamp;
+        schedule_config->trigger.relative_seconds = schedule->trigger.relative_seconds;
+        schedule_config->trigger.type = ESP_SCHEDULE_TYPE_RELATIVE;
+        schedule_config->trigger_cb = esp_rmaker_schedule_trigger_common_cb;
+        schedule_config->timestamp_cb = esp_rmaker_schedule_timestamp_common_cb;
+    } else {
+        int hours = schedule->trigger.minutes / 60;
+        int minutes = schedule->trigger.minutes % 60;
+        schedule_config->trigger.hours = hours;
+        schedule_config->trigger.minutes = minutes;
+        schedule_config->trigger_cb = esp_rmaker_schedule_trigger_common_cb;
 
-    if (schedule->trigger.type == TRIGGER_TYPE_DAYS_OF_WEEK) {
-        schedule_config->trigger.type = ESP_SCHEDULE_TYPE_DAYS_OF_WEEK;
-        schedule_config->trigger.day.repeat_days = schedule->trigger.day.repeat_days;
-        if (schedule->trigger.day.repeat_days == 0) {
-            schedule_config->timestamp_cb = esp_rmaker_schedule_timestamp_common_cb;
-        }
-    } else if (schedule->trigger.type == TRIGGER_TYPE_DATE) {
-        schedule_config->trigger.type = ESP_SCHEDULE_TYPE_DATE;
-        schedule_config->trigger.date.day = schedule->trigger.date.day;
-        schedule_config->trigger.date.repeat_months = schedule->trigger.date.repeat_months;
-        schedule_config->trigger.date.year = schedule->trigger.date.year;
-        schedule_config->trigger.date.repeat_every_year = schedule->trigger.date.repeat_every_year;
-        if (schedule->trigger.date.repeat_months == 0) {
-            schedule_config->timestamp_cb = esp_rmaker_schedule_timestamp_common_cb;
+        if (schedule->trigger.type == TRIGGER_TYPE_DAYS_OF_WEEK) {
+            schedule_config->trigger.type = ESP_SCHEDULE_TYPE_DAYS_OF_WEEK;
+            schedule_config->trigger.day.repeat_days = schedule->trigger.day.repeat_days;
+            if (schedule->trigger.day.repeat_days == 0) {
+                schedule_config->timestamp_cb = esp_rmaker_schedule_timestamp_common_cb;
+            }
+        } else if (schedule->trigger.type == TRIGGER_TYPE_DATE) {
+            schedule_config->trigger.type = ESP_SCHEDULE_TYPE_DATE;
+            schedule_config->trigger.date.day = schedule->trigger.date.day;
+            schedule_config->trigger.date.repeat_months = schedule->trigger.date.repeat_months;
+            schedule_config->trigger.date.year = schedule->trigger.date.year;
+            schedule_config->trigger.date.repeat_every_year = schedule->trigger.date.repeat_every_year;
+            if (schedule->trigger.date.repeat_months == 0) {
+                schedule_config->timestamp_cb = esp_rmaker_schedule_timestamp_common_cb;
+            }
         }
     }
 
@@ -550,7 +566,7 @@ static esp_err_t esp_rmaker_schedule_parse_action(jparse_ctx_t *jctx, esp_rmaker
 static esp_err_t esp_rmaker_schedule_parse_trigger(jparse_ctx_t *jctx, esp_rmaker_schedule_trigger_t *trigger)
 {
     int total_triggers = 0;
-    int minutes = 0, repeat_days = 0, day = 0, repeat_months = 0, year = 0;
+    int relative_seconds = 0, minutes = 0, repeat_days = 0, day = 0, repeat_months = 0, year = 0;
     bool repeat_every_year = false;
     int64_t timestamp = 0;
     trigger_type_t type = TRIGGER_TYPE_INVALID;
@@ -564,24 +580,28 @@ static esp_err_t esp_rmaker_schedule_parse_trigger(jparse_ctx_t *jctx, esp_rmake
         return ESP_OK;
     }
     if(json_arr_get_object(jctx, 0) == 0) {
-        json_obj_get_int(jctx, "m", &minutes);
-        /* Check if it is of type day */
-        if (json_obj_get_int(jctx, "d", &repeat_days) == 0) {
-            type = TRIGGER_TYPE_DAYS_OF_WEEK;
-        }
-        if (json_obj_get_int(jctx, "dd", &day) == 0) {
-            type = TRIGGER_TYPE_DATE;
-            json_obj_get_int(jctx, "mm", &repeat_months);
-            json_obj_get_int(jctx, "yy", &year);
-            json_obj_get_bool(jctx, "r", &repeat_every_year);
-        }
-
         json_obj_get_int64(jctx, "ts", &timestamp);
+        if (json_obj_get_int(jctx, "rsec", &relative_seconds) == 0) {
+            type = TRIGGER_TYPE_RELATIVE;
+        } else {
+            json_obj_get_int(jctx, "m", &minutes);
+            /* Check if it is of type day */
+            if (json_obj_get_int(jctx, "d", &repeat_days) == 0) {
+                type = TRIGGER_TYPE_DAYS_OF_WEEK;
+            }
+            if (json_obj_get_int(jctx, "dd", &day) == 0) {
+                type = TRIGGER_TYPE_DATE;
+                json_obj_get_int(jctx, "mm", &repeat_months);
+                json_obj_get_int(jctx, "yy", &year);
+                json_obj_get_bool(jctx, "r", &repeat_every_year);
+            }
+        }
         json_arr_leave_object(jctx);
     }
     json_obj_leave_array(jctx);
 
     trigger->type = type;
+    trigger->relative_seconds = relative_seconds;
     trigger->minutes = minutes;
     trigger->day.repeat_days = repeat_days;
     trigger->date.day = day;
@@ -777,19 +797,24 @@ static esp_err_t __esp_rmaker_schedule_get_params(char *buf, size_t *buf_size)
         /* Add trigger */
         json_gen_push_array(&jstr, "triggers");
         json_gen_start_object(&jstr);
-        json_gen_obj_set_int(&jstr, "m", schedule->trigger.minutes);
-        if (schedule->trigger.type == TRIGGER_TYPE_DAYS_OF_WEEK) {
-            json_gen_obj_set_int(&jstr, "d", schedule->trigger.day.repeat_days);
-            if (schedule->trigger.day.repeat_days == 0) {
-                json_gen_obj_set_int(&jstr, "ts", schedule->trigger.next_timestamp);
-            }
-        } else if (schedule->trigger.type == TRIGGER_TYPE_DATE) {
-            json_gen_obj_set_int(&jstr, "dd", schedule->trigger.date.day);
-            json_gen_obj_set_int(&jstr, "mm", schedule->trigger.date.repeat_months);
-            json_gen_obj_set_int(&jstr, "yy", schedule->trigger.date.year);
-            json_gen_obj_set_int(&jstr, "r", schedule->trigger.date.repeat_every_year);
-            if (schedule->trigger.date.repeat_months == 0) {
-                json_gen_obj_set_int(&jstr, "ts", schedule->trigger.next_timestamp);
+        if (schedule->trigger.type == TRIGGER_TYPE_RELATIVE) {
+            json_gen_obj_set_int(&jstr, "rsec", schedule->trigger.relative_seconds);
+            json_gen_obj_set_int(&jstr, "ts", schedule->trigger.next_timestamp);
+        } else {
+            json_gen_obj_set_int(&jstr, "m", schedule->trigger.minutes);
+            if (schedule->trigger.type == TRIGGER_TYPE_DAYS_OF_WEEK) {
+                json_gen_obj_set_int(&jstr, "d", schedule->trigger.day.repeat_days);
+                if (schedule->trigger.day.repeat_days == 0) {
+                    json_gen_obj_set_int(&jstr, "ts", schedule->trigger.next_timestamp);
+                }
+            } else if (schedule->trigger.type == TRIGGER_TYPE_DATE) {
+                json_gen_obj_set_int(&jstr, "dd", schedule->trigger.date.day);
+                json_gen_obj_set_int(&jstr, "mm", schedule->trigger.date.repeat_months);
+                json_gen_obj_set_int(&jstr, "yy", schedule->trigger.date.year);
+                json_gen_obj_set_int(&jstr, "r", schedule->trigger.date.repeat_every_year);
+                if (schedule->trigger.date.repeat_months == 0) {
+                    json_gen_obj_set_int(&jstr, "ts", schedule->trigger.next_timestamp);
+                }
             }
         }
         json_gen_end_object(&jstr);

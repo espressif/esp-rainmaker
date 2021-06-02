@@ -171,6 +171,29 @@ static uint32_t esp_schedule_get_next_schedule_time_diff(esp_schedule_t *schedul
 
     /* Get current time */
     time(&now);
+    /* Handling ESP_SCHEDULE_TYPE_RELATIVE first since it doesn't require any
+     * computation based on days, hours, minutes, etc.
+     */
+    if (schedule->trigger.type == ESP_SCHEDULE_TYPE_RELATIVE) {
+        /* If next scheduled time is already set, just compute the difference
+         * between current time and next scheduled time and return that diff.
+         */
+        time_t target;
+        if (schedule->trigger.next_scheduled_time_utc > 0) {
+            target = (time_t)schedule->trigger.next_scheduled_time_utc;
+            time_diff = difftime(target, now);
+        } else {
+            target = now + (time_t)schedule->trigger.relative_seconds;
+            time_diff = schedule->trigger.relative_seconds;
+        }
+        localtime_r(&target, &schedule_time);
+        schedule->trigger.next_scheduled_time_utc = mktime(&schedule_time);
+        /* Print schedule time */
+        memset(time_str, 0, sizeof(time_str));
+        strftime(time_str, sizeof(time_str), "%c %z[%Z]", &schedule_time);
+        ESP_LOGI(TAG, "Schedule %s will be active on: %s. DST: %s", schedule->name, time_str, schedule_time.tm_isdst ? "Yes" : "No");
+        return time_diff;
+    }
     localtime_r(&now, &current_time);
 
     /* Get schedule time */
@@ -221,7 +244,7 @@ static uint32_t esp_schedule_get_next_schedule_time_diff(esp_schedule_t *schedul
     time_diff = difftime((mktime(&schedule_time)), mktime(&current_time));
 
     /* For one time schedules to check for expiry after a reboot. If NVS is enabled, this should be stored in NVS. */
-    schedule->next_scheduled_time_utc = mktime(&schedule_time);
+    schedule->trigger.next_scheduled_time_utc = mktime(&schedule_time);
 
     return time_diff;
 }
@@ -232,17 +255,22 @@ static bool esp_schedule_is_expired(esp_schedule_t *schedule)
     struct tm current_time = {0};
     time(&current_timestamp);
     localtime_r(&current_timestamp, &current_time);
-
-    if (schedule->trigger.type == ESP_SCHEDULE_TYPE_DAYS_OF_WEEK) {
+    
+    if (schedule->trigger.type == ESP_SCHEDULE_TYPE_RELATIVE) {
+        if (schedule->trigger.next_scheduled_time_utc > 0 && schedule->trigger.next_scheduled_time_utc <= current_timestamp) {
+            /* Relative seconds based schedule has expired */
+            return true;
+        }
+    } else if (schedule->trigger.type == ESP_SCHEDULE_TYPE_DAYS_OF_WEEK) {
         if (schedule->trigger.day.repeat_days == ESP_SCHEDULE_DAY_ONCE) {
-            if (schedule->next_scheduled_time_utc > 0 && schedule->next_scheduled_time_utc <= current_timestamp) {
+            if (schedule->trigger.next_scheduled_time_utc > 0 && schedule->trigger.next_scheduled_time_utc <= current_timestamp) {
                 /* One time schedule has expired */
                 return true;
             }
         }
     } else if (schedule->trigger.type == ESP_SCHEDULE_TYPE_DATE) {
         if (schedule->trigger.date.repeat_months == 0) {
-            if (schedule->next_scheduled_time_utc > 0 && schedule->next_scheduled_time_utc <= current_timestamp) {
+            if (schedule->trigger.next_scheduled_time_utc > 0 && schedule->trigger.next_scheduled_time_utc <= current_timestamp) {
                 /* One time schedule has expired */
                 return true;
             } else {
@@ -291,7 +319,7 @@ static void esp_schedule_start_timer(esp_schedule_t *schedule)
     ESP_LOGI(TAG, "Starting a timer for %u seconds for schedule %s", schedule->next_scheduled_time_diff, schedule->name);
 
     if (schedule->timestamp_cb) {
-        schedule->timestamp_cb((esp_schedule_handle_t)schedule, schedule->next_scheduled_time_utc, schedule->priv_data);
+        schedule->timestamp_cb((esp_schedule_handle_t)schedule, schedule->trigger.next_scheduled_time_utc, schedule->priv_data);
     }
 
     xTimerStop(schedule->timer, portMAX_DELAY);
@@ -378,6 +406,10 @@ esp_err_t esp_schedule_disable(esp_schedule_handle_t handle)
     }
     esp_schedule_t *schedule = (esp_schedule_t *)handle;
     esp_schedule_stop_timer(schedule);
+    /* Disabling a schedule should also reset the next_scheduled_time.
+     * It would be re-computed after enabling.
+     */
+    schedule->trigger.next_scheduled_time_utc = 0;
     return ESP_OK;
 }
 
@@ -385,16 +417,21 @@ static esp_err_t esp_schedule_set(esp_schedule_t *schedule, esp_schedule_config_
 {
     /* Setting everything apart from name. */
     schedule->trigger.type = schedule_config->trigger.type;
-    schedule->trigger.hours = schedule_config->trigger.hours;
-    schedule->trigger.minutes = schedule_config->trigger.minutes;
+    if (schedule->trigger.type == ESP_SCHEDULE_TYPE_RELATIVE) {
+        schedule->trigger.relative_seconds = schedule_config->trigger.relative_seconds;
+        schedule->trigger.next_scheduled_time_utc = schedule_config->trigger.next_scheduled_time_utc;
+    } else {
+        schedule->trigger.hours = schedule_config->trigger.hours;
+        schedule->trigger.minutes = schedule_config->trigger.minutes;
 
-    if (schedule->trigger.type == ESP_SCHEDULE_TYPE_DAYS_OF_WEEK) {
-        schedule->trigger.day.repeat_days = schedule_config->trigger.day.repeat_days;
-    } else if (schedule->trigger.type == ESP_SCHEDULE_TYPE_DATE) {
-        schedule->trigger.date.day = schedule_config->trigger.date.day;
-        schedule->trigger.date.repeat_months = schedule_config->trigger.date.repeat_months;
-        schedule->trigger.date.year = schedule_config->trigger.date.year;
-        schedule->trigger.date.repeat_every_year = schedule_config->trigger.date.repeat_every_year;
+        if (schedule->trigger.type == ESP_SCHEDULE_TYPE_DAYS_OF_WEEK) {
+            schedule->trigger.day.repeat_days = schedule_config->trigger.day.repeat_days;
+        } else if (schedule->trigger.type == ESP_SCHEDULE_TYPE_DATE) {
+            schedule->trigger.date.day = schedule_config->trigger.date.day;
+            schedule->trigger.date.repeat_months = schedule_config->trigger.date.repeat_months;
+            schedule->trigger.date.year = schedule_config->trigger.date.year;
+            schedule->trigger.date.repeat_every_year = schedule_config->trigger.date.repeat_every_year;
+        }
     }
 
     schedule->trigger_cb = schedule_config->trigger_cb;
@@ -415,6 +452,10 @@ esp_err_t esp_schedule_edit(esp_schedule_handle_t handle, esp_schedule_config_t 
         return ESP_FAIL;
     }
 
+    /* Editing a schedule with relative time should also reset it. */
+    if (schedule->trigger.type == ESP_SCHEDULE_TYPE_RELATIVE) {
+        schedule->trigger.next_scheduled_time_utc = 0;
+    }
     esp_schedule_set(schedule, schedule_config);
     ESP_LOGD(TAG, "Schedule %s edited", schedule->name);
     return ESP_OK;
@@ -446,7 +487,7 @@ esp_schedule_handle_t esp_schedule_create(esp_schedule_config_t *schedule_config
         return NULL;
     }
 
-    esp_schedule_t *schedule = (esp_schedule_t *)malloc(sizeof(esp_schedule_t));
+    esp_schedule_t *schedule = (esp_schedule_t *)calloc(1, sizeof(esp_schedule_t));
     if (schedule == NULL) {
         ESP_LOGE(TAG, "Could not allocate handle");
         return NULL;

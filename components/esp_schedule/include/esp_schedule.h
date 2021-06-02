@@ -51,6 +51,7 @@ typedef enum esp_schedule_type {
     ESP_SCHEDULE_TYPE_INVALID = 0,
     ESP_SCHEDULE_TYPE_DAYS_OF_WEEK,
     ESP_SCHEDULE_TYPE_DATE,
+    ESP_SCHEDULE_TYPE_RELATIVE,
 } esp_schedule_type_t;
 
 /** Schedule days. Used for ESP_SCHEDULE_TYPE_DAYS_OF_WEEK. */
@@ -108,6 +109,11 @@ typedef struct esp_schedule_trigger {
         /** If the schedule is to be repeated every year. */
         bool repeat_every_year;
     } date;
+    /** For type ESP_SCHEDULE_TYPE_SECONDS */
+    int relative_seconds;
+    /** Used for passing the next schedule timestamp for
+     * ESP_SCHEDULE_TYPE_RELATIVE */
+    time_t next_scheduled_time_utc;
 } esp_schedule_trigger_t;
 
 /** Schedule config */
