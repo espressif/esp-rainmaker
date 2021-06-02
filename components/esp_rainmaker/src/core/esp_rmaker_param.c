@@ -438,6 +438,15 @@ esp_err_t esp_rmaker_param_store_value(_esp_rmaker_param_t *param)
     return err;
 }
 
+esp_rmaker_param_val_t *esp_rmaker_param_get_val(esp_rmaker_param_t *param)
+{
+    if (!param) {
+        ESP_LOGE(TAG, "Param handle cannot be NULL.");
+        return NULL;
+    }
+    return &((_esp_rmaker_param_t *)param)->val;
+}
+
 esp_err_t esp_rmaker_param_delete(const esp_rmaker_param_t *param)
 {
     _esp_rmaker_param_t *_param = (_esp_rmaker_param_t *)param;

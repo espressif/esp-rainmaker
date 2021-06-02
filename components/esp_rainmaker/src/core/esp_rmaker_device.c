@@ -42,6 +42,9 @@ esp_err_t esp_rmaker_device_delete(const esp_rmaker_device_t *device)
             esp_rmaker_param_delete((esp_rmaker_param_t *)param);
             param = next_param;
         }
+        if (_device->subtype) {
+            free(_device->subtype);
+        }
         if (_device->name) {
             free(_device->name);
         }
@@ -202,6 +205,24 @@ esp_err_t esp_rmaker_device_add_attribute(const esp_rmaker_device_t *device, con
     }
     ESP_LOGD(TAG, "Device attribute %s.%s added", _device->name, attr_name);
     return ESP_OK;
+}
+
+/* Add a device subtype */
+esp_err_t esp_rmaker_device_add_subtype(const esp_rmaker_device_t *device, const char *subtype)
+{
+    if (!device || !subtype) {
+        ESP_LOGE(TAG, "Device handle or subtype cannot be NULL.");
+        return ESP_ERR_INVALID_ARG;
+    }
+    _esp_rmaker_device_t *_device = (_esp_rmaker_device_t *)device;
+    if (_device->subtype) {
+        free(_device->subtype);
+    }
+    if ((_device->subtype = strdup(subtype)) != NULL ){
+        return ESP_OK;
+    } else {
+        return ESP_ERR_NO_MEM;
+    }
 }
 
 esp_err_t esp_rmaker_device_assign_primary_param(const esp_rmaker_device_t *device, const esp_rmaker_param_t *param)

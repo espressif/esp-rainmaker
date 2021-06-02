@@ -533,6 +533,19 @@ esp_err_t esp_rmaker_node_remove_device(const esp_rmaker_node_t *node, const esp
  */
 esp_err_t esp_rmaker_device_add_attribute(const esp_rmaker_device_t *device, const char *attr_name, const char *val);
 
+/** Add a Device subtype
+ *
+ * This can be something like esp.subtype.rgb-light for a device of type esp.device.lightbulb.
+ * This would primarily be used by the phone apps to render different icons for the same device type.
+ *
+ * @param[in] device Device handle.
+ * @param[in] subtype String describing the sub type.
+ *
+ * @return ESP_OK if the subtype was added successfully.
+ * @return error in case of failure.
+ */
+esp_err_t esp_rmaker_device_add_subtype(const esp_rmaker_device_t *device, const char *subtype);
+
 /** Get device name from handle
  *
  * @param[in] device Device handle.
@@ -728,6 +741,19 @@ char *esp_rmaker_param_get_name(const esp_rmaker_param_t *param);
  * @return NULL in case of failure, or if the type wasn't provided while creating the parameter.
  */
 char *esp_rmaker_param_get_type(const esp_rmaker_param_t *param);
+
+/** Get parameter value
+ *
+ * This gives the parameter value that is stored in the RainMaker core.
+ *
+ * @note This does not call any explicit functions to read value from hardware/driver.
+ *
+ * @param[in] param Parameter handle
+ *
+ * @return Pointer to parameter value on success.
+ * @return NULL in case of failure.
+ */
+esp_rmaker_param_val_t *esp_rmaker_param_get_val(esp_rmaker_param_t *param);
 
 /** Report the node details to the cloud
  *
