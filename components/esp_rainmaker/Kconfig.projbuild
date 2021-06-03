@@ -175,4 +175,24 @@ menu "ESP RainMaker Config"
 
     endmenu
 
+    menu "ESP RainMaker Scenes"
+
+        config ESP_RMAKER_SCENES_MAX_SCENES
+            int "Maximum scenes"
+            default 10
+            range 1 50
+            help
+                Maximum Number of scenes allowed. The json size for report params increases as the number of scenes increases.
+
+        config ESP_RMAKER_SCENES_DEACTIVATE_SUPPORT
+            bool "Enable Deactivate support"
+            default n
+            help
+                This enables the deactivate callback support. The application callback will be invoked with the source
+                set to ESP_RMAKER_REQ_SRC_SCENE_DEACTIVATE when the deactivate operation is received. However, the
+                param values would be the same as those for activate, since the RainMaker core does not know what the
+                expected values are for scene deactivation.
+
+    endmenu
+
 endmenu
