@@ -89,13 +89,14 @@ void app_main()
     esp_rmaker_device_add_param(fan_device, esp_rmaker_speed_param_create(ESP_RMAKER_DEF_SPEED_NAME, DEFAULT_SPEED));
     esp_rmaker_node_add_device(node, fan_device);
 
-    /* Enable scheduling.
-     * Please note that you also need to set the timezone for schedules to work correctly.
-     * Simplest option is to use the CONFIG_ESP_RMAKER_DEF_TIMEZONE config option.
-     * Else, you can set the timezone using the API call `esp_rmaker_time_set_timezone("Asia/Shanghai");`
+    /* Enable timezone service which will be require for setting appropriate timezone
+     * from the phone apps for scheduling to work correctly.
      * For more information on the various ways of setting timezone, please check
      * https://rainmaker.espressif.com/docs/time-service.html.
      */
+    esp_rmaker_timezone_service_enable();
+
+    /* Enable scheduling. */
     esp_rmaker_schedule_enable();
 
     /* Start the ESP RainMaker Agent */
