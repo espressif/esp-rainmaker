@@ -1,0 +1,3 @@
+version: "1.0.0"
+description: This is a simple, light weight JSON parser built on top of jsmn
+url: https://github.com/espressif/json_parser
