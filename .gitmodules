@@ -6,7 +6,7 @@
 	url = https://github.com/espressif/json_generator.git
 [submodule "components/rmaker_common"]
 	path = components/rmaker_common
-	url = ../esp-rainmaker-common.git
+	url = https://github.com/espressif/esp-rainmaker-common.git
 [submodule "cli"]
 	path = cli
-	url = ../esp-rainmaker-cli.git
+	url = https://github.com/espressif/esp-rainmaker-cli.git
