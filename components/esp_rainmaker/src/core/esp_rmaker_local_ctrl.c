@@ -14,12 +14,29 @@
 
 #include <stdlib.h>
 #include <esp_log.h>
+#include <nvs.h>
 #include <esp_event.h>
 #include <esp_local_ctrl.h>
 #include <wifi_provisioning/manager.h>
 #include <esp_rmaker_internal.h>
+#include <esp_rmaker_standard_services.h>
 #include <esp_https_server.h>
 #include <mdns.h>
+
+#include <esp_idf_version.h>
+#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(4, 2, 0)
+// Features supported in 4.2
+
+#define ESP_RMAKER_LOCAL_CTRL_SECURITY_TYPE CONFIG_ESP_RMAKER_LOCAL_CTRL_SECURITY
+
+#else
+
+#if CONFIG_ESP_RMAKER_LOCAL_CTRL_SECURITY != 0
+#warning "Local control security type is not supported in idf versions below 4.2. Using sec0 by default."
+#endif
+#define ESP_RMAKER_LOCAL_CTRL_SECURITY_TYPE 0
+
+#endif /* !IDF4.2 */
 
 static const char * TAG = "esp_rmaker_local";
 
@@ -27,6 +44,10 @@ static const char * TAG = "esp_rmaker_local";
  * for internal control communication.
  */
 #define ESP_RMAKER_LOCAL_CTRL_HTTP_CTRL_PORT    12312
+#define ESP_RMAKER_NVS_PART_NAME                "nvs"
+#define ESP_RMAKER_NVS_LOCAL_CTRL_NAMESPACE     "local_ctrl"
+#define ESP_RMAKER_NVS_LOCAL_CTRL_POP           "pop"
+#define ESP_RMAKER_POP_LEN    9
 
 /* Custom allowed property types */
 enum property_types {
@@ -123,19 +144,106 @@ static esp_err_t set_property_values(size_t props_count,
     return ret;
 }
 
+static char *__esp_rmaker_local_ctrl_get_nvs(const char *key)
+{
+    char *val = NULL;
+    nvs_handle handle;
+    esp_err_t err = nvs_open_from_partition(ESP_RMAKER_NVS_PART_NAME, ESP_RMAKER_NVS_LOCAL_CTRL_NAMESPACE, NVS_READONLY, &handle);
+    if (err != ESP_OK) {
+        return NULL;
+    }
+    size_t len = 0;
+    if ((err = nvs_get_blob(handle, key, NULL, &len)) == ESP_OK) {
+        val = calloc(1, len + 1); /* +1 for NULL termination */
+        if (val) {
+            nvs_get_blob(handle, key, val, &len);
+        }
+    }
+    nvs_close(handle);
+    return val;
+
+}
+
+static esp_err_t __esp_rmaker_local_ctrl_set_nvs(const char *key, const char *val)
+{
+    nvs_handle handle;
+    esp_err_t err = nvs_open_from_partition(ESP_RMAKER_NVS_PART_NAME, ESP_RMAKER_NVS_LOCAL_CTRL_NAMESPACE, NVS_READWRITE, &handle);
+    if (err != ESP_OK) {
+        return err;
+    }
+    err = nvs_set_blob(handle, key, val, strlen(val));
+    nvs_commit(handle);
+    nvs_close(handle);
+    return err;
+}
+
+static char *esp_rmaker_local_ctrl_get_pop()
+{
+    char *pop = __esp_rmaker_local_ctrl_get_nvs(ESP_RMAKER_NVS_LOCAL_CTRL_POP);
+    if (pop) {
+        return pop;
+    }
+
+    ESP_LOGI(TAG, "Couldn't find POP in NVS. Generating a new one.");
+    pop = (char *)calloc(1, ESP_RMAKER_POP_LEN);
+    if (!pop) {
+        ESP_LOGE(TAG, "Couldn't allocate POP");
+        return NULL;
+    }
+    uint8_t random_bytes[ESP_RMAKER_POP_LEN] = {0};
+    esp_fill_random(&random_bytes, sizeof(random_bytes));
+    snprintf(pop, ESP_RMAKER_POP_LEN, "%02x%02x%02x%02x", random_bytes[0], random_bytes[1], random_bytes[2], random_bytes[3]);
+
+    __esp_rmaker_local_ctrl_set_nvs(ESP_RMAKER_NVS_LOCAL_CTRL_POP, pop);
+    return pop;
+}
+
+static int esp_rmaker_local_ctrl_get_security_type()
+{
+    return ESP_RMAKER_LOCAL_CTRL_SECURITY_TYPE;
+}
+
+static esp_err_t esp_rmaker_local_ctrl_service_enable(void)
+{
+    char *pop_str = esp_rmaker_local_ctrl_get_pop();
+    if (!pop_str) {
+        ESP_LOGE(TAG, "Get POP failed");
+        return ESP_FAIL;
+    }
+    int sec_ver = esp_rmaker_local_ctrl_get_security_type();
+
+    esp_rmaker_device_t *local_ctrl_service = esp_rmaker_create_local_control_service("Local Control", pop_str, sec_ver, NULL);
+    if (!local_ctrl_service) {
+        ESP_LOGE(TAG, "Failed to create Schedule Service");
+        free(pop_str);
+        return ESP_FAIL;
+    }
+    free(pop_str);
+
+    esp_err_t err = esp_rmaker_node_add_device(esp_rmaker_get_node(), local_ctrl_service);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to add service Service");
+        return err;
+    }
+
+    ESP_LOGD(TAG, "Local Control Service Enabled");
+    return err;
+}
+
 static esp_err_t __esp_rmaker_start_local_ctrl_service(const char *serv_name)
 {
     if (!serv_name) {
         ESP_LOGE(TAG, "Service name cannot be empty.");
         return ESP_ERR_INVALID_ARG;
     }
-    ESP_LOGI(TAG, "Starting ESP Local control with HTTP Transport.");
+
+    ESP_LOGI(TAG, "Starting ESP Local control with HTTP Transport and security version: %d", esp_rmaker_local_ctrl_get_security_type());
     /* Set the configuration */
     static httpd_ssl_config_t https_conf = HTTPD_SSL_CONFIG_DEFAULT();
     https_conf.transport_mode = HTTPD_SSL_TRANSPORT_INSECURE;
     https_conf.port_insecure = CONFIG_ESP_RMAKER_LOCAL_CTRL_HTTP_PORT;
     https_conf.httpd.ctrl_port = ESP_RMAKER_LOCAL_CTRL_HTTP_CTRL_PORT;
-    
+
     mdns_init();
     mdns_hostname_set(serv_name);
 
@@ -155,8 +263,40 @@ static esp_err_t __esp_rmaker_start_local_ctrl_service(const char *serv_name)
         .max_properties = 10
     };
 
+    /* If sec1, add security type details to the config */
+    protocomm_security_pop_t *pop = NULL;
+#if ESP_RMAKER_LOCAL_CTRL_SECURITY_TYPE == 1
+        char *pop_str = esp_rmaker_local_ctrl_get_pop();
+        /* Note: pop_str shouldn't be freed. If it gets freed, the pointer which is internally copied in esp_local_ctrl_start() will become invalid which would cause corruption. */
+
+        int sec_ver = esp_rmaker_local_ctrl_get_security_type();
+
+        if (sec_ver != 0 && pop_str) {
+            pop = (protocomm_security_pop_t *)calloc(1, sizeof(protocomm_security_pop_t));
+            if (!pop) {
+                ESP_LOGE(TAG, "Failed to allocate pop");
+                free(pop_str);
+                return ESP_ERR_NO_MEM;
+            }
+            pop->data = (uint8_t *)pop_str;
+            pop->len = strlen(pop_str);
+        }
+
+        config.proto_sec.version = sec_ver;
+        config.proto_sec.custom_handle = NULL;
+        config.proto_sec.pop = pop;
+#endif
+
     /* Start esp_local_ctrl service */
     ESP_ERROR_CHECK(esp_local_ctrl_start(&config));
+
+    /* Add node_id in mdns */
+    mdns_service_txt_item_set("_esp_local_ctrl", "_tcp", "node_id", esp_rmaker_get_node_id());
+
+    if (pop) {
+        free(pop);
+    }
+
     ESP_LOGI(TAG, "esp_local_ctrl service started with name : %s", serv_name);
 
     /* Create the Node Config property */
@@ -230,6 +370,10 @@ esp_err_t esp_rmaker_init_local_ctrl_service(void)
 
 esp_err_t esp_rmaker_start_local_ctrl_service(const char *serv_name)
 {
+    if (ESP_RMAKER_LOCAL_CTRL_SECURITY_TYPE == 1) {
+        esp_rmaker_local_ctrl_service_enable();
+    }
+
     if (!wait_for_wifi_prov) {
         return __esp_rmaker_start_local_ctrl_service(serv_name);
     }

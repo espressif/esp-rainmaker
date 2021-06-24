@@ -1,5 +1,14 @@
 # Changes
 
+## 12-Jan-2022 (esp_rmaker_local_ctrl: Added support for sec1)
+
+This commit adds support for security1 for local control. This can be enabled by setting
+`CONFIG_ESP_RMAKER_LOCAL_CTRL_SECURITY_1` when using local control feature (this is the
+default security level when enabling local control). This would also require the latest
+phone apps which have the support for security1.
+
+You can check the docs [here](https://rainmaker.espressif.com/docs/local-control.html) for more details.
+
 ## 24-Aug-2021 (esp_rmaker_user_mapping: Add checks for user id for better security)
 
 This commit adds some logic to detect a reset to factory or a user change during the

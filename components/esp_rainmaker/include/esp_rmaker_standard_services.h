@@ -85,6 +85,22 @@ esp_rmaker_device_t *esp_rmaker_create_schedule_service(const char *serv_name, e
 
 esp_rmaker_device_t *esp_rmaker_create_system_service(const char *serv_name, void *priv_data);
 
+/** Create a standard Local Control service
+ *
+ * This creates a Local Control service with the mandatory parameters. The default parameter names will be used.
+ * Refer \ref esp_rmaker_standard_params.h for default names.
+ *
+ * @param[in] serv_name The unique service name
+ * @param[in] pop Proof of possession
+ * @param[in] sec_type Security type
+ * @param[in] priv_data (Optional) Private data associated with the service. This should stay
+ * allocated throughout the lifetime of the service.
+ *
+ * @return service_handle on success.
+ * @return NULL in case of any error.
+ */
+esp_rmaker_device_t *esp_rmaker_create_local_control_service(const char *serv_name, const char *pop, int sec_type, void *priv_data);
+
 #ifdef __cplusplus
 }
 #endif

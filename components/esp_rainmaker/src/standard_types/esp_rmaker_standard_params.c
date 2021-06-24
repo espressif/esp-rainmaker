@@ -181,3 +181,17 @@ esp_rmaker_param_t *esp_rmaker_wifi_reset_param_create(const char *param_name)
             esp_rmaker_bool(false), PROP_FLAG_READ | PROP_FLAG_WRITE);
     return param;
 }
+
+esp_rmaker_param_t *esp_rmaker_local_control_pop_param_create(const char *param_name, const char *val)
+{
+    esp_rmaker_param_t *param = esp_rmaker_param_create(param_name, ESP_RMAKER_PARAM_LOCAL_CONTROL_POP,
+            esp_rmaker_str(val), PROP_FLAG_READ);
+    return param;
+}
+
+esp_rmaker_param_t *esp_rmaker_local_control_type_param_create(const char *param_name, int val)
+{
+    esp_rmaker_param_t *param = esp_rmaker_param_create(param_name, ESP_RMAKER_PARAM_LOCAL_CONTROL_TYPE,
+            esp_rmaker_int(val), PROP_FLAG_READ);
+    return param;
+}
