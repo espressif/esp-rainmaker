@@ -1,5 +1,32 @@
 # Changes
 
+## 02-Jul-2021 (esp_insights: Add facility to enable esp_insights in the examples)
+
+This commit introduces a breaking change in compilation, not due to any API change,
+but introduction of new components under components/esp-insights/components.
+You can either choose to include these components in your projects CMakeLists.txt
+as per the standard examples as given here:
+
+```
+set(EXTRA_COMPONENT_DIRS ${RMAKER_PATH}/components ${RMAKER_PATH}/examples/common ${RMAKER_PATH}/components/esp-insights/components)
+```
+
+You will also have to pull in the new esp-insights submodule by executing this command:
+
+```
+git submodule update --init --recursive
+```
+
+Another option is to exclude the common example component (app_insights) that adds these
+components to the dependencies by adding this to your project's CMakeLists.txt:
+
+```
+set(EXCLUDE_COMPONENTS app_insights)
+```
+
+Check out the [esp-insights](https://github.com/espressif/esp-insights) project to understand more about this.
+You can also check the docs [here](https://rainmaker.espressif.com/docs/esp-insights.html) to get started with enabling Insights in ESP RainMaker.
+
 ## 28-May-2021 (esp_rmaker_core: Add a system service for reboot/reset)
 
 The reboot/reset API prototypes have changed from

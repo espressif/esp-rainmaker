@@ -18,6 +18,7 @@
 #include <esp_rmaker_standard_devices.h>
 
 #include <app_wifi.h>
+#include <app_insights.h>
 
 #include "app_priv.h"
 
@@ -60,6 +61,9 @@ void app_main()
     /* Create a device and add the relevant parameters to it */
     temp_sensor_device = esp_rmaker_temp_sensor_device_create("Temperature Sensor", NULL, app_get_current_temperature());
     esp_rmaker_node_add_device(node, temp_sensor_device);
+
+    /* Enable Insights. Requires CONFIG_ESP_INSIGHTS_ENABLED=y */
+    app_insights_enable();
 
     /* Start the ESP RainMaker Agent */
     esp_rmaker_start();

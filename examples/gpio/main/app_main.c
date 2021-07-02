@@ -17,6 +17,7 @@
 #include <esp_rmaker_standard_types.h>
 
 #include <app_wifi.h>
+#include <app_insights.h>
 
 #include "app_priv.h"
 
@@ -84,6 +85,9 @@ void app_main()
     esp_rmaker_device_add_param(gpio_device, blue_param);
 
     esp_rmaker_node_add_device(node, gpio_device);
+
+    /* Enable Insights. Requires CONFIG_ESP_INSIGHTS_ENABLED=y */
+    app_insights_enable();
 
     /* Start the ESP RainMaker Agent */
     esp_rmaker_start();
