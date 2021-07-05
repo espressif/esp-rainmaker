@@ -10,3 +10,6 @@
 [submodule "cli"]
 	path = cli
 	url = ../esp-rainmaker-cli.git
+[submodule "components/esp-insights"]
+	path = components/esp-insights
+	url = ../esp-insights.git
