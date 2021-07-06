@@ -59,8 +59,8 @@ static const char *TAG = "esp_claim";
 #define CLAIM_INIT_PATH     "claim/initiate"
 #define CLAIM_VERIFY_PATH   "claim/verify"
 
-extern uint8_t claim_service_server_root_ca_pem_start[] asm("_binary_claim_service_server_crt_start");
-extern uint8_t claim_service_server_root_ca_pem_end[] asm("_binary_claim_service_server_crt_end");
+extern uint8_t claim_service_server_root_ca_pem_start[] asm("_binary_rmaker_claim_service_server_crt_start");
+extern uint8_t claim_service_server_root_ca_pem_end[] asm("_binary_rmaker_claim_service_server_crt_end");
 #endif /* CONFIG_ESP_RMAKER_SELF_CLAIM */
 
 #define CLAIM_PK_SIZE       2048

@@ -13,4 +13,4 @@ ifndef CONFIG_ESP_RMAKER_LOCAL_CTRL_ENABLE
 COMPONENT_OBJEXCLUDE += src/core/esp_rmaker_local_ctrl.o
 endif
 
-COMPONENT_EMBED_TXTFILES := server_certs/mqtt_server.crt server_certs/claim_service_server.crt server_certs/ota_server.crt
+COMPONENT_EMBED_TXTFILES := server_certs/rmaker_mqtt_server.crt server_certs/rmaker_claim_service_server.crt server_certs/rmaker_ota_server.crt

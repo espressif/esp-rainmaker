@@ -22,8 +22,8 @@
 #include "esp_rmaker_internal.h"
 #include "esp_rmaker_client_data.h"
 
-extern uint8_t mqtt_server_root_ca_pem_start[] asm("_binary_mqtt_server_crt_start");
-extern uint8_t mqtt_server_root_ca_pem_end[] asm("_binary_mqtt_server_crt_end");
+extern uint8_t mqtt_server_root_ca_pem_start[] asm("_binary_rmaker_mqtt_server_crt_start");
+extern uint8_t mqtt_server_root_ca_pem_end[] asm("_binary_rmaker_mqtt_server_crt_end");
 
 char * esp_rmaker_get_mqtt_host()
 {
