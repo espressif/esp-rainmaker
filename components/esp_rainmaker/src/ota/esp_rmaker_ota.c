@@ -30,7 +30,7 @@ static const char *TAG = "esp_rmaker_ota";
 #define OTA_REBOOT_TIMER_SEC    10
 #define DEF_HTTP_BUFFER_SIZE    1024
 
-extern const char esp_rmaker_ota_def_cert[] asm("_binary_ota_server_crt_start");
+extern const char esp_rmaker_ota_def_cert[] asm("_binary_rmaker_ota_server_crt_start");
 const char *ESP_RMAKER_OTA_DEFAULT_SERVER_CERT = esp_rmaker_ota_def_cert;
 char *esp_rmaker_ota_status_to_string(ota_status_t status)
 {
