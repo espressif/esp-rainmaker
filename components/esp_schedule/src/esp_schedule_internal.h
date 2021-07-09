@@ -21,7 +21,6 @@
 typedef struct esp_schedule {
     char name[MAX_SCHEDULE_NAME_LEN + 1];
     esp_schedule_trigger_t trigger;
-    time_t next_scheduled_time_utc;
     uint32_t next_scheduled_time_diff;
     TimerHandle_t timer;
     esp_schedule_trigger_cb_t trigger_cb;
