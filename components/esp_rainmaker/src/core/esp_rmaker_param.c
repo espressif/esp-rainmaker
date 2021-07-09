@@ -393,7 +393,18 @@ esp_err_t esp_rmaker_param_get_stored_value(_esp_rmaker_param_t *param, esp_rmak
     if ((param->val.type == RMAKER_VAL_TYPE_STRING) || (param->val.type == RMAKER_VAL_TYPE_OBJECT) ||
                 (param->val.type == RMAKER_VAL_TYPE_ARRAY)) {
         size_t len = 0;
-        if ((err = nvs_get_str(handle, param->name, NULL, &len)) == ESP_OK) {
+        if ((err = nvs_get_blob(handle, param->name, NULL, &len)) == ESP_OK) {
+            char *s_val = calloc(1, len + 1);
+            if (!s_val) {
+                err = ESP_ERR_NO_MEM;
+            } else {
+                nvs_get_blob(handle, param->name, s_val, &len);
+                s_val[len] = '\0';
+                val->type = param->val.type;
+                val->val.s = s_val;
+            }
+        } else if ((err = nvs_get_str(handle, param->name, NULL, &len)) == ESP_OK) {
+            /* In order to be compatible with the previous nvs_set_str() */
             char *s_val = calloc(1, len);
             if (!s_val) {
                 err = ESP_ERR_NO_MEM;
@@ -425,7 +436,7 @@ esp_err_t esp_rmaker_param_store_value(_esp_rmaker_param_t *param)
                 (param->val.type == RMAKER_VAL_TYPE_ARRAY)) {
         /* Store only if value is not NULL */
         if (param->val.val.s) {
-            err = nvs_set_str(handle, param->name, param->val.val.s);
+            err = nvs_set_blob(handle, param->name, param->val.val.s, strlen(param->val.val.s));
             nvs_commit(handle);
         } else {
             err = ESP_OK;
