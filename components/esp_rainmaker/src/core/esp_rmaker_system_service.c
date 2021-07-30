@@ -27,15 +27,24 @@ static esp_err_t esp_rmaker_system_serv_write_cb(const esp_rmaker_device_t *devi
         const esp_rmaker_param_t *param, const esp_rmaker_param_val_t val,
         void *priv_data, esp_rmaker_write_ctx_t *ctx)
 {
-    esp_err_t err = ESP_FAIL;
+    esp_err_t err = ESP_OK;
     esp_rmaker_system_serv_config_t *config = (esp_rmaker_system_serv_config_t *)priv_data;
     if (strcmp(esp_rmaker_param_get_type(param), ESP_RMAKER_PARAM_REBOOT) == 0) {
-        err = esp_rmaker_reboot(config->reboot_seconds);
+        if (val.val.b == true) {
+            err = esp_rmaker_reboot(config->reboot_seconds);
+        }
     } else if (strcmp(esp_rmaker_param_get_type(param), ESP_RMAKER_PARAM_FACTORY_RESET) == 0) {
-        err = esp_rmaker_factory_reset(config->reset_seconds, config->reset_reboot_seconds);
+        if (val.val.b == true) {
+            err = esp_rmaker_factory_reset(config->reset_seconds, config->reset_reboot_seconds);
+        }
     } else if (strcmp(esp_rmaker_param_get_type(param), ESP_RMAKER_PARAM_WIFI_RESET) == 0) {
-        err = esp_rmaker_wifi_reset(config->reset_seconds, config->reset_reboot_seconds);
+        if (val.val.b == true) {
+            err = esp_rmaker_wifi_reset(config->reset_seconds, config->reset_reboot_seconds);
+        }
+    } else {
+        return ESP_FAIL;
     }
+
     if (err == ESP_OK) {
         esp_rmaker_param_update_and_report(param, val);
     }
