@@ -18,7 +18,8 @@
 #include <json_generator.h>
 #include <esp_rmaker_core.h>
 
-#define RMAKER_PARAM_FLAG_VALUE_CHANGE   0x01
+#define RMAKER_PARAM_FLAG_VALUE_CHANGE   (1 << 0)
+#define RMAKER_PARAM_FLAG_VALUE_NOTIFY   (1 << 1)
 #define ESP_RMAKER_NVS_PART_NAME            "nvs"
 
 typedef enum {
