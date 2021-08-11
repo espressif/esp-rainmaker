@@ -271,6 +271,22 @@ esp_err_t esp_rmaker_node_remove_device(const esp_rmaker_node_t *node, const esp
     return ESP_OK;
 }
 
+esp_rmaker_device_t *esp_rmaker_node_get_device_by_name(const esp_rmaker_node_t *node, const char *device_name)
+{
+    if (!node || !device_name) {
+        ESP_LOGE(TAG, "Node handle or device name cannot be NULL");
+        return NULL;
+    }
+    _esp_rmaker_device_t *device = ((_esp_rmaker_node_t *)node)->devices;
+    while(device) {
+        if (strcmp(device->name, device_name) == 0) {
+            break;
+        }
+        device = device->next;
+    }
+    return (esp_rmaker_device_t *)device;
+}
+
 _esp_rmaker_device_t *esp_rmaker_node_get_first_device(const esp_rmaker_node_t *node)
 {
     _esp_rmaker_node_t *_node = (_esp_rmaker_node_t *)node;
