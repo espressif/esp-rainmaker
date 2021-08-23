@@ -10,18 +10,23 @@
 #ifdef CONFIG_ESP_INSIGHTS_ENABLED
 #include <esp_rmaker_mqtt.h>
 #include <esp_insights.h>
-#include <esp_diagnostics_system_metrics.h>
+#include <string.h>
+#include <esp_rmaker_core.h>
+#include <esp_rmaker_factory.h>
 
 #if CONFIG_APP_INSIGHTS_ENABLE_LOG_TYPE_ALL
 #define APP_INSIGHTS_LOG_TYPE               ESP_DIAG_LOG_TYPE_ERROR \
+                                            | ESP_DIAG_LOG_TYPE_WARNING \
                                             | ESP_DIAG_LOG_TYPE_EVENT
 #else
-#define APP_INSIGHTS_LOG_TYPE               0
+#define APP_INSIGHTS_LOG_TYPE               ESP_DIAG_LOG_TYPE_ERROR
 #endif /* CONFIG_APP_INSIGHTS_ENABLE_LOG_TYPE_ALL */
+
+esp_err_t esp_insights_enable(esp_insights_config_t *config);
 
 #endif /* CONFIG_ESP_INSIGHTS_ENABLED */
 
-static const char *TAG = "app_insights";
+#define TAG "app_insights"
 
 esp_err_t app_insights_enable(void)
 {
@@ -49,12 +54,7 @@ esp_err_t app_insights_enable(void)
     esp_insights_config_t config = {
         .log_type = APP_INSIGHTS_LOG_TYPE,
     };
-    esp_insights_rmaker_enable(&config);
-    ESP_LOGI(TAG, "App Insights Enabled.");
-#ifdef CONFIG_DIAG_ENABLE_HEAP_METRICS
-    /* Dump heap metrics */
-    esp_diag_heap_metrics_dump();
-#endif /* CONFIG_DIAG_ENABLE_HEAP_METRICS */
+    esp_insights_enable(&config);
 #else
     ESP_LOGI(TAG, "Enable CONFIG_ESP_INSIGHTS_ENABLED to get Insights.");
 #endif /* ! CONFIG_ESP_INSIGHTS_ENABLED */
