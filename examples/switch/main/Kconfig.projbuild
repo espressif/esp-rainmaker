@@ -8,4 +8,12 @@ menu "Example Configuration"
             GPIO number on which the "Boot" button is connected. This is generally used
             by the application for custom operations like toggling states, resetting to defaults, etc.
 
+    config EXAMPLE_ENABLE_TEST_NOTIFICATIONS
+        bool "Test Notifications"
+        default n
+        help
+            Enable this option to test mobile push notifications. When enabled, turning on the switch using
+            push button will trigger a parameter notification {"Switch":{"Power":true}} and turning off will
+            trigger an alert "Switch was turned off".
+
 endmenu

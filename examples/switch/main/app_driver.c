@@ -51,9 +51,27 @@ static void push_btn_cb(void *arg)
 {
     bool new_state = !g_power_state;
     app_driver_set_state(new_state);
+#ifdef CONFIG_EXAMPLE_ENABLE_TEST_NOTIFICATIONS
+    /* This snippet has been added just to demonstrate how the APIs esp_rmaker_param_update_and_notify()
+     * and esp_rmaker_raise_alert() can be used to trigger push notifications on the phone apps.
+     * Normally, there should not be a need to use these APIs for such simple operations. Please check
+     * API documentation for details.
+     */
+    if (new_state) {
+        esp_rmaker_param_update_and_notify(
+                esp_rmaker_device_get_param_by_name(switch_device, ESP_RMAKER_DEF_POWER_NAME),
+                esp_rmaker_bool(new_state));
+    } else {
+        esp_rmaker_param_update_and_report(
+                esp_rmaker_device_get_param_by_name(switch_device, ESP_RMAKER_DEF_POWER_NAME),
+                esp_rmaker_bool(new_state));
+        esp_rmaker_raise_alert("Switch was turned off");
+    }
+#else
     esp_rmaker_param_update_and_report(
             esp_rmaker_device_get_param_by_name(switch_device, ESP_RMAKER_DEF_POWER_NAME),
             esp_rmaker_bool(new_state));
+#endif
 }
 
 static void set_power_state(bool target)

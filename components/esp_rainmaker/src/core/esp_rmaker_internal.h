@@ -101,7 +101,6 @@ esp_err_t esp_rmaker_report_node_state(void);
 _esp_rmaker_device_t *esp_rmaker_node_get_first_device(const esp_rmaker_node_t *node);
 esp_rmaker_attr_t *esp_rmaker_node_get_first_attribute(const esp_rmaker_node_t *node);
 esp_err_t esp_rmaker_params_mqtt_init(void);
-esp_err_t esp_rmaker_report_param_internal(void);
 esp_err_t esp_rmaker_param_get_stored_value(_esp_rmaker_param_t *param, esp_rmaker_param_val_t *val);
 esp_err_t esp_rmaker_param_store_value(_esp_rmaker_param_t *param);
 esp_err_t esp_rmaker_node_delete(const esp_rmaker_node_t *node);
