@@ -25,6 +25,7 @@
 #include <esp_rmaker_work_queue.h>
 
 #include <esp_rmaker_core.h>
+#include <esp_rmaker_user_mapping.h>
 #include <esp_rmaker_utils.h>
 #include "esp_rmaker_internal.h"
 #include "esp_rmaker_mqtt.h"
@@ -131,6 +132,10 @@ static void esp_rmaker_event_handler(void* arg, esp_event_base_t event_base,
 #endif
         /* Signal rmaker thread to continue execution */
         xEventGroupSetBits(wifi_event_group, WIFI_CONNECTED_EVENT);
+    } else if (event_base == RMAKER_EVENT && event_id == RMAKER_EVENT_USER_NODE_MAPPING_DONE) {
+        esp_rmaker_params_mqtt_init();
+        esp_event_handler_unregister(RMAKER_EVENT, RMAKER_EVENT_USER_NODE_MAPPING_DONE, &esp_rmaker_event_handler);
+
     }
 }
 
@@ -191,9 +196,11 @@ static esp_err_t esp_rmaker_report_node_config_and_state()
         ESP_LOGE(TAG, "Report node config failed.");
         return ESP_FAIL;
     }
-    if (esp_rmaker_report_node_state() != ESP_OK) {
-        ESP_LOGE(TAG, "Report node state failed.");
-        return ESP_FAIL;
+    if (esp_rmaker_user_node_mapping_get_state() == ESP_RMAKER_USER_MAPPING_DONE) {
+        if (esp_rmaker_report_node_state() != ESP_OK) {
+            ESP_LOGE(TAG, "Report node state failed.");
+            return ESP_FAIL;
+        }
     }
     return ESP_OK;
 }
@@ -292,13 +299,38 @@ static void esp_rmaker_task(void *data)
     }
     esp_rmaker_priv_data->mqtt_connected = true;
     esp_rmaker_priv_data->state = ESP_RMAKER_STATE_STARTED;
-    if (esp_rmaker_report_node_config_and_state() != ESP_OK) {
+    if (esp_rmaker_report_node_config() != ESP_OK) {
         ESP_LOGE(TAG, "Aborting!!!");
         goto rmaker_end;
     }
-    if (esp_rmaker_register_for_set_params() != ESP_OK) {
-        ESP_LOGE(TAG, "Aborting!!!");
-        goto rmaker_end;
+    if (esp_rmaker_user_node_mapping_get_state() == ESP_RMAKER_USER_MAPPING_DONE) {
+        if (esp_rmaker_params_mqtt_init() != ESP_OK) {
+            ESP_LOGE(TAG, "Aborting!!!");
+            goto rmaker_end;
+        }
+    } else {
+        /* If network is connected without even starting the user-node mapping workflow,
+         * it could mean that some incorrect app was used to provision the device. Even
+         * if the older user would not be able to update the params, it would be better
+         * to completely reset the user permissions by sending a dummy user node mapping
+         * request, so that the earlier user won't even see the connectivity and other
+         * status.
+         */
+        if (esp_rmaker_user_node_mapping_get_state() != ESP_RMAKER_USER_MAPPING_STARTED) {
+            esp_rmaker_start_user_node_mapping("esp-rmaker", "failed");
+        }
+        /* Wait for User Node mapping to finish. This will also consider the above dummy user
+         * node mapping request as a successful  mapping, but that is still fine since the
+         * cloud would have reset the mappings. This allows other alternative user node mappings
+         * to be used after this point, which may be independent of provisioning.
+         */
+        err = esp_event_handler_register(RMAKER_EVENT, RMAKER_EVENT_USER_NODE_MAPPING_DONE,
+                &esp_rmaker_event_handler, NULL);
+        if (err != ESP_OK) {
+            ESP_LOGE(TAG, "Aborting!!!");
+            goto rmaker_end;
+        }
+        ESP_LOGI(TAG, "Waiting for User Node Association.");
     }
     return;
 
@@ -400,6 +432,7 @@ static esp_err_t esp_rmaker_init(const esp_rmaker_config_t *config, bool use_cla
             }
         }
     }
+    esp_rmaker_user_node_mapping_init();
 #ifdef CONFIG_ESP_RMAKER_LOCAL_CTRL_ENABLE
     esp_rmaker_init_local_ctrl_service();
 #endif

@@ -41,6 +41,11 @@ typedef enum {
     RMAKER_EVENT_CLAIM_SUCCESSFUL,
     /** Self Claiming Failed */
     RMAKER_EVENT_CLAIM_FAILED,
+    /** Node side communication for User-Node mapping done.
+     * Actual mapping state will be managed by the ESP RainMaker cloud based on the user side communication.
+     * Associated data is the NULL terminated user id.
+     */
+    RMAKER_EVENT_USER_NODE_MAPPING_DONE,
 } esp_rmaker_event_t;
 
 /** ESP RainMaker Node information */

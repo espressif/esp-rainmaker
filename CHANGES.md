@@ -1,5 +1,22 @@
 # Changes
 
+## 24-Aug-2021 (esp_rmaker_user_mapping: Add checks for user id for better security)
+
+This commit adds some logic to detect a reset to factory or a user change during the
+user node association workflow so that the RainMaker cloud can reset any earlier
+mappings if this reset state is reported by the device during user node association.
+
+If an existing, provisioned node is upgraded with a new firmware with this logic enabled,
+it will send a request to cloud to reset the user mapping and so a re-provisioning would be
+required. Moreover, a simple Wi-Fi reset will be treated as a factory reset in the context of
+user node association. A side effect of this would be that the cloud can remove the secondary
+users associated with that node and so, those would have to be added back again.
+All subsequent Wi-Fi/Factory resets and provisioning + user node association would work fine.
+For all new nodes, enabling this logic would have no issues.
+
+Since this change in behavior is a breaking change, the feature has been kept disabled by default.
+However, it is strongly recommended to enable this using CONFIG_ESP_RMAKER_USER_ID_CHECK
+
 ## 02-Jul-2021 (esp_insights: Add facility to enable esp_insights in the examples)
 
 This commit introduces a breaking change in compilation, not due to any API change,

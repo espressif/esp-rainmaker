@@ -31,7 +31,6 @@
 #define NODE_PARAMS_REMOTE_TOPIC_SUFFIX         "params/remote"
 #define TIME_SERIES_DATA_TOPIC_SUFFIX           "params/ts_data"
 
-#define ESP_RMAKER_NVS_PART_NAME        "nvs"
 #define MAX_PUBLISH_TOPIC_LEN           64
 #define RMAKER_PARAMS_SIZE_MARGIN       50
 
@@ -40,6 +39,7 @@ static size_t max_node_params_size = CONFIG_ESP_RMAKER_MAX_PARAM_DATA_SIZE;
  * It may be reallocated if the params size becomes too large */
 static char *node_params_buf;
 static char publish_topic[MAX_PUBLISH_TOPIC_LEN];
+static bool esp_rmaker_params_mqtt_init_done;
 
 static const char *TAG = "esp_rmaker_param";
 
@@ -221,7 +221,11 @@ esp_err_t esp_rmaker_report_param_internal(void)
             snprintf(publish_topic, sizeof(publish_topic), "node/%s/%s",
                     esp_rmaker_get_node_id(), NODE_PARAMS_LOCAL_TOPIC_SUFFIX);
             ESP_LOGI(TAG, "Reporting params: %s", node_params_buf);
-            esp_rmaker_mqtt_publish(publish_topic, node_params_buf, strlen(node_params_buf), RMAKER_MQTT_QOS1, NULL);
+            if (esp_rmaker_params_mqtt_init_done) {
+                esp_rmaker_mqtt_publish(publish_topic, node_params_buf, strlen(node_params_buf), RMAKER_MQTT_QOS1, NULL);
+            } else {
+                ESP_LOGW(TAG, "Not reporting params since params mqtt not initialized yet.");
+            }
         }
         return ESP_OK;
     }
@@ -239,7 +243,11 @@ esp_err_t esp_rmaker_report_node_state(void)
             snprintf(publish_topic, sizeof(publish_topic), "node/%s/%s",
                     esp_rmaker_get_node_id(), NODE_PARAMS_LOCAL_INIT_TOPIC_SUFFIX);
             ESP_LOGI(TAG, "Reporting params (init): %s", node_params_buf);
-            esp_rmaker_mqtt_publish(publish_topic, node_params_buf, strlen(node_params_buf), RMAKER_MQTT_QOS1, NULL);
+            if (esp_rmaker_params_mqtt_init_done) {
+                esp_rmaker_mqtt_publish(publish_topic, node_params_buf, strlen(node_params_buf), RMAKER_MQTT_QOS1, NULL);
+            } else {
+                ESP_LOGW(TAG, "Not reporting params since params mqtt not initialized yet.");
+            }
         }
         return ESP_OK;
     }
@@ -367,7 +375,7 @@ static void esp_rmaker_set_params_callback(const char *topic, void *payload, siz
     esp_rmaker_handle_set_params((char *)payload, payload_len, ESP_RMAKER_REQ_SRC_CLOUD);
 }
 
-esp_err_t esp_rmaker_register_for_set_params(void)
+static esp_err_t esp_rmaker_register_for_set_params(void)
 {
     char subscribe_topic[100];
     snprintf(subscribe_topic, sizeof(subscribe_topic), "node/%s/%s",
@@ -378,6 +386,19 @@ esp_err_t esp_rmaker_register_for_set_params(void)
         return ESP_FAIL;
     }
     return ESP_OK;
+}
+
+esp_err_t esp_rmaker_params_mqtt_init(void)
+{
+    /* Subscribe for parameter update requests */
+    esp_err_t err = esp_rmaker_register_for_set_params();
+    if (err == ESP_OK) {
+        ESP_LOGI(TAG, "Params MQTT Init done.");
+        esp_rmaker_params_mqtt_init_done = true;
+        /* Report the current node state i.e. values of all the node parameters */
+        esp_rmaker_report_node_state();
+    }
+    return err;
 }
 
 esp_err_t esp_rmaker_param_get_stored_value(_esp_rmaker_param_t *param, esp_rmaker_param_val_t *val)
