@@ -1,4 +1,4 @@
-// Copyright 2019 Espressif Systems (Shanghai) PTE LTD
+// Copyright 2020 Espressif Systems (Shanghai) PTE LTD
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -14,10 +14,12 @@
 
 #include <stdio.h>
 #include <esp_err.h>
+#include "esp_log.h"
 
 #include "qrcodegen.h"
+#include "qrcode.h"
 
-#define MAX_QRCODE_VERSION 5
+static const char *TAG = "qrcode";
 
 static const char *lt[] = {
     /* 0 */ "  ",
@@ -38,13 +40,8 @@ static const char *lt[] = {
     /* 15 */ "\u2588\u2588",
 };
 
-void print_qr_char(unsigned char n)
+void esp_qrcode_print_console(esp_qrcode_handle_t qrcode)
 {
-    printf("%s", lt[n]);
-}
-
-extern void print_qr_char(unsigned char);
-static void printQr(const uint8_t qrcode[]) {
     int size = qrcodegen_getSize(qrcode);
     int border = 2;
     unsigned char num = 0;
@@ -64,38 +61,69 @@ static void printQr(const uint8_t qrcode[]) {
             if ((x < size + border) && (y < size + border) && qrcodegen_getModule(qrcode, x+1, y+1)) {
                 num |= 1 << 3;
             }
-            print_qr_char(num);
+            printf("%s", lt[num]);
         }
         printf("\n");
     }
     printf("\n");
 }
 
-esp_err_t qrcode_display(const char *text)
+esp_err_t esp_qrcode_generate(esp_qrcode_config_t *cfg, const char *text)
 {
-	enum qrcodegen_Ecc errCorLvl = qrcodegen_Ecc_LOW;
-    uint8_t *qrcode, *tempBuffer;
+    enum qrcodegen_Ecc ecc_lvl;
+    uint8_t *qrcode, *tempbuf;
     esp_err_t err = ESP_FAIL;
 
-    qrcode = calloc(1, qrcodegen_BUFFER_LEN_FOR_VERSION(MAX_QRCODE_VERSION));
-    if (!qrcode)
+    qrcode = calloc(1, qrcodegen_BUFFER_LEN_FOR_VERSION(cfg->max_qrcode_version));
+    if (!qrcode) {
         return ESP_ERR_NO_MEM;
+    }
 
-    tempBuffer = calloc(1, qrcodegen_BUFFER_LEN_FOR_VERSION(MAX_QRCODE_VERSION));
-    if (!tempBuffer) {
+    tempbuf = calloc(1, qrcodegen_BUFFER_LEN_FOR_VERSION(cfg->max_qrcode_version));
+    if (!tempbuf) {
         free(qrcode);
         return ESP_ERR_NO_MEM;
     }
 
-	// Make and print the QR Code symbol
-	bool ok = qrcodegen_encodeText(text, tempBuffer, qrcode, errCorLvl,
-		qrcodegen_VERSION_MIN, MAX_QRCODE_VERSION, qrcodegen_Mask_AUTO, true);
-	if (ok) {
-		printQr(qrcode);
+    switch(cfg->qrcode_ecc_level) {
+        case ESP_QRCODE_ECC_LOW:
+            ecc_lvl = qrcodegen_Ecc_LOW;
+            break;
+        case ESP_QRCODE_ECC_MED:
+            ecc_lvl = qrcodegen_Ecc_MEDIUM;
+            break;
+        case ESP_QRCODE_ECC_QUART:
+            ecc_lvl = qrcodegen_Ecc_QUARTILE;
+            break;
+        case ESP_QRCODE_ECC_HIGH:
+            ecc_lvl = qrcodegen_Ecc_HIGH;
+            break;
+        default:
+            ecc_lvl = qrcodegen_Ecc_LOW;
+            break;
+    }
+
+    ESP_LOGD(TAG, "Encoding below text with ECC LVL %d & QR Code Version %d",
+             ecc_lvl, cfg->max_qrcode_version);
+    ESP_LOGD(TAG, "%s", text);
+    // Make and print the QR Code symbol
+    bool ok = qrcodegen_encodeText(text, tempbuf, qrcode, ecc_lvl,
+                                   qrcodegen_VERSION_MIN, cfg->max_qrcode_version,
+                                   qrcodegen_Mask_AUTO, true);
+    if (ok && cfg->display_func) {
+        cfg->display_func((esp_qrcode_handle_t)qrcode);
         err = ESP_OK;
     }
 
     free(qrcode);
-    free(tempBuffer);
+    free(tempbuf);
     return err;
+}
+
+esp_err_t qrcode_display(const char *text)
+{
+#define MAX_QRCODE_VERSION 5
+    esp_qrcode_config_t cfg = ESP_QRCODE_CONFIG_DEFAULT();
+    cfg.max_qrcode_version = MAX_QRCODE_VERSION;
+    return esp_qrcode_generate(&cfg, text);
 }
