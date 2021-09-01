@@ -26,7 +26,7 @@ before_script:
 - git --version
 # Cloning esp-idf - Started
 - echo Cloning esp-idf - Started
-- git clone --recursive --branch master --depth 1 ${IDF_GIT_PATH}/esp-idf.git
+- git clone --recursive --branch ${IDF_GIT_BRANCH} --depth 1 ${IDF_GIT_PATH}/esp-idf.git
 - cd esp-idf
 - echo Cloning esp-idf - Done
 # Cloning esp-idf - Done
