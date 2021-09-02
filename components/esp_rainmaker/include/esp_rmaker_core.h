@@ -518,6 +518,18 @@ esp_err_t esp_rmaker_node_add_device(const esp_rmaker_node_t *node, const esp_rm
  */
 esp_err_t esp_rmaker_node_remove_device(const esp_rmaker_node_t *node, const esp_rmaker_device_t *device);
 
+/** Get device by name
+ *
+ * Get handle for a device based on the name.
+ *
+ * @param[in] node Node handle.
+ * @param[in] device_name Device name to search.
+ *
+ * @return Device handle on success.
+ * @return NULL in case of failure.
+ */
+esp_rmaker_device_t *esp_rmaker_node_get_device_by_name(const esp_rmaker_node_t *node, const char *device_name);
+
 /** Add a Device attribute
  *
  * @note Device attributes are reported only once after a boot-up as part of the node
