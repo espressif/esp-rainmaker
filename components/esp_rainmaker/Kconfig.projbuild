@@ -48,6 +48,18 @@ menu "ESP RainMaker Config"
             has the calls to create and register the user mapping handlers, enable this config
             option to prevent duplication.
 
+    config ESP_RMAKER_USER_ID_CHECK
+        bool "User id check for User Node mapping"
+        default n
+        help
+            This enables the additional user id checks during user node mapping. Whenever a new user
+            id is received, it is checked against the existing user id in NVS. If there is a mismatch,
+            or if no user id exists in NVS, this is considered as a reset state and the same is reported
+            to the ESP RainMaker Cloud during the User Node association MQTT Publish so that the cloud
+            can take appropriate action w.r.t user permissions. It is recommended to enable this option
+            for security reasons.
+
+
     config ESP_RMAKER_LOCAL_CTRL_ENABLE
         bool "ESP RainMaker Local Control"
         default n
