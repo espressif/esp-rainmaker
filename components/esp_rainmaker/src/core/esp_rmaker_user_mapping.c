@@ -36,7 +36,7 @@ static const char *TAG = "esp_rmaker_user_mapping";
 typedef struct {
     char *user_id;
     char *secret_key;
-    int32_t mqtt_msg_id;
+    int mqtt_msg_id;
 } esp_rmaker_user_mapping_data_t;
 
 static esp_rmaker_user_mapping_data_t *rmaker_user_mapping_data;
