@@ -30,9 +30,13 @@
 #define NODE_PARAMS_LOCAL_INIT_TOPIC_SUFFIX     "params/local/init"
 #define NODE_PARAMS_REMOTE_TOPIC_SUFFIX         "params/remote"
 #define TIME_SERIES_DATA_TOPIC_SUFFIX           "params/ts_data"
+#define NODE_PARAMS_ALERT_TOPIC_SUFFIX          "alert"
+
+#define ESP_RMAKER_ALERT_KEY                    "esp.alert.str"
 
 #define MAX_PUBLISH_TOPIC_LEN           64
-#define RMAKER_PARAMS_SIZE_MARGIN       50
+#define RMAKER_PARAMS_SIZE_MARGIN       50 /* To accommodate for changes in param values while creating JSON */
+#define RMAKER_ALERT_STR_MARGIN         25 /* To accommodate rest of the alert payload {"esp.alert.str":""}  */
 
 static size_t max_node_params_size = CONFIG_ESP_RMAKER_MAX_PARAM_DATA_SIZE;
 /* This buffer will be allocated once and will be reused for all param updates.
@@ -210,7 +214,7 @@ static esp_err_t esp_rmaker_allocate_and_populate_params(uint8_t flags, bool res
     return err;
 }
 
-esp_err_t esp_rmaker_report_param_internal(void)
+static esp_err_t esp_rmaker_report_param_internal(uint8_t flags)
 {
     esp_err_t err = esp_rmaker_allocate_and_populate_params(RMAKER_PARAM_FLAG_VALUE_CHANGE, true);
     if (err == ESP_OK) {
@@ -218,9 +222,17 @@ esp_err_t esp_rmaker_report_param_internal(void)
          * length as even the smallest possible data, Eg. '{"d":{"p":0}}' will be > 10 bytes.
          */
         if (strlen(node_params_buf) > 10) {
-            snprintf(publish_topic, sizeof(publish_topic), "node/%s/%s",
-                    esp_rmaker_get_node_id(), NODE_PARAMS_LOCAL_TOPIC_SUFFIX);
-            ESP_LOGI(TAG, "Reporting params: %s", node_params_buf);
+            if (flags == RMAKER_PARAM_FLAG_VALUE_CHANGE) {
+                snprintf(publish_topic, sizeof(publish_topic), "node/%s/%s",
+                        esp_rmaker_get_node_id(), NODE_PARAMS_LOCAL_TOPIC_SUFFIX);
+                ESP_LOGI(TAG, "Reporting params: %s", node_params_buf);
+            } else if (flags == RMAKER_PARAM_FLAG_VALUE_NOTIFY) {
+                snprintf(publish_topic, sizeof(publish_topic), "node/%s/%s",
+                        esp_rmaker_get_node_id(), NODE_PARAMS_ALERT_TOPIC_SUFFIX);
+                ESP_LOGI(TAG, "Notifying params: %s", node_params_buf);
+            } else {
+                return ESP_FAIL;
+            }
             if (esp_rmaker_params_mqtt_init_done) {
                 esp_rmaker_mqtt_publish(publish_topic, node_params_buf, strlen(node_params_buf), RMAKER_MQTT_QOS1, NULL);
             } else {
@@ -688,7 +700,21 @@ esp_err_t esp_rmaker_param_report(const esp_rmaker_param_t *param)
         return ESP_ERR_INVALID_ARG;
     }
     ((_esp_rmaker_param_t *)param)->flags |= RMAKER_PARAM_FLAG_VALUE_CHANGE;
-    return esp_rmaker_report_param_internal();
+    return esp_rmaker_report_param_internal(RMAKER_PARAM_FLAG_VALUE_CHANGE);
+}
+
+esp_err_t esp_rmaker_param_notify(const esp_rmaker_param_t *param)
+{
+    if (!param) {
+        ESP_LOGE(TAG, "Param handle cannot be NULL.");
+        return ESP_ERR_INVALID_ARG;
+    }
+    ((_esp_rmaker_param_t *)param)->flags |= (RMAKER_PARAM_FLAG_VALUE_CHANGE | RMAKER_PARAM_FLAG_VALUE_NOTIFY);
+    esp_err_t err = esp_rmaker_report_param_internal(RMAKER_PARAM_FLAG_VALUE_NOTIFY);
+    if (err != ESP_OK) {
+        ESP_LOGW(TAG, "Failed to report parameter");
+    }
+    return esp_rmaker_report_param_internal(RMAKER_PARAM_FLAG_VALUE_CHANGE);
 }
 
 esp_err_t esp_rmaker_param_update_and_report(const esp_rmaker_param_t *param, esp_rmaker_param_val_t val)
@@ -697,6 +723,16 @@ esp_err_t esp_rmaker_param_update_and_report(const esp_rmaker_param_t *param, es
     /** Report parameter only if the RainMaker has started */
     if ((err == ESP_OK) && (esp_rmaker_get_state() == ESP_RMAKER_STATE_STARTED)) {
         err = esp_rmaker_param_report(param);
+    }
+    return err;
+}
+
+esp_err_t esp_rmaker_param_update_and_notify(const esp_rmaker_param_t *param, esp_rmaker_param_val_t val)
+{
+    esp_err_t err = esp_rmaker_param_update(param, val);
+    /** Report parameter only if the RainMaker has started */
+    if ((err == ESP_OK) && (esp_rmaker_get_state() == ESP_RMAKER_STATE_STARTED)) {
+        err = esp_rmaker_param_notify(param);
     }
     return err;
 }
@@ -717,4 +753,16 @@ char *esp_rmaker_param_get_type(const esp_rmaker_param_t *param)
         return NULL;
     }
     return ((_esp_rmaker_param_t *)param)->type;
+}
+
+esp_err_t esp_rmaker_raise_alert(const char *alert_str)
+{
+    char msg[ESP_RMAKER_MAX_ALERT_LEN + 1]; /* + 1 for NULL terminattion */
+    strlcpy(msg, alert_str, sizeof(msg));
+    char buf[ESP_RMAKER_MAX_ALERT_LEN + RMAKER_ALERT_STR_MARGIN];
+    snprintf(buf, sizeof(buf), "{\"%s\":\"%s\"}", ESP_RMAKER_ALERT_KEY, msg);
+    snprintf(publish_topic, sizeof(publish_topic), "node/%s/%s",
+            esp_rmaker_get_node_id(), NODE_PARAMS_ALERT_TOPIC_SUFFIX);
+    ESP_LOGI(TAG, "Reporting alert: %s", buf);
+    return esp_rmaker_mqtt_publish(publish_topic, buf, strlen(buf), RMAKER_MQTT_QOS1, NULL);
 }

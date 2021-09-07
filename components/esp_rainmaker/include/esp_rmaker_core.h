@@ -24,7 +24,8 @@ extern "C"
 
 #define ESP_RMAKER_CONFIG_VERSION    "2020-03-20"
 
-#define MAX_VERSION_STRING_LEN  16
+/* Maximum length of the alert message that can be passed to esp_rmaker_raise_alert() */
+#define ESP_RMAKER_MAX_ALERT_LEN    100
 
 /** @cond **/
 /** ESP RainMaker Event Base */
@@ -740,6 +741,46 @@ esp_err_t esp_rmaker_param_add_array_max_count(const esp_rmaker_param_t *param, 
  * @return error in case of failure.
  */
 esp_err_t esp_rmaker_param_update_and_report(const esp_rmaker_param_t *param, esp_rmaker_param_val_t val);
+
+/** Update and notify a parameter
+ *
+ * Calling this API will update the parameter and report it to ESP RainMaker cloud similar to
+ * esp_rmaker_param_update_and_report(). However, additionally, it will also trigger a notification
+ * on the phone apps (if enabled).
+ *
+ * @note This should be used only when some local change requires explicit notification even when the
+ * phone app is in background, not otherwise.
+ * Eg. Alarm got triggered, temperature exceeded some threshold, etc.
+ *
+ * Alternatively, the esp_rmaker_raise_alert() API can also be used to trigger notification
+ * on the phone apps with pre-formatted text.
+ *
+ * @param[in] param Parameter handle.
+ * @param[in] val New value of the parameter.
+ *
+ * @return ESP_OK if the parameter was updated successfully.
+ * @return error in case of failure.
+ */
+esp_err_t esp_rmaker_param_update_and_notify(const esp_rmaker_param_t *param, esp_rmaker_param_val_t val);
+
+/** Trigger an alert on the phone app
+ *
+ * This API will trigger a notification alert on the phone apps (if enabled) using the formatted text
+ * provided. Note that this does not send a notification directly to the phone, but reports the alert
+ * to the ESP RainMaker cloud which then uses the Notification framework to send notifications to the
+ * phone apps. The value does not get stored anywhere, nor is it linked to any node parameters.
+ *
+ * @note This should be used only if some event requires explicitly alerting the user even when the
+ * phone app is in background, not otherwise.
+ * Eg. "Motion Detected", "Fire alarm triggered"
+ *
+ * @param[in] alert_str NULL terminated pre-formatted alert string.
+ *     Maximum length can be ESP_RMAKER_MAX_ALERT_LEN, excluding NULL character.
+ *
+ * @return ESP_OK on success.
+ * @return error in case of failure.
+ */
+esp_err_t esp_rmaker_raise_alert(const char *alert_str);
 
 /** Get parameter name from handle
  *
