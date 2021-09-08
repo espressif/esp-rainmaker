@@ -46,10 +46,24 @@ before_script:
 - echo Building switch app - Started
 - ls
 - cd $CI_PROJECT_DIR/examples/switch
-- echo Running idf.py
+- echo Building for esp32
 - idf.py build
+- idf.py set-target esp32
 - echo Running make
 - rm -rf build/ sdkconfig
+- echo Building for esp32s2
+- idf.py set-target esp32s2
+- idf.py build
+- rm -rf build/ sdkconfig
+- echo Building for esp32c3
+- idf.py set-target esp32c3
+- idf.py build
+- rm -rf build/ sdkconfig
+- echo Building for esp32s3
+- idf.py set-target esp32s3
+- idf.py build
+- rm -rf build/ sdkconfig
+- echo Running make
 - make defconfig
 - make $MAKEFLAGS
 - echo Building switch app - Done
