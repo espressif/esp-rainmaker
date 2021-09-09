@@ -75,7 +75,7 @@ void app_main()
     }
     ESP_ERROR_CHECK( err );
 
-    /* Initialize Wi-Fi. Note that, this should be called before esp_rmaker_init()
+    /* Initialize Wi-Fi. Note that, this should be called before esp_rmaker_node_init()
      */
     app_wifi_init();
     
