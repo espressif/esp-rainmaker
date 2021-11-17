@@ -230,7 +230,7 @@ static esp_err_t esp_rmaker_allocate_and_populate_params(uint8_t flags, bool res
 
 static esp_err_t esp_rmaker_report_param_internal(uint8_t flags)
 {
-    esp_err_t err = esp_rmaker_allocate_and_populate_params(RMAKER_PARAM_FLAG_VALUE_CHANGE, true);
+    esp_err_t err = esp_rmaker_allocate_and_populate_params(flags, true);
     if (err == ESP_OK) {
         /* Just checking if there are indeed any params to report by comparing with a decent enough
          * length as even the smallest possible data, Eg. '{"d":{"p":0}}' will be > 10 bytes.
