@@ -134,9 +134,6 @@ static esp_err_t esp_rmaker_populate_params(char *buf, size_t *buf_len, uint8_t 
                     device_added = true;
                 }
                 esp_rmaker_report_value(&param->val, param->name, &jstr);
-                if (reset_flags) {
-                    param->flags &= ~flags;
-                }
             }
             param = param->next;
         }
@@ -147,6 +144,23 @@ static esp_err_t esp_rmaker_populate_params(char *buf, size_t *buf_len, uint8_t 
     }
     if (json_gen_end_object(&jstr) < 0) {
         err = ESP_ERR_NO_MEM;
+    }
+    /* Resetting the flags after creating the JSON in order to handle cases wherein
+     * memory has been insufficient and this same function would have to be called
+     * again with a larger buffer.
+     */
+    if (err == ESP_OK) {
+        device = esp_rmaker_node_get_first_device(esp_rmaker_get_node());
+        while (device) {
+            _esp_rmaker_param_t *param = device->params;
+            while (param) {
+                if (reset_flags) {
+                    param->flags &= ~flags;
+                }
+                param = param->next;
+            }
+            device = device->next;
+        }
     }
     *buf_len = json_gen_str_end(&jstr);
     return err;
@@ -216,7 +230,7 @@ static esp_err_t esp_rmaker_allocate_and_populate_params(uint8_t flags, bool res
 
 static esp_err_t esp_rmaker_report_param_internal(uint8_t flags)
 {
-    esp_err_t err = esp_rmaker_allocate_and_populate_params(RMAKER_PARAM_FLAG_VALUE_CHANGE, true);
+    esp_err_t err = esp_rmaker_allocate_and_populate_params(flags, true);
     if (err == ESP_OK) {
         /* Just checking if there are indeed any params to report by comparing with a decent enough
          * length as even the smallest possible data, Eg. '{"d":{"p":0}}' will be > 10 bytes.
