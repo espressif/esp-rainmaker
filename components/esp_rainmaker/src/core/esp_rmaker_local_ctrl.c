@@ -60,6 +60,8 @@ enum property_flags {
     PROP_FLAG_READONLY = (1 << 0)
 };
 
+static bool g_local_ctrl_is_started = false;
+
 static char *g_serv_name;
 static bool wait_for_wifi_prov;
 /********* Handler functions for responding to control requests / commands *********/
@@ -322,6 +324,10 @@ static esp_err_t __esp_rmaker_start_local_ctrl_service(const char *serv_name)
     /* Now register the properties */
     ESP_ERROR_CHECK(esp_local_ctrl_add_property(&node_config));
     ESP_ERROR_CHECK(esp_local_ctrl_add_property(&node_params));
+
+    /* update the global status */
+    g_local_ctrl_is_started = true;
+    esp_rmaker_post_event(RMAKER_EVENT_LOCAL_CTRL_STARTED, serv_name, strlen(serv_name) + 1);
     return ESP_OK;
 }
 
@@ -350,6 +356,11 @@ static void esp_rmaker_local_ctrl_prov_event_handler(void* arg, esp_event_base_t
                 break;
         }
     }
+}
+
+bool esp_rmaker_local_ctrl_service_started(void)
+{
+    return g_local_ctrl_is_started;
 }
 
 esp_err_t esp_rmaker_init_local_ctrl_service(void)
