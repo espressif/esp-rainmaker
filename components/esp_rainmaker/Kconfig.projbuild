@@ -135,6 +135,15 @@ menu "ESP RainMaker Config"
             help
                 This allows you to skip the project name check.
 
+        config ESP_RMAKER_OTA_HTTP_RX_BUFFER_SIZE
+            int "OTA HTTP receive buffer size"
+            default 1024
+            range 512 LWIP_TCP_WND_DEFAULT
+            help
+                Increasing this value beyond the default would speed up the OTA download process. 
+                However, please ensure that your application has enough memory headroom to allow this, 
+                else, the OTA may fail.
+                
     endmenu
 
     menu "ESP RainMaker Scheduling"
