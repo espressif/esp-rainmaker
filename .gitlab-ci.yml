@@ -155,7 +155,6 @@ before_script:
 .build_homekit_switch: &build_homekit_switch
 # Building homekit_switch app - Started
 - cd $CI_PROJECT_DIR/examples/homekit_switch
-- mkdir components
 - cd components
 - echo Cloning esp-homekit-sdk
 - git clone --recursive --branch master --depth 1 https://github.com/espressif/esp-homekit-sdk.git

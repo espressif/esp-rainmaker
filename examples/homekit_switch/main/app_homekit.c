@@ -173,6 +173,7 @@ esp_err_t app_homekit_start(bool init_state)
         app_homekit_show_qr();
     }
 #endif
+    hap_enable_mfi_auth(HAP_MFI_AUTH_HW);
     /* Register our event handler for Wi-Fi, IP and Provisioning related events */
     esp_event_handler_register(IP_EVENT, IP_EVENT_STA_GOT_IP, &app_homekit_event_handler, NULL);
     esp_event_handler_register(HAP_EVENT, HAP_EVENT_CTRL_UNPAIRED, &app_homekit_event_handler, NULL);
