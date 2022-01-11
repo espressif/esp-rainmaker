@@ -118,6 +118,13 @@ esp_rmaker_param_t *esp_rmaker_temperature_param_create(const char *param_name, 
     return param;
 }
 
+esp_rmaker_param_t *esp_rmaker_humidity_param_create(const char *param_name, float val)
+{
+    esp_rmaker_param_t *param = esp_rmaker_param_create(param_name, ESP_RMAKER_PARAM_HUMIDITY,
+            esp_rmaker_float(val), PROP_FLAG_READ);
+    return param;
+}
+
 esp_rmaker_param_t *esp_rmaker_ota_status_param_create(const char *param_name)
 {
     esp_rmaker_param_t *param = esp_rmaker_param_create(param_name, ESP_RMAKER_PARAM_OTA_STATUS,
