@@ -77,6 +77,24 @@ menu "ESP RainMaker Config"
         help
             The port number to be used for http for local control.
 
+    choice ESP_RMAKER_LOCAL_CTRL_SECURITY
+        prompt "Local Control Security Type"
+        depends on ESP_RMAKER_LOCAL_CTRL_ENABLE
+        default ESP_RMAKER_LOCAL_CTRL_SECURITY_1
+        help
+            Security type to be selected for local control.
+
+        config ESP_RMAKER_LOCAL_CTRL_SECURITY_0
+            bool "sec0"
+        config ESP_RMAKER_LOCAL_CTRL_SECURITY_1
+            bool "sec1"
+    endchoice
+
+    config ESP_RMAKER_LOCAL_CTRL_SECURITY
+        int
+        default 0 if ESP_RMAKER_LOCAL_CTRL_SECURITY_0
+        default 1 if ESP_RMAKER_LOCAL_CTRL_SECURITY_1
+
     choice ESP_RMAKER_CONSOLE_UART_NUM
         prompt "UART for console input"
         default ESP_RMAKER_CONSOLE_UART_NUM_0

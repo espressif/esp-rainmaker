@@ -48,6 +48,8 @@ extern "C"
 #define ESP_RMAKER_DEF_REBOOT_NAME          "Reboot"
 #define ESP_RMAKER_DEF_FACTORY_RESET_NAME   "Factory-Reset"
 #define ESP_RMAKER_DEF_WIFI_RESET_NAME      "Wi-Fi-Reset"
+#define ESP_RMAKER_DEF_LOCAL_CONTROL_POP    "POP"
+#define ESP_RMAKER_DEF_LOCAL_CONTROL_TYPE   "Type"
 
 /**
  * Create standard name param
@@ -301,6 +303,32 @@ esp_rmaker_param_t *esp_rmaker_factory_reset_param_create(const char *param_name
  * @return NULL in case of failures.
  */
 esp_rmaker_param_t *esp_rmaker_wifi_reset_param_create(const char *param_name);
+
+/**
+ * Create standard Local Control POP param
+ *
+ * This will create the standard Local Control POP parameter.
+ *
+ * @param[in] param_name Name of the parameter
+ * @param[in] val Default Value of the parameter (Eg. "abcd1234"). Can be kept NULL.
+ *
+ * @return Parameter handle on success.
+ * @return NULL in case of failures.
+ */
+esp_rmaker_param_t *esp_rmaker_local_control_pop_param_create(const char *param_name, const char *val);
+
+/**
+ * Create standard Local Control Type param
+ *
+ * This will create the standard Local Control security type parameter.
+ *
+ * @param[in] param_name Name of the parameter
+ * @param[in] val Default Value of the parameter
+ *
+ * @return Parameter handle on success.
+ * @return NULL in case of failures.
+ */
+esp_rmaker_param_t *esp_rmaker_local_control_type_param_create(const char *param_name, int val);
 
 #ifdef __cplusplus
 }
