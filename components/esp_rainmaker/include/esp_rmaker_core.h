@@ -47,6 +47,8 @@ typedef enum {
      * Associated data is the NULL terminated user id.
      */
     RMAKER_EVENT_USER_NODE_MAPPING_DONE,
+    /** Local control started. Associated data is the NULL terminated Service Name */
+    RMAKER_EVENT_LOCAL_CTRL_STARTED,
 } esp_rmaker_event_t;
 
 /** ESP RainMaker Node information */
@@ -377,7 +379,7 @@ esp_err_t esp_rmaker_node_deinit(const esp_rmaker_node_t *node);
 const esp_rmaker_node_t *esp_rmaker_get_node(void);
 
 /** Get Node Id
- * 
+ *
  * Returns pointer to the NULL terminated Node ID string.
  *
  * @return Pointer to a NULL terminated Node ID string.
@@ -541,7 +543,7 @@ esp_rmaker_device_t *esp_rmaker_node_get_device_by_name(const esp_rmaker_node_t 
  * @note Device attributes are reported only once after a boot-up as part of the node
  * configuration.
  * Eg. Serial Number
- * 
+ *
  * @param[in] device Device handle.
  * @param[in] attr_name Name of the attribute.
  * @param[in] val Value of the attribute.
@@ -852,6 +854,13 @@ esp_err_t esp_rmaker_timezone_service_enable(void);
  */
 esp_err_t esp_rmaker_system_service_enable(esp_rmaker_system_serv_config_t *config);
 
+/**
+ * Check if local_ctrl service has started
+ *
+ * @return true if service has started
+ * @return false if the service has not started
+ */
+bool esp_rmaker_local_ctrl_service_started(void);
 
 #ifdef __cplusplus
 }
