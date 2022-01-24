@@ -1,5 +1,12 @@
 # Changes
 
+## 25-Jan-2022 (app_wifi: Minor feature additions to provisioning workflow)
+
+Added a 30 minute timeout for Wi-Fi provisioning as a security measure. A device reboot will be
+required to restart provisioning after it times out. The value can changed using the
+`CONFIG_APP_WIFI_PROV_TIMEOUT_PERIOD` config option. A value of 0 will disable the timeout logic.
+`APP_WIFI_EVENT_PROV_TIMEOUT` event will be triggerd to indicate that the provisioning has timed out.
+
 ## 25-Jan-2022 (examples: Enable some security features and change order of component dirs)
 
 A couple of security features were added some time back, viz.

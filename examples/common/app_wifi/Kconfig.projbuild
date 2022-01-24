@@ -31,4 +31,12 @@ menu "ESP RainMaker App Wi-Fi Provisioning"
         help
             Show some intro text for demos in order to help users understand more about ESP RainMaker.
 
+    config APP_WIFI_PROV_TIMEOUT_PERIOD
+        int "Provisioning Timeout"
+        default 30
+        help
+            Timeout (in minutes) after which the provisioning will auto stop. A reboot will be required
+            to restart provisioning. Set to 0 if you do not want provisioning to auto stop.
+            It is recommended to set this to some non zero value if provisioning does not have PoP.
+
 endmenu
