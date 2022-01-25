@@ -1,5 +1,19 @@
 # Changes
 
+## 25-Jan-2022 (examples: Enable some security features and change order of component dirs)
+
+A couple of security features were added some time back, viz.
+
+1. esp_rmaker_local_ctrl: Added support for sec1
+2. esp_rmaker_user_mapping: Add checks for user id for better security
+
+These are kept disabled by default at component level to maintain backward compatibility and not
+change any existing projects. However, since enabling them is recommended, these are added in
+the sdkconfig.defaults of all examples.
+
+A minor change in CMakeLists.txt has also been done for all examples so that the rmaker_common
+component from esp-rainmaker gets used, rather than the one from esp-insights.
+
 ## 12-Jan-2022 (esp_rmaker_local_ctrl: Added support for sec1)
 
 This commit adds support for security1 for local control. This can be enabled by setting
