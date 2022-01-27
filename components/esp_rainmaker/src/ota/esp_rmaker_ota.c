@@ -21,6 +21,9 @@
 #include <esp_https_ota.h>
 #include <esp_wifi_types.h>
 #include <esp_wifi.h>
+#if CONFIG_BT_ENABLED
+#include <esp_bt.h>
+#endif /* CONFIG_BT_ENABLED */
 
 #include <esp_rmaker_utils.h>
 #include "esp_rmaker_ota_internal.h"
@@ -159,7 +162,7 @@ static esp_err_t esp_rmaker_ota_default_cb(esp_rmaker_ota_handle_t ota_handle, e
 
     esp_rmaker_ota_report_status(ota_handle, OTA_STATUS_IN_PROGRESS, "Starting OTA Upgrade");
 
-/* Using a warning just to highlight the message */
+    /* Using a warning just to highlight the message */
     ESP_LOGW(TAG, "Starting OTA. This may take time.");
     esp_https_ota_handle_t https_ota_handle = NULL;
     esp_err_t err = esp_https_ota_begin(&ota_config, &https_ota_handle);
@@ -174,9 +177,15 @@ static esp_err_t esp_rmaker_ota_default_cb(esp_rmaker_ota_handle_t ota_handle, e
  */
     wifi_ps_type_t ps_type;
     esp_wifi_get_ps(&ps_type);
-/* Disable Wi-Fi power save to speed up OTA
- */
+/* Disable Wi-Fi power save to speed up OTA, iff BT is controller is idle/disabled.
+ * Co-ex requirement, device panics otherwise.*/
+#if CONFIG_BT_ENABLED
+    if (esp_bt_controller_get_status() == ESP_BT_CONTROLLER_STATUS_IDLE) {
+        esp_wifi_set_ps(WIFI_PS_NONE);
+    }
+#else
     esp_wifi_set_ps(WIFI_PS_NONE);
+#endif /* CONFIG_BT_ENABLED */
 
     esp_app_desc_t app_desc;
     err = esp_https_ota_get_img_desc(https_ota_handle, &app_desc);
@@ -222,8 +231,15 @@ static esp_err_t esp_rmaker_ota_default_cb(esp_rmaker_ota_handle_t ota_handle, e
     } else {
         esp_rmaker_ota_report_status(ota_handle, OTA_STATUS_IN_PROGRESS, "Firmware Image download complete");
     }
+
 ota_end:
+#ifdef CONFIG_BT_ENABLED
+    if (esp_bt_controller_get_status() == ESP_BT_CONTROLLER_STATUS_IDLE) {
+        esp_wifi_set_ps(ps_type);
+    }
+#else
     esp_wifi_set_ps(ps_type);
+#endif /* CONFIG_BT_ENABLED */
     ota_finish_err = esp_https_ota_finish(https_ota_handle);
     if ((err == ESP_OK) && (ota_finish_err == ESP_OK)) {
         ESP_LOGI(TAG, "OTA upgrade successful. Rebooting in %d seconds...", OTA_REBOOT_TIMER_SEC);
