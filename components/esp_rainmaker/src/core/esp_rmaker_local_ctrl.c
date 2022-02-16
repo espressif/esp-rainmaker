@@ -327,7 +327,7 @@ static esp_err_t __esp_rmaker_start_local_ctrl_service(const char *serv_name)
 
     /* update the global status */
     g_local_ctrl_is_started = true;
-    esp_rmaker_post_event(RMAKER_EVENT_LOCAL_CTRL_STARTED, serv_name, strlen(serv_name) + 1);
+    esp_rmaker_post_event(RMAKER_EVENT_LOCAL_CTRL_STARTED, (void *)serv_name, strlen(serv_name) + 1);
     return ESP_OK;
 }
 
