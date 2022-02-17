@@ -701,6 +701,7 @@ esp_err_t esp_rmaker_param_update(const esp_rmaker_param_t *param, esp_rmaker_pa
         default:
             return ESP_ERR_INVALID_ARG;
     }
+    _param->flags |= RMAKER_PARAM_FLAG_VALUE_CHANGE;
     if (_param->prop_flags & PROP_FLAG_PERSIST) {
         esp_rmaker_param_store_value(_param);
     }
@@ -713,7 +714,6 @@ esp_err_t esp_rmaker_param_report(const esp_rmaker_param_t *param)
         ESP_LOGE(TAG, "Param handle cannot be NULL.");
         return ESP_ERR_INVALID_ARG;
     }
-    ((_esp_rmaker_param_t *)param)->flags |= RMAKER_PARAM_FLAG_VALUE_CHANGE;
     return esp_rmaker_report_param_internal(RMAKER_PARAM_FLAG_VALUE_CHANGE);
 }
 

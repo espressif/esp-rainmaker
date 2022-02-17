@@ -731,6 +731,30 @@ esp_err_t esp_rmaker_param_add_valid_str_list(const esp_rmaker_param_t *param, c
  */
 esp_err_t esp_rmaker_param_add_array_max_count(const esp_rmaker_param_t *param, int count);
 
+
+/* Update a parameter
+ *
+ * This will just update the value of a parameter with esp rainmaker core, without actually reporting
+ * it. This can be used when multiple parameters need to be reported together.
+ * Eg. If x parameters are to be reported, this API can be used for the first x -1 parameters
+ * and the last one can be updated using esp_rmaker_param_update_and_report().
+ * This will report all parameters which were updated prior to this call.
+ *
+ * Sample:
+ *
+ * esp_rmaker_param_update(param1, esp_rmaker_float(10.2));
+ * esp_rmaker_param_update(param2, esp_rmaker_int(55));
+ * esp_rmaker_param_update(param3, esp_rmaker_int(95));
+ * esp_rmaker_param_update_and_report(param1, esp_rmaker_bool(true));
+ *
+ * @param[in] param Parameter handle.
+ * @param[in] val New value of the parameter.
+ *
+ * @return ESP_OK if the parameter was updated successfully.
+ * @return error in case of failure.
+ */
+esp_err_t esp_rmaker_param_update(const esp_rmaker_param_t *param, esp_rmaker_param_val_t val);
+
 /** Update and report a parameter
  *
  * Calling this API will update the parameter and report it to ESP RainMaker cloud.
