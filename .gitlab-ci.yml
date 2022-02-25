@@ -47,9 +47,8 @@ before_script:
 - ls
 - cd $CI_PROJECT_DIR/examples/switch
 - echo Building for esp32
-- idf.py build
 - idf.py set-target esp32
-- echo Running make
+- idf.py build
 - rm -rf build/ sdkconfig
 - echo Building for esp32s2
 - idf.py set-target esp32s2
@@ -62,10 +61,6 @@ before_script:
 - echo Building for esp32s3
 - idf.py set-target esp32s3
 - idf.py build
-- rm -rf build/ sdkconfig
-- echo Running make
-- make defconfig
-- make $MAKEFLAGS
 - echo Building switch app - Done
 # Building switch app - Done
 # Copying switch.bin to esp-rainmaker-bins-${CI_JOB_ID}/
@@ -78,10 +73,6 @@ before_script:
 - echo Running idf.py
 - cd $CI_PROJECT_DIR/examples/led_light
 - idf.py build
-- echo Running make
-- rm -rf build/ sdkconfig
-- make defconfig
-- make $MAKEFLAGS
 - echo Building led_light app - Done
 # Building led_light app - Done
 # Copying led_light.bin to esp-rainmaker-bins-${CI_JOB_ID}/
@@ -94,10 +85,6 @@ before_script:
 - echo Running idf.py
 - cd $CI_PROJECT_DIR/examples/fan
 - idf.py build
-- echo Running make
-- rm -rf build/ sdkconfig
-- make defconfig
-- make $MAKEFLAGS
 - echo Building fan app - Done
 # Building fan app - Done
 # Copying fan.bin to esp-rainmaker-bins-${CI_JOB_ID}/
@@ -110,10 +97,6 @@ before_script:
 - echo Running idf.py
 - cd $CI_PROJECT_DIR/examples/temperature_sensor
 - idf.py build
-- echo Running make
-- rm -rf build/ sdkconfig
-- make defconfig
-- make $MAKEFLAGS
 - echo Building temperature_sensor app - Done
 # Building temperature_sensor app - Done
 # Copying temperature_sensor.bin to esp-rainmaker-bins-${CI_JOB_ID}/
@@ -126,10 +109,6 @@ before_script:
 - echo Running idf.py
 - cd $CI_PROJECT_DIR/examples/multi_device
 - idf.py build
-- echo Running make
-- rm -rf build/ sdkconfig
-- make defconfig
-- make $MAKEFLAGS
 - echo Building multi_device app - Done
 # Building multi_device app - Done
 # Copying multi_device.bin to esp-rainmaker-bins-${CI_JOB_ID}/
@@ -142,10 +121,6 @@ before_script:
 - echo Running idf.py
 - cd $CI_PROJECT_DIR/examples/gpio
 - idf.py build
-- echo Running make
-- rm -rf build/ sdkconfig
-- make defconfig
-- make $MAKEFLAGS
 - echo Building gpio app - Done
 # Building gpio app - Done
 # Copying gpio.bin to esp-rainmaker-bins-${CI_JOB_ID}/
@@ -163,10 +138,6 @@ before_script:
 - echo Building homekit_switch app - Started
 - echo Running idf.py
 - idf.py build
-# - echo Running make
-# - rm -rf build/ sdkconfig
-# - make defconfig
-# - make $MAKEFLAGS
 - echo Building homekit_switch app - Done
 # Building homekit_switch app - Done
 # Copying homekit_switch.bin to esp-rainmaker-bins-${CI_JOB_ID}/
