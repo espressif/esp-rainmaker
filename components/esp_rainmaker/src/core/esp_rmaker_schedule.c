@@ -47,7 +47,7 @@ typedef enum trigger_type {
 typedef struct esp_rmaker_schedule_trigger {
     trigger_type_t type;
     /* Relative Seconds */
-    uint16_t relative_seconds;
+    int relative_seconds;
     /* Minutes from 12am */
     uint16_t minutes;
     struct {
