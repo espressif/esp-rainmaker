@@ -12,8 +12,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <mbedtls/version.h>
+/* Keep forward-compatibility with Mbed TLS 3.x */
+#if (MBEDTLS_VERSION_NUMBER < 0x03000000)
+#define MBEDTLS_2_X_COMPAT
+#else /* !(MBEDTLS_VERSION_NUMBER < 0x03000000) */
+/* Macro wrapper for struct's private members */
+#ifndef MBEDTLS_ALLOW_PRIVATE_ACCESS
+#define MBEDTLS_ALLOW_PRIVATE_ACCESS
+#endif /* MBEDTLS_ALLOW_PRIVATE_ACCESS */
+#endif /* !(MBEDTLS_VERSION_NUMBER < 0x03000000) */
 
-#include "mbedtls/config.h"
 #include "mbedtls/platform.h"
 #include "mbedtls/pk.h"
 #include "mbedtls/rsa.h"
@@ -44,6 +53,7 @@
 #include "esp_rmaker_internal.h"
 #include "esp_rmaker_client_data.h"
 #include "esp_rmaker_claim.h"
+
 
 static const char *TAG = "esp_claim";
 
@@ -796,7 +806,12 @@ esp_err_t __esp_rmaker_claim_init(esp_rmaker_claim_data_t *claim_data)
     if (key) {
         mbedtls_pk_free(&claim_data->key);
         mbedtls_pk_init(&claim_data->key);
-        if (mbedtls_pk_parse_key(&claim_data->key, (uint8_t *)key, strlen(key) + 1, NULL, 0) == 0) {
+#ifdef MBEDTLS_2_X_COMPAT
+        int ret = mbedtls_pk_parse_key(&claim_data->key, (uint8_t *)key, strlen(key) + 1, NULL, 0);
+#else
+        int ret = mbedtls_pk_parse_key(&claim_data->key, (uint8_t *)key, strlen(key) + 1, NULL, 0, mbedtls_ctr_drbg_random, NULL);
+#endif
+        if (ret == 0) {
             ESP_LOGI(TAG, "Private key already exists. No need to re-initialise it.");
             claim_data->state = RMAKER_CLAIM_STATE_PK_GENERATED;
         }
