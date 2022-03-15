@@ -11,7 +11,7 @@
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
 #include <esp_log.h>
-
+#include <esp_netif_types.h>
 #include <esp_rmaker_core.h>
 #include <esp_rmaker_standard_params.h>
 

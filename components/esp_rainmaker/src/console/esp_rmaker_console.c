@@ -57,7 +57,7 @@ static void scli_task(void *arg)
         memset(linebuf, 0, sizeof(linebuf));
         i = 0;
         do {
-            ret = xQueueReceive(uart_queue, (void * )&event, (portTickType)portMAX_DELAY);
+            ret = xQueueReceive(uart_queue, (void * )&event, (TickType_t)portMAX_DELAY);
             if (ret != pdPASS) {
                 if(stop == 1) {
                     break;
