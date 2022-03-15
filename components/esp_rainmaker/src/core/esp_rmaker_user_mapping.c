@@ -32,6 +32,8 @@ static const char *TAG = "esp_rmaker_user_mapping";
 #define USER_MAPPING_ENDPOINT       "cloud_user_assoc"
 #define USER_MAPPING_NVS_NAMESPACE  "user_mapping"
 #define USER_ID_NVS_NAME            "user_id"
+#define USER_RESET_ID               "esp-rmaker"
+#define USER_RESET_KEY              "failed"
 
 typedef struct {
     char *user_id;
@@ -82,7 +84,15 @@ static void esp_rmaker_user_mapping_event_handler(void* arg, esp_event_base_t ev
         int msg_id = *((int *)event_data);
         if (msg_id == rmaker_user_mapping_data->mqtt_msg_id) {
             ESP_LOGI(TAG, "User Node association message published successfully.");
-            rmaker_user_mapping_state = ESP_RMAKER_USER_MAPPING_DONE;
+            esp_rmaker_user_mapping_data_t *data = (esp_rmaker_user_mapping_data_t *)arg;
+            if (data && (strcmp(data->user_id, USER_RESET_ID) == 0)) {
+                rmaker_user_mapping_state = ESP_RMAKER_USER_MAPPING_RESET;
+                esp_rmaker_post_event(RMAKER_EVENT_USER_NODE_MAPPING_RESET, NULL, 0);
+            } else {
+                rmaker_user_mapping_state = ESP_RMAKER_USER_MAPPING_DONE;
+                esp_rmaker_post_event(RMAKER_EVENT_USER_NODE_MAPPING_DONE, rmaker_user_mapping_data->user_id,
+                    strlen(rmaker_user_mapping_data->user_id) + 1);
+            }
 #ifdef CONFIG_ESP_RMAKER_USER_ID_CHECK
             /* Store User Id in NVS since acknowledgement of the user-node association message is received */
             nvs_handle handle;
@@ -92,8 +102,6 @@ static void esp_rmaker_user_mapping_event_handler(void* arg, esp_event_base_t ev
                 nvs_close(handle);
             }
 #endif
-            esp_rmaker_post_event(RMAKER_EVENT_USER_NODE_MAPPING_DONE, rmaker_user_mapping_data->user_id,
-                    strlen(rmaker_user_mapping_data->user_id) + 1);
             esp_rmaker_user_mapping_cleanup_data();
             esp_event_handler_unregister(RMAKER_COMMON_EVENT, RMAKER_MQTT_EVENT_PUBLISHED,
                     &esp_rmaker_user_mapping_event_handler);
@@ -108,7 +116,7 @@ static void esp_rmaker_user_mapping_cb(void *priv_data)
         return;
     }
     esp_event_handler_register(RMAKER_COMMON_EVENT, RMAKER_MQTT_EVENT_PUBLISHED,
-            &esp_rmaker_user_mapping_event_handler, NULL);
+            &esp_rmaker_user_mapping_event_handler, data);
     char publish_payload[200];
     json_gen_str_t jstr;
     json_gen_str_start(&jstr, publish_payload, sizeof(publish_payload), NULL, NULL);
@@ -198,6 +206,11 @@ esp_err_t esp_rmaker_start_user_node_mapping(char *user_id, char *secret_key)
 user_mapping_error:
     esp_rmaker_user_mapping_cleanup_data();
     return ESP_FAIL;
+}
+
+esp_err_t esp_rmaker_reset_user_node_mapping(void)
+{
+    return esp_rmaker_start_user_node_mapping(USER_RESET_ID, USER_RESET_KEY);
 }
 
 int esp_rmaker_user_mapping_handler(uint32_t session_id, const uint8_t *inbuf, ssize_t inlen, uint8_t **outbuf, ssize_t *outlen, void *priv_data)
