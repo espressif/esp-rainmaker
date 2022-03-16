@@ -30,12 +30,6 @@ typedef enum {
     ESP_RMAKER_STATE_STOP_REQUESTED,
 } esp_rmaker_state_t;
 
-typedef enum {
-    ESP_RMAKER_USER_MAPPING_RESET = 0,
-    ESP_RMAKER_USER_MAPPING_STARTED,
-    ESP_RMAKER_USER_MAPPING_DONE,
-} esp_rmaker_user_mapping_state_t;
-
 typedef struct {
     esp_rmaker_param_val_t min;
     esp_rmaker_param_val_t max;
@@ -111,8 +105,8 @@ char *esp_rmaker_get_node_params(void);
 esp_err_t esp_rmaker_handle_set_params(char *data, size_t data_len, esp_rmaker_req_src_t src);
 esp_err_t esp_rmaker_user_mapping_prov_init(void);
 esp_err_t esp_rmaker_user_mapping_prov_deinit(void);
-esp_rmaker_user_mapping_state_t esp_rmaker_user_node_mapping_get_state(void);
 esp_err_t esp_rmaker_user_node_mapping_init(void);
+esp_err_t esp_rmaker_reset_user_node_mapping(void);
 esp_err_t esp_rmaker_init_local_ctrl_service(void);
 esp_err_t esp_rmaker_start_local_ctrl_service(const char *serv_name);
 static inline esp_err_t esp_rmaker_post_event(esp_rmaker_event_t event_id, void* data, size_t data_size)

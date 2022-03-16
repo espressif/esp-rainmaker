@@ -134,9 +134,11 @@ static void esp_rmaker_event_handler(void* arg, esp_event_base_t event_base,
             /* Signal rmaker thread to continue execution */
             xEventGroupSetBits(wifi_event_group, WIFI_CONNECTED_EVENT);
         }
-    } else if (event_base == RMAKER_EVENT && event_id == RMAKER_EVENT_USER_NODE_MAPPING_DONE) {
+    } else if (event_base == RMAKER_EVENT &&
+            (event_id == RMAKER_EVENT_USER_NODE_MAPPING_DONE ||
+            event_id == RMAKER_EVENT_USER_NODE_MAPPING_RESET)) {
         esp_rmaker_params_mqtt_init();
-        esp_event_handler_unregister(RMAKER_EVENT, RMAKER_EVENT_USER_NODE_MAPPING_DONE, &esp_rmaker_event_handler);
+        esp_event_handler_unregister(RMAKER_EVENT, event_id, &esp_rmaker_event_handler);
     }
 }
 
@@ -331,15 +333,15 @@ static void esp_rmaker_task(void *data)
          * status.
          */
         if (esp_rmaker_user_node_mapping_get_state() != ESP_RMAKER_USER_MAPPING_STARTED) {
-            esp_rmaker_start_user_node_mapping("esp-rmaker", "failed");
+            esp_rmaker_reset_user_node_mapping();
+            /* Wait for user reset to finish. */
+            err = esp_event_handler_register(RMAKER_EVENT, RMAKER_EVENT_USER_NODE_MAPPING_RESET,
+                    &esp_rmaker_event_handler, NULL);
+        } else {
+            /* Wait for User Node mapping to finish. */
+            err = esp_event_handler_register(RMAKER_EVENT, RMAKER_EVENT_USER_NODE_MAPPING_DONE,
+                    &esp_rmaker_event_handler, NULL);
         }
-        /* Wait for User Node mapping to finish. This will also consider the above dummy user
-         * node mapping request as a successful  mapping, but that is still fine since the
-         * cloud would have reset the mappings. This allows other alternative user node mappings
-         * to be used after this point, which may be independent of provisioning.
-         */
-        err = esp_event_handler_register(RMAKER_EVENT, RMAKER_EVENT_USER_NODE_MAPPING_DONE,
-                &esp_rmaker_event_handler, NULL);
         if (err != ESP_OK) {
             ESP_LOGE(TAG, "Aborting!!!");
             goto rmaker_end;
