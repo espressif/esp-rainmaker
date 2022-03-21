@@ -68,7 +68,6 @@ esp_rmaker_device_t *esp_rmaker_temp_sensor_device_create(const char *dev_name,
     return device;
 }
 
-
 esp_rmaker_device_t *esp_rmaker_power_meter_sensor_device_create(const char *dev_name,
         void *priv_data, int power)
 {
