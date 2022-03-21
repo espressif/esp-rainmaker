@@ -30,6 +30,7 @@ extern "C"
 
 #define ESP_RMAKER_PARAM_NAME           "esp.param.name"
 #define ESP_RMAKER_PARAM_POWER          "esp.param.power"
+#define ESP_RMAKER_PARAM_POWER_METER    "esp.param.power-meter"
 #define ESP_RMAKER_PARAM_BRIGHTNESS     "esp.param.brightness"
 #define ESP_RMAKER_PARAM_HUE            "esp.param.hue"
 #define ESP_RMAKER_PARAM_SATURATION     "esp.param.saturation"
@@ -57,6 +58,7 @@ extern "C"
 #define ESP_RMAKER_DEVICE_LIGHTBULB     "esp.device.lightbulb"
 #define ESP_RMAKER_DEVICE_FAN           "esp.device.fan"
 #define ESP_RMAKER_DEVICE_TEMP_SENSOR   "esp.device.temperature-sensor"
+#define ESP_RMAKER_DEVICE_POWER_METER_SENSOR   "esp.device.power-meter-sensor"
 
 
 /********** STANDARD SERVICE TYPES **********/
