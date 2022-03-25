@@ -16,6 +16,8 @@
 #include <esp_log.h>
 #include <esp_event.h>
 #include <nvs.h>
+#include <freertos/FreeRTOS.h>
+#include <freertos/semphr.h>
 #include <wifi_provisioning/manager.h>
 #include <json_generator.h>
 #include <esp_rmaker_work_queue.h>
@@ -35,14 +37,21 @@ static const char *TAG = "esp_rmaker_user_mapping";
 #define USER_RESET_ID               "esp-rmaker"
 #define USER_RESET_KEY              "failed"
 
+/* A delay large enough to allow the tasks to get the semaphore, but small
+ * enough to prevent tasks getting blocked for long.
+ */
+#define SEMAPHORE_DELAY_MSEC         5000
+
 typedef struct {
     char *user_id;
     char *secret_key;
     int mqtt_msg_id;
+    bool sent;
 } esp_rmaker_user_mapping_data_t;
 
 static esp_rmaker_user_mapping_data_t *rmaker_user_mapping_data;
 esp_rmaker_user_mapping_state_t rmaker_user_mapping_state;
+SemaphoreHandle_t esp_rmaker_user_mapping_lock = NULL;
 
 static void esp_rmaker_user_mapping_cleanup_data(void)
 {
@@ -82,10 +91,13 @@ static void esp_rmaker_user_mapping_event_handler(void* arg, esp_event_base_t ev
          * has indeed reached the RainMaker cloud.
          */
         int msg_id = *((int *)event_data);
-        if (msg_id == rmaker_user_mapping_data->mqtt_msg_id) {
+        if (xSemaphoreTake(esp_rmaker_user_mapping_lock, SEMAPHORE_DELAY_MSEC/portTICK_PERIOD_MS) != pdTRUE) {
+            ESP_LOGE(TAG, "Failed to take semaphore.");
+            return;
+        }
+        if ((rmaker_user_mapping_data != NULL) && (msg_id == rmaker_user_mapping_data->mqtt_msg_id)) {
             ESP_LOGI(TAG, "User Node association message published successfully.");
-            esp_rmaker_user_mapping_data_t *data = (esp_rmaker_user_mapping_data_t *)arg;
-            if (data && (strcmp(data->user_id, USER_RESET_ID) == 0)) {
+            if (strcmp(rmaker_user_mapping_data->user_id, USER_RESET_ID) == 0) {
                 rmaker_user_mapping_state = ESP_RMAKER_USER_MAPPING_RESET;
                 esp_rmaker_post_event(RMAKER_EVENT_USER_NODE_MAPPING_RESET, NULL, 0);
             } else {
@@ -106,25 +118,31 @@ static void esp_rmaker_user_mapping_event_handler(void* arg, esp_event_base_t ev
             esp_event_handler_unregister(RMAKER_COMMON_EVENT, RMAKER_MQTT_EVENT_PUBLISHED,
                     &esp_rmaker_user_mapping_event_handler);
         }
+        xSemaphoreGive(esp_rmaker_user_mapping_lock);
     }
 }
 
 static void esp_rmaker_user_mapping_cb(void *priv_data)
 {
-    esp_rmaker_user_mapping_data_t *data = (esp_rmaker_user_mapping_data_t *)priv_data;
-    if (!data) {
+    if (xSemaphoreTake(esp_rmaker_user_mapping_lock, SEMAPHORE_DELAY_MSEC/portTICK_PERIOD_MS) != pdTRUE) {
+        ESP_LOGE(TAG, "Failed to take semaphore.");
+        return;
+    }
+    /* If there is no user node mapping data, or if the data is already sent, just return */
+    if (rmaker_user_mapping_data == NULL || rmaker_user_mapping_data->sent == true) {
+        xSemaphoreGive(esp_rmaker_user_mapping_lock);
         return;
     }
     esp_event_handler_register(RMAKER_COMMON_EVENT, RMAKER_MQTT_EVENT_PUBLISHED,
-            &esp_rmaker_user_mapping_event_handler, data);
+            &esp_rmaker_user_mapping_event_handler, NULL);
     char publish_payload[200];
     json_gen_str_t jstr;
     json_gen_str_start(&jstr, publish_payload, sizeof(publish_payload), NULL, NULL);
     json_gen_start_object(&jstr);
     char *node_id = esp_rmaker_get_node_id();
     json_gen_obj_set_string(&jstr, "node_id", node_id);
-    json_gen_obj_set_string(&jstr, "user_id", data->user_id);
-    json_gen_obj_set_string(&jstr, "secret_key", data->secret_key);
+    json_gen_obj_set_string(&jstr, "user_id", rmaker_user_mapping_data->user_id);
+    json_gen_obj_set_string(&jstr, "secret_key", rmaker_user_mapping_data->secret_key);
     if (esp_rmaker_user_node_mapping_get_state() != ESP_RMAKER_USER_MAPPING_DONE) {
         json_gen_obj_set_bool(&jstr, "reset", true);
     }
@@ -132,10 +150,15 @@ static void esp_rmaker_user_mapping_cb(void *priv_data)
     json_gen_str_end(&jstr);
     char publish_topic[100];
     snprintf(publish_topic, sizeof(publish_topic), "node/%s/%s", node_id, USER_MAPPING_TOPIC_SUFFIX);
-    esp_err_t err = esp_rmaker_mqtt_publish(publish_topic, publish_payload, strlen(publish_payload), RMAKER_MQTT_QOS1, &data->mqtt_msg_id);
+    esp_err_t err = esp_rmaker_mqtt_publish(publish_topic, publish_payload, strlen(publish_payload), RMAKER_MQTT_QOS1, &rmaker_user_mapping_data->mqtt_msg_id);
+    ESP_LOGI(TAG, "MQTT Publish: %s", publish_payload);
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "MQTT Publish Error %d", err);
+    } else {
+        rmaker_user_mapping_state = ESP_RMAKER_USER_MAPPING_REQ_SENT;
+        rmaker_user_mapping_data->sent = true;
     }
+    xSemaphoreGive(esp_rmaker_user_mapping_lock);
     return;
 }
 
@@ -175,20 +198,32 @@ static bool esp_rmaker_user_mapping_detect_reset(const char *user_id)
 
 esp_err_t esp_rmaker_start_user_node_mapping(char *user_id, char *secret_key)
 {
+    if (esp_rmaker_user_mapping_lock == NULL) {
+        ESP_LOGE(TAG, "User Node mapping not initialised.");
+        return ESP_FAIL;
+    }
+    if (xSemaphoreTake(esp_rmaker_user_mapping_lock, SEMAPHORE_DELAY_MSEC/portTICK_PERIOD_MS) != pdTRUE) {
+        ESP_LOGE(TAG, "Failed to take semaphore.");
+        return ESP_FAIL;
+    }
     if (rmaker_user_mapping_data) {
         esp_rmaker_user_mapping_cleanup_data();
     }
 
     rmaker_user_mapping_data = calloc(1, sizeof(esp_rmaker_user_mapping_data_t));
     if (!rmaker_user_mapping_data) {
-        return ESP_FAIL;
+        ESP_LOGE(TAG, "Failed to allocate memory for rmaker_user_mapping_data.");
+        xSemaphoreGive(esp_rmaker_user_mapping_lock);
+        return ESP_ERR_NO_MEM;
     }
     rmaker_user_mapping_data->user_id = strdup(user_id);
     if (!rmaker_user_mapping_data->user_id) {
+        ESP_LOGE(TAG, "Failed to allocate memory for user_id.");
         goto user_mapping_error;
     }
     rmaker_user_mapping_data->secret_key = strdup(secret_key);
     if (!rmaker_user_mapping_data->secret_key) {
+        ESP_LOGE(TAG, "Failed to allocate memory for secret_key.");
         goto user_mapping_error;
     }
     if (esp_rmaker_user_mapping_detect_reset(user_id)) {
@@ -197,14 +232,17 @@ esp_err_t esp_rmaker_start_user_node_mapping(char *user_id, char *secret_key)
     } else {
         rmaker_user_mapping_state = ESP_RMAKER_USER_MAPPING_DONE;
     }
-    if (esp_rmaker_work_queue_add_task(esp_rmaker_user_mapping_cb, rmaker_user_mapping_data) != ESP_OK) {
+    if (esp_rmaker_work_queue_add_task(esp_rmaker_user_mapping_cb, NULL) != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to queue user mapping task.");
         goto user_mapping_error;
     }
     esp_rmaker_user_mapping_prov_deinit();
+    xSemaphoreGive(esp_rmaker_user_mapping_lock);
     return ESP_OK;
 
 user_mapping_error:
     esp_rmaker_user_mapping_cleanup_data();
+    xSemaphoreGive(esp_rmaker_user_mapping_lock);
     return ESP_FAIL;
 }
 
@@ -311,5 +349,21 @@ esp_err_t esp_rmaker_user_node_mapping_init(void)
 #else
     rmaker_user_mapping_state = ESP_RMAKER_USER_MAPPING_DONE;
 #endif
+    if (!esp_rmaker_user_mapping_lock) {
+        esp_rmaker_user_mapping_lock = xSemaphoreCreateMutex();
+        if (!esp_rmaker_user_mapping_lock) {
+            ESP_LOGE(TAG, "Failed to create Mutex");
+            return ESP_FAIL;
+        }
+    }
+    return ESP_OK;
+}
+
+esp_err_t esp_rmaker_user_node_mapping_deinit(void)
+{
+    if (esp_rmaker_user_mapping_lock) {
+        vSemaphoreDelete(esp_rmaker_user_mapping_lock);
+        esp_rmaker_user_mapping_lock = NULL;
+    }
     return ESP_OK;
 }
