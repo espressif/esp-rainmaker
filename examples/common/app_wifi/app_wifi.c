@@ -128,6 +128,9 @@ static void app_wifi_print_qr(const char *name, const char *pop, const char *tra
 static void event_handler(void* arg, esp_event_base_t event_base,
                           int32_t event_id, void* event_data)
 {
+#ifdef CONFIG_APP_WIFI_RESET_PROV_ON_FAILURE
+    static int retries = 0;
+#endif
     if (event_base == WIFI_PROV_EVENT) {
         switch (event_id) {
             case WIFI_PROV_START:
@@ -147,10 +150,26 @@ static void event_handler(void* arg, esp_event_base_t event_base,
                          "\n\tPlease reset to factory and retry provisioning",
                          (*reason == WIFI_PROV_STA_AUTH_ERROR) ?
                          "Wi-Fi station authentication failed" : "Wi-Fi access-point not found");
+#ifdef CONFIG_APP_WIFI_RESET_PROV_ON_FAILURE
+                retries++;
+                if (retries >= CONFIG_APP_WIFI_PROV_MAX_RETRY_CNT) {
+#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(4, 3, 1)
+                    ESP_LOGI(TAG, "Failed to connect with provisioned AP, reseting provisioned credentials");
+                    wifi_prov_mgr_reset_sm_state_on_failure();
+                    esp_event_post(APP_WIFI_EVENT, APP_WIFI_EVENT_PROV_RESTART, NULL, 0, portMAX_DELAY);
+#else
+                    ESP_LOGW(TAG, "Failed to connect with provisioned AP, please reset to provisioning manually");
+#endif
+                    retries = 0;
+                }
+#endif
                 break;
             }
             case WIFI_PROV_CRED_SUCCESS:
                 ESP_LOGI(TAG, "Provisioning successful");
+#ifdef CONFIG_APP_WIFI_RESET_PROV_ON_FAILURE
+                retries = 0;
+#endif
                 break;
             case WIFI_PROV_END:
                 if (prov_stop_timer) {

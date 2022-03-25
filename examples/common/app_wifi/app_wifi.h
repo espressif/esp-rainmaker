@@ -18,6 +18,8 @@ typedef enum {
     APP_WIFI_EVENT_QR_DISPLAY = 1,
     /** Provisioning timed out */
     APP_WIFI_EVENT_PROV_TIMEOUT,
+    /** Provisioning has restarted due to failures (Invalid SSID/Passphrase) */
+    APP_WIFI_EVENT_PROV_RESTART,
 } app_wifi_event_t;
 
 /** Types of Proof of Possession */
