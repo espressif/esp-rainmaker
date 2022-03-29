@@ -52,6 +52,8 @@ static const char *cb_srcs[ESP_RMAKER_REQ_SRC_MAX] = {
     [ESP_RMAKER_REQ_SRC_INIT] = "Init",
     [ESP_RMAKER_REQ_SRC_CLOUD] = "Cloud",
     [ESP_RMAKER_REQ_SRC_SCHEDULE] = "Schedule",
+    [ESP_RMAKER_REQ_SRC_SCENE_ACTIVATE] = "Scene Activate",
+    [ESP_RMAKER_REQ_SRC_SCENE_DEACTIVATE] = "Scene Deactivate",
     [ESP_RMAKER_REQ_SRC_LOCAL] = "Local",
 };
 

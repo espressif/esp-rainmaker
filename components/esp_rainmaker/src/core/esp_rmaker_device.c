@@ -170,10 +170,6 @@ esp_err_t esp_rmaker_device_add_attribute(const esp_rmaker_device_t *device, con
         return ESP_ERR_INVALID_ARG;
     }
     _esp_rmaker_device_t *_device = ( _esp_rmaker_device_t *)device;
-    if (_device->is_service) {
-        ESP_LOGE(TAG, "Cannot add attribute to a service");
-        return ESP_ERR_INVALID_ARG;
-    }
     esp_rmaker_attr_t *attr = _device->attributes;
     while(attr) {
         if (strcmp(attr_name, attr->name) == 0) {
