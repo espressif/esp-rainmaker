@@ -34,10 +34,10 @@ esp_rmaker_param_t *esp_rmaker_power_param_create(const char *param_name, bool v
     return param;
 }
 
-esp_rmaker_param_t *esp_rmaker_power_meter_param_create(const char *param_name, int val)
+esp_rmaker_param_t *esp_rmaker_power_meter_param_create(const char *param_name, float val)
 {
     esp_rmaker_param_t *param = esp_rmaker_param_create(param_name, ESP_RMAKER_PARAM_POWER_METER,
-            esp_rmaker_int(val), PROP_FLAG_READ | PROP_FLAG_WRITE);
+            esp_rmaker_float(val), PROP_FLAG_READ | PROP_FLAG_WRITE | PROP_FLAG_TIME_SERIES);
     if (param) {
         esp_rmaker_param_add_ui_type(param, ESP_RMAKER_UI_TEXT);
     }
