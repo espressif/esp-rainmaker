@@ -79,3 +79,8 @@ docs/docusaurus/website/node_modules
 
 # cli logs
 **/logs
+
+# generated docs
+docs/doxygen-warning-log.txt
+docs/man/
+docs/xml/
