@@ -14,6 +14,7 @@
 #include <sdkconfig.h>
 #include <string.h>
 #include <esp_log.h>
+#include <esp_ota_ops.h>
 #include <json_generator.h>
 #include <esp_rmaker_core.h>
 #include "esp_rmaker_internal.h"
@@ -32,7 +33,13 @@ static esp_err_t esp_rmaker_report_info(json_gen_str_t *jptr)
     json_gen_obj_set_string(jptr, "name",  info->name);
     json_gen_obj_set_string(jptr, "fw_version",  info->fw_version);
     json_gen_obj_set_string(jptr, "type",  info->type);
+    if (info->subtype) {
+        json_gen_obj_set_string(jptr, "subtype",  info->subtype);
+    }
     json_gen_obj_set_string(jptr, "model",  info->model);
+    const esp_app_desc_t *app_desc = esp_ota_get_app_description();
+    json_gen_obj_set_string(jptr, "project_name", app_desc->project_name);
+    json_gen_obj_set_string(jptr, "platform", CONFIG_IDF_TARGET);
     json_gen_pop_object(jptr);
     return ESP_OK;
 }
@@ -186,6 +193,9 @@ static esp_err_t esp_rmaker_report_devices_or_services(json_gen_str_t *jptr, cha
             }
             if (device->subtype) {
                 json_gen_obj_set_string(jptr, "subtype", device->subtype);
+            }
+            if (device->model) {
+                json_gen_obj_set_string(jptr, "model", device->model);
             }
             if (device->attributes) {
                 json_gen_push_array(jptr, "attributes");
