@@ -38,6 +38,9 @@ static void esp_rmaker_node_info_free(esp_rmaker_node_info_t *info)
         if (info->fw_version) {
             free(info->fw_version);
         }
+        if (info->subtype) {
+            free(info->subtype);
+        }
         free(info);
     }
 }
@@ -150,6 +153,7 @@ esp_err_t esp_rmaker_node_add_fw_version(const esp_rmaker_node_t *node, const ch
     info->fw_version = strdup(fw_version);
     if (!info->fw_version) {
         ESP_LOGE(TAG, "Failed to allocate memory for fw version.");
+        return ESP_ERR_NO_MEM;
     }
     return ESP_OK;
 }
@@ -171,6 +175,29 @@ esp_err_t esp_rmaker_node_add_model(const esp_rmaker_node_t *node, const char *m
     info->model = strdup(model);
     if (!info->model) {
         ESP_LOGE(TAG, "Failed to allocate memory for node model.");
+        return ESP_ERR_NO_MEM;
+    }
+    return ESP_OK;
+}
+
+esp_err_t esp_rmaker_node_add_subtype(const esp_rmaker_node_t *node, const char *subtype)
+{
+    if (!node || !subtype) {
+        ESP_LOGE(TAG, "Node handle or subtype cannot be NULL.");
+        return ESP_ERR_INVALID_ARG;
+    }
+    esp_rmaker_node_info_t *info = esp_rmaker_node_get_info(node);
+    if (!info) {
+        ESP_LOGE(TAG, "Failed to get Node Info.");
+        return ESP_ERR_INVALID_ARG;
+    }
+    if (info->subtype) {
+        free(info->subtype);
+    }
+    info->subtype = strdup(subtype);
+    if (!info->subtype) {
+        ESP_LOGE(TAG, "Failed to allocate memory for node subtype.");
+        return ESP_ERR_NO_MEM;
     }
     return ESP_OK;
 }
