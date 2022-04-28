@@ -47,6 +47,8 @@ char *esp_rmaker_ota_status_to_string(ota_status_t status)
             return "failed";
         case OTA_STATUS_DELAYED:
             return "delayed";
+        case OTA_STATUS_REJECTED:
+            return "rejected";
         default:
             return "invalid";
     }
@@ -108,27 +110,28 @@ static esp_err_t validate_image_header(esp_rmaker_ota_handle_t ota_handle,
         ESP_LOGD(TAG, "Running firmware version: %s", running_app_info.version);
     }
 
-#ifndef CONFIG_ESP_RMAKER_SKIP_VERSION_CHECK
-    if (memcmp(new_app_info->version, running_app_info.version, sizeof(new_app_info->version)) == 0) {
-        ESP_LOGW(TAG, "Current running version is same as the new. We will not continue the update.");
-        esp_rmaker_ota_report_status(ota_handle, OTA_STATUS_FAILED, "Same version received");
-        return ESP_FAIL;
-    }
-#endif
-
 #ifndef CONFIG_ESP_RMAKER_SKIP_PROJECT_NAME_CHECK
     if (memcmp(new_app_info->project_name, running_app_info.project_name, sizeof(new_app_info->project_name)) != 0) {
         ESP_LOGW(TAG, "OTA Image built for Project: %s. Expected: %s",
                 new_app_info->project_name, running_app_info.project_name);
-        esp_rmaker_ota_report_status(ota_handle, OTA_STATUS_FAILED, "Project Name mismatch");
+        esp_rmaker_ota_report_status(ota_handle, OTA_STATUS_REJECTED, "Project Name mismatch");
         return ESP_FAIL;
     }
 #endif
 
+#ifndef CONFIG_ESP_RMAKER_SKIP_VERSION_CHECK
+    if (memcmp(new_app_info->version, running_app_info.version, sizeof(new_app_info->version)) == 0) {
+        ESP_LOGW(TAG, "Current running version is same as the new. We will not continue the update.");
+        esp_rmaker_ota_report_status(ota_handle, OTA_STATUS_REJECTED, "Same version received");
+        return ESP_FAIL;
+    }
+#endif
+
+
     return ESP_OK;
 }
 
-static esp_err_t esp_rmaker_ota_default_cb(esp_rmaker_ota_handle_t ota_handle, esp_rmaker_ota_data_t *ota_data)
+esp_err_t esp_rmaker_ota_default_cb(esp_rmaker_ota_handle_t ota_handle, esp_rmaker_ota_data_t *ota_data)
 {
     if (!ota_data->url) {
         return ESP_FAIL;
@@ -146,7 +149,8 @@ static esp_err_t esp_rmaker_ota_default_cb(esp_rmaker_ota_handle_t ota_handle, e
         .cert_pem = ota_data->server_cert,
         .timeout_ms = 5000,
         .buffer_size = DEF_HTTP_RX_BUFFER_SIZE,
-        .buffer_size_tx = buffer_size_tx
+        .buffer_size_tx = buffer_size_tx,
+        .keep_alive_enable = true
     };
 #ifdef CONFIG_ESP_RMAKER_SKIP_COMMON_NAME_CHECK
     config.skip_cert_common_name_check = true;
@@ -220,6 +224,7 @@ static esp_err_t esp_rmaker_ota_default_cb(esp_rmaker_ota_handle_t ota_handle, e
         }
     }
     if (err != ESP_OK) {
+        ESP_LOGE(TAG, "ESP_HTTPS_OTA upgrade failed %s", esp_err_to_name(err));
         char description[40];
         snprintf(description, sizeof(description), "OTA failed: Error %s", esp_err_to_name(err));
         esp_rmaker_ota_report_status(ota_handle, OTA_STATUS_FAILED, description);
