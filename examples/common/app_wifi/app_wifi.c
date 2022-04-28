@@ -234,14 +234,14 @@ static esp_err_t read_random_bytes_from_nvs(uint8_t **random_bytes, size_t *len)
 static esp_err_t get_device_service_name(char *service_name, size_t max)
 {
     uint8_t *nvs_random = NULL;
-    const char *ssid_prefix = "PROV_";
+    const char *ssid_prefix = CONFIG_APP_WIFI_PROV_NAME_PREFIX;
     size_t nvs_random_size = 0;
     if ((read_random_bytes_from_nvs(&nvs_random, &nvs_random_size) != ESP_OK) || nvs_random_size < 3) {
         uint8_t eth_mac[6];
         esp_wifi_get_mac(WIFI_IF_STA, eth_mac);
-        snprintf(service_name, max, "%s%02x%02x%02x", ssid_prefix, eth_mac[3], eth_mac[4], eth_mac[5]);
+        snprintf(service_name, max, "%s_%02x%02x%02x", ssid_prefix, eth_mac[3], eth_mac[4], eth_mac[5]);
     } else {
-        snprintf(service_name, max, "%s%02x%02x%02x", ssid_prefix, nvs_random[nvs_random_size - 3],
+        snprintf(service_name, max, "%s_%02x%02x%02x", ssid_prefix, nvs_random[nvs_random_size - 3],
                 nvs_random[nvs_random_size - 2], nvs_random[nvs_random_size - 1]);
     }
     if (nvs_random) {
