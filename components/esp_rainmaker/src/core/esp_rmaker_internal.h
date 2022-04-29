@@ -107,6 +107,7 @@ esp_err_t esp_rmaker_handle_set_params(char *data, size_t data_len, esp_rmaker_r
 esp_err_t esp_rmaker_user_mapping_prov_init(void);
 esp_err_t esp_rmaker_user_mapping_prov_deinit(void);
 esp_err_t esp_rmaker_user_node_mapping_init(void);
+esp_err_t esp_rmaker_user_node_mapping_deinit(void);
 esp_err_t esp_rmaker_reset_user_node_mapping(void);
 esp_err_t esp_rmaker_init_local_ctrl_service(void);
 esp_err_t esp_rmaker_start_local_ctrl_service(const char *serv_name);
