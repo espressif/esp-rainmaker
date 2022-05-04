@@ -28,6 +28,21 @@
 #include <esp_rmaker_utils.h>
 #include "esp_rmaker_ota_internal.h"
 
+#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(4, 4, 0)
+// Features supported in 4.4+
+
+#ifdef CONFIG_ESP_RMAKER_USE_CERT_BUNDLE
+#define ESP_RMAKER_USE_CERT_BUNDLE
+#include <esp_crt_bundle.h>
+#endif
+
+#else
+
+#ifdef CONFIG_ESP_RMAKER_USE_CERT_BUNDLE
+#warning "Certificate Bundle not supported below IDF v4.4. Using provided certificate instead."
+#endif
+
+#endif /* !IDF4.4 */
 static const char *TAG = "esp_rmaker_ota";
 
 #define OTA_REBOOT_TIMER_SEC    10
@@ -146,7 +161,11 @@ esp_err_t esp_rmaker_ota_default_cb(esp_rmaker_ota_handle_t ota_handle, esp_rmak
     esp_err_t ota_finish_err = ESP_OK;
     esp_http_client_config_t config = {
         .url = ota_data->url,
+#ifdef CONFIG_ESP_RMAKER_USE_CERT_BUNDLE
+        .crt_bundle_attach = esp_crt_bundle_attach,
+#else
         .cert_pem = ota_data->server_cert,
+#endif
         .timeout_ms = 5000,
         .buffer_size = DEF_HTTP_RX_BUFFER_SIZE,
         .buffer_size_tx = buffer_size_tx,
