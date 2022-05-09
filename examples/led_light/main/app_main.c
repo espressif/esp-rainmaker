@@ -29,8 +29,6 @@ static const char *TAG = "app_main";
 
 esp_rmaker_device_t *light_device;
 
-extern const char ota_server_cert[] asm("_binary_server_crt_start");
-
 /* Callback to handle commands received from the RainMaker cloud */
 static esp_err_t write_cb(const esp_rmaker_device_t *device, const esp_rmaker_param_t *param,
             const esp_rmaker_param_val_t val, void *priv_data, esp_rmaker_write_ctx_t *ctx)
@@ -108,7 +106,7 @@ void app_main()
 
     /* Enable OTA */
     esp_rmaker_ota_config_t ota_config = {
-        .server_cert = ota_server_cert,
+        .server_cert = ESP_RMAKER_OTA_DEFAULT_SERVER_CERT,
     };
     esp_rmaker_ota_enable(&ota_config, OTA_USING_PARAMS);
 

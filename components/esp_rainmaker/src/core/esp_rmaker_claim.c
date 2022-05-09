@@ -54,6 +54,21 @@
 #include "esp_rmaker_client_data.h"
 #include "esp_rmaker_claim.h"
 
+#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(4, 4, 0)
+// Features supported in 4.4+
+
+#ifdef CONFIG_ESP_RMAKER_USE_CERT_BUNDLE
+#define ESP_RMAKER_USE_CERT_BUNDLE
+#include <esp_crt_bundle.h>
+#endif
+
+#else
+
+#ifdef CONFIG_ESP_RMAKER_USE_CERT_BUNDLE
+#warning "Certificate Bundle not supported below IDF v4.4. Using provided certificate instead."
+#endif
+
+#endif /* !IDF4.4 */
 
 static const char *TAG = "esp_claim";
 
@@ -370,7 +385,11 @@ static esp_err_t esp_rmaker_claim_perform_common(esp_rmaker_claim_data_t *claim_
         .url = url,
         .transport_type = HTTP_TRANSPORT_OVER_SSL,
         .buffer_size = 1024,
+#ifdef ESP_RMAKER_USE_CERT_BUNDLE
+        .crt_bundle_attach = esp_crt_bundle_attach,
+#else
         .cert_pem = (const char *)claim_service_server_root_ca_pem_start,
+#endif
         .skip_cert_common_name_check = false
     };
     esp_http_client_handle_t client = esp_http_client_init(&config);
