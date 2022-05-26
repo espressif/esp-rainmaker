@@ -284,10 +284,16 @@ ota_end:
     return ESP_FAIL;
 }
 
+static const esp_rmaker_ota_config_t ota_default_config = {
+    .server_cert = esp_rmaker_ota_def_cert,
+};
 /* Enable the ESP RainMaker specific OTA */
 esp_err_t esp_rmaker_ota_enable(esp_rmaker_ota_config_t *ota_config, esp_rmaker_ota_type_t type)
 {
-    if (!ota_config || ((type != OTA_USING_PARAMS) && (type != OTA_USING_TOPICS))) {
+    if (ota_config == NULL) {
+        ota_config = (esp_rmaker_ota_config_t *)&ota_default_config;
+    }
+    if ((type != OTA_USING_PARAMS) && (type != OTA_USING_TOPICS)) {
         ESP_LOGE(TAG,"Invalid arguments for esp_rmaker_ota_enable()");
         return ESP_ERR_INVALID_ARG;
     }
@@ -342,4 +348,9 @@ esp_err_t esp_rmaker_ota_enable(esp_rmaker_ota_config_t *ota_config, esp_rmaker_
         ESP_LOGE(TAG, "Failed to enable OTA");
     }
     return err;
+}
+
+esp_err_t esp_rmaker_ota_enable_default(void)
+{
+    return esp_rmaker_ota_enable(NULL, OTA_USING_TOPICS);
 }
