@@ -2,8 +2,8 @@ menu "ESP RainMaker Config"
 
     choice ESP_RMAKER_CLAIM_TYPE
         bool "Claiming Type"
-        default ESP_RMAKER_SELF_CLAIM if IDF_TARGET_ESP32S2
-        default ESP_RMAKER_ASSISTED_CLAIM if !IDF_TARGET_ESP32S2
+        default ESP_RMAKER_SELF_CLAIM
+        default ESP_RMAKER_ASSISTED_CLAIM if IDF_TARGET_ESP32
         help
             Claiming type to be used.
 
