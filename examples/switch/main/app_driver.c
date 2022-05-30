@@ -22,7 +22,7 @@
 #define BUTTON_ACTIVE_LEVEL  0
 
 /* This is the GPIO on which the power will be set */
-#define OUTPUT_GPIO    19
+#define OUTPUT_GPIO    CONFIG_EXAMPLE_OUTPUT_GPIO
 static bool g_power_state = DEFAULT_POWER;
 
 /* These values correspoind to H,S,V = 120,100,10 */

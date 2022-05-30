@@ -23,7 +23,7 @@
 #define BUTTON_GPIO          CONFIG_EXAMPLE_BOARD_BUTTON_GPIO
 #define BUTTON_ACTIVE_LEVEL  0
 /* This is the GPIO on which the power will be set */
-#define OUTPUT_GPIO    19
+#define OUTPUT_GPIO    CONFIG_EXAMPLE_OUTPUT_GPIO
 
 /* These values correspoind to H,S,V = 120,100,10 */
 #define DEFAULT_RED     0

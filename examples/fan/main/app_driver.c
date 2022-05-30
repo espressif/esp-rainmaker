@@ -21,8 +21,6 @@
 /* This is the button that is used for toggling the power */
 #define BUTTON_GPIO          CONFIG_EXAMPLE_BOARD_BUTTON_GPIO
 #define BUTTON_ACTIVE_LEVEL  0
-/* This is the GPIO on which the power will be set */
-#define OUTPUT_GPIO    19
 
 #define DEFAULT_HUE         180
 #define DEFAULT_SATURATION  100
