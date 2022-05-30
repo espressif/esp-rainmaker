@@ -169,13 +169,12 @@ end:
     return;
 }
 
-#ifdef CONFIG_ESP_RMAKER_OTA_AUTOFETCH
-static void esp_rmaker_ota_fetch(void *priv)
+esp_err_t esp_rmaker_ota_fetch(void)
 {
     esp_rmaker_node_info_t *info = esp_rmaker_node_get_info(esp_rmaker_get_node());
     if (!info) {
         ESP_LOGE(TAG, "Node info not found. Cant send otafetch request");
-        return;
+        return ESP_FAIL;
     }
     char publish_payload[150];
     json_gen_str_t jstr;
@@ -192,8 +191,13 @@ static void esp_rmaker_ota_fetch(void *priv)
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "OTA Fetch Publish Error %d", err);
     }
+    return err;
 }
-#endif /* CONFIG_ESP_RMAKER_OTA_AUTOFETCH */
+
+void esp_rmaker_ota_timer_cb_fetch(void *priv)
+{
+    esp_rmaker_ota_fetch();
+}
 
 static esp_err_t esp_rmaker_ota_subscribe(void *priv_data)
 {
@@ -215,10 +219,10 @@ static void esp_rmaker_ota_work_fn(void *priv_data)
 {
     esp_rmaker_ota_subscribe(priv_data);
 #ifdef CONFIG_ESP_RMAKER_OTA_AUTOFETCH
-    esp_rmaker_ota_fetch(priv_data);
+    esp_rmaker_ota_fetch();
     if (ota_autofetch_period > 0) {
         esp_timer_create_args_t autofetch_timer_conf = {
-            .callback = esp_rmaker_ota_fetch,
+            .callback = esp_rmaker_ota_timer_cb_fetch,
             .arg = priv_data,
             .dispatch_method = ESP_TIMER_TASK,
             .name = "ota_autofetch_tm"

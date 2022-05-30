@@ -20,6 +20,7 @@
 #include <esp_rmaker_standard_devices.h>
 #include <esp_rmaker_ota.h>
 #include <esp_rmaker_schedule.h>
+#include <esp_rmaker_scenes.h>
 #include <esp_rmaker_console.h>
 
 #include <esp_rmaker_common_events.h>
@@ -92,6 +93,21 @@ static void event_handler(void* arg, esp_event_base_t event_base,
             default:
                 ESP_LOGW(TAG, "Unhandled RainMaker Common Event: %d", event_id);
         }
+    } else if (event_base == APP_WIFI_EVENT) {
+        switch (event_id) {
+            case APP_WIFI_EVENT_QR_DISPLAY:
+                ESP_LOGI(TAG, "Provisioning QR : %s", (char *)event_data);
+                break;
+            case APP_WIFI_EVENT_PROV_TIMEOUT:
+                ESP_LOGI(TAG, "Provisioning Timed Out. Please reboot.");
+                break;
+            case APP_WIFI_EVENT_PROV_RESTART:
+                ESP_LOGI(TAG, "Provisioning has restarted due to failures.");
+                break;
+            default:
+                ESP_LOGW(TAG, "Unhandled App Wi-Fi Event: %d", event_id);
+                break;
+        }
     } else {
         ESP_LOGW(TAG, "Invalid event received!");
     }
@@ -120,6 +136,8 @@ void app_main()
 
     /* Register an event handler to catch RainMaker events */
     ESP_ERROR_CHECK(esp_event_handler_register(RMAKER_EVENT, ESP_EVENT_ANY_ID, &event_handler, NULL));
+    ESP_ERROR_CHECK(esp_event_handler_register(RMAKER_COMMON_EVENT, ESP_EVENT_ANY_ID, &event_handler, NULL));
+    ESP_ERROR_CHECK(esp_event_handler_register(APP_WIFI_EVENT, ESP_EVENT_ANY_ID, &event_handler, NULL));
 
     /* Initialize the ESP RainMaker Agent.
      * Note that this should be called after app_wifi_init() but before app_wifi_start()
@@ -180,6 +198,9 @@ void app_main()
 
     /* Enable scheduling. */
     esp_rmaker_schedule_enable();
+
+    /* Enable Scenes */
+    esp_rmaker_scenes_enable();
 
     /* Enable Insights. Requires CONFIG_ESP_INSIGHTS_ENABLED=y */
     app_insights_enable();

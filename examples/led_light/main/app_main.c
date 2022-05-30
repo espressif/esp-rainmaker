@@ -18,6 +18,7 @@
 #include <esp_rmaker_standard_devices.h>
 #include <esp_rmaker_ota.h>
 #include <esp_rmaker_schedule.h>
+#include <esp_rmaker_scenes.h>
 
 #include <app_wifi.h>
 #include <app_insights.h>
@@ -27,8 +28,6 @@
 static const char *TAG = "app_main";
 
 esp_rmaker_device_t *light_device;
-
-extern const char ota_server_cert[] asm("_binary_server_crt_start");
 
 /* Callback to handle commands received from the RainMaker cloud */
 static esp_err_t write_cb(const esp_rmaker_device_t *device, const esp_rmaker_param_t *param,
@@ -107,7 +106,7 @@ void app_main()
 
     /* Enable OTA */
     esp_rmaker_ota_config_t ota_config = {
-        .server_cert = ota_server_cert,
+        .server_cert = ESP_RMAKER_OTA_DEFAULT_SERVER_CERT,
     };
     esp_rmaker_ota_enable(&ota_config, OTA_USING_PARAMS);
 
@@ -120,6 +119,9 @@ void app_main()
 
     /* Enable scheduling. */
     esp_rmaker_schedule_enable();
+
+    /* Enable Scenes */
+    esp_rmaker_scenes_enable();
 
     /* Enable Insights. Requires CONFIG_ESP_INSIGHTS_ENABLED=y */
     app_insights_enable();

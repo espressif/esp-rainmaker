@@ -32,4 +32,37 @@ menu "App Wi-Fi Provisioning"
         help
             "Use Apple WAC Provisioning"
 
+    config APP_WIFI_RESET_PROV_ON_FAILURE
+        bool
+        default y
+        prompt "Reset provisioned credentials and state machine after session failure"
+        help
+            Enable reseting provisioned credentials and state machine after session failure.
+            This will restart the provisioning service after retries are exhausted.
+
+    config APP_WIFI_PROV_MAX_RETRY_CNT
+        int
+        default 5
+        prompt "Max retries before reseting provisioning state machine"
+        depends on APP_WIFI_RESET_PROV_ON_FAILURE
+        help
+            Set the Maximum retry to avoid reconnecting to an inexistent AP or if credentials
+            are misconfigured. Provisioned credentials are erased and internal state machine
+            is reset after this threshold is reached.
+
+    config APP_WIFI_PROV_TIMEOUT_PERIOD
+        int "Provisioning Timeout"
+        default 10
+        help
+            Timeout (in minutes) after which the provisioning will auto stop. A reboot will be required
+            to restart provisioning. Set to 0 if you do not want provisioning to auto stop.
+            It is recommended to set this to 15 or 10 depending on the HomeKit spec version supported,
+            to match the WAC timeout.
+
+    config APP_WIFI_PROV_NAME_PREFIX
+        string "Provisioning Name Prefix"
+        default "PROV"
+        help
+            Provisioning Name Prefix.
+
 endmenu
