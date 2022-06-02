@@ -37,7 +37,7 @@ static bool g_power_state = DEFAULT_SWITCH_POWER;
 static float g_temperature = DEFAULT_TEMPERATURE;
 static TimerHandle_t sensor_timer;
 
-static void app_sensor_update(void *priv)
+static void app_sensor_update(TimerHandle_t handle)
 {
     static float delta = 0.5;
     g_temperature += delta;

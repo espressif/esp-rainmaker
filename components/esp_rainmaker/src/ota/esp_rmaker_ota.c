@@ -161,7 +161,7 @@ esp_err_t esp_rmaker_ota_default_cb(esp_rmaker_ota_handle_t ota_handle, esp_rmak
     esp_err_t ota_finish_err = ESP_OK;
     esp_http_client_config_t config = {
         .url = ota_data->url,
-#ifdef CONFIG_ESP_RMAKER_USE_CERT_BUNDLE
+#ifdef ESP_RMAKER_USE_CERT_BUNDLE
         .crt_bundle_attach = esp_crt_bundle_attach,
 #else
         .cert_pem = ota_data->server_cert,
