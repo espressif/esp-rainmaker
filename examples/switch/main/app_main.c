@@ -18,7 +18,6 @@
 #include <esp_rmaker_standard_types.h>
 #include <esp_rmaker_standard_params.h>
 #include <esp_rmaker_standard_devices.h>
-#include <esp_rmaker_ota.h>
 #include <esp_rmaker_schedule.h>
 #include <esp_rmaker_scenes.h>
 #include <esp_rmaker_console.h>
@@ -184,10 +183,7 @@ void app_main()
     esp_rmaker_node_add_device(node, switch_device);
 
     /* Enable OTA */
-    esp_rmaker_ota_config_t ota_config = {
-        .server_cert = ESP_RMAKER_OTA_DEFAULT_SERVER_CERT,
-    };
-    esp_rmaker_ota_enable(&ota_config, OTA_USING_PARAMS);
+    esp_rmaker_ota_enable_default();
 
     /* Enable timezone service which will be require for setting appropriate timezone
      * from the phone apps for scheduling to work correctly.

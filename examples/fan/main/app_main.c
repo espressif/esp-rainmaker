@@ -91,6 +91,9 @@ void app_main()
     esp_rmaker_device_add_param(fan_device, esp_rmaker_speed_param_create(ESP_RMAKER_DEF_SPEED_NAME, DEFAULT_SPEED));
     esp_rmaker_node_add_device(node, fan_device);
 
+    /* Enable OTA */
+    esp_rmaker_ota_enable_default();
+
     /* Enable timezone service which will be require for setting appropriate timezone
      * from the phone apps for scheduling to work correctly.
      * For more information on the various ways of setting timezone, please check
