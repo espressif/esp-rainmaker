@@ -49,7 +49,7 @@ static esp_err_t write_cb(const esp_rmaker_device_t *device, const esp_rmaker_pa
 }
 /* Event handler for catching RainMaker events */
 static void event_handler(void* arg, esp_event_base_t event_base,
-                          int event_id, void* event_data)
+                          int32_t event_id, void* event_data)
 {
     if (event_base == RMAKER_EVENT) {
         switch (event_id) {
@@ -182,10 +182,7 @@ void app_main()
     esp_rmaker_node_add_device(node, switch_device);
 
     /* Enable OTA */
-    esp_rmaker_ota_config_t ota_config = {
-        .server_cert = ESP_RMAKER_OTA_DEFAULT_SERVER_CERT,
-    };
-    esp_rmaker_ota_enable(&ota_config, OTA_USING_PARAMS);
+    esp_rmaker_ota_enable_default();
 
     /* Enable Insights. Requires CONFIG_ESP_INSIGHTS_ENABLED=y */
     app_insights_enable();

@@ -38,7 +38,7 @@ static esp_err_t esp_rmaker_report_info(json_gen_str_t *jptr)
     }
     json_gen_obj_set_string(jptr, "model",  info->model);
     const esp_app_desc_t *app_desc = esp_ota_get_app_description();
-    json_gen_obj_set_string(jptr, "project_name", app_desc->project_name);
+    json_gen_obj_set_string(jptr, "project_name", (char *)app_desc->project_name);
     json_gen_obj_set_string(jptr, "platform", CONFIG_IDF_TARGET);
     json_gen_pop_object(jptr);
     return ESP_OK;

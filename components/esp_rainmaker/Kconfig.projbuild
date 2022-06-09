@@ -2,8 +2,8 @@ menu "ESP RainMaker Config"
 
     choice ESP_RMAKER_CLAIM_TYPE
         bool "Claiming Type"
-        default ESP_RMAKER_SELF_CLAIM if IDF_TARGET_ESP32S2
-        default ESP_RMAKER_ASSISTED_CLAIM if !IDF_TARGET_ESP32S2
+        default ESP_RMAKER_SELF_CLAIM
+        default ESP_RMAKER_ASSISTED_CLAIM if IDF_TARGET_ESP32
         help
             Claiming type to be used.
 
@@ -79,6 +79,14 @@ menu "ESP RainMaker Config"
             can take appropriate action w.r.t user permissions. It is recommended to enable this option
             for security reasons.
 
+    config RMAKER_NAME_PARAM_CB
+        bool "Call device callback for Name param"
+        default n
+        help
+            By default, the "Name" parameter (esp.param.name) changes are handled internally. If Applications
+            want to handle this themselves, this config option can be enabled. Please ensure that you update
+            and report the name parameter in your callback so that it reflects correctly everywhere.
+            If no device callback is registered, the name paramater will be handled internally.
 
     config ESP_RMAKER_LOCAL_CTRL_ENABLE
         bool "ESP RainMaker Local Control"

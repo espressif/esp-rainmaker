@@ -357,7 +357,19 @@ static esp_err_t esp_rmaker_device_set_params(_esp_rmaker_device_t *device, jpar
              * of calling the registered callback.
              */
             if (param->type && (strcmp(param->type, ESP_RMAKER_PARAM_NAME) == 0)) {
+#ifdef CONFIG_RMAKER_NAME_PARAM_CB
+                if (device->write_cb) {
+                    esp_rmaker_write_ctx_t ctx = {
+                        .src = src,
+                    };
+                    device->write_cb((esp_rmaker_device_t *)device, (esp_rmaker_param_t *)param,
+                                new_val, device->priv_data, &ctx);
+                } else {
+                    esp_rmaker_param_update_and_report((esp_rmaker_param_t *)param, new_val);
+                }
+#else
                 esp_rmaker_param_update_and_report((esp_rmaker_param_t *)param, new_val);
+#endif
             } else if (device->write_cb) {
                 esp_rmaker_write_ctx_t ctx = {
                     .src = src,

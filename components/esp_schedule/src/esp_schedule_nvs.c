@@ -227,7 +227,27 @@ esp_schedule_handle_t *esp_schedule_nvs_get_all(uint8_t *schedule_count)
         return NULL;
     }
     int handle_count = 0;
+
     nvs_entry_info_t nvs_entry;
+#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 0, 0)
+    nvs_iterator_t nvs_iterator = NULL;
+    esp_err_t err = nvs_entry_find(esp_schedule_nvs_partition, ESP_SCHEDULE_NVS_NAMESPACE, NVS_TYPE_BLOB, &nvs_iterator);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "No entry found in NVS");
+        return NULL;;
+    }
+    while (err == ESP_OK) {
+        nvs_entry_info(nvs_iterator, &nvs_entry);
+        ESP_LOGI(TAG, "Found schedule in NVS with key: %s", nvs_entry.key);
+        handle_list[handle_count] = esp_schedule_nvs_get(nvs_entry.key);
+        if (handle_list[handle_count] != NULL) {
+            /* Increase count only if nvs_get was successful */
+            handle_count++;
+        }
+        err = nvs_entry_next(&nvs_iterator);
+    }
+    nvs_release_iterator(nvs_iterator);
+#else
     nvs_iterator_t nvs_iterator = nvs_entry_find(esp_schedule_nvs_partition, ESP_SCHEDULE_NVS_NAMESPACE, NVS_TYPE_BLOB);
     if (nvs_iterator == NULL) {
         ESP_LOGE(TAG, "No entry found in NVS");
@@ -243,6 +263,7 @@ esp_schedule_handle_t *esp_schedule_nvs_get_all(uint8_t *schedule_count)
         }
         nvs_iterator = nvs_entry_next(nvs_iterator);
     }
+#endif
     *schedule_count = handle_count;
     ESP_LOGI(TAG, "Found %d schedules in NVS", *schedule_count);
     return handle_list;
