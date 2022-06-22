@@ -79,11 +79,10 @@ static esp_err_t esp_rmaker_ota_service_cb(const esp_rmaker_device_t *device, co
 
 esp_err_t esp_rmaker_ota_report_status_using_params(esp_rmaker_ota_handle_t ota_handle, ota_status_t status, char *additional_info)
 {
-    if (!ota_handle) {
+    const esp_rmaker_device_t *device = esp_rmaker_node_get_device_by_name(esp_rmaker_get_node(), ESP_RMAKER_OTA_SERV_NAME);
+    if (!device) {
         return ESP_FAIL;
     }
-    esp_rmaker_ota_t *ota = (esp_rmaker_ota_t *)ota_handle;
-    const esp_rmaker_device_t *device = (esp_rmaker_device_t *)ota->transient_priv;
     esp_rmaker_param_t *info_param = esp_rmaker_device_get_param_by_type(device, ESP_RMAKER_PARAM_OTA_INFO);
     esp_rmaker_param_t *status_param = esp_rmaker_device_get_param_by_type(device, ESP_RMAKER_PARAM_OTA_STATUS);
 
