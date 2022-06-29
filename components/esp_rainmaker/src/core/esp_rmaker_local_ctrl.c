@@ -266,7 +266,12 @@ static esp_err_t __esp_rmaker_start_local_ctrl_service(const char *serv_name)
     };
 
     /* If sec1, add security type details to the config */
-    protocomm_security_pop_t *pop = NULL;
+#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 0, 0)
+#define PROTOCOMM_SEC_DATA protocomm_security1_params_t
+#else
+#define PROTOCOMM_SEC_DATA  protocomm_security_pop_t
+#endif /* ESP_IDF_VERSION */
+    PROTOCOMM_SEC_DATA *pop = NULL;
 #if ESP_RMAKER_LOCAL_CTRL_SECURITY_TYPE == 1
         char *pop_str = esp_rmaker_local_ctrl_get_pop();
         /* Note: pop_str shouldn't be freed. If it gets freed, the pointer which is internally copied in esp_local_ctrl_start() will become invalid which would cause corruption. */
@@ -274,7 +279,7 @@ static esp_err_t __esp_rmaker_start_local_ctrl_service(const char *serv_name)
         int sec_ver = esp_rmaker_local_ctrl_get_security_type();
 
         if (sec_ver != 0 && pop_str) {
-            pop = (protocomm_security_pop_t *)calloc(1, sizeof(protocomm_security_pop_t));
+            pop = (PROTOCOMM_SEC_DATA *)calloc(1, sizeof(PROTOCOMM_SEC_DATA));
             if (!pop) {
                 ESP_LOGE(TAG, "Failed to allocate pop");
                 free(pop_str);
@@ -286,7 +291,11 @@ static esp_err_t __esp_rmaker_start_local_ctrl_service(const char *serv_name)
 
         config.proto_sec.version = sec_ver;
         config.proto_sec.custom_handle = NULL;
+#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 0, 0)
+        config.proto_sec.sec_params = pop;
+#else
         config.proto_sec.pop = pop;
+#endif /* ESP_IDF_VERSION */
 #endif
 
     /* Start esp_local_ctrl service */
