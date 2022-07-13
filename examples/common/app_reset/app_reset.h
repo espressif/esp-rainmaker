@@ -10,6 +10,10 @@
 #include <esp_err.h>
 #include <iot_button.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /** Create a button handle
  *
  * This is just a wrapper over iot_button_create(). This can be used to register
@@ -40,3 +44,7 @@ button_handle_t app_reset_button_create(gpio_num_t gpio_num, button_active_t act
  * @return error in case of failure.
  */
 esp_err_t app_reset_button_register(button_handle_t btn_handle, uint8_t wifi_reset_timeout, uint8_t factory_reset_timeout);
+
+#ifdef __cplusplus
+}
+#endif
