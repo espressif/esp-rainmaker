@@ -17,10 +17,12 @@
 #include <json_generator.h>
 #include <esp_log.h>
 #include <esp_system.h>
+#include <nvs.h>
 #include <esp_rmaker_work_queue.h>
 #include <esp_rmaker_core.h>
 #include <esp_rmaker_ota.h>
 
+#include "esp_rmaker_internal.h"
 #include "esp_rmaker_ota_internal.h"
 #include "esp_rmaker_mqtt.h"
 
@@ -53,6 +55,21 @@ esp_err_t esp_rmaker_ota_report_status_using_topics(esp_rmaker_ota_handle_t ota_
     json_gen_start_object(&jstr);
     if (ota->transient_priv) {
         json_gen_obj_set_string(&jstr, "ota_job_id", (char *)ota->transient_priv);
+    } else {
+        /* This will get executed only when the OTA status is being reported after a reboot, either to
+         * indicate successful verification of new firmware, or to indicate that firmware was rolled back
+         */
+        nvs_handle handle;
+        esp_err_t err = nvs_open_from_partition(ESP_RMAKER_NVS_PART_NAME, RMAKER_OTA_NVS_NAMESPACE, NVS_READWRITE, &handle);
+        if (err == ESP_OK) {
+            char job_id[64] = {0};
+            size_t len = sizeof(job_id);
+            if ((err = nvs_get_blob(handle, RMAKER_OTA_JOB_ID_NVS_NAME, job_id, &len)) == ESP_OK) {
+                json_gen_obj_set_string(&jstr, "ota_job_id", job_id);
+                nvs_erase_key(handle, RMAKER_OTA_JOB_ID_NVS_NAME);
+            }
+            nvs_close(handle);
+        }
     }
     json_gen_obj_set_string(&jstr, "status", esp_rmaker_ota_status_to_string(status));
     json_gen_obj_set_string(&jstr, "additional_info", additional_info);
@@ -60,6 +77,7 @@ esp_err_t esp_rmaker_ota_report_status_using_topics(esp_rmaker_ota_handle_t ota_
     json_gen_str_end(&jstr);
 
     char publish_topic[100];
+    ESP_LOGI(TAG, "%s",publish_payload);
     snprintf(publish_topic, sizeof(publish_topic), "node/%s/%s", node_id, OTASTATUS_TOPIC_SUFFIX);
     esp_err_t err = esp_rmaker_mqtt_publish(publish_topic, publish_payload, strlen(publish_payload),
                         RMAKER_MQTT_QOS1, NULL);
@@ -129,6 +147,12 @@ static void ota_url_handler(const char *topic, void *payload, size_t payload_len
         goto end;
     }
     json_obj_get_string(&jctx, "ota_job_id", ota_job_id, len);
+    nvs_handle handle;
+    esp_err_t err = nvs_open_from_partition(ESP_RMAKER_NVS_PART_NAME, RMAKER_OTA_NVS_NAMESPACE, NVS_READWRITE, &handle);
+    if (err == ESP_OK) {
+        nvs_set_blob(handle, RMAKER_OTA_JOB_ID_NVS_NAME, ota_job_id, strlen(ota_job_id));
+        nvs_close(handle);
+    }
     ESP_LOGI(TAG, "OTA Job ID: %s", ota_job_id);
     ota->transient_priv = ota_job_id;
     len = 0;
@@ -171,6 +195,7 @@ end:
 
 esp_err_t esp_rmaker_ota_fetch(void)
 {
+    ESP_LOGI(TAG, "Fetching OTA details, if any.");
     esp_rmaker_node_info_t *info = esp_rmaker_node_get_info(esp_rmaker_get_node());
     if (!info) {
         ESP_LOGE(TAG, "Node info not found. Cant send otafetch request");
@@ -217,9 +242,17 @@ static esp_err_t esp_rmaker_ota_subscribe(void *priv_data)
 
 static void esp_rmaker_ota_work_fn(void *priv_data)
 {
+    esp_rmaker_ota_t *ota = (esp_rmaker_ota_t *)priv_data;
+    /* If the firmware was rolled back, indicate that first */
+    if (ota->rolled_back) {
+        esp_rmaker_ota_report_status((esp_rmaker_ota_handle_t )ota, OTA_STATUS_REJECTED, "Firmware rolled back");
+        ota->rolled_back = false;
+    }
     esp_rmaker_ota_subscribe(priv_data);
 #ifdef CONFIG_ESP_RMAKER_OTA_AUTOFETCH
-    esp_rmaker_ota_fetch();
+    if (ota->ota_in_progress != true) {
+        esp_rmaker_ota_fetch();
+    }
     if (ota_autofetch_period > 0) {
         esp_timer_create_args_t autofetch_timer_conf = {
             .callback = esp_rmaker_ota_timer_cb_fetch,

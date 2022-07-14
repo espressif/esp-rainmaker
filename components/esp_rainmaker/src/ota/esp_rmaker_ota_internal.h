@@ -17,6 +17,11 @@
 #include <stdint.h>
 #include <esp_err.h>
 #include <esp_rmaker_ota.h>
+
+#define RMAKER_OTA_NVS_NAMESPACE            "rmaker_ota"
+#define RMAKER_OTA_JOB_ID_NVS_NAME          "rmaker_ota_id"
+#define RMAKER_OTA_UPDATE_FLAG_NVS_NAME     "ota_update"
+
 typedef struct {
     esp_rmaker_ota_type_t type;
     esp_rmaker_ota_cb_t ota_cb;
@@ -25,6 +30,7 @@ typedef struct {
     char *url;
     int filesize;
     bool ota_in_progress;
+    bool rolled_back;
     ota_status_t last_reported_status;
     void *transient_priv;
 } esp_rmaker_ota_t;

@@ -1,5 +1,17 @@
 # Changes
 
+## 28-Jun-2022 (examples: Enable CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE in all examples)
+
+`CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE` has been enabled in all examples by default,
+as a safety measure to prevent devices getting bricked after a faulty firmware upgrade.
+The OTA firmware upgrade will be marked as successful only if the firmware can connect to
+MQTT within 90 seconds of calling `esp_rmaker_ota_enable_default()` (or other esp_emaker_enable APIs).
+The time out is configurable using `CONFIG_ESP_RMAKER_OTA_ROLLBACK_WAIT_PERIOD`.
+
+Note that this is a bootloader feature and so, just enabling this feature and pushing out updated
+firmware to existing devices won't be of any use. Please flash new bootloader on the devices to
+make this work.
+
 ## 26-May-2022 (claiming and ota)
 
 - claiming: Make self claiming as the default for esp32s3 and esp32c3
