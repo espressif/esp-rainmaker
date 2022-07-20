@@ -443,7 +443,7 @@ static esp_err_t esp_rmaker_claim_perform_init(esp_rmaker_claim_data_t *claim_da
     }
 
     err = esp_rmaker_claim_perform_common(claim_data, CLAIM_INIT_PATH);
-    if (err != OK) {
+    if (err != ESP_OK) {
         ESP_LOGE(TAG, "Claim Init Request Failed.");
         return err;
     }
@@ -458,7 +458,7 @@ static esp_err_t esp_rmaker_claim_perform_init(esp_rmaker_claim_data_t *claim_da
 static esp_err_t esp_rmaker_claim_perform_verify(esp_rmaker_claim_data_t *claim_data)
 {
     esp_err_t err = esp_rmaker_claim_perform_common(claim_data, CLAIM_VERIFY_PATH);
-    if (err != OK) {
+    if (err != ESP_OK) {
         ESP_LOGE(TAG, "Claim Verify Failed.");
         return err;
     }
