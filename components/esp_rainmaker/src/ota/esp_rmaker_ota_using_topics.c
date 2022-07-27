@@ -99,6 +99,10 @@ void esp_rmaker_ota_finish_using_topics(esp_rmaker_ota_t *ota)
         free(ota->transient_priv);
         ota->transient_priv = NULL;
     }
+    if (ota->metadata) {
+        free(ota->metadata);
+        ota->metadata = NULL;
+    }
     ota->ota_in_progress = false;
 }
 static void ota_url_handler(const char *topic, void *payload, size_t payload_len, void *priv_data)
@@ -175,6 +179,22 @@ static void ota_url_handler(const char *topic, void *payload, size_t payload_len
     int filesize = 0;
     json_obj_get_int(&jctx, "file_size", &filesize);
     ESP_LOGI(TAG, "File Size: %d", filesize);
+
+    int metadata_size = 0;
+    char *metadata = NULL;
+    json_obj_get_object_strlen(&jctx, "metadata", &metadata_size);
+    if (metadata_size > 0) {
+        metadata_size++; /* Increment for NULL character */
+        metadata = calloc(1, metadata_size);
+        if (!metadata) {
+            ESP_LOGE(TAG, "Aborted. OTA metadata memory allocation failed");
+            esp_rmaker_ota_report_status(ota_handle, OTA_STATUS_FAILED, "Aborted. OTA metadata memory allocation failed");
+            free(url);
+            goto end;
+        }
+        json_obj_get_object_str(&jctx, "metadata", metadata, metadata_size);
+        ota->metadata = metadata;
+    }
 
     json_parse_end(&jctx);
     if (ota->url) {

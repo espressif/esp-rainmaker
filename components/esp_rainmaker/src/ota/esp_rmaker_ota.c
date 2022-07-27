@@ -139,7 +139,8 @@ void esp_rmaker_ota_common_cb(void *priv)
         .url = ota->url,
         .filesize = ota->filesize,
         .server_cert = ota->server_cert,
-        .priv = ota->priv
+        .priv = ota->priv,
+        .metadata = ota->metadata
     };
     ota->ota_cb((esp_rmaker_ota_handle_t) ota, &ota_data);
 ota_finish:
