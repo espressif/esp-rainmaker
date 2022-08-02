@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include <stdlib.h>
+#include <inttypes.h>
 #include <esp_log.h>
 #include <nvs.h>
 #include <esp_event.h>
@@ -74,7 +75,7 @@ static esp_err_t get_property_values(size_t props_count,
     esp_err_t ret = ESP_OK;
     uint32_t i;
     for (i = 0; i < props_count && ret == ESP_OK ; i++) {
-        ESP_LOGD(TAG, "(%d) Reading property : %s", i, props[i].name);
+        ESP_LOGD(TAG, "(%"PRIu32") Reading property : %s", i, props[i].name);
         switch (props[i].type) {
             case PROP_TYPE_NODE_CONFIG: {
                 char *node_config = esp_rmaker_get_node_config();
@@ -343,7 +344,7 @@ static esp_err_t __esp_rmaker_start_local_ctrl_service(const char *serv_name)
 static void esp_rmaker_local_ctrl_prov_event_handler(void* arg, esp_event_base_t event_base,
                           int32_t event_id, void* event_data)
 {
-    ESP_LOGI(TAG, "Event %d", event_id);
+    ESP_LOGI(TAG, "Event %"PRIu32, event_id);
     if (event_base == WIFI_PROV_EVENT) {
         switch (event_id) {
             case WIFI_PROV_START:

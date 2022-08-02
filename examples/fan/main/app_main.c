@@ -71,7 +71,7 @@ void app_main()
     /* Initialize Wi-Fi. Note that, this should be called before esp_rmaker_node_init()
      */
     app_wifi_init();
-    
+
     /* Initialize the ESP RainMaker Agent.
      * Note that this should be called after app_wifi_init() but before app_wifi_start()
      * */

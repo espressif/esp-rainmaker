@@ -8,6 +8,7 @@
 */
 
 #include <string.h>
+#include <inttypes.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
 #include <esp_log.h>
@@ -67,7 +68,7 @@ static void event_handler(void* arg, esp_event_base_t event_base,
                 ESP_LOGI(TAG, "RainMaker Claim Failed.");
                 break;
             default:
-                ESP_LOGW(TAG, "Unhandled RainMaker Event: %d", event_id);
+                ESP_LOGW(TAG, "Unhandled RainMaker Event: %"PRIi32, event_id);
         }
     } else if (event_base == RMAKER_COMMON_EVENT) {
         switch (event_id) {
@@ -90,7 +91,7 @@ static void event_handler(void* arg, esp_event_base_t event_base,
                 ESP_LOGI(TAG, "MQTT Published. Msg id: %d.", *((int *)event_data));
                 break;
             default:
-                ESP_LOGW(TAG, "Unhandled RainMaker Common Event: %d", event_id);
+                ESP_LOGW(TAG, "Unhandled RainMaker Common Event: %"PRIi32, event_id);
         }
     } else if (event_base == APP_WIFI_EVENT) {
         switch (event_id) {
@@ -104,7 +105,7 @@ static void event_handler(void* arg, esp_event_base_t event_base,
                 ESP_LOGI(TAG, "Provisioning has restarted due to failures.");
                 break;
             default:
-                ESP_LOGW(TAG, "Unhandled App Wi-Fi Event: %d", event_id);
+                ESP_LOGW(TAG, "Unhandled App Wi-Fi Event: %"PRIi32, event_id);
                 break;
         }
     } else {
