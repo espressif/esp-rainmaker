@@ -58,6 +58,8 @@ static TimerHandle_t s_ota_rollback_timer;
 #define RMAKER_OTA_ROLLBACK_WAIT_PERIOD    CONFIG_ESP_RMAKER_OTA_ROLLBACK_WAIT_PERIOD
 extern const char esp_rmaker_ota_def_cert[] asm("_binary_rmaker_ota_server_crt_start");
 const char *ESP_RMAKER_OTA_DEFAULT_SERVER_CERT = esp_rmaker_ota_def_cert;
+ESP_EVENT_DEFINE_BASE(RMAKER_OTA_EVENT);
+
 char *esp_rmaker_ota_status_to_string(ota_status_t status)
 {
     switch (status) {
@@ -76,6 +78,32 @@ char *esp_rmaker_ota_status_to_string(ota_status_t status)
     }
     return "invalid";
 }
+
+esp_rmaker_ota_event_t esp_rmaker_ota_status_to_event(ota_status_t status)
+{
+    switch (status) {
+        case OTA_STATUS_IN_PROGRESS:
+            return RMAKER_OTA_EVENT_IN_PROGRESS;
+        case OTA_STATUS_SUCCESS:
+            return RMAKER_OTA_EVENT_SUCCESSFUL;
+        case OTA_STATUS_FAILED:
+            return RMAKER_OTA_EVENT_FAILED;
+        case OTA_STATUS_DELAYED:
+            return RMAKER_OTA_EVENT_DELAYED;
+        case OTA_STATUS_REJECTED:
+            return RMAKER_OTA_EVENT_REJECTED;
+        default:
+            ESP_LOGD(TAG, "No Rmaker OTA Event for given status: %d: %s",
+                    status, esp_rmaker_ota_status_to_string(status));
+    }
+    return RMAKER_OTA_EVENT_INVALID;
+}
+
+static inline esp_err_t esp_rmaker_ota_post_event(esp_rmaker_event_t event_id, void* data, size_t data_size)
+{
+    return esp_event_post(RMAKER_OTA_EVENT, event_id, data, data_size, portMAX_DELAY);
+}
+
 esp_err_t esp_rmaker_ota_report_status(esp_rmaker_ota_handle_t ota_handle, ota_status_t status, char *additional_info)
 {
     ESP_LOGI(TAG, "Reporting %s: %s", esp_rmaker_ota_status_to_string(status), additional_info);
@@ -94,6 +122,7 @@ esp_err_t esp_rmaker_ota_report_status(esp_rmaker_ota_handle_t ota_handle, ota_s
         esp_rmaker_ota_t *ota = (esp_rmaker_ota_t *)ota_handle;
         ota->last_reported_status = status;
     }
+    esp_rmaker_ota_post_event(esp_rmaker_ota_status_to_event(status), additional_info, strlen(additional_info) + 1);
     return err;
 }
 
@@ -160,6 +189,7 @@ esp_err_t esp_rmaker_ota_default_cb(esp_rmaker_ota_handle_t ota_handle, esp_rmak
     if (!ota_data->url) {
         return ESP_FAIL;
     }
+    esp_rmaker_ota_post_event(RMAKER_OTA_EVENT_STARTING, NULL, 0);
     int buffer_size_tx = DEF_HTTP_TX_BUFFER_SIZE;
     /* In case received url is longer, we will increase the tx buffer size
      * to accomodate the longer url and other headers.
