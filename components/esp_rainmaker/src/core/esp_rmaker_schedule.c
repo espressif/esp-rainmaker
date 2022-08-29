@@ -14,6 +14,7 @@
 
 #include <time.h>
 #include <string.h>
+#include <inttypes.h>
 #include <esp_log.h>
 #include <esp_err.h>
 #include <freertos/FreeRTOS.h>
@@ -157,12 +158,12 @@ static esp_rmaker_schedule_t *esp_rmaker_schedule_get_schedule_from_index(int32_
     esp_rmaker_schedule_t *schedule = schedule_priv_data->schedule_list;
     while(schedule) {
         if (schedule->index == index) {
-            ESP_LOGD(TAG, "Schedule with index %d found in list for get.", index);
+            ESP_LOGD(TAG, "Schedule with index %"PRIi32" found in list for get.", index);
             return schedule;
         }
         schedule = schedule->next;
     }
-    ESP_LOGD(TAG, "Schedule with index %d not found in list for get.", index);
+    ESP_LOGD(TAG, "Schedule with index %"PRIi32" not found in list for get.", index);
     return NULL;
 }
 
@@ -293,7 +294,7 @@ static void esp_rmaker_schedule_trigger_work_cb(void *priv_data)
     int32_t index = (int32_t)priv_data;
     esp_rmaker_schedule_t *schedule = esp_rmaker_schedule_get_schedule_from_index(index);
     if (!schedule) {
-        ESP_LOGE(TAG, "Schedule with index %d not found for trigger work callback", index);
+        ESP_LOGE(TAG, "Schedule with index %"PRIi32" not found for trigger work callback", index);
         return;
     }
     esp_rmaker_schedule_process_action(&schedule->action);
@@ -315,7 +316,7 @@ static void esp_rmaker_schedule_timestamp_common_cb(esp_schedule_handle_t handle
     int32_t index = (int32_t)priv_data;
     esp_rmaker_schedule_t *schedule = esp_rmaker_schedule_get_schedule_from_index(index);
     if (!schedule) {
-        ESP_LOGE(TAG, "Schedule with index %d not found for timestamp callback", index);
+        ESP_LOGE(TAG, "Schedule with index %"PRIi32" not found for timestamp callback", index);
         return;
     }
     schedule->trigger.next_timestamp = next_timestamp;
