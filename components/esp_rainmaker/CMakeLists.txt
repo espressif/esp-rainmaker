@@ -20,6 +20,11 @@ set(priv_req protobuf-c json_parser json_generator
              nvs_flash esp_http_client app_update esp-tls mbedtls esp_https_ota
              console esp_local_ctrl esp_https_server mdns esp_schedule efuse driver rmaker_common wifi_provisioning)
 
+# Add CBOR for MQTT OTA support
+if (CONFIG_ESP_RMAKER_OTA_USE_MQTT)
+    list(APPEND priv_req cbor)
+endif()
+
 if ("${IDF_VERSION_MAJOR}.${IDF_VERSION_MINOR}" VERSION_GREATER_EQUAL "5.0")
     list(APPEND priv_req esp_app_format)
 endif()
@@ -57,6 +62,12 @@ set(ota_srcs "src/ota/esp_rmaker_ota.c"
         "src/ota/esp_rmaker_ota_using_params.c"
         "src/ota/esp_rmaker_ota_using_topics.c")
 set(ota_priv_includes "src/ota")
+if (CONFIG_ESP_RMAKER_OTA_USE_MQTT)
+    list(APPEND ota_srcs "src/ota/esp_rmaker_mqtt_ota.c")
+endif()
+if (CONFIG_ESP_RMAKER_OTA_USE_HTTPS)
+    list(APPEND ota_srcs "src/ota/esp_rmaker_https_ota.c")
+endif()
 
 # Thread BR
 set(thread_br_srcs )

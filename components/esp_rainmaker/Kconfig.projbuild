@@ -308,15 +308,6 @@ menu "ESP RainMaker Config"
             help
                 This allows you to skip the project name check.
 
-        config ESP_RMAKER_OTA_HTTP_RX_BUFFER_SIZE
-            int "OTA HTTP receive buffer size"
-            default 1024
-            range 512 LWIP_TCP_WND_DEFAULT
-            help
-                Increasing this value beyond the default would speed up the OTA download process.
-                However, please ensure that your application has enough memory headroom to allow this,
-                else, the OTA may fail.
-
         config ESP_RMAKER_OTA_ROLLBACK_WAIT_PERIOD
             int "OTA Rollback Wait Period (Seconds)"
             default 90
@@ -373,6 +364,54 @@ menu "ESP RainMaker Config"
             range 1 60
             help
                 Delay (in minutes) before re-fetching OTA details after all retry attempts fail (for OTA using topics).
+
+        choice ESP_RMAKER_OTA_TYPE
+            prompt "OTA Update Protocol Type"
+            default ESP_RMAKER_OTA_USE_HTTPS
+            help
+                Protocol to be used for OTA Update
+            config ESP_RMAKER_OTA_USE_HTTPS
+                bool "HTTPS"
+            config ESP_RMAKER_OTA_USE_MQTT
+                bool "MQTT"
+        endchoice
+
+        config ESP_RMAKER_OTA_HTTP_RX_BUFFER_SIZE
+            int "OTA HTTP receive buffer size"
+            default 1024
+            range 512 LWIP_TCP_WND_DEFAULT
+            depends on ESP_RMAKER_OTA_USE_HTTPS
+            help
+                Increasing this value beyond the default would speed up the OTA download process.
+                However, please ensure that your application has enough memory headroom to allow this,
+                else, the OTA may fail.
+
+        config ESP_RMAKER_MQTT_OTA_BLOCK_SIZE
+                int "MQTT OTA Block Length"
+                default 3072
+                depends on ESP_RMAKER_OTA_USE_MQTT
+                range 256 131072
+                help
+                    The block size to fetch in a MQTT OTA publish message.
+                    Note that number of blocks * block size should not exceed 128KB.
+
+        config ESP_RMAKER_MQTT_OTA_NO_OF_BLOCKS
+                int "MQTT OTA No. of Blocks"
+                default 42
+                depends on ESP_RMAKER_OTA_USE_MQTT
+                range 1 512
+                help
+                    The number of blocks of file to fetch in a MQTT OTA publish message.
+                    Note that number of blocks * block size should not exceed 128KB.
+
+        config ESP_RMAKER_MQTT_OTA_MAX_RETRIES
+                int "MQTT OTA Maximum Number of Retries"
+                default 3
+                depends on ESP_RMAKER_OTA_USE_MQTT
+                range 1 255
+                help
+                    The number of times we should resend request for fetching file blocks, in case we do not get any response.
+
 
     endmenu
 

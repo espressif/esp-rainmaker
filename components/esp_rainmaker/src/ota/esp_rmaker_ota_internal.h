@@ -1,24 +1,23 @@
-// Copyright 2020 Espressif Systems (Shanghai) PTE LTD
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+/*
+ * SPDX-FileCopyrightText: 2020-2025 Espressif Systems (Shanghai) CO LTD
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
 
 #pragma once
+
 
 #include <stdint.h>
 #include <esp_err.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/timers.h>
 #include <esp_rmaker_ota.h>
+#include <esp_app_format.h>
+#include <esp_ota_ops.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 #define RMAKER_OTA_NVS_NAMESPACE            "rmaker_ota"
 #define RMAKER_OTA_JOB_ID_NVS_NAME          "rmaker_ota_id"
@@ -34,6 +33,9 @@ typedef struct {
     const char *server_cert;
     char *url;
     char *fw_version;
+#ifdef CONFIG_ESP_RMAKER_OTA_USE_MQTT
+    char *stream_id;
+#endif
     int filesize;
     bool ota_in_progress;
     bool validation_in_progress;
@@ -43,7 +45,16 @@ typedef struct {
     char *metadata;
 } esp_rmaker_ota_t;
 
+
+
 char *esp_rmaker_ota_status_to_string(ota_status_t status);
+esp_err_t esp_rmaker_ota_post_event(esp_rmaker_event_t event_id, void *data, size_t data_size);
+typedef enum {
+    OTA_OK = 0,
+    OTA_ERR,
+    OTA_DELAYED
+} esp_rmaker_ota_action_t;
+
 void esp_rmaker_ota_common_cb(void *priv);
 void esp_rmaker_ota_finish_using_params(esp_rmaker_ota_t *ota);
 void esp_rmaker_ota_finish_using_topics(esp_rmaker_ota_t *ota);
@@ -53,3 +64,17 @@ esp_err_t esp_rmaker_ota_report_status_using_params(esp_rmaker_ota_handle_t ota_
 esp_err_t esp_rmaker_ota_enable_using_topics(esp_rmaker_ota_t *ota);
 esp_err_t esp_rmaker_ota_report_status_using_topics(esp_rmaker_ota_handle_t ota_handle,
         ota_status_t status, char *additional_info);
+
+/* Common retry loop infrastructure with function pointer pattern */
+typedef esp_err_t (*ota_protocol_func_t)(esp_rmaker_ota_handle_t ota_handle, esp_rmaker_ota_data_t *ota_data, char *err_desc, size_t err_desc_size);
+
+/* Complete OTA workflow orchestration */
+esp_err_t esp_rmaker_ota_start_workflow(esp_rmaker_ota_handle_t ota_handle, esp_rmaker_ota_data_t *ota_data,
+                                       ota_protocol_func_t protocol_func, const char *protocol_name);
+
+/* OTA image header validation */
+esp_err_t validate_image_header(esp_rmaker_ota_handle_t ota_handle, esp_app_desc_t *new_app_info);
+
+#ifdef __cplusplus
+}
+#endif

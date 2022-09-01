@@ -1,0 +1,102 @@
+name: Auto Tag from Component Version
+
+on:
+  push:
+    branches: [ master ]
+    paths:
+      - 'components/esp_rainmaker/idf_component.yml'
+
+  # Allow manual trigger
+  workflow_dispatch:
+
+permissions:
+  contents: write  # Required to create tags
+
+jobs:
+  auto-tag:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # Get full history for tagging
+
+    - name: Extract version from component file
+      id: get_version
+      run: |
+        # Extract version from YAML file using grep and sed
+        VERSION=$(grep '^version:' components/esp_rainmaker/idf_component.yml | sed 's/version: *"\(.*\)"/\1/')
+
+        if [ -z "$VERSION" ]; then
+          echo "Error: Could not extract version from idf_component.yml"
+          exit 1
+        fi
+
+        # Validate version format (basic semver check)
+        if ! echo "$VERSION" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.-]+)?(\+[a-zA-Z0-9.-]+)?$'; then
+          echo "Error: Invalid version format: $VERSION"
+          exit 1
+        fi
+
+        echo "Extracted version: $VERSION"
+        echo "version=$VERSION" >> $GITHUB_OUTPUT
+        echo "tag_name=v$VERSION" >> $GITHUB_OUTPUT
+
+    - name: Check if tag already exists
+      id: check_tag
+      run: |
+        TAG_NAME="v${{ steps.get_version.outputs.version }}"
+
+        # Check if tag exists locally
+        if git tag -l | grep -q "^$TAG_NAME$"; then
+          echo "Tag $TAG_NAME already exists locally"
+          echo "tag_exists=true" >> $GITHUB_OUTPUT
+          exit 0
+        fi
+
+        # Check if tag exists on remote
+        if git ls-remote --tags origin | grep -q "refs/tags/$TAG_NAME$"; then
+          echo "Tag $TAG_NAME already exists on remote"
+          echo "tag_exists=true" >> $GITHUB_OUTPUT
+          exit 0
+        fi
+
+        echo "Tag $TAG_NAME does not exist"
+        echo "tag_exists=false" >> $GITHUB_OUTPUT
+
+    - name: Create and push tag
+      if: steps.check_tag.outputs.tag_exists == 'false'
+      run: |
+        TAG_NAME="v${{ steps.get_version.outputs.version }}"
+
+        # Configure git user (use GitHub Actions bot)
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+
+        # Create annotated tag
+        git tag -a "$TAG_NAME" -m "Release $TAG_NAME - Auto-tagged from idf_component.yml"
+
+        # Push tag to origin
+        git push origin "$TAG_NAME"
+
+        echo "✅ Successfully created and pushed tag: $TAG_NAME"
+
+    - name: Tag already exists
+      if: steps.check_tag.outputs.tag_exists == 'true'
+      run: |
+        TAG_NAME="v${{ steps.get_version.outputs.version }}"
+        echo "ℹ️  Tag $TAG_NAME already exists. Skipping tag creation."
+
+    - name: Summary
+      run: |
+        echo "## Auto-Tag Summary" >> $GITHUB_STEP_SUMMARY
+        echo "- **Component:** esp_rainmaker" >> $GITHUB_STEP_SUMMARY
+        echo "- **Version:** ${{ steps.get_version.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Tag:** ${{ steps.get_version.outputs.tag_name }}" >> $GITHUB_STEP_SUMMARY
+
+        if [ "${{ steps.check_tag.outputs.tag_exists }}" == "true" ]; then
+          echo "- **Status:** ⚠️ Tag already exists" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "- **Status:** ✅ Tag created successfully" >> $GITHUB_STEP_SUMMARY
+        fi

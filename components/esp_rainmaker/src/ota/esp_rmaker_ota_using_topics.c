@@ -1,16 +1,9 @@
-// Copyright 2020 Espressif Systems (Shanghai) PTE LTD
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+/*
+ * SPDX-FileCopyrightText: 2020-2025 Espressif Systems (Shanghai) CO LTD
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
 #include <stdint.h>
 #include <string.h>
 #include <json_parser.h>
@@ -106,8 +99,8 @@ static void ota_fetch_timeout_timer_cb(TimerHandle_t xTimer)
 
 
 
-static void ota_fetch_mqtt_event_handler(void* arg, esp_event_base_t event_base,
-                                         int32_t event_id, void* event_data)
+static void ota_fetch_mqtt_event_handler(void *arg, esp_event_base_t event_base,
+                                          int32_t event_id, void *event_data)
 {
     if (!event_data || event_base != RMAKER_COMMON_EVENT) {
         return;
@@ -183,6 +176,12 @@ void esp_rmaker_ota_finish_using_topics(esp_rmaker_ota_t *ota)
         free(ota->url);
         ota->url = NULL;
     }
+#ifdef CONFIG_ESP_RMAKER_OTA_USE_MQTT
+    if (ota->stream_id) {
+        free(ota->stream_id);
+        ota->stream_id = NULL;
+    }
+#endif
     ota->filesize = 0;
     if (ota->transient_priv) {
         free(ota->transient_priv);
@@ -222,6 +221,9 @@ static void ota_url_handler(const char *topic, void *payload, size_t payload_len
     */
     jparse_ctx_t jctx;
     char *url = NULL, *ota_job_id = NULL, *fw_version = NULL;
+#ifdef CONFIG_ESP_RMAKER_OTA_USE_MQTT
+    char *stream_id = NULL;
+#endif
     int ret = json_parse_start(&jctx, (char *)payload, (int) payload_len);
     if (ret != 0) {
         ESP_LOGE(TAG, "Invalid JSON received: %s", (char *)payload);
@@ -269,10 +271,27 @@ static void ota_url_handler(const char *topic, void *payload, size_t payload_len
     json_obj_get_string(&jctx, "url", url, len);
     ESP_LOGI(TAG, "URL: %s", url);
 
+#ifdef CONFIG_ESP_RMAKER_OTA_USE_MQTT
+    len = 0;
+    ret = json_obj_get_strlen(&jctx, "stream_id", &len);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Aborted. Stream ID not found in JSON");
+        esp_rmaker_ota_report_status(ota_handle, OTA_STATUS_FAILED, "Aborted. Stream ID not found in JSON");
+        goto end;
+    }
+    len++; /* Increment for NULL character */
+    stream_id = calloc(1, len);
+    if (!stream_id) {
+        ESP_LOGE(TAG, "Aborted. Stream ID memory allocation failed");
+        esp_rmaker_ota_report_status(ota_handle, OTA_STATUS_FAILED, "Aborted. Stream ID memory allocation failed");
+        goto end;
+    }
+    json_obj_get_string(&jctx, "stream_id", stream_id, len);
+    ESP_LOGI(TAG, "Stream ID: %s", stream_id);
+#endif
     int filesize = 0;
     json_obj_get_int(&jctx, "file_size", &filesize);
     ESP_LOGI(TAG, "File Size: %d", filesize);
-
     len = 0;
     ret = json_obj_get_strlen(&jctx, "fw_version", &len);
     if (ret == ESP_OK && len > 0) {
@@ -307,6 +326,9 @@ static void ota_url_handler(const char *topic, void *payload, size_t payload_len
         free(ota->url);
     }
     ota->url = url;
+#ifdef CONFIG_ESP_RMAKER_OTA_USE_MQTT
+    ota->stream_id = stream_id;
+#endif
     ota->fw_version = fw_version;
     ota->filesize = filesize;
     ota->ota_in_progress = true;
@@ -318,6 +340,11 @@ end:
     if (url) {
         free(url);
     }
+#ifdef CONFIG_ESP_RMAKER_OTA_USE_MQTT
+    if (stream_id) {
+        free(stream_id);
+    }
+#endif
     if (fw_version) {
         free(fw_version);
     }

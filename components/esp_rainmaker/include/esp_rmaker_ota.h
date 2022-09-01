@@ -70,6 +70,8 @@ typedef void *esp_rmaker_ota_handle_t;
 typedef struct {
     /** The OTA URL received from ESP RainMaker Cloud */
     char *url;
+    /** The Stream ID received from ESP RainMaker Cloud. This will be used only in MQTT based OTA*/
+    char *stream_id;
     /** Size of the OTA File. Can be 0 if the file size isn't received from
      * the ESP RainMaker Cloud */
     int filesize;
@@ -176,6 +178,32 @@ typedef struct {
      */
     void *priv;
 } esp_rmaker_ota_config_t;
+
+/** HTTPS OTA Callback
+ *
+ * This callback forces the use of HTTPS protocol for OTA updates.
+ * Use this in your ota_config.ota_cb to always use HTTPS.
+ *
+ * @param[in] handle An OTA handle assigned by the ESP RainMaker Core
+ * @param[in] ota_data The data to be used for the OTA
+ *
+ * @return ESP_OK if the OTA was successful
+ * @return ESP_FAIL if the OTA failed
+ */
+esp_err_t esp_rmaker_ota_https_cb(esp_rmaker_ota_handle_t handle, esp_rmaker_ota_data_t *ota_data);
+
+/** MQTT OTA Callback
+ *
+ * This callback forces the use of MQTT protocol for OTA updates.
+ * Use this in your ota_config.ota_cb to always use MQTT.
+ *
+ * @param[in] handle An OTA handle assigned by the ESP RainMaker Core
+ * @param[in] ota_data The data to be used for the OTA
+ *
+ * @return ESP_OK if the OTA was successful
+ * @return ESP_FAIL if the OTA failed
+ */
+esp_err_t esp_rmaker_ota_mqtt_cb(esp_rmaker_ota_handle_t handle, esp_rmaker_ota_data_t *ota_data);
 
 /** Enable OTA
  *
