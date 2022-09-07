@@ -21,6 +21,10 @@
 
 #include "esp_rmaker_internal.h"
 
+#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 0, 0)
+#include <esp_app_desc.h>
+#endif
+
 static const char *TAG = "esp_rmaker_node";
 
 static void esp_rmaker_node_info_free(esp_rmaker_node_info_t *info)
@@ -121,7 +125,12 @@ esp_rmaker_node_t *esp_rmaker_node_create(const char *name, const char *type)
     }
     node->info->name = strdup(name);
     node->info->type = strdup(type);
-    const esp_app_desc_t *app_desc = esp_ota_get_app_description();
+    const esp_app_desc_t *app_desc;
+#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 0, 0)
+    app_desc = esp_app_get_description();
+#else
+    app_desc = esp_ota_get_app_description();
+#endif
     node->info->fw_version = strdup(app_desc->version);
     node->info->model = strdup(app_desc->project_name);
     if (!node->info->name || !node->info->type

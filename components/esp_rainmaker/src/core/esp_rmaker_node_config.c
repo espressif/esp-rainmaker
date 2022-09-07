@@ -20,6 +20,10 @@
 #include "esp_rmaker_internal.h"
 #include "esp_rmaker_mqtt.h"
 
+#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 0, 0)
+#include <esp_app_desc.h>
+#endif
+
 #define NODE_CONFIG_TOPIC_SUFFIX        "config"
 
 static const char *TAG = "esp_rmaker_node_config";
@@ -37,7 +41,12 @@ static esp_err_t esp_rmaker_report_info(json_gen_str_t *jptr)
         json_gen_obj_set_string(jptr, "subtype",  info->subtype);
     }
     json_gen_obj_set_string(jptr, "model",  info->model);
-    const esp_app_desc_t *app_desc = esp_ota_get_app_description();
+    const esp_app_desc_t *app_desc;
+#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 0, 0)
+    app_desc = esp_app_get_description();
+#else
+    app_desc = esp_ota_get_app_description();
+#endif
     json_gen_obj_set_string(jptr, "project_name", (char *)app_desc->project_name);
     json_gen_obj_set_string(jptr, "platform", CONFIG_IDF_TARGET);
     json_gen_pop_object(jptr);
