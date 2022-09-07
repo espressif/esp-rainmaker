@@ -68,6 +68,10 @@ esp_err_t esp_rmaker_ota_report_status_using_topics(esp_rmaker_ota_handle_t ota_
                 nvs_erase_key(handle, RMAKER_OTA_JOB_ID_NVS_NAME);
             }
             nvs_close(handle);
+            if (err != ESP_OK) {
+                ESP_LOGW(TAG, "Not reporting any status, since there is no Job ID available");
+                return ESP_ERR_INVALID_STATE;
+            }
         }
     }
     json_gen_obj_set_string(&jstr, "status", esp_rmaker_ota_status_to_string(status));

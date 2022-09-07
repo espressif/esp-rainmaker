@@ -52,7 +52,6 @@
 
 #endif /* !IDF4.4 */
 static const char *TAG = "esp_rmaker_ota";
-static TimerHandle_t s_ota_rollback_timer;
 
 #define OTA_REBOOT_TIMER_SEC    10
 #define DEF_HTTP_TX_BUFFER_SIZE    1024
@@ -67,6 +66,8 @@ typedef enum {
     OTA_ERR,
     OTA_DELAYED
 } esp_rmaker_ota_action_t;
+
+static esp_rmaker_ota_t *g_ota_priv;
 
 char *esp_rmaker_ota_status_to_string(ota_status_t status)
 {
@@ -502,35 +503,84 @@ static void event_handler(void* arg, esp_event_base_t event_base,
                           int32_t event_id, void* event_data)
 {
     esp_rmaker_ota_t *ota = (esp_rmaker_ota_t *)arg;
+    esp_rmaker_ota_diag_status_t diag_status = OTA_DIAG_STATUS_SUCCESS;
+    if (ota->ota_diag) {
+        esp_rmaker_ota_diag_priv_t ota_diag_priv = {
+            .state = OTA_DIAG_STATE_POST_MQTT,
+            .rmaker_ota = ota->validation_in_progress
+        };
+        diag_status = ota->ota_diag(&ota_diag_priv, ota->priv);
+    }
+    if (diag_status == OTA_DIAG_STATUS_SUCCESS) {
+        esp_rmaker_ota_mark_valid();
+    } else if (diag_status == OTA_DIAG_STATUS_FAIL) {
+        ESP_LOGE(TAG, "Diagnostics failed! Start rollback to the previous version ...");
+        esp_rmaker_ota_mark_invalid();
+    } else {
+        ESP_LOGW(TAG, "Waiting for application to validate OTA.");
+    }
+}
+
+esp_err_t esp_rmaker_ota_mark_valid(void)
+{
+    const esp_partition_t *running = esp_ota_get_running_partition();
+    esp_ota_img_states_t ota_state;
+    if (esp_ota_get_state_partition(running, &ota_state) == ESP_OK) {
+        if (ota_state != ESP_OTA_IMG_PENDING_VERIFY) {
+            ESP_LOGW(TAG, "OTA Already marked as valid");
+            return ESP_ERR_INVALID_STATE;
+        }
+    }
+
     esp_event_handler_unregister(RMAKER_COMMON_EVENT, RMAKER_MQTT_EVENT_CONNECTED, &event_handler);
-    esp_rmaker_ota_report_status((esp_rmaker_ota_handle_t )ota, OTA_STATUS_SUCCESS, "OTA Upgrade finished and verified successfully");
+    esp_rmaker_ota_t *ota = g_ota_priv;
+    if (!ota) {
+        return ESP_ERR_INVALID_ARG;
+    }
     esp_ota_mark_app_valid_cancel_rollback();
     ota->ota_in_progress = false;
-    if (s_ota_rollback_timer) {
-        xTimerStop(s_ota_rollback_timer, portMAX_DELAY);
-        xTimerDelete(s_ota_rollback_timer, portMAX_DELAY);
-        s_ota_rollback_timer = NULL;
+    if (ota->rollback_timer) {
+        xTimerStop(ota->rollback_timer, portMAX_DELAY);
+        xTimerDelete(ota->rollback_timer, portMAX_DELAY);
+        ota->rollback_timer = NULL;
     }
+    esp_rmaker_ota_report_status((esp_rmaker_ota_handle_t )ota, OTA_STATUS_SUCCESS, "OTA Upgrade finished and verified successfully");
     if (ota->type == OTA_USING_TOPICS) {
         if (esp_rmaker_ota_fetch_with_delay(RMAKER_OTA_FETCH_DELAY) != ESP_OK) {
             ESP_LOGE(TAG, "Failed to create OTA Fetch timer.");
         }
     }
+    return ESP_OK;
 }
+
+esp_err_t esp_rmaker_ota_mark_invalid(void)
+{
+    const esp_partition_t *running = esp_ota_get_running_partition();
+    esp_ota_img_states_t ota_state;
+    if (esp_ota_get_state_partition(running, &ota_state) == ESP_OK) {
+        if (ota_state != ESP_OTA_IMG_PENDING_VERIFY) {
+            ESP_LOGE(TAG, "Cannot rollback due to invalid OTA state.");
+            return ESP_ERR_INVALID_STATE;
+        }
+    }
+    esp_ota_mark_app_invalid_rollback_and_reboot();
+    return ESP_OK;
+}
+
 
 static void esp_ota_rollback(TimerHandle_t handle)
 {
     ESP_LOGE(TAG, "Could not verify firmware even after %d seconds since boot-up. Rolling back.",
             RMAKER_OTA_ROLLBACK_WAIT_PERIOD);
-    esp_ota_mark_app_invalid_rollback_and_reboot();
+    esp_rmaker_ota_mark_invalid();
 }
 
 static esp_err_t esp_ota_check_for_mqtt(esp_rmaker_ota_t *ota)
 {
-    s_ota_rollback_timer = xTimerCreate("ota_rollback_tm", (RMAKER_OTA_ROLLBACK_WAIT_PERIOD * 1000) / portTICK_PERIOD_MS,
+    ota->rollback_timer = xTimerCreate("ota_rollback_tm", (RMAKER_OTA_ROLLBACK_WAIT_PERIOD * 1000) / portTICK_PERIOD_MS,
                             pdTRUE, NULL, esp_ota_rollback);
-    if (s_ota_rollback_timer) {
-        xTimerStart(s_ota_rollback_timer, 0);
+    if (ota->rollback_timer) {
+        xTimerStart(ota->rollback_timer, 0);
     } else {
         ESP_LOGW(TAG, "Could not create rollback timer. Will require manual reboot if firmware verification fails");
     }
@@ -538,8 +588,32 @@ static esp_err_t esp_ota_check_for_mqtt(esp_rmaker_ota_t *ota)
     return esp_event_handler_register(RMAKER_COMMON_EVENT, RMAKER_MQTT_EVENT_CONNECTED, &event_handler, ota);
 }
 
-static void esp_rmaker_ota_manage_rollback(esp_rmaker_ota_config_t *ota_config, esp_rmaker_ota_t *ota)
+static esp_err_t esp_rmaker_erase_rollback_flag(void)
 {
+    nvs_handle handle;
+    esp_err_t err = nvs_open_from_partition(ESP_RMAKER_NVS_PART_NAME, RMAKER_OTA_NVS_NAMESPACE, NVS_READWRITE, &handle);
+    if (err == ESP_OK) {
+        nvs_erase_key(handle, RMAKER_OTA_UPDATE_FLAG_NVS_NAME);
+        nvs_commit(handle);
+        nvs_close(handle);
+    }
+    return ESP_OK;
+}
+
+static void esp_rmaker_ota_manage_rollback(esp_rmaker_ota_t *ota)
+{
+    /* If rollback is enabled, and the ota update flag is found, it means that the OTA validation is pending
+    */
+    nvs_handle handle;
+    esp_err_t err = nvs_open_from_partition(ESP_RMAKER_NVS_PART_NAME, RMAKER_OTA_NVS_NAMESPACE, NVS_READWRITE, &handle);
+    if (err == ESP_OK) {
+        uint8_t ota_update = 0;
+        size_t len = sizeof(ota_update);
+        if ((err = nvs_get_blob(handle, RMAKER_OTA_UPDATE_FLAG_NVS_NAME, &ota_update, &len)) == ESP_OK) {
+            ota->validation_in_progress = true;
+        }
+        nvs_close(handle);
+    }
     const esp_partition_t *running = esp_ota_get_running_partition();
     esp_ota_img_states_t ota_state;
     if (esp_ota_get_state_partition(running, &ota_state) == ESP_OK) {
@@ -551,11 +625,15 @@ static void esp_rmaker_ota_manage_rollback(esp_rmaker_ota_config_t *ota_config, 
         if (ota_state == ESP_OTA_IMG_PENDING_VERIFY) {
             ESP_LOGI(TAG, "First Boot after an OTA");
             /* Run diagnostic function */
-            bool diagnostic_is_ok = true;
-            if (ota_config->ota_diag) {
-                diagnostic_is_ok = ota_config->ota_diag();
+            esp_rmaker_ota_diag_status_t diag_status = OTA_DIAG_STATUS_SUCCESS;
+            if (ota->ota_diag) {
+                esp_rmaker_ota_diag_priv_t ota_diag_priv = {
+                    .state = OTA_DIAG_STATE_INIT,
+                    .rmaker_ota = ota->validation_in_progress
+                };
+                diag_status = ota->ota_diag(&ota_diag_priv, ota->priv);
             }
-            if (diagnostic_is_ok) {
+            if (diag_status != OTA_DIAG_STATUS_FAIL) {
                 ESP_LOGI(TAG, "Diagnostics completed successfully! Continuing execution ...");
                 /* Will not mark the image valid here immediately, but instead will wait for
                  * MQTT connection. The below flag will tell the OTA functions that the earlier
@@ -565,31 +643,22 @@ static void esp_rmaker_ota_manage_rollback(esp_rmaker_ota_config_t *ota_config, 
                 esp_ota_check_for_mqtt(ota);
             } else {
                 ESP_LOGE(TAG, "Diagnostics failed! Start rollback to the previous version ...");
-                esp_ota_mark_app_invalid_rollback_and_reboot();
+                esp_rmaker_ota_mark_invalid();
             }
-#ifdef CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE
         } else {
             /* If rollback is enabled, and the ota update flag is found, it means that the firmware was rolled back
             */
-            nvs_handle handle;
-            esp_err_t err = nvs_open_from_partition(ESP_RMAKER_NVS_PART_NAME, RMAKER_OTA_NVS_NAMESPACE, NVS_READWRITE, &handle);
-            if (err == ESP_OK) {
-                uint8_t ota_update = 0;
-                size_t len = sizeof(ota_update);
-                if ((err = nvs_get_blob(handle, RMAKER_OTA_UPDATE_FLAG_NVS_NAME, &ota_update, &len)) == ESP_OK) {
-                    ota->rolled_back = true;
-                    nvs_erase_key(handle, RMAKER_OTA_UPDATE_FLAG_NVS_NAME);
-                    if (ota->type == OTA_USING_PARAMS) {
-                        /* Calling this only for OTA_USING_PARAMS, because for OTA_USING_TOPICS,
-                         * the work queue function will manage the status reporting later.
-                         */
-                        esp_rmaker_ota_report_status((esp_rmaker_ota_handle_t )ota,
-                                OTA_STATUS_REJECTED, "Firmware rolled back");
-                    }
+            if (ota->validation_in_progress) {
+                ota->rolled_back = true;
+                esp_rmaker_erase_rollback_flag();
+                if (ota->type == OTA_USING_PARAMS) {
+                    /* Calling this only for OTA_USING_PARAMS, because for OTA_USING_TOPICS,
+                     * the work queue function will manage the status reporting later.
+                     */
+                    esp_rmaker_ota_report_status((esp_rmaker_ota_handle_t )ota,
+                            OTA_STATUS_REJECTED, "Firmware rolled back");
                 }
-                nvs_close(handle);
             }
-#endif
         }
     }
 }
@@ -622,6 +691,7 @@ esp_err_t esp_rmaker_ota_enable(esp_rmaker_ota_config_t *ota_config, esp_rmaker_
     } else {
         ota->ota_cb = esp_rmaker_ota_default_cb;
     }
+    ota->ota_diag = ota_config->ota_diag;
     ota->priv = ota_config->priv;
     ota->server_cert = ota_config->server_cert;
     esp_err_t err = ESP_FAIL;
@@ -632,8 +702,9 @@ esp_err_t esp_rmaker_ota_enable(esp_rmaker_ota_config_t *ota_config, esp_rmaker_
         err = esp_rmaker_ota_enable_using_topics(ota);
     }
     if (err == ESP_OK) {
-        esp_rmaker_ota_manage_rollback(ota_config, ota);
+        esp_rmaker_ota_manage_rollback(ota);
         ota_init_done = true;
+        g_ota_priv = ota;
     } else {
         free(ota);
         ESP_LOGE(TAG, "Failed to enable OTA");

@@ -16,6 +16,8 @@
 
 #include <stdint.h>
 #include <esp_err.h>
+#include <freertos/FreeRTOS.h>
+#include <freertos/timers.h>
 #include <esp_rmaker_ota.h>
 
 #define RMAKER_OTA_NVS_NAMESPACE            "rmaker_ota"
@@ -27,11 +29,14 @@ typedef struct {
     esp_rmaker_ota_type_t type;
     esp_rmaker_ota_cb_t ota_cb;
     void *priv;
+    esp_rmaker_post_ota_diag_t ota_diag;
+    TimerHandle_t rollback_timer;
     const char *server_cert;
     char *url;
     char *fw_version;
     int filesize;
     bool ota_in_progress;
+    bool validation_in_progress;
     bool rolled_back;
     ota_status_t last_reported_status;
     void *transient_priv;
