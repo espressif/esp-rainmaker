@@ -110,29 +110,29 @@ esp_err_t esp_rmaker_report_value(const esp_rmaker_param_val_t *val, char *key, 
     return ESP_OK;
 }
 
-esp_err_t esp_rmaker_report_data_type(esp_rmaker_val_type_t type, json_gen_str_t *jptr)
+esp_err_t esp_rmaker_report_data_type(esp_rmaker_val_type_t type, char *data_type_key, json_gen_str_t *jptr)
 {
     switch (type) {
         case RMAKER_VAL_TYPE_BOOLEAN:
-            json_gen_obj_set_string(jptr, "data_type", "bool");
+            json_gen_obj_set_string(jptr, data_type_key, "bool");
             break;
         case RMAKER_VAL_TYPE_INTEGER:
-            json_gen_obj_set_string(jptr, "data_type", "int");
+            json_gen_obj_set_string(jptr, data_type_key, "int");
             break;
         case RMAKER_VAL_TYPE_FLOAT:
-            json_gen_obj_set_string(jptr, "data_type", "float");
+            json_gen_obj_set_string(jptr, data_type_key, "float");
             break;
         case RMAKER_VAL_TYPE_STRING:
-            json_gen_obj_set_string(jptr, "data_type", "string");
+            json_gen_obj_set_string(jptr, data_type_key, "string");
             break;
         case RMAKER_VAL_TYPE_OBJECT:
-            json_gen_obj_set_string(jptr, "data_type", "object");
+            json_gen_obj_set_string(jptr, data_type_key, "object");
             break;
         case RMAKER_VAL_TYPE_ARRAY:
-            json_gen_obj_set_string(jptr, "data_type", "array");
+            json_gen_obj_set_string(jptr, data_type_key, "array");
             break;
         default:
-            json_gen_obj_set_string(jptr, "data_type", "invalid");
+            json_gen_obj_set_string(jptr, data_type_key, "invalid");
             break;
     }
     return ESP_OK;
@@ -147,7 +147,7 @@ static esp_err_t esp_rmaker_report_param_config(_esp_rmaker_param_t *param, json
     if (param->type) {
         json_gen_obj_set_string(jptr, "type", param->type);
     }
-    esp_rmaker_report_data_type(param->val.type, jptr);
+    esp_rmaker_report_data_type(param->val.type, "data_type", jptr);
     json_gen_push_array(jptr, "properties");
     if (param->prop_flags & PROP_FLAG_READ) {
         json_gen_arr_set_string(jptr, "read");
