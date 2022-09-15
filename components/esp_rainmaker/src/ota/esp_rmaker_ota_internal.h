@@ -33,6 +33,7 @@ typedef struct {
     bool rolled_back;
     ota_status_t last_reported_status;
     void *transient_priv;
+    char *metadata;
 } esp_rmaker_ota_t;
 
 char *esp_rmaker_ota_status_to_string(ota_status_t status);
