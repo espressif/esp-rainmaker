@@ -22,6 +22,7 @@
 #include <esp_rmaker_schedule.h>
 #include <esp_rmaker_scenes.h>
 #include <esp_rmaker_console.h>
+#include <esp_rmaker_ota.h>
 
 #include <esp_rmaker_common_events.h>
 
@@ -108,6 +109,33 @@ static void event_handler(void* arg, esp_event_base_t event_base,
                 ESP_LOGW(TAG, "Unhandled App Wi-Fi Event: %"PRIi32, event_id);
                 break;
         }
+    } else if (event_base == RMAKER_OTA_EVENT) {
+        switch(event_id) {
+            case RMAKER_OTA_EVENT_STARTING:
+                ESP_LOGI(TAG, "Starting OTA.");
+                break;
+            case RMAKER_OTA_EVENT_IN_PROGRESS:
+                ESP_LOGI(TAG, "OTA is in progress.");
+                break;
+            case RMAKER_OTA_EVENT_SUCCESSFUL:
+                ESP_LOGI(TAG, "OTA successful.");
+                break;
+            case RMAKER_OTA_EVENT_FAILED:
+                ESP_LOGI(TAG, "OTA Failed.");
+                break;
+            case RMAKER_OTA_EVENT_REJECTED:
+                ESP_LOGI(TAG, "OTA Rejected.");
+                break;
+            case RMAKER_OTA_EVENT_DELAYED:
+                ESP_LOGI(TAG, "OTA Delayed.");
+                break;
+            case RMAKER_OTA_EVENT_REQ_FOR_REBOOT:
+                ESP_LOGI(TAG, "Firmware image downloaded. Please reboot your device to apply the upgrade.");
+                break;
+            default:
+                ESP_LOGW(TAG, "Unhandled OTA Event: %"PRIi32, event_id);
+                break;
+        }
     } else {
         ESP_LOGW(TAG, "Invalid event received!");
     }
@@ -138,6 +166,7 @@ void app_main()
     ESP_ERROR_CHECK(esp_event_handler_register(RMAKER_EVENT, ESP_EVENT_ANY_ID, &event_handler, NULL));
     ESP_ERROR_CHECK(esp_event_handler_register(RMAKER_COMMON_EVENT, ESP_EVENT_ANY_ID, &event_handler, NULL));
     ESP_ERROR_CHECK(esp_event_handler_register(APP_WIFI_EVENT, ESP_EVENT_ANY_ID, &event_handler, NULL));
+    ESP_ERROR_CHECK(esp_event_handler_register(RMAKER_OTA_EVENT, ESP_EVENT_ANY_ID, &event_handler, NULL));
 
     /* Initialize the ESP RainMaker Agent.
      * Note that this should be called after app_wifi_init() but before app_wifi_start()
