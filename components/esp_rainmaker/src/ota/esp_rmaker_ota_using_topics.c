@@ -23,6 +23,7 @@
 #include <esp_rmaker_work_queue.h>
 #include <esp_rmaker_core.h>
 #include <esp_rmaker_ota.h>
+#include <esp_rmaker_utils.h>
 
 #include "esp_rmaker_internal.h"
 #include "esp_rmaker_ota_internal.h"
@@ -146,7 +147,7 @@ static void ota_url_handler(const char *topic, void *payload, size_t payload_len
         goto end;
     }
     len++; /* Increment for NULL character */
-    ota_job_id = calloc(1, len);
+    ota_job_id = MEM_CALLOC_EXTRAM(1, len);
     if (!ota_job_id) {
         ESP_LOGE(TAG, "Aborted. OTA Job ID memory allocation failed");
         esp_rmaker_ota_report_status(ota_handle, OTA_STATUS_FAILED, "Aborted. OTA Updated ID memory allocation failed");
@@ -169,7 +170,7 @@ static void ota_url_handler(const char *topic, void *payload, size_t payload_len
         goto end;
     }
     len++; /* Increment for NULL character */
-    url = calloc(1, len);
+    url = MEM_CALLOC_EXTRAM(1, len);
     if (!url) {
         ESP_LOGE(TAG, "Aborted. URL memory allocation failed");
         esp_rmaker_ota_report_status(ota_handle, OTA_STATUS_FAILED, "Aborted. URL memory allocation failed");
@@ -186,7 +187,7 @@ static void ota_url_handler(const char *topic, void *payload, size_t payload_len
     ret = json_obj_get_strlen(&jctx, "fw_version", &len);
     if (ret == ESP_OK && len > 0) {
         len++; /* Increment for NULL character */
-        fw_version = calloc(1, len);
+        fw_version = MEM_CALLOC_EXTRAM(1, len);
         if (!fw_version) {
             ESP_LOGE(TAG, "Aborted. Firmware version memory allocation failed");
             esp_rmaker_ota_report_status(ota_handle, OTA_STATUS_FAILED, "Aborted. Firmware version memory allocation failed");
@@ -201,7 +202,7 @@ static void ota_url_handler(const char *topic, void *payload, size_t payload_len
     ret = json_obj_get_object_strlen(&jctx, "metadata", &metadata_size);
     if (ret == ESP_OK && metadata_size > 0) {
         metadata_size++; /* Increment for NULL character */
-        metadata = calloc(1, metadata_size);
+        metadata = MEM_CALLOC_EXTRAM(1, metadata_size);
         if (!metadata) {
             ESP_LOGE(TAG, "Aborted. OTA metadata memory allocation failed");
             esp_rmaker_ota_report_status(ota_handle, OTA_STATUS_FAILED, "Aborted. OTA metadata memory allocation failed");

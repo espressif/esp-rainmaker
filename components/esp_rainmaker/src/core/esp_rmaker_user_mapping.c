@@ -24,6 +24,7 @@
 #include <esp_rmaker_core.h>
 #include <esp_rmaker_user_mapping.h>
 #include <esp_rmaker_mqtt.h>
+#include <esp_rmaker_utils.h>
 #include <esp_rmaker_common_events.h>
 #include "esp_rmaker_user_mapping.pb-c.h"
 #include "esp_rmaker_internal.h"
@@ -174,7 +175,7 @@ static bool esp_rmaker_user_mapping_detect_reset(const char *user_id)
     char *nvs_user_id = NULL;
     size_t len = 0;
     if ((err = nvs_get_blob(handle, USER_ID_NVS_NAME, NULL, &len)) == ESP_OK) {
-        nvs_user_id = calloc(1, len + 1); /* +1 for NULL termination */
+        nvs_user_id = MEM_CALLOC_EXTRAM(1, len + 1); /* +1 for NULL termination */
         if (nvs_user_id) {
             nvs_get_blob(handle, USER_ID_NVS_NAME, nvs_user_id, &len);
             /* If existing user id and new user id are same, this is not a reset state */
@@ -210,7 +211,7 @@ esp_err_t esp_rmaker_start_user_node_mapping(char *user_id, char *secret_key)
         esp_rmaker_user_mapping_cleanup_data();
     }
 
-    rmaker_user_mapping_data = calloc(1, sizeof(esp_rmaker_user_mapping_data_t));
+    rmaker_user_mapping_data = MEM_CALLOC_EXTRAM(1, sizeof(esp_rmaker_user_mapping_data_t));
     if (!rmaker_user_mapping_data) {
         ESP_LOGE(TAG, "Failed to allocate memory for rmaker_user_mapping_data.");
         xSemaphoreGive(esp_rmaker_user_mapping_lock);
@@ -288,7 +289,7 @@ int esp_rmaker_user_mapping_handler(uint32_t session_id, const uint8_t *inbuf, s
 	    resp.resp_set_user_mapping = &payload;
 
 	    *outlen = rainmaker__rmaker_config_payload__get_packed_size(&resp);
-	    *outbuf = (uint8_t *)malloc(*outlen);
+	    *outbuf = (uint8_t *)MEM_ALLOC_EXTRAM(*outlen);
 	    rainmaker__rmaker_config_payload__pack(&resp, *outbuf);
         break;
     }

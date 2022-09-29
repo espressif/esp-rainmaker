@@ -24,6 +24,7 @@
 #include <esp_rmaker_core.h>
 #include <esp_rmaker_utils.h>
 #include <esp_rmaker_internal.h>
+#include <esp_rmaker_utils.h>
 #include <esp_rmaker_standard_services.h>
 #include <esp_rmaker_standard_types.h>
 #include <esp_rmaker_schedule.h>
@@ -563,7 +564,7 @@ static esp_err_t esp_rmaker_schedule_parse_action(jparse_ctx_t *jctx, esp_rmaker
     if (action->data) {
         free(action->data);
     }
-    action->data = (void *)calloc(1, action->data_len);
+    action->data = (void *)MEM_CALLOC_EXTRAM(1, action->data_len);
     if (!action->data) {
         ESP_LOGE(TAG, "Could not allocate action");
         return ESP_ERR_NO_MEM;
@@ -635,7 +636,7 @@ static esp_err_t esp_rmaker_schedule_parse_info_and_flags(jparse_ctx_t *jctx, ch
 
         if (strlen(_info) > 0) {
             /* +1 for NULL termination */
-            *info = (char *)calloc(1, strlen(_info) + 1);
+            *info = (char *)MEM_CALLOC_EXTRAM(1, strlen(_info) + 1);
             if (*info) {
                 strncpy(*info, _info, strlen(_info));
             }
@@ -672,7 +673,7 @@ static esp_rmaker_schedule_t *esp_rmaker_schedule_find_or_create(jparse_ctx_t *j
         }
 
         /* This is a new schedule. Fill it. */
-        schedule = (esp_rmaker_schedule_t *)calloc(1, sizeof(esp_rmaker_schedule_t));
+        schedule = (esp_rmaker_schedule_t *)MEM_CALLOC_EXTRAM(1, sizeof(esp_rmaker_schedule_t));
         if (!schedule) {
             ESP_LOGE(TAG, "Couldn't allocate schedule with id: %s", id);
             return NULL;
@@ -891,7 +892,7 @@ static char *esp_rmaker_schedule_get_params(void)
         ESP_LOGE(TAG, "Failed to get required size for schedules JSON.");
         return NULL;
     }
-    char *data = calloc(1, req_size);
+    char *data = MEM_CALLOC_EXTRAM(1, req_size);
     if (!data) {
         ESP_LOGE(TAG, "Failed to allocate %d bytes for schedule.", req_size);
         return NULL;
@@ -940,7 +941,7 @@ static esp_err_t write_cb(const esp_rmaker_device_t *device, const esp_rmaker_pa
 
 esp_err_t esp_rmaker_schedule_enable(void)
 {
-    schedule_priv_data = (esp_rmaker_schedule_priv_data_t *)calloc(1, sizeof(esp_rmaker_schedule_priv_data_t));
+    schedule_priv_data = (esp_rmaker_schedule_priv_data_t *)MEM_CALLOC_EXTRAM(1, sizeof(esp_rmaker_schedule_priv_data_t));
     if (!schedule_priv_data) {
         ESP_LOGE(TAG, "Couldn't allocate schedule_priv_data");
         return ESP_ERR_NO_MEM;

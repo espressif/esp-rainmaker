@@ -18,6 +18,7 @@
 
 #include <esp_rmaker_factory.h>
 #include <esp_rmaker_core.h>
+#include <esp_rmaker_utils.h>
 
 #include "esp_rmaker_internal.h"
 #include "esp_rmaker_client_data.h"
@@ -53,7 +54,7 @@ char * esp_rmaker_get_client_csr()
 
 esp_rmaker_mqtt_conn_params_t *esp_rmaker_get_mqtt_conn_params()
 {
-    esp_rmaker_mqtt_conn_params_t *mqtt_conn_params = calloc(1, sizeof(esp_rmaker_mqtt_conn_params_t));
+    esp_rmaker_mqtt_conn_params_t *mqtt_conn_params = MEM_CALLOC_EXTRAM(1, sizeof(esp_rmaker_mqtt_conn_params_t));
     if ((mqtt_conn_params->client_key = esp_rmaker_get_client_key()) == NULL) {
         goto init_err;
     }

@@ -16,7 +16,7 @@ set(core_srcs "src/core/esp_rmaker_core.c"
 
 set(priv_req protobuf-c json_parser json_generator wifi_provisioning
              nvs_flash esp_http_client app_update esp-tls mbedtls esp_https_ota
-             console esp_local_ctrl esp_https_server mdns esp_schedule efuse driver)
+             console esp_local_ctrl esp_https_server mdns esp_schedule efuse driver rmaker_common)
 
 if(CONFIG_ESP_RMAKER_ASSISTED_CLAIM)
     list(APPEND core_srcs

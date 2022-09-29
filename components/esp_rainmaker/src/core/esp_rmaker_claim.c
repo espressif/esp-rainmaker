@@ -38,6 +38,7 @@
 
 #include <esp_rmaker_work_queue.h>
 #include <esp_rmaker_factory.h>
+#include <esp_rmaker_utils.h>
 
 #include <wifi_provisioning/manager.h>
 #include <esp_event.h>
@@ -243,7 +244,7 @@ static esp_err_t handle_claim_verify_response(esp_rmaker_claim_data_t *claim_dat
         int required_len = 0;
         if (json_obj_get_strlen(&jctx, "certificate", &required_len) == 0) {
             required_len++; /* For NULL termination */
-            char *certificate =  calloc(1, required_len);
+            char *certificate =  MEM_CALLOC_EXTRAM(1, required_len);
             if (!certificate) {
                 json_parse_end(&jctx);
                 ESP_LOGE(TAG, "Failed to allocate %d bytes for certificate.", required_len);
@@ -788,7 +789,7 @@ esp_err_t esp_rmaker_claiming_handler(uint32_t session_id, const uint8_t *inbuf,
             break;
     }
     *outlen = rmaker_claim__rmaker_claim_payload__get_packed_size(&response);
-    *outbuf = (uint8_t *)malloc(*outlen);
+    *outbuf = (uint8_t *)MEM_ALLOC_EXTRAM(*outlen);
     rmaker_claim__rmaker_claim_payload__pack(&response, *outbuf);
     rmaker_claim__rmaker_claim_payload__free_unpacked(command, NULL);
     return ESP_OK;
@@ -887,7 +888,7 @@ void esp_rmaker_claim_task(void *args)
         ESP_LOGE(TAG, "Arguments for claiming task cannot be NULL");
         return;
     }
-    esp_rmaker_claim_data_t *claim_data = calloc(1, sizeof(esp_rmaker_claim_data_t));
+    esp_rmaker_claim_data_t *claim_data = MEM_CALLOC_EXTRAM(1, sizeof(esp_rmaker_claim_data_t));
     if (!claim_data) {
         ESP_LOGE(TAG, "Failed to allocate memory for claim data.");
         return;

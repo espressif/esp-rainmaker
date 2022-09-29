@@ -181,7 +181,7 @@ char *esp_rmaker_get_node_params(void)
     }
     /* Keeping some margin just in case some param value changes in between */
     req_size += RMAKER_PARAMS_SIZE_MARGIN;
-    char *node_params = calloc(1, req_size);
+    char *node_params = MEM_CALLOC_EXTRAM(1, req_size);
     if (!node_params) {
         ESP_LOGE(TAG, "Failed to allocate %d bytes for Node params.", req_size);
         return NULL;
@@ -214,7 +214,7 @@ static char * esp_rmaker_param_get_buf(size_t size)
     }
     if (!s_node_params_buf) {
         ESP_LOGD(TAG, "Allocating s_node_params_buf for size %d.", size);
-        s_node_params_buf = calloc(1, size);
+        s_node_params_buf = MEM_CALLOC_EXTRAM(1, size);
         if (!s_node_params_buf) {
             ESP_LOGE(TAG, "Failed to allocate %d bytes for Node params.", size);
             s_param_buf_size = 0;
@@ -311,7 +311,7 @@ static esp_err_t esp_rmaker_device_set_params(_esp_rmaker_device_t *device, jpar
                 int val_size = 0;
                 if (json_obj_get_strlen(jptr, param->name, &val_size) == 0) {
                     val_size++; /* For NULL termination */
-                    new_val.val.s = calloc(1, val_size);
+                    new_val.val.s = MEM_CALLOC_EXTRAM(1, val_size);
                     if (!new_val.val.s) {
                         return ESP_ERR_NO_MEM;
                     }
@@ -325,7 +325,7 @@ static esp_err_t esp_rmaker_device_set_params(_esp_rmaker_device_t *device, jpar
                 int val_size = 0;
                 if (json_obj_get_object_strlen(jptr, param->name, &val_size) == 0) {
                     val_size++; /* For NULL termination */
-                    new_val.val.s = calloc(1, val_size);
+                    new_val.val.s = MEM_CALLOC_EXTRAM(1, val_size);
                     if (!new_val.val.s) {
                         return ESP_ERR_NO_MEM;
                     }
@@ -339,7 +339,7 @@ static esp_err_t esp_rmaker_device_set_params(_esp_rmaker_device_t *device, jpar
                 int val_size = 0;
                 if (json_obj_get_array_strlen(jptr, param->name, &val_size) == 0) {
                     val_size++; /* For NULL termination */
-                    new_val.val.s = calloc(1, val_size);
+                    new_val.val.s = MEM_CALLOC_EXTRAM(1, val_size);
                     if (!new_val.val.s) {
                         return ESP_ERR_NO_MEM;
                     }
@@ -442,7 +442,7 @@ esp_err_t esp_rmaker_param_get_stored_value(_esp_rmaker_param_t *param, esp_rmak
                 (param->val.type == RMAKER_VAL_TYPE_ARRAY)) {
         size_t len = 0;
         if ((err = nvs_get_blob(handle, param->name, NULL, &len)) == ESP_OK) {
-            char *s_val = calloc(1, len + 1);
+            char *s_val = MEM_CALLOC_EXTRAM(1, len + 1);
             if (!s_val) {
                 err = ESP_ERR_NO_MEM;
             } else {
@@ -453,7 +453,7 @@ esp_err_t esp_rmaker_param_get_stored_value(_esp_rmaker_param_t *param, esp_rmak
             }
         } else if ((err = nvs_get_str(handle, param->name, NULL, &len)) == ESP_OK) {
             /* In order to be compatible with the previous nvs_set_str() */
-            char *s_val = calloc(1, len);
+            char *s_val = MEM_CALLOC_EXTRAM(1, len);
             if (!s_val) {
                 err = ESP_ERR_NO_MEM;
             } else {
@@ -538,7 +538,7 @@ esp_rmaker_param_t *esp_rmaker_param_create(const char *param_name, const char *
             return NULL;
         }
     }
-    _esp_rmaker_param_t *param = calloc(1, sizeof(_esp_rmaker_param_t));
+    _esp_rmaker_param_t *param = MEM_CALLOC_EXTRAM(1, sizeof(_esp_rmaker_param_t));
     if (!param) {
         ESP_LOGE(TAG, "Failed to allocate memory for param %s", param_name);
         return NULL;
@@ -595,7 +595,7 @@ esp_err_t esp_rmaker_param_add_bounds(const esp_rmaker_param_t *param,
         ESP_LOGE(TAG, "Cannot set bounds for %s because of value type mismatch.", _param->name);
         return ESP_ERR_INVALID_ARG;
     }
-    esp_rmaker_param_bounds_t *bounds = calloc(1, sizeof(esp_rmaker_param_bounds_t));
+    esp_rmaker_param_bounds_t *bounds = MEM_CALLOC_EXTRAM(1, sizeof(esp_rmaker_param_bounds_t));
     if (!bounds) {
         ESP_LOGE(TAG, "Failed to allocate memory for parameter bounds.");
         return ESP_ERR_NO_MEM;
@@ -621,7 +621,7 @@ esp_err_t esp_rmaker_param_add_valid_str_list(const esp_rmaker_param_t *param, c
         ESP_LOGE(TAG, "Only string params can have valid strings array.");
         return ESP_ERR_INVALID_ARG;
     }
-    esp_rmaker_param_valid_str_list_t *valid_str_list = calloc(1, sizeof(esp_rmaker_param_valid_str_list_t));
+    esp_rmaker_param_valid_str_list_t *valid_str_list = MEM_CALLOC_EXTRAM(1, sizeof(esp_rmaker_param_valid_str_list_t));
     if (!valid_str_list) {
         ESP_LOGE(TAG, "Failed to allocate memory for valid strings array.");
         return ESP_ERR_NO_MEM;
@@ -646,7 +646,7 @@ esp_err_t esp_rmaker_param_add_array_max_count(const esp_rmaker_param_t *param, 
         ESP_LOGE(TAG, "Only array params can have max count.");
         return ESP_ERR_INVALID_ARG;
     }
-    esp_rmaker_param_bounds_t *bounds = calloc(1, sizeof(esp_rmaker_param_bounds_t));
+    esp_rmaker_param_bounds_t *bounds = MEM_CALLOC_EXTRAM(1, sizeof(esp_rmaker_param_bounds_t));
     if (!bounds) {
         ESP_LOGE(TAG, "Failed to allocate memory for parameter bounds.");
         return ESP_ERR_NO_MEM;
