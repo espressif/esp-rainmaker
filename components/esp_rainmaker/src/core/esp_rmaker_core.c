@@ -23,6 +23,7 @@
 
 #include <esp_rmaker_factory.h>
 #include <esp_rmaker_work_queue.h>
+#include <esp_rmaker_common_events.h>
 
 #include <esp_rmaker_core.h>
 #include <esp_rmaker_user_mapping.h>
@@ -33,7 +34,8 @@
 #include "esp_rmaker_client_data.h"
 
 static const int WIFI_CONNECTED_EVENT = BIT0;
-static EventGroupHandle_t wifi_event_group;
+static const int MQTT_CONNECTED_EVENT = BIT1;
+static EventGroupHandle_t rmaker_core_event_group;
 
 ESP_EVENT_DEFINE_BASE(RMAKER_EVENT);
 
@@ -130,9 +132,9 @@ static void esp_rmaker_event_handler(void* arg, esp_event_base_t event_base,
             ESP_LOGE(TAG, "Please update your phone apps and repeat Wi-Fi provisioning with BLE transport.");
         }
 #endif
-        if (wifi_event_group) {
+        if (rmaker_core_event_group) {
             /* Signal rmaker thread to continue execution */
-            xEventGroupSetBits(wifi_event_group, WIFI_CONNECTED_EVENT);
+            xEventGroupSetBits(rmaker_core_event_group, WIFI_CONNECTED_EVENT);
         }
     } else if (event_base == RMAKER_EVENT &&
             (event_id == RMAKER_EVENT_USER_NODE_MAPPING_DONE ||
@@ -140,6 +142,11 @@ static void esp_rmaker_event_handler(void* arg, esp_event_base_t event_base,
         esp_event_handler_unregister(RMAKER_EVENT, event_id, &esp_rmaker_event_handler);
         esp_rmaker_params_mqtt_init();
         esp_rmaker_cmd_response_enable();
+    } else if (event_base == RMAKER_COMMON_EVENT && event_id == RMAKER_MQTT_EVENT_CONNECTED) {
+        if (rmaker_core_event_group) {
+            /* Signal rmaker thread to continue execution */
+            xEventGroupSetBits(rmaker_core_event_group, MQTT_CONNECTED_EVENT);
+        }
     }
 }
 
@@ -226,12 +233,17 @@ static void esp_rmaker_task(void *data)
     esp_rmaker_priv_data->state = ESP_RMAKER_STATE_STARTING;
     esp_err_t err = ESP_FAIL;
     wifi_ap_record_t ap_info;
-    wifi_event_group = xEventGroupCreate();
-    if (!wifi_event_group) {
+    rmaker_core_event_group = xEventGroupCreate();
+    if (!rmaker_core_event_group) {
         ESP_LOGE(TAG, "Failed to create event group. Aborting");
         goto rmaker_end;
     }
     err = esp_event_handler_register(IP_EVENT, IP_EVENT_STA_GOT_IP, &esp_rmaker_event_handler, esp_rmaker_priv_data);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to register event handler. Error: %d. Aborting", err);
+        goto rmaker_end;
+    }
+    err = esp_event_handler_register(RMAKER_COMMON_EVENT, RMAKER_MQTT_EVENT_CONNECTED, &esp_rmaker_event_handler, esp_rmaker_priv_data);
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "Failed to register event handler. Error: %d. Aborting", err);
         goto rmaker_end;
@@ -261,7 +273,7 @@ static void esp_rmaker_task(void *data)
     /* Check if already connected to Wi-Fi */
     if (esp_wifi_sta_get_ap_info(&ap_info) != ESP_OK) {
         /* Wait for Wi-Fi connection */
-        xEventGroupWaitBits(wifi_event_group, WIFI_CONNECTED_EVENT, false, true, portMAX_DELAY);
+        xEventGroupWaitBits(rmaker_core_event_group, WIFI_CONNECTED_EVENT, false, true, portMAX_DELAY);
     }
     esp_event_handler_unregister(IP_EVENT, IP_EVENT_STA_GOT_IP, &esp_rmaker_event_handler);
 
@@ -312,6 +324,9 @@ static void esp_rmaker_task(void *data)
         ESP_LOGE(TAG, "esp_rmaker_mqtt_connect() returned %d. Aborting", err);
         goto rmaker_end;
     }
+    ESP_LOGI(TAG, "Waiting for MQTT connection");
+    xEventGroupWaitBits(rmaker_core_event_group, MQTT_CONNECTED_EVENT, false, true, portMAX_DELAY);
+    esp_event_handler_unregister(RMAKER_COMMON_EVENT, RMAKER_MQTT_EVENT_CONNECTED, &esp_rmaker_event_handler);
     esp_rmaker_priv_data->mqtt_connected = true;
     esp_rmaker_priv_data->state = ESP_RMAKER_STATE_STARTED;
     err = esp_rmaker_report_node_config();
@@ -357,10 +372,10 @@ static void esp_rmaker_task(void *data)
     err = ESP_OK;
 
 rmaker_end:
-    if (wifi_event_group) {
-        vEventGroupDelete(wifi_event_group);
+    if (rmaker_core_event_group) {
+        vEventGroupDelete(rmaker_core_event_group);
     }
-    wifi_event_group = NULL;
+    rmaker_core_event_group = NULL;
     if (err == ESP_OK) {
         return;
     }
