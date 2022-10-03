@@ -88,6 +88,7 @@ esp_err_t app_insights_enable(void)
     esp_insights_config_t config = {
         .log_type = APP_INSIGHTS_LOG_TYPE,
         .node_id  = node_id,
+        .alloc_ext_ram = true,
     };
     esp_insights_enable(&config);
 #else
