@@ -42,6 +42,8 @@ typedef enum {
     RMAKER_OTA_EVENT_REJECTED,
     /** RainMaker OTA Delayed */
     RMAKER_OTA_EVENT_DELAYED,
+    /** OTA Image has been flashed and active partition changed. Reboot is requested. Applicable only if Auto reboot is disabled **/
+    RMAKER_OTA_EVENT_REQ_FOR_REBOOT,
 } esp_rmaker_ota_event_t;
 
 /** Default ESP RainMaker OTA Server Certificate */

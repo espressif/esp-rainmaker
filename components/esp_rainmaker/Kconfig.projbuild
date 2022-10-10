@@ -209,6 +209,13 @@ menu "ESP RainMaker Config"
                 this wait period (in seconds), the firmware will be marked as invalid and the older
                 firmware will be booted into.
 
+        config ESP_RMAKER_OTA_DISABLE_AUTO_REBOOT
+            bool "Disable auto reboot"
+            default n
+            help
+                After OTA image is flashed and active partition changed, the device automatically reboots. To disable this
+                behaviour and handle reboot on your own, based on RMAKER_OTA event, enable this option.
+
     endmenu
 
     menu "ESP RainMaker Scheduling"
