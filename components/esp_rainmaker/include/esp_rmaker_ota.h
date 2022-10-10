@@ -79,6 +79,8 @@ typedef struct {
     /** Size of the OTA File. Can be 0 if the file size isn't received from
      * the ESP RainMaker Cloud */
     int filesize;
+    /** The firmware version of the OTA image **/
+    char *fw_version;
     /** The server certificate passed in esp_rmaker_enable_ota() */
     const char *server_cert;
     /** The private data passed in esp_rmaker_enable_ota() */

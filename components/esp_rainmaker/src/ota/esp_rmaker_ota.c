@@ -138,6 +138,7 @@ void esp_rmaker_ota_common_cb(void *priv)
     esp_rmaker_ota_data_t ota_data = {
         .url = ota->url,
         .filesize = ota->filesize,
+        .fw_version = ota->fw_version,
         .server_cert = ota->server_cert,
         .priv = ota->priv,
         .metadata = ota->metadata
