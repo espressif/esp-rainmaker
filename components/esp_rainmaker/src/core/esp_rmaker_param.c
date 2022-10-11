@@ -426,7 +426,7 @@ static esp_err_t esp_rmaker_register_for_set_params(void)
     snprintf(subscribe_topic, sizeof(subscribe_topic), "node/%s/%s",
                 esp_rmaker_get_node_id(), NODE_PARAMS_REMOTE_TOPIC_SUFFIX);
     esp_err_t err = esp_rmaker_mqtt_subscribe(subscribe_topic, esp_rmaker_set_params_callback, RMAKER_MQTT_QOS1, NULL);
-    if(err != ESP_OK) {
+    if (err != ESP_OK) {
         ESP_LOGE(TAG, "Failed to subscribe to %s. Error %d", subscribe_topic, err);
         return ESP_FAIL;
     }
@@ -674,7 +674,7 @@ esp_err_t esp_rmaker_param_add_ui_type(const esp_rmaker_param_t *param, const ch
     if (_param->ui_type) {
         free(_param->ui_type);
     }
-    if ((_param->ui_type = strdup(ui_type)) != NULL ){
+    if ((_param->ui_type = strdup(ui_type)) != NULL ) {
         return ESP_OK;
     } else {
         return ESP_ERR_NO_MEM;
@@ -747,9 +747,15 @@ static esp_err_t __esp_rmaker_param_report_time_series(json_gen_str_t *jptr, con
 {
     json_gen_start_object(jptr);
     char param_name[MAX_TS_DATA_PARAM_NAME];
+    if (!param) {
+        return ESP_ERR_INVALID_ARG;
+    }
     _esp_rmaker_param_t *_param = (_esp_rmaker_param_t *)param;
-    _esp_rmaker_device_t *_device = _param->parent;
-    snprintf(param_name, sizeof(param_name), "%s.%s", _device->name, _param->name);
+    _esp_rmaker_device_t *device = _param->parent;
+    if (!device) {
+        return ESP_FAIL;
+    }
+    snprintf(param_name, sizeof(param_name), "%s.%s", device->name, _param->name);
     json_gen_obj_set_string(jptr, "name", param_name);
     esp_rmaker_report_data_type( _param->val.type, "dt", jptr);
     json_gen_push_array(jptr, "records");
@@ -765,6 +771,10 @@ static esp_err_t esp_rmaker_param_report_time_series(const esp_rmaker_param_t *p
         ESP_LOGE(TAG, "Param handle cannot be NULL.");
         return ESP_ERR_INVALID_ARG;
     }
+    if (!((_esp_rmaker_param_t *)param)->parent) {
+        ESP_LOGE(TAG, "Param \"%s\" has not been added to any device.", ((_esp_rmaker_param_t *)param)->name);
+        return ESP_FAIL;
+    }
     if (esp_rmaker_time_check() != true) {
         ESP_LOGE(TAG, "Current time not yet available. Cannot report time series data.");
         return ESP_ERR_INVALID_STATE;
@@ -774,13 +784,16 @@ static esp_err_t esp_rmaker_param_report_time_series(const esp_rmaker_param_t *p
     if (!node_params_buf) {
         return ESP_ERR_NO_MEM;
     }
+    esp_err_t err;
     json_gen_str_t jstr;
     int buf_len = max_node_params_size;
     json_gen_str_start(&jstr, node_params_buf, buf_len, NULL, NULL);
     json_gen_start_object(&jstr);
     json_gen_obj_set_string(&jstr, "ts_data_version", TS_DATA_VERSION);
     json_gen_push_array(&jstr, "ts_data");
-    __esp_rmaker_param_report_time_series(&jstr, param);
+    if ((err = __esp_rmaker_param_report_time_series(&jstr, param)) != ESP_OK) {
+        return err;
+    }
     json_gen_pop_array(&jstr);
     json_gen_end_object(&jstr);
     json_gen_str_end(&jstr);
