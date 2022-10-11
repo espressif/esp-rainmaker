@@ -138,6 +138,7 @@ void esp_rmaker_ota_common_cb(void *priv)
     esp_rmaker_ota_data_t ota_data = {
         .url = ota->url,
         .filesize = ota->filesize,
+        .fw_version = ota->fw_version,
         .server_cert = ota->server_cert,
         .priv = ota->priv,
         .metadata = ota->metadata
@@ -306,7 +307,6 @@ ota_end:
 #endif /* CONFIG_BT_ENABLED */
     ota_finish_err = esp_https_ota_finish(https_ota_handle);
     if ((err == ESP_OK) && (ota_finish_err == ESP_OK)) {
-        ESP_LOGI(TAG, "OTA upgrade successful. Rebooting in %d seconds...", OTA_REBOOT_TIMER_SEC);
 #ifdef CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE
         nvs_handle handle;
         esp_err_t err = nvs_open_from_partition(ESP_RMAKER_NVS_PART_NAME, RMAKER_OTA_NVS_NAMESPACE, NVS_READWRITE, &handle);
@@ -320,7 +320,13 @@ ota_end:
 #else
         esp_rmaker_ota_report_status(ota_handle, OTA_STATUS_SUCCESS, "OTA Upgrade finished successfully");
 #endif
+#ifndef CONFIG_ESP_RMAKER_OTA_DISABLE_AUTO_REBOOT
+        ESP_LOGI(TAG, "OTA upgrade successful. Rebooting in %d seconds...", OTA_REBOOT_TIMER_SEC);
         esp_rmaker_reboot(OTA_REBOOT_TIMER_SEC);
+#else
+        ESP_LOGI(TAG, "OTA upgrade successful. Auto reboot is disabled. Requesting a Reboot via Event handler.");
+        esp_rmaker_ota_post_event(RMAKER_OTA_EVENT_REQ_FOR_REBOOT, NULL, 0);
+#endif
         return ESP_OK;
     } else {
         if (ota_finish_err == ESP_ERR_OTA_VALIDATE_FAILED) {

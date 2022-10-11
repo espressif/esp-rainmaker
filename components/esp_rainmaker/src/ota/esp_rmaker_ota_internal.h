@@ -28,6 +28,7 @@ typedef struct {
     void *priv;
     const char *server_cert;
     char *url;
+    char *fw_version;
     int filesize;
     bool ota_in_progress;
     bool rolled_back;
