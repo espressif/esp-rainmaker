@@ -21,6 +21,7 @@
 #define RMAKER_OTA_NVS_NAMESPACE            "rmaker_ota"
 #define RMAKER_OTA_JOB_ID_NVS_NAME          "rmaker_ota_id"
 #define RMAKER_OTA_UPDATE_FLAG_NVS_NAME     "ota_update"
+#define RMAKER_OTA_FETCH_DELAY              5
 
 typedef struct {
     esp_rmaker_ota_type_t type;
