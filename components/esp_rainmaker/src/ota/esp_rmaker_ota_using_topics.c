@@ -15,6 +15,8 @@
 #include <string.h>
 #include <json_parser.h>
 #include <json_generator.h>
+#include <freertos/FreeRTOS.h>
+#include <freertos/timers.h>
 #include <esp_log.h>
 #include <esp_system.h>
 #include <nvs.h>
@@ -263,7 +265,7 @@ esp_err_t esp_rmaker_ota_fetch(void)
     return err;
 }
 
-void esp_rmaker_ota_timer_cb_fetch(void *priv)
+void esp_rmaker_ota_autofetch_timer_cb(void *priv)
 {
     esp_rmaker_ota_fetch();
 }
@@ -295,11 +297,13 @@ static void esp_rmaker_ota_work_fn(void *priv_data)
     esp_rmaker_ota_subscribe(priv_data);
 #ifdef CONFIG_ESP_RMAKER_OTA_AUTOFETCH
     if (ota->ota_in_progress != true) {
-        esp_rmaker_ota_fetch();
+        if (esp_rmaker_ota_fetch_with_delay(RMAKER_OTA_FETCH_DELAY) != ESP_OK) {
+            ESP_LOGE(TAG, "Failed to create OTA Fetch timer.");
+        }
     }
     if (ota_autofetch_period > 0) {
         esp_timer_create_args_t autofetch_timer_conf = {
-            .callback = esp_rmaker_ota_timer_cb_fetch,
+            .callback = esp_rmaker_ota_autofetch_timer_cb,
             .arg = priv_data,
             .dispatch_method = ESP_TIMER_TASK,
             .name = "ota_autofetch_tm"
@@ -307,7 +311,7 @@ static void esp_rmaker_ota_work_fn(void *priv_data)
         if (esp_timer_create(&autofetch_timer_conf, &ota_autofetch_timer) == ESP_OK) {
             esp_timer_start_periodic(ota_autofetch_timer, ota_autofetch_period);
         } else {
-            ESP_LOGE(TAG, "Failes to create OTA Autofetch timer");
+            ESP_LOGE(TAG, "Failed to create OTA Autofetch timer");
         }
     }
 #endif /* CONFIG_ESP_RMAKER_OTA_AUTOFETCH */
@@ -321,4 +325,21 @@ esp_err_t esp_rmaker_ota_enable_using_topics(esp_rmaker_ota_t *ota)
         ESP_LOGI(TAG, "OTA enabled with Topics");
     }
     return err;
+}
+
+static void esp_rmaker_ota_fetch_timer_cb(TimerHandle_t xTimer)
+{
+    esp_rmaker_ota_fetch();
+    xTimerDelete(xTimer, 0);
+}
+
+esp_err_t esp_rmaker_ota_fetch_with_delay(int time)
+{
+    TimerHandle_t timer = xTimerCreate(NULL, (time * 1000) / portTICK_PERIOD_MS, pdFALSE, NULL, esp_rmaker_ota_fetch_timer_cb);
+    if (timer == NULL) {
+        return ESP_ERR_NO_MEM;
+    } else {
+        xTimerStart(timer, 0);
+    }
+    return ESP_OK;
 }

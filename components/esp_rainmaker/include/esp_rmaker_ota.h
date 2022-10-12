@@ -199,6 +199,18 @@ esp_err_t esp_rmaker_ota_default_cb(esp_rmaker_ota_handle_t handle, esp_rmaker_o
  * @return error on failure
  */
 esp_err_t esp_rmaker_ota_fetch(void);
+
+/** Fetch OTA Info with a delay
+ *
+ * For OTA using Topics, this API can be used to explicitly ask the backend if an OTA is available
+ * after a delay (in seconds) passed as an argument.
+ *
+ * @param[in] time Delay (in seconds)
+ *
+ * @return ESP_OK if the OTA fetch timer was created.
+ * @return error on failure
+ */
+esp_err_t esp_rmaker_ota_fetch_with_delay(int time);
 #ifdef __cplusplus
 }
 #endif
