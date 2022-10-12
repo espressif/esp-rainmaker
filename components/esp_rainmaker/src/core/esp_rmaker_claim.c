@@ -44,6 +44,7 @@
 #include <esp_tls.h>
 #include <esp_rmaker_core.h>
 #include <string.h>
+#include <inttypes.h>
 #include <esp_wifi.h>
 #include <esp_log.h>
 #include <esp_http_client.h>
@@ -310,17 +311,17 @@ static esp_err_t hmac_challenge(const char* hmac_request, unsigned char *hmac_re
     mbedtls_md_context_t ctx;
     mbedtls_md_type_t md_type = MBEDTLS_MD_SHA512;
     uint32_t hmac_key[4];
-    
+
     esp_err_t err = read_hmac_key(hmac_key, sizeof(hmac_key));
     if (err != ESP_OK) {
         return err;
     }
 
-    mbedtls_md_init(&ctx);  
-    int ret = mbedtls_md_setup(&ctx, mbedtls_md_info_from_type(md_type) ,1); 
+    mbedtls_md_init(&ctx);
+    int ret = mbedtls_md_setup(&ctx, mbedtls_md_info_from_type(md_type) ,1);
     ret |= mbedtls_md_hmac_starts(&ctx, (const unsigned char *)hmac_key, sizeof(hmac_key));
-    ret |= mbedtls_md_hmac_update(&ctx, (const unsigned char *)hmac_request, strlen(hmac_request));    
-    ret |= mbedtls_md_hmac_finish(&ctx, hmac_response);   
+    ret |= mbedtls_md_hmac_update(&ctx, (const unsigned char *)hmac_request, strlen(hmac_request));
+    ret |= mbedtls_md_hmac_finish(&ctx, hmac_response);
     mbedtls_md_free(&ctx);
 
     if(ret == 0) {
@@ -443,7 +444,7 @@ static esp_err_t esp_rmaker_claim_perform_init(esp_rmaker_claim_data_t *claim_da
     }
 
     err = esp_rmaker_claim_perform_common(claim_data, CLAIM_INIT_PATH);
-    if (err != OK) {
+    if (err != ESP_OK) {
         ESP_LOGE(TAG, "Claim Init Request Failed.");
         return err;
     }
@@ -458,7 +459,7 @@ static esp_err_t esp_rmaker_claim_perform_init(esp_rmaker_claim_data_t *claim_da
 static esp_err_t esp_rmaker_claim_perform_verify(esp_rmaker_claim_data_t *claim_data)
 {
     esp_err_t err = esp_rmaker_claim_perform_common(claim_data, CLAIM_VERIFY_PATH);
-    if (err != OK) {
+    if (err != ESP_OK) {
         ESP_LOGE(TAG, "Claim Verify Failed.");
         return err;
     }
@@ -579,7 +580,7 @@ esp_err_t esp_rmaker_assisted_claim_handle_start(RmakerClaim__RMakerClaimPayload
         ESP_LOGE(TAG, "PK not created. Cannot proceed with Assisted Claiming.");
         response->resppayload->status = RMAKER_CLAIM__RMAKER_CLAIM_STATUS__InvalidState;
         return ESP_OK;
-    } 
+    }
     if (generate_claim_init_request(claim_data) != ESP_OK) {
         return ESP_OK;
     }
@@ -674,7 +675,7 @@ esp_err_t esp_rmaker_assisted_claim_handle_init(RmakerClaim__RMakerClaimPayload 
     claim_data->payload_offset += payload_buf->payload.len;
 
     response->resppayload->status = RMAKER_CLAIM__RMAKER_CLAIM_STATUS__Success;
-    
+
     if (claim_data->payload_offset == claim_data->payload_len) {
         ESP_LOGD(TAG, "Finished sending Claim Verify Payload.");
         claim_data->state = RMAKER_CLAIM_STATE_VERIFY;
@@ -715,7 +716,7 @@ esp_err_t esp_rmaker_assisted_claim_handle_verify(RmakerClaim__RMakerClaimPayloa
     claim_data->payload_len += recv_payload_buf->len;
 
     if ((recv_payload->offset + recv_payload_buf->len) == recv_payload->totallen) {
-        ESP_LOGD(TAG, "Received complete response of len = %d bytes for Claim Verify", recv_payload->totallen);
+        ESP_LOGD(TAG, "Received complete response of len = %"PRIu32" bytes for Claim Verify", recv_payload->totallen);
         if (handle_claim_verify_response(claim_data) == ESP_OK) {
             ESP_LOGI(TAG,"Assisted Claiming was Successful.");
             claim_data->state = RMAKER_CLAIM_STATE_VERIFY_DONE;

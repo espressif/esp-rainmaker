@@ -84,3 +84,7 @@ docs/docusaurus/website/node_modules
 docs/doxygen-warning-log.txt
 docs/man/
 docs/xml/
+
+# IDF package manager
+**/managed_components/
+*.lock

@@ -2,8 +2,8 @@ menu "ESP RainMaker Config"
 
     choice ESP_RMAKER_CLAIM_TYPE
         bool "Claiming Type"
-        default ESP_RMAKER_SELF_CLAIM if IDF_TARGET_ESP32S2
-        default ESP_RMAKER_ASSISTED_CLAIM if !IDF_TARGET_ESP32S2
+        default ESP_RMAKER_SELF_CLAIM
+        default ESP_RMAKER_ASSISTED_CLAIM if IDF_TARGET_ESP32
         help
             Claiming type to be used.
 
@@ -79,6 +79,14 @@ menu "ESP RainMaker Config"
             can take appropriate action w.r.t user permissions. It is recommended to enable this option
             for security reasons.
 
+    config RMAKER_NAME_PARAM_CB
+        bool "Call device callback for Name param"
+        default n
+        help
+            By default, the "Name" parameter (esp.param.name) changes are handled internally. If Applications
+            want to handle this themselves, this config option can be enabled. Please ensure that you update
+            and report the name parameter in your callback so that it reflects correctly everywhere.
+            If no device callback is registered, the name paramater will be handled internally.
 
     config ESP_RMAKER_LOCAL_CTRL_ENABLE
         bool "ESP RainMaker Local Control"
@@ -191,6 +199,23 @@ menu "ESP RainMaker Config"
                 However, please ensure that your application has enough memory headroom to allow this,
                 else, the OTA may fail.
 
+        config ESP_RMAKER_OTA_ROLLBACK_WAIT_PERIOD
+            int "OTA Rollback Wait Period (Seconds)"
+            default 90
+            range 30 600
+            help
+                After an OTA Update, if CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE is set, then the firmware will wait for MQTT
+                connection to mark the new firmware as valid. However, if it is not able to do so within
+                this wait period (in seconds), the firmware will be marked as invalid and the older
+                firmware will be booted into.
+
+        config ESP_RMAKER_OTA_DISABLE_AUTO_REBOOT
+            bool "Disable auto reboot"
+            default n
+            help
+                After OTA image is flashed and active partition changed, the device automatically reboots. To disable this
+                behaviour and handle reboot on your own, based on RMAKER_OTA event, enable this option.
+
     endmenu
 
     menu "ESP RainMaker Scheduling"
@@ -221,6 +246,26 @@ menu "ESP RainMaker Config"
                 set to ESP_RMAKER_REQ_SRC_SCENE_DEACTIVATE when the deactivate operation is received. However, the
                 param values would be the same as those for activate, since the RainMaker core does not know what the
                 expected values are for scene deactivation.
+
+    endmenu
+
+    menu "ESP RainMaker Command-Response"
+
+        config ESP_RMAKER_CMD_RESP_ENABLE
+            bool "Enable Command-Response Module"
+            default y
+            help
+                Enable the ESP RainMaker Command-Response module for semi-synchronous communication. Please refer the RainMaker documents
+                for additional information.
+
+        config ESP_RMAKER_CMD_RESP_TEST_ENABLE
+            bool "Enable Command-Response Testing"
+            default n
+            depends on ESP_RMAKER_CMD_RESP_ENABLE
+            help
+                Enable testing for Command-Response module. This enables triggering commands and parsing response from the node itself,
+                rather than receiving the commands from cloud. C API or the serial console can be used to trigger the commands.
+                This should be enabled only while testing commands, but should always be disabled in production firmware.
 
     endmenu
 

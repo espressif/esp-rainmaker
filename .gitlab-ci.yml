@@ -5,7 +5,6 @@ stages:
 variables:
   V: "0"
   MAKEFLAGS: "-j8 --no-keep-going"
-  IDF_PATH: "$CI_PROJECT_DIR/esp-idf"
   APP_BUILD: "all"
   GIT_SUBMODULE_STRATEGY: recursive
 
@@ -20,173 +19,78 @@ before_script:
     # Create esp-rainmaker-bins-${CI_JOB_ID}/ dir (to copy binaries into for artifacts)
     - mkdir -p $CI_PROJECT_DIR/esp-rainmaker-bins-${CI_JOB_ID}
 
-.setup_idf: &setup_idf
-# Checking git version
-- echo Checking git version
-- git --version
-# Cloning esp-idf - Started
-- echo Cloning esp-idf - Started
-- git clone --recursive --branch ${IDF_GIT_BRANCH} --depth 1 ${IDF_GIT_PATH}/esp-idf.git
-- cd esp-idf
-- echo Cloning esp-idf - Done
-# Cloning esp-idf - Done
-# Running install.sh - Started
-- echo Running install.sh - Started
-- ./install.sh
-- echo Running install.sh - Done
-# Running install.sh - Done
-# Running export.sh - Started
-- echo Running export.sh - Started
-- . export.sh
-- echo Running export.sh - Done
-# Running export.sh - Done
-
-.build_switch: &build_switch
-# Building switch app - Started
-- echo Building switch app - Started
-- ls
-- cd $CI_PROJECT_DIR/examples/switch
-- echo Building for esp32
-- idf.py set-target esp32
-- idf.py build
-- rm -rf build/ sdkconfig
-- echo Building for esp32s2
-- idf.py set-target esp32s2
-- idf.py build
-- rm -rf build/ sdkconfig
-- echo Building for esp32c3
-- idf.py set-target esp32c3
-- idf.py build
-- rm -rf build/ sdkconfig
-- echo Building for esp32s3
-- idf.py set-target esp32s3
-- idf.py build
-- echo Building switch app - Done
-# Building switch app - Done
-# Copying switch.bin to esp-rainmaker-bins-${CI_JOB_ID}/
-- echo Copy switch.bin to esp-rainmaker-bins-${CI_JOB_ID}/
-- cp $CI_PROJECT_DIR/examples/switch/build/switch.bin $CI_PROJECT_DIR/esp-rainmaker-bins-${CI_JOB_ID}/
-
-.build_led_light: &build_led_light
-# Building led_light app - Started
-- echo Building led_light app - Started
-- echo Running idf.py
-- cd $CI_PROJECT_DIR/examples/led_light
-- idf.py build
-- echo Building led_light app - Done
-# Building led_light app - Done
-# Copying led_light.bin to esp-rainmaker-bins-${CI_JOB_ID}/
-- echo Copy led_light.bin to esp-rainmaker-bins-${CI_JOB_ID}/
-- cp $CI_PROJECT_DIR/examples/led_light/build/led_light.bin $CI_PROJECT_DIR/esp-rainmaker-bins-${CI_JOB_ID}/
-
-.build_fan: &build_fan
-# Building fan app - Started
-- echo Building fan app - Started
-- echo Running idf.py
-- cd $CI_PROJECT_DIR/examples/fan
-- idf.py build
-- echo Building fan app - Done
-# Building fan app - Done
-# Copying fan.bin to esp-rainmaker-bins-${CI_JOB_ID}/
-- echo Copy fan.bin to esp-rainmaker-bins-${CI_JOB_ID}/
-- cp $CI_PROJECT_DIR/examples/fan/build/fan.bin $CI_PROJECT_DIR/esp-rainmaker-bins-${CI_JOB_ID}/
-
-.build_temperature_sensor: &build_temperature_sensor
-# Building temperature_sensor app - Started
-- echo Building temperature_sensor app - Started
-- echo Running idf.py
-- cd $CI_PROJECT_DIR/examples/temperature_sensor
-- idf.py build
-- echo Building temperature_sensor app - Done
-# Building temperature_sensor app - Done
-# Copying temperature_sensor.bin to esp-rainmaker-bins-${CI_JOB_ID}/
-- echo Copy temperature_sensor.bin to esp-rainmaker-bins-${CI_JOB_ID}/
-- cp $CI_PROJECT_DIR/examples/temperature_sensor/build/temperature_sensor.bin $CI_PROJECT_DIR/esp-rainmaker-bins-${CI_JOB_ID}/
-
-.build_multi_device: &build_multi_device
-# Building multi_device app - Started
-- echo Building multi_device app - Started
-- echo Running idf.py
-- cd $CI_PROJECT_DIR/examples/multi_device
-- idf.py build
-- echo Building multi_device app - Done
-# Building multi_device app - Done
-# Copying multi_device.bin to esp-rainmaker-bins-${CI_JOB_ID}/
-- echo Copy multi_device.bin to esp-rainmaker-bins-${CI_JOB_ID}/
-- cp $CI_PROJECT_DIR/examples/multi_device/build/multi_device.bin $CI_PROJECT_DIR/esp-rainmaker-bins-${CI_JOB_ID}/
-
-.build_gpio: &build_gpio
-# Building gpio app - Started
-- echo Building gpio app - Started
-- echo Running idf.py
-- cd $CI_PROJECT_DIR/examples/gpio
-- idf.py build
-- echo Building gpio app - Done
-# Building gpio app - Done
-# Copying gpio.bin to esp-rainmaker-bins-${CI_JOB_ID}/
-- echo Copy gpio.bin to esp-rainmaker-bins-${CI_JOB_ID}/
-- cp $CI_PROJECT_DIR/examples/gpio/build/gpio.bin $CI_PROJECT_DIR/esp-rainmaker-bins-${CI_JOB_ID}/
-
-.build_homekit_switch: &build_homekit_switch
-# Building homekit_switch app - Started
-- cd $CI_PROJECT_DIR/examples/homekit_switch
+.build_all_examples: &build_all_examples
+- pip install --upgrade idf-component-manager
+- for EXAMPLE in $EXAMPLES; do
+- cd $CI_PROJECT_DIR/examples/$EXAMPLE
+- echo Building $EXAMPLE
+- if [[ "$EXAMPLE" == "homekit_switch" ]]; then
 - cd components
 - echo Cloning esp-homekit-sdk
 - git clone --recursive --branch master --depth 1 https://github.com/espressif/esp-homekit-sdk.git
 - cd ..
 - export HOMEKIT_PATH=$PWD/components/esp-homekit-sdk
-- echo Building homekit_switch app - Started
-- echo Running idf.py
+- fi
+- for TARGET in $EXAMPLE_TARGETS; do
+- echo Building for $TARGET
+- idf.py set-target $TARGET
 - idf.py build
-- echo Building homekit_switch app - Done
-# Building homekit_switch app - Done
-# Copying homekit_switch.bin to esp-rainmaker-bins-${CI_JOB_ID}/
-- echo Copy homekit_switch.bin to esp-rainmaker-bins-${CI_JOB_ID}/
-- cp $CI_PROJECT_DIR/examples/homekit_switch/build/homekit_switch.bin $CI_PROJECT_DIR/esp-rainmaker-bins-${CI_JOB_ID}/
+- mkdir -p $CI_PROJECT_DIR/esp-rainmaker-bins-${CI_JOB_ID}/$EXAMPLE/$TARGET/
+- cp $CI_PROJECT_DIR/examples/$EXAMPLE/build/*.bin $CI_PROJECT_DIR/esp-rainmaker-bins-${CI_JOB_ID}/$EXAMPLE/$TARGET/
+- done
+- echo Build Complete for $EXAMPLE
+- done
+# Generating zip file for binaries generated
+- cd $CI_PROJECT_DIR
+- echo Generating zip file for binaries generated
+- tar -zcvf esp-rainmaker-bins-${CI_JOB_ID}.zip esp-rainmaker-bins-${CI_JOB_ID}/
 
-build_app:
+.build_template:
   stage: build
-  image: $CI_DOCKER_REGISTRY/esp32-ci-env:rainmaker
+  image: espressif/idf:latest
   tags:
     - build
-  artifacts:
-    paths:
-      - $CI_PROJECT_DIR/esp-rainmaker-bins-${CI_JOB_ID}.zip
-    expire_in: 6 mos
+  variables:
+    PEDANTIC_FLAGS: "-Werror -Werror=deprecated-declarations -Wno-error=cpp -Werror=unused-variable -Werror=unused-but-set-variable -Werror=unused-function"
+    EXTRA_CFLAGS: "${PEDANTIC_FLAGS}"
+    EXTRA_CXXFLAGS: "${PEDANTIC_FLAGS}"
+    EXAMPLE_TARGETS: "esp32"
+    EXAMPLES: "switch led_light fan temperature_sensor multi_device gpio homekit_switch"
   script:
-    - *setup_idf
-    - for APP in $APP_BUILD; do
-    - if [[ "$APP_BUILD" == "all" || "$APP" == "switch" ]]; then
-    - *build_switch
-    - fi
-    - if [[ "$APP_BUILD" == "all" || "$APP" == "led_light" ]]; then
-    - *build_led_light
-    - fi
-    - if [[ "$APP_BUILD" == "all" || "$APP" == "fan" ]]; then
-    - *build_fan
-    - fi
-    - if [[ "$APP_BUILD" == "all" || "$APP" == "temperature_sensor" ]]; then
-    - *build_temperature_sensor
-    - fi
-    - if [[ "$APP_BUILD" == "all" || "$APP" == "multi_device" ]]; then
-    - *build_multi_device
-    - fi
-    - if [[ "$APP_BUILD" == "all" || "$APP" == "gpio" ]]; then
-    - *build_gpio
-    - fi
-    - if [[ "$APP_BUILD" == "all" || "$APP" == "homekit_switch" ]]; then
-    - *build_homekit_switch
-    - fi
-    - done
-    - echo Build Complete for $APP_BUILD
-    # Generating zip file for binaries generated
-    - cd $CI_PROJECT_DIR
-    - echo Generating zip file for binaries generated
-    - tar -zcvf esp-rainmaker-bins-${CI_JOB_ID}.zip esp-rainmaker-bins-${CI_JOB_ID}/
-  
+    - *build_all_examples
+
+build_idf_v4.1:
+  extends: .build_template
+  image: espressif/idf:release-v4.1
+
+build_idf_v4.2:
+  extends: .build_template
+  image: espressif/idf:release-v4.2
+  variables:
+    EXAMPLE_TARGETS: "esp32 esp32s2"
+
+build_idf_v4.3:
+  extends: .build_template
+  image: espressif/idf:release-v4.3
+  variables:
+    EXAMPLE_TARGETS: "esp32 esp32s2 esp32c3"
+
+build_idf_v4.4:
+  extends: .build_template
+  image: espressif/idf:release-v4.4
+  variables:
+    EXAMPLE_TARGETS: "esp32 esp32s2 esp32c3 esp32s3"
+
+build_idf_v5.0:
+  extends: .build_template
+  image: espressif/idf:release-v5.0
+  variables:
+    EXAMPLE_TARGETS: "esp32 esp32s2 esp32c3 esp32s3"
+    EXAMPLES: "switch led_light fan temperature_sensor multi_device gpio"
+
 build_docs:
     stage: build
-    image: $CI_DOCKER_REGISTRY/esp32-ci-env:rainmaker
+    image: $CI_DOCKER_REGISTRY/esp32-ci-env
     tags:
       - build
     artifacts:
@@ -213,7 +117,7 @@ build_docs:
 
 push_master_to_github:
   stage: deploy
-  image: $CI_DOCKER_REGISTRY/esp32-ci-env:rainmaker
+  image: espressif/idf:latest
   tags:
     - build
   when: on_success

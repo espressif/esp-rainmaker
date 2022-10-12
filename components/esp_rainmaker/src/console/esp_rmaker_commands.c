@@ -14,6 +14,7 @@
 
 #include <stdio.h>
 #include <string.h>
+#include <inttypes.h>
 #include <ctype.h>
 #include <nvs_flash.h>
 #include <esp_log.h>
@@ -34,6 +35,7 @@
 #include <esp_rmaker_core.h>
 #include <esp_rmaker_user_mapping.h>
 #include <esp_rmaker_utils.h>
+#include <esp_rmaker_cmd_resp.h>
 
 #include <esp_rmaker_console_internal.h>
 
@@ -59,7 +61,7 @@ static int task_dump_cli_handler(int argc, char *argv[])
     num_of_tasks = uxTaskGetSystemState(task_array, num_of_tasks, NULL);
     printf("%s: \tName\tNumber\tPriority\tStackWaterMark\n", TAG);
     for (int i = 0; i < num_of_tasks; i++) {
-        printf("%16s\t%d\t%d\t%d\n",
+        printf("%16s\t%d\t%d\t%"PRIu32"\n",
                task_array[i].pcTaskName,
                task_array[i].xTaskNumber,
                task_array[i].uxCurrentPriority,
@@ -402,6 +404,31 @@ static void register_time_commands()
     esp_console_cmd_register(&tz_set_cmd);
 }
 
+static int cmd_resp_cli_handler(int argc, char *argv[])
+{
+    if (argc != 5) {
+        printf("Usage: cmd <req_id> <user_role> <cmd> <data>\n");
+        return -1;
+    }
+    char *req_id = argv[1];
+    uint8_t user_role = atoi(argv[2]);
+    uint16_t cmd = atoi(argv[3]);
+    esp_rmaker_cmd_resp_test_send(req_id, user_role, cmd, (void *)argv[4], strlen(argv[4]), esp_rmaker_test_cmd_resp, NULL);
+    return 0;
+}
+
+static void register_cmd_resp_command()
+{
+    const esp_console_cmd_t cmd_resp_cmd = {
+        .command = "cmd",
+        .help = "Send command to command-response module. Usage cmd <req_id> <cmd> <user_role> <data>",
+        .func = &cmd_resp_cli_handler,
+    };
+    ESP_LOGI(TAG, "Registering command: %s", cmd_resp_cmd.command);
+    esp_console_cmd_register(&cmd_resp_cmd);
+}
+
+
 void register_commands()
 {
     register_generic_debug_commands();
@@ -410,4 +437,5 @@ void register_commands()
     register_get_node_id();
     register_wifi_prov();
     register_time_commands();
+    register_cmd_resp_command();
 }

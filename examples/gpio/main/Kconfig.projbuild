@@ -8,4 +8,22 @@ menu "Example Configuration"
             GPIO number on which the "Boot" button is connected. This is generally used
             by the application for custom operations like toggling states, resetting to defaults, etc.
 
+    config EXAMPLE_OUTPUT_GPIO_RED
+        int "Red GPIO"
+        default 2 
+        help
+            Control digital RGB LEDs. Need to connect this GPIO to the red pin of the LED.
+
+    config EXAMPLE_OUTPUT_GPIO_GREEN
+        int "Green GPIO"
+        default 4
+        help
+            Control digital RGB LEDs. Need to connect this GPIO to the green pin of the LED.
+
+    config EXAMPLE_OUTPUT_GPIO_BLUE
+        int "Blue GPIO"
+        default 5
+        help
+            Control digital RGB LEDs. Need to connect this GPIO to the blue pin of the LED.
+
 endmenu

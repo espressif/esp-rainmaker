@@ -124,7 +124,10 @@ esp_rmaker_param_t *esp_rmaker_speed_param_create(const char *param_name, int va
 esp_rmaker_param_t *esp_rmaker_temperature_param_create(const char *param_name, float val)
 {
     esp_rmaker_param_t *param = esp_rmaker_param_create(param_name, ESP_RMAKER_PARAM_TEMPERATURE,
-            esp_rmaker_float(val), PROP_FLAG_READ);
+            esp_rmaker_float(val), PROP_FLAG_READ | PROP_FLAG_TIME_SERIES);
+    if (param) {
+        esp_rmaker_param_add_ui_type(param, ESP_RMAKER_UI_TEXT);
+    }
     return param;
 }
 

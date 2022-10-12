@@ -8,6 +8,7 @@
 */
 
 #include <string.h>
+#include <inttypes.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
 #include <esp_log.h>
@@ -18,7 +19,6 @@
 #include <esp_rmaker_standard_types.h>
 #include <esp_rmaker_standard_params.h>
 #include <esp_rmaker_standard_devices.h>
-#include <esp_rmaker_ota.h>
 #include <esp_rmaker_schedule.h>
 #include <esp_rmaker_scenes.h>
 #include <esp_rmaker_console.h>
@@ -68,7 +68,7 @@ static void event_handler(void* arg, esp_event_base_t event_base,
                 ESP_LOGI(TAG, "RainMaker Claim Failed.");
                 break;
             default:
-                ESP_LOGW(TAG, "Unhandled RainMaker Event: %d", event_id);
+                ESP_LOGW(TAG, "Unhandled RainMaker Event: %"PRIi32, event_id);
         }
     } else if (event_base == RMAKER_COMMON_EVENT) {
         switch (event_id) {
@@ -91,7 +91,7 @@ static void event_handler(void* arg, esp_event_base_t event_base,
                 ESP_LOGI(TAG, "MQTT Published. Msg id: %d.", *((int *)event_data));
                 break;
             default:
-                ESP_LOGW(TAG, "Unhandled RainMaker Common Event: %d", event_id);
+                ESP_LOGW(TAG, "Unhandled RainMaker Common Event: %"PRIi32, event_id);
         }
     } else if (event_base == APP_WIFI_EVENT) {
         switch (event_id) {
@@ -105,7 +105,7 @@ static void event_handler(void* arg, esp_event_base_t event_base,
                 ESP_LOGI(TAG, "Provisioning has restarted due to failures.");
                 break;
             default:
-                ESP_LOGW(TAG, "Unhandled App Wi-Fi Event: %d", event_id);
+                ESP_LOGW(TAG, "Unhandled App Wi-Fi Event: %"PRIi32, event_id);
                 break;
         }
     } else {
@@ -184,10 +184,7 @@ void app_main()
     esp_rmaker_node_add_device(node, switch_device);
 
     /* Enable OTA */
-    esp_rmaker_ota_config_t ota_config = {
-        .server_cert = ESP_RMAKER_OTA_DEFAULT_SERVER_CERT,
-    };
-    esp_rmaker_ota_enable(&ota_config, OTA_USING_PARAMS);
+    esp_rmaker_ota_enable_default();
 
     /* Enable timezone service which will be require for setting appropriate timezone
      * from the phone apps for scheduling to work correctly.

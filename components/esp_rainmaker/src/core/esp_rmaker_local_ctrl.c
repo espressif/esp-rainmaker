@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include <stdlib.h>
+#include <inttypes.h>
 #include <esp_log.h>
 #include <nvs.h>
 #include <esp_event.h>
@@ -74,7 +75,7 @@ static esp_err_t get_property_values(size_t props_count,
     esp_err_t ret = ESP_OK;
     uint32_t i;
     for (i = 0; i < props_count && ret == ESP_OK ; i++) {
-        ESP_LOGD(TAG, "(%d) Reading property : %s", i, props[i].name);
+        ESP_LOGD(TAG, "(%"PRIu32") Reading property : %s", i, props[i].name);
         switch (props[i].type) {
             case PROP_TYPE_NODE_CONFIG: {
                 char *node_config = esp_rmaker_get_node_config();
@@ -266,7 +267,12 @@ static esp_err_t __esp_rmaker_start_local_ctrl_service(const char *serv_name)
     };
 
     /* If sec1, add security type details to the config */
-    protocomm_security_pop_t *pop = NULL;
+#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 0, 0)
+#define PROTOCOMM_SEC_DATA protocomm_security1_params_t
+#else
+#define PROTOCOMM_SEC_DATA  protocomm_security_pop_t
+#endif /* ESP_IDF_VERSION */
+    PROTOCOMM_SEC_DATA *pop = NULL;
 #if ESP_RMAKER_LOCAL_CTRL_SECURITY_TYPE == 1
         char *pop_str = esp_rmaker_local_ctrl_get_pop();
         /* Note: pop_str shouldn't be freed. If it gets freed, the pointer which is internally copied in esp_local_ctrl_start() will become invalid which would cause corruption. */
@@ -274,7 +280,7 @@ static esp_err_t __esp_rmaker_start_local_ctrl_service(const char *serv_name)
         int sec_ver = esp_rmaker_local_ctrl_get_security_type();
 
         if (sec_ver != 0 && pop_str) {
-            pop = (protocomm_security_pop_t *)calloc(1, sizeof(protocomm_security_pop_t));
+            pop = (PROTOCOMM_SEC_DATA *)calloc(1, sizeof(PROTOCOMM_SEC_DATA));
             if (!pop) {
                 ESP_LOGE(TAG, "Failed to allocate pop");
                 free(pop_str);
@@ -286,7 +292,11 @@ static esp_err_t __esp_rmaker_start_local_ctrl_service(const char *serv_name)
 
         config.proto_sec.version = sec_ver;
         config.proto_sec.custom_handle = NULL;
+#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 0, 0)
+        config.proto_sec.sec_params = pop;
+#else
         config.proto_sec.pop = pop;
+#endif /* ESP_IDF_VERSION */
 #endif
 
     /* Start esp_local_ctrl service */
@@ -334,7 +344,7 @@ static esp_err_t __esp_rmaker_start_local_ctrl_service(const char *serv_name)
 static void esp_rmaker_local_ctrl_prov_event_handler(void* arg, esp_event_base_t event_base,
                           int32_t event_id, void* event_data)
 {
-    ESP_LOGI(TAG, "Event %d", event_id);
+    ESP_LOGI(TAG, "Event %"PRIu32, event_id);
     if (event_base == WIFI_PROV_EVENT) {
         switch (event_id) {
             case WIFI_PROV_START:

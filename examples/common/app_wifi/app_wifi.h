@@ -9,6 +9,10 @@
 #include <esp_err.h>
 #include <esp_event.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /** ESP RainMaker Event Base */
 ESP_EVENT_DECLARE_BASE(APP_WIFI_EVENT);
 
@@ -36,3 +40,7 @@ typedef enum {
 
 void app_wifi_init();
 esp_err_t app_wifi_start(app_wifi_pop_type_t pop_type);
+
+#ifdef __cplusplus
+}
+#endif

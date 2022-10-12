@@ -90,7 +90,7 @@ typedef struct {
 esp_rmaker_node_t *esp_rmaker_node_create(const char *name, const char *type);
 esp_err_t esp_rmaker_change_node_id(char *node_id, size_t len);
 esp_err_t esp_rmaker_report_value(const esp_rmaker_param_val_t *val, char *key, json_gen_str_t *jptr);
-esp_err_t esp_rmaker_report_data_type(esp_rmaker_val_type_t type, json_gen_str_t *jptr);
+esp_err_t esp_rmaker_report_data_type(esp_rmaker_val_type_t type, char *data_type_key, json_gen_str_t *jptr);
 esp_err_t esp_rmaker_report_node_config(void);
 esp_err_t esp_rmaker_report_node_state(void);
 _esp_rmaker_device_t *esp_rmaker_node_get_first_device(const esp_rmaker_node_t *node);
@@ -116,3 +116,4 @@ static inline esp_err_t esp_rmaker_post_event(esp_rmaker_event_t event_id, void*
     return esp_event_post(RMAKER_EVENT, event_id, data, data_size, portMAX_DELAY);
 }
 esp_rmaker_state_t esp_rmaker_get_state(void);
+esp_err_t esp_rmaker_cmd_response_enable(void);

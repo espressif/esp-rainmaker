@@ -1,5 +1,44 @@
 # Changes
 
+## 28-Jun-2022 (examples: Enable CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE in all examples)
+
+`CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE` has been enabled in all examples by default,
+as a safety measure to prevent devices getting bricked after a faulty firmware upgrade.
+The OTA firmware upgrade will be marked as successful only if the firmware can connect to
+MQTT within 90 seconds of calling `esp_rmaker_ota_enable_default()` (or other esp_emaker_enable APIs).
+The time out is configurable using `CONFIG_ESP_RMAKER_OTA_ROLLBACK_WAIT_PERIOD`.
+
+Note that this is a bootloader feature and so, just enabling this feature and pushing out updated
+firmware to existing devices won't be of any use. Please flash new bootloader on the devices to
+make this work.
+
+## 26-May-2022 (claiming and ota)
+
+- claiming: Make self claiming as the default for esp32s3 and esp32c3
+- ota: Make "OTA using Topics" as default and provide a simplified API for that
+
+Self claiming is much more convenient and fast since the node directly gets the
+credentials from the claiming service over HTTPS, instead of using the slower BLE based
+Assisted claiming, wherein the phone app acts as a proxy between the node and the
+claiming service. However, with self claiming, there was no concept of
+[Admin Role](https://rainmaker.espressif.com/docs/user-roles.html#admin-users) and so, it was
+not possible to access the node via the RainMaker or Insights dashboards. This was one
+reason why Assisted Claiming was kept as a default for esp32c3 and esp32s3 even though
+they support self claiming.
+
+With recent changes in the Public RainMaker backend, the primary user (the user who performs the [user-node
+mapping](https://rainmaker.espressif.com/docs/user-node-mapping.html)) for a self claimed
+node is now made as the admin. This gives the primary user the access to the node for OTA and Insights.
+So, self claiming has now been made as the default for all chips (except esp32) and the OTA Using Topics
+has also been made as the default, since it is convenient and also the correct option for
+production devices. A simpler API `esp_rmaker_ota_enable_default()` as also been added in esp_rmaker_core.h.
+
+Note: Nodes that are already claimed via Assisted/Host Claiming will not have any effect, even if the
+new firmware is enabled with self claiming. The self claiming will take effect only if the flash is
+erased. **This will result in a change of node_id, since mac address is the node_id for self claimed nodes.**
+If you want to contine using Assisted Claiming (probably because there is quite some data associated
+with the node_id), please set is explicitly in your sdkconfig.
+
 ## 25-Jan-2022 (app_wifi: Minor feature additions to provisioning workflow)
 
 Added a 30 minute timeout for Wi-Fi provisioning as a security measure. A device reboot will be
