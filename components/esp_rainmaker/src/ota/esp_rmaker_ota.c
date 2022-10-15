@@ -342,7 +342,6 @@ ota_end:
     return ESP_FAIL;
 }
 
-
 static void event_handler(void* arg, esp_event_base_t event_base,
                           int32_t event_id, void* event_data)
 {
@@ -357,7 +356,9 @@ static void event_handler(void* arg, esp_event_base_t event_base,
         s_ota_rollback_timer = NULL;
     }
     if (ota->type == OTA_USING_TOPICS) {
-        esp_rmaker_ota_fetch();
+        if (esp_rmaker_ota_fetch_with_delay(RMAKER_OTA_FETCH_DELAY) != ESP_OK) {
+            ESP_LOGE(TAG, "Failed to create OTA Fetch timer.");
+        }
     }
 }
 
