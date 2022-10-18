@@ -270,6 +270,13 @@ menu "ESP RainMaker Config"
                 After OTA image is flashed and active partition changed, the device automatically reboots. To disable this
                 behaviour and handle reboot on your own, based on RMAKER_OTA event, enable this option.
 
+        config ESP_RMAKER_OTA_TIME_SUPPORT
+            bool "Enable OTA Time Support"
+            default y
+            help
+                OTA Jobs can include additional metadata for time to indicate a range of valid date and the time within
+                those dates. Eg. Perform OTA between 1 Dec 2022 and 10 Dec 2022 that too only between 2:00am and 5:00am.
+                If you want to ignore this, disable this option.
     endmenu
 
     menu "ESP RainMaker Scheduling"

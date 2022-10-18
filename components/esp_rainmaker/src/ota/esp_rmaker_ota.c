@@ -25,6 +25,7 @@
 #include <esp_wifi_types.h>
 #include <esp_wifi.h>
 #include <nvs.h>
+#include <json_parser.h>
 #if CONFIG_BT_ENABLED
 #include <esp_bt.h>
 #endif /* CONFIG_BT_ENABLED */
@@ -60,6 +61,12 @@ static TimerHandle_t s_ota_rollback_timer;
 extern const char esp_rmaker_ota_def_cert[] asm("_binary_rmaker_ota_server_crt_start");
 const char *ESP_RMAKER_OTA_DEFAULT_SERVER_CERT = esp_rmaker_ota_def_cert;
 ESP_EVENT_DEFINE_BASE(RMAKER_OTA_EVENT);
+
+typedef enum {
+    OTA_OK = 0,
+    OTA_ERR,
+    OTA_DELAYED
+} esp_rmaker_ota_action_t;
 
 char *esp_rmaker_ota_status_to_string(ota_status_t status)
 {
@@ -195,10 +202,146 @@ static esp_err_t validate_image_header(esp_rmaker_ota_handle_t ota_handle,
     return ESP_OK;
 }
 
+#ifdef CONFIG_ESP_RMAKER_OTA_TIME_SUPPORT
+
+/* Retry delay for cases wherein time info itself is not available */
+#define OTA_FETCH_RETRY_DELAY   30
+#define MINUTES_IN_DAY          (24 * 60)
+#define OTA_DELAY_TIME_BUFFER   5
+
+/* Check if time data is available in the metadata. Format
+ * {"download_window":{"end":1155,"start":1080},"validity":{"end":1665426600,"start":1665081000}}
+ */
+esp_rmaker_ota_action_t esp_rmaker_ota_handle_time(jparse_ctx_t *jptr, esp_rmaker_ota_handle_t ota_handle, esp_rmaker_ota_data_t *ota_data)
+{
+    bool time_info = false;
+    int start_min = -1, end_min = -1, start_date = -1, end_date = -1;
+    if (json_obj_get_object(jptr, "download_window") == 0) {
+        /* Download window means specific time of day. Eg, Between 02:00am and 05:00am only */
+        time_info = true;
+        json_obj_get_int(jptr, "start", &start_min);
+        json_obj_get_int(jptr, "end", &end_min);
+        json_obj_leave_object(jptr);
+        ESP_LOGI(TAG, "Download Window : %d %d", start_min, end_min);
+    }
+    if (json_obj_get_object(jptr, "validity") == 0) {
+        /* Validity indicates start and end epoch time, typicaly useful if OTA is to be performed between some dates */
+        time_info = true;
+        json_obj_get_int(jptr, "start", &start_date);
+        json_obj_get_int(jptr, "end", &end_date);
+        json_obj_leave_object(jptr);
+        ESP_LOGI(TAG, "Validity : %d %d", start_date, end_date);
+    }
+    if (time_info) {
+        /* If time info is present, but time is not yet synchronised, we will re-fetch OTA after some time */
+        if (esp_rmaker_time_check() != true) {
+            esp_rmaker_ota_report_status(ota_handle, OTA_STATUS_DELAYED, "No time information available yet.");
+            esp_rmaker_ota_fetch_with_delay(OTA_FETCH_RETRY_DELAY);
+            return OTA_DELAYED;
+        }
+        time_t current_timestamp = 0;
+        struct tm current_time = {0};
+        time(&current_timestamp);
+        localtime_r(&current_timestamp, &current_time);
+
+        /* Check for date validity first */
+        if ((start_date != -1) && (current_timestamp < start_date)) {
+            int delay_time = start_date - current_timestamp;
+            /* The delay logic here can include the start_min and end_min as well, but it makes the logic quite complex,
+             * just for a minor optimisation.
+             */
+            ESP_LOGI(TAG, "Delaying OTA by %d seconds (%d min) as it is not valid yet.", delay_time, delay_time / 60);
+            esp_rmaker_ota_report_status(ota_handle, OTA_STATUS_DELAYED, "Not within valid window.");
+            esp_rmaker_ota_fetch_with_delay(delay_time + OTA_DELAY_TIME_BUFFER);
+            return OTA_DELAYED;
+        } else if ((end_date != -1) && (current_timestamp > end_date)) {
+            ESP_LOGE(TAG, "OTA download window lapsed");
+            esp_rmaker_ota_report_status(ota_handle, OTA_STATUS_FAILED, "OTA download window lapsed.");
+            return OTA_ERR;
+        }
+
+        /* Check for download window */
+        if (start_min != -1) {
+            /* end_min is required if start_min is provided */
+            if (end_min == -1) {
+                ESP_LOGE(TAG, "Download window should have an end time if start time is specified.");
+                esp_rmaker_ota_report_status(ota_handle, OTA_STATUS_FAILED, "Invalid download window specified.");
+                return OTA_ERR;
+            }
+            int cur_min = current_time.tm_hour * 60 + current_time.tm_min;
+            if (start_min > end_min) {
+                /* This means that the window is across midnight (Eg. 23:00 to 02:00 i.e. 1380 to 120).
+                 * We are just moving the window here such that start_min becomes 0 and the comparisons are simplified.
+                 * For this example, diff_min will be  1440 - 1380 = 60.
+                 * Effective end_min: 180
+                 * If cur_time is 18:00, effective cur_time = 1080 + 60 = 1140
+                 * If cur_time is 23:30, effective cur_time = 1410 + 60 = 1470 ( > MINUTES_IN_DAY)
+                 *          So, cur_time = 1470 - 1440 = 30
+                 * */
+                int diff_min = MINUTES_IN_DAY - start_min;
+                start_min = 0;
+                end_min += diff_min;
+                cur_min += diff_min;
+                if (cur_min >= MINUTES_IN_DAY) {
+                    cur_min -= MINUTES_IN_DAY;
+                }
+            }
+            /* Current time is within OTA download window */
+            if ((cur_min >= start_min) && (cur_min <= end_min)) {
+                ESP_LOGI(TAG, "OTA received within download window.");
+                return OTA_OK;
+            } else {
+                /* Delay the OTA if it is not in the download window. Even if it later goes outside the valid date range,
+                 * that will be handled in subsequent ota fetch. Reporting failure here itself would mark the OTA job
+                 * as failed and the node will no more get the OTA even if it tries to fetch it again due to a reboot or
+                 * other action within the download window.
+                 */
+                int delay_min = start_min - cur_min;
+                if (delay_min < 0) {
+                    delay_min += MINUTES_IN_DAY;
+                }
+                ESP_LOGI(TAG, "Delaying OTA by %d seconds (%d min) as it is not within download window.", delay_min * 60, delay_min);
+                esp_rmaker_ota_report_status(ota_handle, OTA_STATUS_DELAYED, "Not within download window.");
+                esp_rmaker_ota_fetch_with_delay(delay_min * 60 + OTA_DELAY_TIME_BUFFER);
+                return OTA_DELAYED;
+            }
+        } else {
+            ESP_LOGI(TAG, "OTA received within validity period.");
+        }
+    }
+    return OTA_OK;
+}
+
+#endif /* CONFIG_ESP_RMAKER_OTA_TIME_SUPPORT */
+
+esp_rmaker_ota_action_t esp_rmaker_ota_handle_metadata(esp_rmaker_ota_handle_t ota_handle, esp_rmaker_ota_data_t *ota_data)
+{
+    if (!ota_data->metadata) {
+        return ESP_OK;
+    }
+    esp_rmaker_ota_action_t ota_action = OTA_OK;
+    jparse_ctx_t jctx;
+    if (json_parse_start(&jctx, ota_data->metadata, strlen(ota_data->metadata)) == 0) {
+#ifdef CONFIG_ESP_RMAKER_OTA_TIME_SUPPORT
+        /* Handle OTA timing data, if any */
+        ota_action = esp_rmaker_ota_handle_time(&jctx, ota_handle, ota_data);
+#endif /* CONFIG_ESP_RMAKER_OTA_TIME_SUPPORT */
+        json_parse_end(&jctx);
+    }
+    return ota_action;
+}
+
 esp_err_t esp_rmaker_ota_default_cb(esp_rmaker_ota_handle_t ota_handle, esp_rmaker_ota_data_t *ota_data)
 {
     if (!ota_data->url) {
         return ESP_FAIL;
+    }
+    /* Handle OTA metadata, if any */
+    if (ota_data->metadata) {
+        if (esp_rmaker_ota_handle_metadata(ota_handle, ota_data) != OTA_OK) {
+            ESP_LOGW(TAG, "Cannot proceed with the OTA as per the metadata received.");
+            return ESP_FAIL;
+        }
     }
     esp_rmaker_ota_post_event(RMAKER_OTA_EVENT_STARTING, NULL, 0);
     int buffer_size_tx = DEF_HTTP_TX_BUFFER_SIZE;
@@ -495,6 +638,9 @@ esp_err_t esp_rmaker_ota_enable(esp_rmaker_ota_config_t *ota_config, esp_rmaker_
         free(ota);
         ESP_LOGE(TAG, "Failed to enable OTA");
     }
+#ifdef CONFIG_ESP_RMAKER_OTA_TIME_SUPPORT
+    esp_rmaker_time_sync_init(NULL);
+#endif
     return err;
 }
 
