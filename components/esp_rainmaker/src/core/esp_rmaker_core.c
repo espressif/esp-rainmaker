@@ -81,6 +81,21 @@ esp_rmaker_state_t esp_rmaker_get_state(void)
     return ESP_RMAKER_STATE_DEINIT;
 }
 
+static void reset_event_handler(void* arg, esp_event_base_t event_base,
+                          int32_t event_id, void* event_data)
+{
+        switch (event_id) {
+            case RMAKER_EVENT_WIFI_RESET:
+                esp_rmaker_mqtt_disconnect();
+                break;
+            case RMAKER_EVENT_FACTORY_RESET:
+                esp_rmaker_reset_user_node_mapping();
+                break;
+            default:
+                break;
+        }
+}
+
 static char *esp_rmaker_populate_node_id(bool use_claiming)
 {
     char *node_id = esp_rmaker_factory_get("node_id");
@@ -540,6 +555,7 @@ esp_err_t esp_rmaker_start(void)
         ESP_LOGE(TAG, "Couldn't create RainMaker Work Queue task");
         return ESP_FAIL;
     }
+    ESP_ERROR_CHECK(esp_event_handler_register(RMAKER_COMMON_EVENT, ESP_EVENT_ANY_ID, &reset_event_handler, NULL));
     return ESP_OK;
 }
 
@@ -549,4 +565,3 @@ esp_err_t esp_rmaker_stop()
     esp_rmaker_priv_data->state = ESP_RMAKER_STATE_STOP_REQUESTED;
     return ESP_OK;
 }
-
