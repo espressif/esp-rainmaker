@@ -1,11 +1,17 @@
 # Changes
 
+## 16-Nov-2022 (mqtt_topics: Added support for AWS basic ingest topics.)
+
+- AWS Basic Ingest Topics optimize data flow by removing the publish/subscribe message broker from the ingestion path, making it more cost effective. You can refer the official docs [here](https://docs.aws.amazon.com/iot/latest/developerguide/iot-basic-ingest.html).
+- This setting is turned on by default and can be turned off by running `idf.py menuconfig` and disabling `CONFIG_ESP_RMAKER_MQTT_USE_BASIC_INGEST_TOPICS` option.
+
 ## 2-Nov-2022 (Added MQTT disconnect and user node mapping reset calls on WiFi/Factory Reset.)
 
 - On a Wi-Fi reset triggered via esp_rmaker_wifi_reset(), the rmaker core will first disconnect from MQTT so that its offline state reflects immediately.
 - On a Factory reset triggered via esp_rmaker_factory_reset(), the rmaker core will trigger a user mapping reset (if mqtt connection is active) so that the node gets removed from the user's account immediately.
 - The reset delay time for the push button based reset has been changed from 0 to 2 seconds to give some time for the above mentioned operations.
 
+Note: This config is enabled by default. You can disable it using `idf.py menuconfig`
 ## 28-Jun-2022 (examples: Enable CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE in all examples)
 
 `CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE` has been enabled in all examples by default,
@@ -272,12 +278,12 @@ esp_err_t esp_rmaker_create_device(const char *dev_name, const char *type, esp_r
 ```
 
 #### New
-```		
+```
 typedef esp_err_t (*esp_rmaker_device_write_cb_t)(const esp_rmaker_device_t *device, const esp_rmaker_param_t *param,
         const esp_rmaker_param_val_t val, void *priv_data, esp_rmaker_write_ctx_t *ctx);
 typedef esp_err_t (*esp_rmaker_device_read_cb_t)(const esp_rmaker_device_t *device, const esp_rmaker_param_t *param,
         void *priv_data, esp_rmaker_read_ctx_t *ctx);
-        
+
 esp_rmaker_device_t *esp_rmaker_device_create(const char *dev_name, const char *type, void *priv_data);
 esp_err_t esp_rmaker_device_add_cb(const esp_rmaker_device_t *device, esp_rmaker_device_write_cb_t write_cb, esp_rmaker_device_read_cb_t read_cb);
 esp_err_t esp_rmaker_node_add_device(const esp_rmaker_node_t *node, const esp_rmaker_device_t *device);

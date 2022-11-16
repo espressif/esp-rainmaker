@@ -52,6 +52,13 @@ menu "ESP RainMaker Config"
         help
             ESP RainMaker MQTT Host name.
 
+    config ESP_RMAKER_MQTT_USE_BASIC_INGEST_TOPICS
+        bool "Use Basic Ingest Topics"
+        default y
+        help
+            This config enables the use of AWS Basic Ingest Topics for Node to Cloud communication, 
+            which eliminates the MQTT Broker and thus reduces messaging cost.
+
     config ESP_RMAKER_MAX_PARAM_DATA_SIZE
         int "Maximum Parameters' data size"
         default 1024

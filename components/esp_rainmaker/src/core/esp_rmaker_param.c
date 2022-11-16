@@ -25,18 +25,13 @@
 #include <esp_rmaker_standard_types.h>
 #include <esp_rmaker_mqtt.h>
 #include <esp_rmaker_utils.h>
-
+#include "esp_rmaker_mqtt_topics.h"
 #include "esp_rmaker_internal.h"
 
 #define TS_DATA_VERSION                         "2021-09-13"
-#define NODE_PARAMS_LOCAL_TOPIC_SUFFIX          "params/local"
-#define NODE_PARAMS_LOCAL_INIT_TOPIC_SUFFIX     "params/local/init"
-#define NODE_PARAMS_REMOTE_TOPIC_SUFFIX         "params/remote"
-#define TIME_SERIES_DATA_TOPIC_SUFFIX           "tsdata"
-#define NODE_PARAMS_ALERT_TOPIC_SUFFIX          "alert"
+
 #define ESP_RMAKER_ALERT_KEY                    "esp.alert.str"
 
-#define MAX_PUBLISH_TOPIC_LEN           64
 #define RMAKER_PARAMS_SIZE_MARGIN       50 /* To accommodate for changes in param values while creating JSON */
 #define RMAKER_ALERT_STR_MARGIN         25 /* To accommodate rest of the alert payload {"esp.alert.str":""}  */
 #define MAX_TS_DATA_PARAM_NAME          66 /* Time series data param name is of the format <device_name>.<param_name> */
@@ -44,7 +39,8 @@
 static size_t max_node_params_size = CONFIG_ESP_RMAKER_MAX_PARAM_DATA_SIZE;
 /* This buffer will be allocated once and will be reused for all param updates.
  * It may be reallocated if the params size becomes too large */
-static char publish_topic[MAX_PUBLISH_TOPIC_LEN];
+
+static char publish_topic[MQTT_TOPIC_BUFFER_SIZE];
 static bool esp_rmaker_params_mqtt_init_done;
 
 static const char *TAG = "esp_rmaker_param";
@@ -266,12 +262,10 @@ static esp_err_t esp_rmaker_report_param_internal(uint8_t flags)
         char *node_params_buf = esp_rmaker_param_get_buf(0);
         if (strlen(node_params_buf) > 10) {
             if (flags == RMAKER_PARAM_FLAG_VALUE_CHANGE) {
-                snprintf(publish_topic, sizeof(publish_topic), "node/%s/%s",
-                        esp_rmaker_get_node_id(), NODE_PARAMS_LOCAL_TOPIC_SUFFIX);
+                esp_rmaker_create_mqtt_topic(publish_topic, sizeof(publish_topic), NODE_PARAMS_LOCAL_TOPIC_SUFFIX, NODE_PARAMS_LOCAL_TOPIC_RULE);
                 ESP_LOGI(TAG, "Reporting params: %s", node_params_buf);
             } else if (flags == RMAKER_PARAM_FLAG_VALUE_NOTIFY) {
-                snprintf(publish_topic, sizeof(publish_topic), "node/%s/%s",
-                        esp_rmaker_get_node_id(), NODE_PARAMS_ALERT_TOPIC_SUFFIX);
+                esp_rmaker_create_mqtt_topic(publish_topic, sizeof(publish_topic), NODE_PARAMS_ALERT_TOPIC_SUFFIX, NODE_PARAMS_ALERT_TOPIC_RULE);
                 ESP_LOGI(TAG, "Notifying params: %s", node_params_buf);
             } else {
                 return ESP_FAIL;
@@ -286,6 +280,7 @@ static esp_err_t esp_rmaker_report_param_internal(uint8_t flags)
     }
     return err;
 }
+
 
 static esp_err_t esp_rmaker_device_set_params(_esp_rmaker_device_t *device, jparse_ctx_t *jptr, esp_rmaker_req_src_t src)
 {
@@ -422,7 +417,7 @@ static void esp_rmaker_set_params_callback(const char *topic, void *payload, siz
 
 static esp_err_t esp_rmaker_register_for_set_params(void)
 {
-    char subscribe_topic[100];
+    char subscribe_topic[MQTT_TOPIC_BUFFER_SIZE];
     snprintf(subscribe_topic, sizeof(subscribe_topic), "node/%s/%s",
                 esp_rmaker_get_node_id(), NODE_PARAMS_REMOTE_TOPIC_SUFFIX);
     esp_err_t err = esp_rmaker_mqtt_subscribe(subscribe_topic, esp_rmaker_set_params_callback, RMAKER_MQTT_QOS1, NULL);
@@ -797,7 +792,7 @@ static esp_err_t esp_rmaker_param_report_time_series(const esp_rmaker_param_t *p
     json_gen_pop_array(&jstr);
     json_gen_end_object(&jstr);
     json_gen_str_end(&jstr);
-    snprintf(publish_topic, sizeof(publish_topic), "node/%s/%s", esp_rmaker_get_node_id(), TIME_SERIES_DATA_TOPIC_SUFFIX);
+    esp_rmaker_create_mqtt_topic(publish_topic, sizeof(publish_topic), TIME_SERIES_DATA_TOPIC_SUFFIX, TIME_SERIES_DATA_TOPIC_RULE);
     if (esp_rmaker_params_mqtt_init_done) {
         _esp_rmaker_param_t *_param = (_esp_rmaker_param_t *)param;
         _esp_rmaker_device_t *_device = _param->parent;
@@ -873,8 +868,7 @@ esp_err_t esp_rmaker_report_node_state(void)
          */
         char *node_params_buf = esp_rmaker_param_get_buf(0);
         if (strlen(node_params_buf) > 10) {
-            snprintf(publish_topic, sizeof(publish_topic), "node/%s/%s",
-                    esp_rmaker_get_node_id(), NODE_PARAMS_LOCAL_INIT_TOPIC_SUFFIX);
+            esp_rmaker_create_mqtt_topic(publish_topic, sizeof(publish_topic), NODE_PARAMS_LOCAL_INIT_TOPIC_SUFFIX, NODE_PARAMS_LOCAL_INIT_RULE);
             ESP_LOGI(TAG, "Reporting params (init): %s", node_params_buf);
             if (esp_rmaker_params_mqtt_init_done) {
                 esp_rmaker_mqtt_publish(publish_topic, node_params_buf, strlen(node_params_buf), RMAKER_MQTT_QOS1, NULL);
@@ -925,8 +919,7 @@ esp_err_t esp_rmaker_raise_alert(const char *alert_str)
     strlcpy(msg, alert_str, sizeof(msg));
     char buf[ESP_RMAKER_MAX_ALERT_LEN + RMAKER_ALERT_STR_MARGIN];
     snprintf(buf, sizeof(buf), "{\"%s\":\"%s\"}", ESP_RMAKER_ALERT_KEY, msg);
-    snprintf(publish_topic, sizeof(publish_topic), "node/%s/%s",
-            esp_rmaker_get_node_id(), NODE_PARAMS_ALERT_TOPIC_SUFFIX);
+    esp_rmaker_create_mqtt_topic(publish_topic, sizeof(publish_topic), NODE_PARAMS_ALERT_TOPIC_SUFFIX, NODE_PARAMS_ALERT_TOPIC_RULE);
     ESP_LOGI(TAG, "Reporting alert: %s", buf);
     return esp_rmaker_mqtt_publish(publish_topic, buf, strlen(buf), RMAKER_MQTT_QOS1, NULL);
 }

@@ -27,6 +27,7 @@
 #include "esp_rmaker_internal.h"
 #include "esp_rmaker_ota_internal.h"
 #include "esp_rmaker_mqtt.h"
+#include "esp_rmaker_mqtt_topics.h"
 
 #ifdef CONFIG_ESP_RMAKER_OTA_AUTOFETCH
 #include <esp_timer.h>
@@ -39,10 +40,6 @@ static uint64_t ota_autofetch_period = (OTA_AUTOFETCH_PERIOD * 60 * 60 * 1000000
 
 static const char *TAG = "esp_rmaker_ota_using_topics";
 
-#define OTAURL_TOPIC_SUFFIX     "otaurl"
-#define OTAFETCH_TOPIC_SUFFIX   "otafetch"
-#define OTASTATUS_TOPIC_SUFFIX  "otastatus"
-
 esp_err_t esp_rmaker_ota_report_status_using_topics(esp_rmaker_ota_handle_t ota_handle, ota_status_t status, char *additional_info)
 {
     if (!ota_handle) {
@@ -51,7 +48,6 @@ esp_err_t esp_rmaker_ota_report_status_using_topics(esp_rmaker_ota_handle_t ota_
     esp_rmaker_ota_t *ota = (esp_rmaker_ota_t *)ota_handle;
 
     char publish_payload[200];
-    char *node_id = esp_rmaker_get_node_id();
     json_gen_str_t jstr;
     json_gen_str_start(&jstr, publish_payload, sizeof(publish_payload), NULL, NULL);
     json_gen_start_object(&jstr);
@@ -78,9 +74,9 @@ esp_err_t esp_rmaker_ota_report_status_using_topics(esp_rmaker_ota_handle_t ota_
     json_gen_end_object(&jstr);
     json_gen_str_end(&jstr);
 
-    char publish_topic[100];
+    char publish_topic[MQTT_TOPIC_BUFFER_SIZE];
+    esp_rmaker_create_mqtt_topic(publish_topic, sizeof(publish_topic), OTASTATUS_TOPIC_SUFFIX, OTASTATUS_TOPIC_RULE);
     ESP_LOGI(TAG, "%s",publish_payload);
-    snprintf(publish_topic, sizeof(publish_topic), "node/%s/%s", node_id, OTASTATUS_TOPIC_SUFFIX);
     esp_err_t err = esp_rmaker_mqtt_publish(publish_topic, publish_payload, strlen(publish_payload),
                         RMAKER_MQTT_QOS1, NULL);
     if (err != ESP_OK) {
@@ -255,8 +251,8 @@ esp_err_t esp_rmaker_ota_fetch(void)
     json_gen_obj_set_string(&jstr, "fw_version", info->fw_version);
     json_gen_end_object(&jstr);
     json_gen_str_end(&jstr);
-    char publish_topic[100];
-    snprintf(publish_topic, sizeof(publish_topic), "node/%s/%s", esp_rmaker_get_node_id(), OTAFETCH_TOPIC_SUFFIX);
+    char publish_topic[MQTT_TOPIC_BUFFER_SIZE];
+    esp_rmaker_create_mqtt_topic(publish_topic, sizeof(publish_topic), OTAFETCH_TOPIC_SUFFIX, OTAFETCH_TOPIC_RULE);
     esp_err_t err = esp_rmaker_mqtt_publish(publish_topic, publish_payload, strlen(publish_payload),
                         RMAKER_MQTT_QOS1, NULL);
     if (err != ESP_OK) {
@@ -272,7 +268,7 @@ void esp_rmaker_ota_autofetch_timer_cb(void *priv)
 
 static esp_err_t esp_rmaker_ota_subscribe(void *priv_data)
 {
-    char subscribe_topic[100];
+    char subscribe_topic[MQTT_TOPIC_BUFFER_SIZE];
 
     snprintf(subscribe_topic, sizeof(subscribe_topic),"node/%s/%s", esp_rmaker_get_node_id(), OTAURL_TOPIC_SUFFIX);
 

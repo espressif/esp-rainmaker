@@ -19,6 +19,7 @@
 #include <esp_rmaker_core.h>
 #include "esp_rmaker_internal.h"
 #include "esp_rmaker_mqtt.h"
+#include "esp_rmaker_mqtt_topics.h"
 
 #if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 0, 0)
 #include <esp_app_desc.h>
@@ -279,9 +280,8 @@ esp_err_t esp_rmaker_report_node_config()
         ESP_LOGE(TAG, "Could not get node configuration for reporting to cloud");
         return ESP_FAIL;
     }
-
-    char publish_topic[100];
-    snprintf(publish_topic, sizeof(publish_topic), "node/%s/%s", esp_rmaker_get_node_id(), NODE_CONFIG_TOPIC_SUFFIX);
+    char publish_topic[MQTT_TOPIC_BUFFER_SIZE];
+    esp_rmaker_create_mqtt_topic(publish_topic, MQTT_TOPIC_BUFFER_SIZE, NODE_CONFIG_TOPIC_SUFFIX, NODE_CONFIG_TOPIC_RULE);
     ESP_LOGI(TAG, "Reporting Node Configuration of length %d bytes.", strlen(publish_payload));
     ESP_LOGD(TAG, "%s", publish_payload);
     esp_err_t ret = esp_rmaker_mqtt_publish(publish_topic, publish_payload, strlen(publish_payload),

@@ -17,9 +17,7 @@
 #include <esp_rmaker_mqtt.h>
 #include <esp_rmaker_cmd_resp.h>
 #include "esp_rmaker_internal.h"
-
-#define TO_NODE_TOPIC_SUFFIX            "to-node"
-#define FROM_NODE_TOPIC_SUFFIX          "from-node"
+#include "esp_rmaker_mqtt_topics.h"
 
 static const char *TAG = "esp_rmaker_cmd_resp";
 
@@ -38,18 +36,18 @@ esp_err_t esp_rmaker_test_cmd_resp(const void *cmd, size_t cmd_len, void *priv_d
         ESP_LOGE(TAG, "No command data to send.");
         return ESP_ERR_INVALID_ARG;
     }
-    char publish_topic[100];
+    char publish_topic[MQTT_TOPIC_BUFFER_SIZE];
     snprintf(publish_topic, sizeof(publish_topic), "node/%s/%s", esp_rmaker_get_node_id(), TO_NODE_TOPIC_SUFFIX);
-    return esp_rmaker_mqtt_publish(publish_topic, cmd, cmd_len, RMAKER_MQTT_QOS1, NULL);
+    return esp_rmaker_mqtt_publish(publish_topic, (void *)cmd, cmd_len, RMAKER_MQTT_QOS1, NULL);
 }
 
 static esp_err_t esp_rmaker_cmd_resp_test_enable(void)
 {
     char subscribe_topic[100];
     snprintf(subscribe_topic, sizeof(subscribe_topic), "node/%s/%s",
-                esp_rmaker_get_node_id(), FROM_NODE_TOPIC_SUFFIX);
+                esp_rmaker_get_node_id(), CMD_RESP_TOPIC_SUFFIX);
     esp_err_t err = esp_rmaker_mqtt_subscribe(subscribe_topic, esp_rmaker_resp_callback, RMAKER_MQTT_QOS1, NULL);
-    if(err != ESP_OK) {
+    if (err != ESP_OK) {
         ESP_LOGE(TAG, "Failed to subscribe to %s. Error %d", subscribe_topic, err);
         return ESP_FAIL;
     }
@@ -76,8 +74,8 @@ static void esp_rmaker_cmd_callback(const char *topic, void *payload, size_t pay
      */
     if (esp_rmaker_cmd_response_handler(payload, payload_len, &output, &output_len) == ESP_OK) {
         if (output) {
-            char publish_topic[100];
-            snprintf(publish_topic, sizeof(publish_topic), "node/%s/%s", esp_rmaker_get_node_id(), FROM_NODE_TOPIC_SUFFIX);
+            char publish_topic[MQTT_TOPIC_BUFFER_SIZE];
+            esp_rmaker_create_mqtt_topic(publish_topic, sizeof(publish_topic), CMD_RESP_TOPIC_SUFFIX, CMD_RESP_TOPIC_RULE);
             if (esp_rmaker_mqtt_publish(publish_topic, output, output_len, RMAKER_MQTT_QOS1, NULL) != ESP_OK) {
                 ESP_LOGE(TAG, "Failed to publish reponse.");
             }
@@ -95,7 +93,7 @@ esp_err_t esp_rmaker_cmd_response_enable(void)
     snprintf(subscribe_topic, sizeof(subscribe_topic), "node/%s/%s",
                 esp_rmaker_get_node_id(), TO_NODE_TOPIC_SUFFIX);
     esp_err_t err = esp_rmaker_mqtt_subscribe(subscribe_topic, esp_rmaker_cmd_callback, RMAKER_MQTT_QOS1, NULL);
-    if(err != ESP_OK) {
+    if (err != ESP_OK) {
         ESP_LOGE(TAG, "Failed to subscribe to %s. Error %d", subscribe_topic, err);
         return ESP_FAIL;
     }

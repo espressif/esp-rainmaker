@@ -25,6 +25,7 @@
 esp_err_t esp_insights_enable(esp_insights_config_t *config);
 
 #define INSIGHTS_TOPIC_SUFFIX       "diagnostics/from-node"
+#define INSIGHTS_TOPIC_RULE         "insights_message_delivery"
 
 static int app_insights_data_send(void *data, size_t len)
 {
@@ -37,7 +38,7 @@ static int app_insights_data_send(void *data, size_t len)
     if (!node_id) {
         return -1;
     }
-    snprintf(topic, sizeof(topic), "node/%s/%s", node_id, INSIGHTS_TOPIC_SUFFIX);
+    esp_rmaker_create_mqtt_topic(topic, sizeof(topic), INSIGHTS_TOPIC_SUFFIX, INSIGHTS_TOPIC_RULE);
     esp_rmaker_mqtt_publish(topic, data, len, RMAKER_MQTT_QOS1, &msg_id);
     return msg_id;
 }
