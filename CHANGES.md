@@ -1,5 +1,11 @@
 # Changes
 
+## 2-Nov-2022 (Added MQTT disconnect and user node mapping reset calls on WiFi/Factory Reset.)
+
+- On a Wi-Fi reset triggered via esp_rmaker_wifi_reset(), the rmaker core will first disconnect from MQTT so that its offline state reflects immediately.
+- On a Factory reset triggered via esp_rmaker_factory_reset(), the rmaker core will trigger a user mapping reset (if mqtt connection is active) so that the node gets removed from the user's account immediately.
+- The reset delay time for the push button based reset has been changed from 0 to 2 seconds to give some time for the above mentioned operations.
+
 ## 28-Jun-2022 (examples: Enable CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE in all examples)
 
 `CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE` has been enabled in all examples by default,
@@ -308,6 +314,3 @@ esp_err_t esp_rmaker_param_update_and_report(const esp_rmaker_param_t *param, es
 - `esp_rmaker_device_add_param()` modified to accept the device and param handles.
 - `esp_rmaker_param_add_type()` removed because the type is now included in `esp_rmaker_param_create()`
 - `esp_rmaker_update_param()` changed to `esp_rmaker_param_update_and_report()`. It now accepts param handle, instead of device and parameter names.
-
-
-
