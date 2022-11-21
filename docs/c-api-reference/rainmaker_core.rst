@@ -12,3 +12,7 @@ User Mapping
 Scheduling
 ----------
 .. include:: /_build/inc/esp_rmaker_schedule.inc
+
+Scenes
+------
+.. include:: /_build/inc/esp_rmaker_scenes.inc
