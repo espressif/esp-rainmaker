@@ -36,7 +36,9 @@ endif()
 set(core_priv_includes "src/core")
 
 # MQTT
-set(mqtt_srcs "src/mqtt/esp_rmaker_mqtt.c")
+set(mqtt_srcs "src/mqtt/esp_rmaker_mqtt.c"
+        "src/mqtt/esp_rmaker_mqtt_budget.c")
+set(mqtt_priv_includes "src/mqtt")
 
 # OTA
 set(ota_srcs "src/ota/esp_rmaker_ota.c"
@@ -56,7 +58,7 @@ set(standard_types_srcs "src/standard_types/esp_rmaker_standard_params.c"
 
 idf_component_register(SRCS ${core_srcs} ${mqtt_srcs} ${ota_srcs} ${standard_types_srcs} ${console_srcs}
                        INCLUDE_DIRS "include"
-                       PRIV_INCLUDE_DIRS ${core_priv_includes} ${ota_priv_includes} ${console_priv_includes}
+                       PRIV_INCLUDE_DIRS ${core_priv_includes} ${ota_priv_includes} ${console_priv_includes} ${mqtt_priv_includes}
                        REQUIRES rmaker_common
                        PRIV_REQUIRES ${priv_req})
 

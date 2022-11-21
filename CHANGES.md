@@ -1,5 +1,15 @@
 # Changes
 
+## 21-Nov-2022 (esp_rmaker_mqtt: Add MQTT budgeting to control the number of messages sent)
+
+- Due to some poor, non-optimised coding or bugs, it is possible that the node keeps bombarding the MQTT
+broker with publish messages. To prevent this, a concept of MQTT Budgeting has been added.
+- By default, a node will be given a budget of 100 (`CONFIG_ESP_RMAKER_MQTT_DEFAULT_BUDGET`), which will
+  go on incrementing by 1 (`CONFIG_ESP_RMAKER_MQTT_BUDGET_REVIVE_COUNT` every 5 seconds (`CONFIG_ESP_RMAKER_MQTT_BUDGET_REVIVE_PERIOD`),
+  limited to a max value of 1024 (`CONFIG_ESP_RMAKER_MQTT_MAX_BUDGET`).
+- Budget will be decremented by 1 for every MQTT publish and messages will be dropped if budget is 0.
+- This behaviour is enabled by default and can be disabled by disabling `CONFIG_ESP_RMAKER_MQTT_ENABLE_BUDGETING`.
+
 ## 16-Nov-2022 (mqtt_topics: Added support for AWS basic ingest topics.)
 
 - AWS Basic Ingest Topics optimize data flow by removing the publish/subscribe message broker from the ingestion path, making it more cost effective. You can refer the official docs [here](https://docs.aws.amazon.com/iot/latest/developerguide/iot-basic-ingest.html).
