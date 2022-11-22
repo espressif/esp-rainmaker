@@ -64,18 +64,23 @@ esp_err_t esp_schedule_nvs_add(esp_schedule_t *schedule)
         uint8_t schedule_count;
         err = nvs_get_u8(nvs_handle, ESP_SCHEDULE_COUNT_KEY, &schedule_count);
         if (err != ESP_OK) {
-            ESP_LOGE(TAG, "NVS set failed for schedule count with error %d", err);
-            nvs_close(nvs_handle);
-            return err;
+            if (err == ESP_ERR_NVS_NOT_FOUND) {
+                schedule_count = 0;
+            } else {
+                ESP_LOGE(TAG, "NVS get failed with error %d", err);
+                nvs_close(nvs_handle);
+                return err;
+            }
         }
         schedule_count++;
         err = nvs_set_u8(nvs_handle, ESP_SCHEDULE_COUNT_KEY, schedule_count);
         if (err != ESP_OK) {
-            ESP_LOGE(TAG, "NVS get failed for schedule count with error %d", err);
+            ESP_LOGE(TAG, "NVS set failed for schedule count with error %d", err);
             nvs_close(nvs_handle);
             return err;
         }
     }
+    nvs_commit(nvs_handle);
     nvs_close(nvs_handle);
     ESP_LOGI(TAG, "Schedule %s added in NVS", schedule->name);
     return ESP_OK;
@@ -95,16 +100,11 @@ esp_err_t esp_schedule_nvs_remove_all(void)
     }
     err = nvs_erase_all(nvs_handle);
     if (err != ESP_OK) {
-        ESP_LOGE(TAG, "NVS set failed with error %d", err);
+        ESP_LOGE(TAG, "NVS erase all keys failed with error %d", err);
         nvs_close(nvs_handle);
         return err;
     }
-    err = nvs_set_u8(nvs_handle, ESP_SCHEDULE_COUNT_KEY, 0);
-    if (err != ESP_OK) {
-        ESP_LOGE(TAG, "NVS get failed for schedule count with error %d", err);
-        nvs_close(nvs_handle);
-        return err;
-    }
+    nvs_commit(nvs_handle);
     nvs_close(nvs_handle);
     ESP_LOGI(TAG, "All schedules removed from NVS");
     return ESP_OK;
@@ -124,24 +124,25 @@ esp_err_t esp_schedule_nvs_remove(esp_schedule_t *schedule)
     }
     err = nvs_erase_key(nvs_handle, schedule->name);
     if (err != ESP_OK) {
-        ESP_LOGE(TAG, "NVS set failed with error %d", err);
+        ESP_LOGE(TAG, "NVS erase key failed with error %d", err);
         nvs_close(nvs_handle);
         return err;
     }
     uint8_t schedule_count;
     err = nvs_get_u8(nvs_handle, ESP_SCHEDULE_COUNT_KEY, &schedule_count);
     if (err != ESP_OK) {
-        ESP_LOGE(TAG, "NVS set failed for schedule count with error %d", err);
+        ESP_LOGE(TAG, "NVS get failed for schedule count with error %d", err);
         nvs_close(nvs_handle);
         return err;
     }
     schedule_count--;
     err = nvs_set_u8(nvs_handle, ESP_SCHEDULE_COUNT_KEY, schedule_count);
     if (err != ESP_OK) {
-        ESP_LOGE(TAG, "NVS get failed for schedule count with error %d", err);
+        ESP_LOGE(TAG, "NVS set failed for schedule count with error %d", err);
         nvs_close(nvs_handle);
         return err;
     }
+    nvs_commit(nvs_handle);
     nvs_close(nvs_handle);
     ESP_LOGI(TAG, "Schedule %s removed from NVS", schedule->name);
     return ESP_OK;
@@ -154,7 +155,7 @@ static uint8_t esp_schedule_nvs_get_count(void)
         return 0;
     }
     nvs_handle_t nvs_handle;
-    esp_err_t err = nvs_open_from_partition(esp_schedule_nvs_partition, ESP_SCHEDULE_NVS_NAMESPACE, NVS_READWRITE, &nvs_handle);
+    esp_err_t err = nvs_open_from_partition(esp_schedule_nvs_partition, ESP_SCHEDULE_NVS_NAMESPACE, NVS_READONLY, &nvs_handle);
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "NVS open failed with error %d", err);
         return 0;
@@ -162,7 +163,7 @@ static uint8_t esp_schedule_nvs_get_count(void)
     uint8_t schedule_count;
     err = nvs_get_u8(nvs_handle, ESP_SCHEDULE_COUNT_KEY, &schedule_count);
     if (err != ESP_OK) {
-        ESP_LOGE(TAG, "NVS set failed for schedule count with error %d", err);
+        ESP_LOGE(TAG, "NVS get failed for schedule count with error %d", err);
         nvs_close(nvs_handle);
         return 0;
     }
@@ -186,7 +187,7 @@ static esp_schedule_handle_t esp_schedule_nvs_get(char *nvs_key)
     }
     err = nvs_get_blob(nvs_handle, nvs_key, NULL, &buf_size);
     if (err != ESP_OK) {
-        ESP_LOGE(TAG, "NVS set failed with error %d", err);
+        ESP_LOGE(TAG, "NVS get failed with error %d", err);
         nvs_close(nvs_handle);
         return NULL;
     }
@@ -198,7 +199,7 @@ static esp_schedule_handle_t esp_schedule_nvs_get(char *nvs_key)
     }
     err = nvs_get_blob(nvs_handle, nvs_key, schedule, &buf_size);
     if (err != ESP_OK) {
-        ESP_LOGE(TAG, "NVS set failed with error %d", err);
+        ESP_LOGE(TAG, "NVS get failed with error %d", err);
         nvs_close(nvs_handle);
         free(schedule);
         return NULL;
