@@ -22,7 +22,7 @@ extern "C"
 #endif
 
 esp_rmaker_mqtt_conn_params_t *esp_rmaker_mqtt_get_conn_params(void);
-   
+
 /** Initialize ESP RainMaker MQTT
  *
  * @param[in] config The MQTT configuration data
@@ -85,6 +85,15 @@ esp_err_t esp_rmaker_mqtt_subscribe(const char *topic, esp_rmaker_mqtt_subscribe
  */
 esp_err_t esp_rmaker_mqtt_unsubscribe(const char *topic);
 esp_err_t esp_rmaker_mqtt_setup(esp_rmaker_mqtt_config_t mqtt_config);
+
+/** Creates appropriate MQTT Topic String based on CONFIG_ESP_RMAKER_MQTT_USE_BASIC_INGEST_TOPICS
+ * @param[out] buf Buffer to hold topic string
+ * @param[in] buf_size Size of buffer
+ * @param[in] topic_suffix MQTT Topic suffix
+ * @param[in] rule Basic Ingests Rule Name
+*/
+void esp_rmaker_create_mqtt_topic(char *buf, size_t buf_size, const char *topic_suffix, const char *rule);
+
 #ifdef __cplusplus
 }
 #endif

@@ -15,6 +15,8 @@
 #include <esp_log.h>
 #include <esp_rmaker_mqtt_glue.h>
 #include <esp_rmaker_client_data.h>
+#include <esp_rmaker_core.h>
+
 static const char *TAG = "esp_rmaker_mqtt";
 static esp_rmaker_mqtt_config_t g_mqtt_config;
 
@@ -89,4 +91,13 @@ esp_err_t esp_rmaker_mqtt_publish(const char *topic, void *data, size_t data_len
     }
     ESP_LOGW(TAG, "esp_rmaker_mqtt_publish not registered");
     return ESP_OK;
+}
+
+void esp_rmaker_create_mqtt_topic(char *buf, size_t buf_size, const char *topic_suffix, const char *rule)
+{
+#ifdef CONFIG_ESP_RMAKER_MQTT_USE_BASIC_INGEST_TOPICS
+    snprintf(buf, buf_size, "$aws/rules/%s/node/%s/%s", rule, esp_rmaker_get_node_id(), topic_suffix);
+#else
+    snprintf(buf, buf_size, "node/%s/%s", esp_rmaker_get_node_id(), topic_suffix);
+#endif
 }

@@ -27,10 +27,10 @@
 #include <esp_rmaker_common_events.h>
 #include "esp_rmaker_user_mapping.pb-c.h"
 #include "esp_rmaker_internal.h"
+#include "esp_rmaker_mqtt_topics.h"
 
 static const char *TAG = "esp_rmaker_user_mapping";
 
-#define USER_MAPPING_TOPIC_SUFFIX   "user/mapping"
 #define USER_MAPPING_ENDPOINT       "cloud_user_assoc"
 #define USER_MAPPING_NVS_NAMESPACE  "user_mapping"
 #define USER_ID_NVS_NAME            "user_id"
@@ -148,8 +148,8 @@ static void esp_rmaker_user_mapping_cb(void *priv_data)
     }
     json_gen_end_object(&jstr);
     json_gen_str_end(&jstr);
-    char publish_topic[100];
-    snprintf(publish_topic, sizeof(publish_topic), "node/%s/%s", node_id, USER_MAPPING_TOPIC_SUFFIX);
+    char publish_topic[MQTT_TOPIC_BUFFER_SIZE];
+    esp_rmaker_create_mqtt_topic(publish_topic, sizeof(publish_topic), USER_MAPPING_TOPIC_SUFFIX, USER_MAPPING_TOPIC_RULE);
     esp_err_t err = esp_rmaker_mqtt_publish(publish_topic, publish_payload, strlen(publish_payload), RMAKER_MQTT_QOS1, &rmaker_user_mapping_data->mqtt_msg_id);
     ESP_LOGI(TAG, "MQTT Publish: %s", publish_payload);
     if (err != ESP_OK) {
