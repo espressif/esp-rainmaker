@@ -32,6 +32,12 @@ esp_rmaker_mqtt_conn_params_t *esp_rmaker_mqtt_get_conn_params(void);
  */
 esp_err_t esp_rmaker_mqtt_init(esp_rmaker_mqtt_conn_params_t *conn_params);
 
+/* Deinitialize ESP RainMaker MQTT
+ *
+ * Call this function after MQTT has disconnected.
+ */
+void esp_rmaker_mqtt_deinit(void);
+
 /** MQTT Connect
  *
  * Starts the connection attempts to the MQTT broker as per the configuration

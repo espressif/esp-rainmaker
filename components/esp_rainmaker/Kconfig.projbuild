@@ -59,6 +59,46 @@ menu "ESP RainMaker Config"
             This config enables the use of AWS Basic Ingest Topics for Node to Cloud communication, 
             which eliminates the MQTT Broker and thus reduces messaging cost.
 
+    config ESP_RMAKER_MQTT_ENABLE_BUDGETING
+        bool "Enable MQTT budgeting"
+        default y
+        help
+            Enable MQTT budgeting, which will control the number of MQTT messages sent by the node.
+
+    config ESP_RMAKER_MQTT_DEFAULT_BUDGET
+        int "Default MQTT Budget"
+        depends on ESP_RMAKER_MQTT_ENABLE_BUDGETING
+        default 100
+        range 64 ESP_RMAKER_MQTT_MAX_BUDGET
+        help
+            Default MQTT budget. Budget will reduce on sending an MQTT message and increase based on
+            ESP_RMAKER_MQTT_BUDGET_REVIVE_PERIOD. If no budget is available, MQTT message will be dropped.
+
+    config ESP_RMAKER_MQTT_MAX_BUDGET
+        int "Max MQTT Budget"
+        depends on ESP_RMAKER_MQTT_ENABLE_BUDGETING
+        default 1024
+        range 64 2048
+        help
+            Maximum budget that the node can have. No additional budget will be allocated if this count is reached.
+
+    config ESP_RMAKER_MQTT_BUDGET_REVIVE_PERIOD
+        int "MQTT Budget revive period"
+        depends on ESP_RMAKER_MQTT_ENABLE_BUDGETING
+        default 5
+        range 5 600
+        help
+            Period in seconds after which the MQTT budget should revive (by ESP_RMAKER_MQTT_BUDGET_REVIVE_COUNT).
+            This is used to limit the messages being sent by the node.
+
+    config ESP_RMAKER_MQTT_BUDGET_REVIVE_COUNT
+        int "MQTT Budget revive count"
+        depends on ESP_RMAKER_MQTT_ENABLE_BUDGETING
+        default 1
+        range 1 16
+        help
+            The count by which the budget will be increased periodically based on ESP_RMAKER_MQTT_BUDGET_REVIVE_PERIOD.
+
     config ESP_RMAKER_MAX_PARAM_DATA_SIZE
         int "Maximum Parameters' data size"
         default 1024
