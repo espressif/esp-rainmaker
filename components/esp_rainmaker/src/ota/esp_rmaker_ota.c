@@ -16,6 +16,7 @@
 #include <freertos/FreeRTOS.h>
 #include <freertos/timers.h>
 #include <freertos/task.h>
+#include <esp_efuse.h>
 #include <esp_event.h>
 #include <esp_log.h>
 #include <esp_ota_ops.h>
@@ -183,6 +184,13 @@ static esp_err_t validate_image_header(esp_rmaker_ota_handle_t ota_handle,
     }
 #endif
 
+#ifndef CONFIG_ESP_RMAKER_SKIP_SECURE_VERSION_CHECK
+    if (esp_efuse_check_secure_version(new_app_info->secure_version) == false) {
+        ESP_LOGW(TAG, "New secure version is lower than stored in efuse. We will not continue the update.");
+        esp_rmaker_ota_report_status(ota_handle, OTA_STATUS_REJECTED, "Lower secure version received");
+        return ESP_FAIL;
+    }
+#endif
 
     return ESP_OK;
 }
