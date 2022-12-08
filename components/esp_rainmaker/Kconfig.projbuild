@@ -231,6 +231,13 @@ menu "ESP RainMaker Config"
                 This allows you to skip the firmware version check. Useful during development,
                 but not for production.
 
+        config ESP_RMAKER_SKIP_SECURE_VERSION_CHECK
+            bool "Skip secure version check"
+            default n
+            help
+                This allows you to skip the secure version check. Useful during development,
+                but not for production. Check out ESP IDF's Anti-rollback feature for more details.
+
         config ESP_RMAKER_SKIP_PROJECT_NAME_CHECK
             bool "Skip project name check"
             default n
