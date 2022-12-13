@@ -17,6 +17,7 @@
 #include <esp_rmaker_client_data.h>
 #include <esp_rmaker_core.h>
 
+#include "esp_rmaker_mqtt.h"
 #include "esp_rmaker_mqtt_budget.h"
 
 static const char *TAG = "esp_rmaker_mqtt";
