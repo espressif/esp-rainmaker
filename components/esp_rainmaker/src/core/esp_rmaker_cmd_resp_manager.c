@@ -88,6 +88,11 @@ static void esp_rmaker_cmd_callback(const char *topic, void *payload, size_t pay
 
 esp_err_t esp_rmaker_cmd_response_enable(void)
 {
+    static bool enabled = false;
+    if (enabled == true) {
+        ESP_LOGI(TAG, "Command-response Module already enabled.");
+        return ESP_OK;
+    }
     ESP_LOGI(TAG, "Enabling Command-Response Module.");
     char subscribe_topic[100];
     snprintf(subscribe_topic, sizeof(subscribe_topic), "node/%s/%s",
@@ -100,6 +105,7 @@ esp_err_t esp_rmaker_cmd_response_enable(void)
 #ifdef CONFIG_ESP_RMAKER_CMD_RESP_TEST_ENABLE
     esp_rmaker_cmd_resp_test_enable();
 #endif /* CONFIG_ESP_RMAKER_CMD_RESP_TEST_ENABLE */
+    enabled = true;
     return ESP_OK;
 }
 #else
