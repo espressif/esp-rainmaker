@@ -277,6 +277,10 @@ esp_err_t esp_rmaker_ota_default_cb(esp_rmaker_ota_handle_t ota_handle, esp_rmak
     int count = 0;
     while (1) {
         err = esp_https_ota_perform(https_ota_handle);
+        if (err == ESP_ERR_INVALID_VERSION) {
+            esp_rmaker_ota_report_status(ota_handle, OTA_STATUS_REJECTED, "Chip revision mismatch");
+            goto ota_end;
+        }
         if (err != ESP_ERR_HTTPS_OTA_IN_PROGRESS) {
             break;
         }
