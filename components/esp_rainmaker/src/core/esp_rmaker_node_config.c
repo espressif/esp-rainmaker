@@ -17,6 +17,7 @@
 #include <esp_ota_ops.h>
 #include <json_generator.h>
 #include <esp_rmaker_core.h>
+#include <esp_rmaker_utils.h>
 #include "esp_rmaker_internal.h"
 #include "esp_rmaker_mqtt.h"
 #include "esp_rmaker_mqtt_topics.h"
@@ -259,7 +260,7 @@ char *esp_rmaker_get_node_config(void)
         ESP_LOGE(TAG, "Failed to get required size for Node config JSON.");
         return NULL;
     }
-    char *node_config = calloc(1, req_size);
+    char *node_config = MEM_CALLOC_EXTRAM(1, req_size);
     if (!node_config) {
         ESP_LOGE(TAG, "Failed to allocate %d bytes for node config", req_size);
         return NULL;

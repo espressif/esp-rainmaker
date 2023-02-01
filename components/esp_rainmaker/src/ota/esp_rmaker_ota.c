@@ -31,7 +31,7 @@
 
 #include <esp_rmaker_utils.h>
 #include <esp_rmaker_common_events.h>
-
+#include <esp_rmaker_utils.h>
 #include "esp_rmaker_internal.h"
 #include "esp_rmaker_ota_internal.h"
 
@@ -465,7 +465,7 @@ esp_err_t esp_rmaker_ota_enable(esp_rmaker_ota_config_t *ota_config, esp_rmaker_
         ESP_LOGE(TAG, "OTA already initialised");
         return ESP_FAIL;
     }
-    esp_rmaker_ota_t *ota = calloc(1, sizeof(esp_rmaker_ota_t));
+    esp_rmaker_ota_t *ota = MEM_CALLOC_EXTRAM(1, sizeof(esp_rmaker_ota_t));
     if (!ota) {
         ESP_LOGE(TAG, "Failed to allocate memory for esp_rmaker_ota_t");
         return ESP_ERR_NO_MEM;

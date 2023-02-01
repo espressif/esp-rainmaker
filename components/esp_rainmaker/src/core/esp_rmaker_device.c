@@ -17,6 +17,7 @@
 
 #include <esp_rmaker_core.h>
 #include <esp_rmaker_standard_types.h>
+#include <esp_rmaker_utils.h>
 
 #include "esp_rmaker_internal.h"
 
@@ -65,7 +66,7 @@ static esp_rmaker_device_t *__esp_rmaker_device_create(const char *name, const c
         ESP_LOGE(TAG, "%s name is mandatory", is_service ? "Service":"Device");
         return NULL;
     }
-    _esp_rmaker_device_t *_device = calloc(1, sizeof(_esp_rmaker_device_t));
+    _esp_rmaker_device_t *_device = MEM_CALLOC_EXTRAM(1, sizeof(_esp_rmaker_device_t));
     if (!_device) {
         ESP_LOGE(TAG, "Failed to allocate memory for %s %s", is_service ? "Service":"Device", name);
         return NULL;
@@ -185,7 +186,7 @@ esp_err_t esp_rmaker_device_add_attribute(const esp_rmaker_device_t *device, con
             break;
         }
     }
-    esp_rmaker_attr_t *new_attr = calloc(1, sizeof(esp_rmaker_attr_t));
+    esp_rmaker_attr_t *new_attr = MEM_CALLOC_EXTRAM(1, sizeof(esp_rmaker_attr_t));
     if (!new_attr) {
         ESP_LOGE(TAG, "Failed to allocate memory for device attribute");
         return ESP_ERR_NO_MEM;

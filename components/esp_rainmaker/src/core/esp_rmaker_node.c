@@ -16,7 +16,7 @@
 #include <esp_wifi.h>
 #include <esp_log.h>
 #include <esp_ota_ops.h>
-
+#include <esp_rmaker_utils.h>
 #include <esp_rmaker_core.h>
 
 #include "esp_rmaker_internal.h"
@@ -106,7 +106,7 @@ esp_rmaker_node_t *esp_rmaker_node_create(const char *name, const char *type)
         ESP_LOGE(TAG, "Node Name and Type are mandatory.");
         return NULL;
     }
-    _esp_rmaker_node_t *node = calloc(1, sizeof(_esp_rmaker_node_t));
+    _esp_rmaker_node_t *node = MEM_CALLOC_EXTRAM(1, sizeof(_esp_rmaker_node_t));
     if (!node) {
         ESP_LOGE(TAG, "Failed to allocate memory for node.");
         return NULL;
@@ -118,7 +118,7 @@ esp_rmaker_node_t *esp_rmaker_node_create(const char *name, const char *type)
     }
     ESP_LOGI(TAG, "Node ID ----- %s", node->node_id);
 
-    node->info = calloc(1, sizeof(esp_rmaker_node_info_t));
+    node->info = MEM_CALLOC_EXTRAM(1, sizeof(esp_rmaker_node_info_t));
     if (!node->info) {
         ESP_LOGE(TAG, "Failed to allocate memory for node info.");
         goto node_create_err;
@@ -225,7 +225,7 @@ esp_err_t esp_rmaker_node_add_attribute(const esp_rmaker_node_t *node, const cha
         }
         attr = attr->next;
     }
-    esp_rmaker_attr_t *new_attr = calloc(1, sizeof(esp_rmaker_attr_t));
+    esp_rmaker_attr_t *new_attr = MEM_CALLOC_EXTRAM(1, sizeof(esp_rmaker_attr_t));
     if (!new_attr) {
         ESP_LOGE(TAG, "Failed to create node attribute %s.", attr_name);
         return ESP_ERR_NO_MEM;

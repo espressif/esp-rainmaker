@@ -23,6 +23,7 @@
 #include <esp_rmaker_standard_services.h>
 #include <esp_https_server.h>
 #include <mdns.h>
+#include <esp_rmaker_utils.h>
 
 #include <esp_idf_version.h>
 #if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(4, 2, 0)
@@ -157,7 +158,7 @@ static char *__esp_rmaker_local_ctrl_get_nvs(const char *key)
     }
     size_t len = 0;
     if ((err = nvs_get_blob(handle, key, NULL, &len)) == ESP_OK) {
-        val = calloc(1, len + 1); /* +1 for NULL termination */
+        val = MEM_CALLOC_EXTRAM(1, len + 1); /* +1 for NULL termination */
         if (val) {
             nvs_get_blob(handle, key, val, &len);
         }
@@ -188,7 +189,7 @@ static char *esp_rmaker_local_ctrl_get_pop()
     }
 
     ESP_LOGI(TAG, "Couldn't find POP in NVS. Generating a new one.");
-    pop = (char *)calloc(1, ESP_RMAKER_POP_LEN);
+    pop = (char *)MEM_CALLOC_EXTRAM(1, ESP_RMAKER_POP_LEN);
     if (!pop) {
         ESP_LOGE(TAG, "Couldn't allocate POP");
         return NULL;
@@ -280,7 +281,7 @@ static esp_err_t __esp_rmaker_start_local_ctrl_service(const char *serv_name)
         int sec_ver = esp_rmaker_local_ctrl_get_security_type();
 
         if (sec_ver != 0 && pop_str) {
-            pop = (PROTOCOMM_SEC_DATA *)calloc(1, sizeof(PROTOCOMM_SEC_DATA));
+            pop = (PROTOCOMM_SEC_DATA *)MEM_CALLOC_EXTRAM(1, sizeof(PROTOCOMM_SEC_DATA));
             if (!pop) {
                 ESP_LOGE(TAG, "Failed to allocate pop");
                 free(pop_str);

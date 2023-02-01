@@ -23,6 +23,7 @@
 #include <esp_system.h>
 #include <argtable3/argtable3.h>
 #include <esp_heap_caps.h>
+#include <esp_rmaker_utils.h>
 #ifdef CONFIG_HEAP_TRACING
 #include <esp_heap_trace.h>
 #endif
@@ -53,7 +54,7 @@ static int task_dump_cli_handler(int argc, char *argv[])
     printf("%s: To use this utility enable: Component config --> FreeRTOS --> Enable FreeRTOS trace facility\n", TAG);
 #else
     int num_of_tasks = uxTaskGetNumberOfTasks();
-    TaskStatus_t *task_array = calloc(num_of_tasks, sizeof(TaskStatus_t));
+    TaskStatus_t *task_array = MEM_CALLOC_EXTRAM(num_of_tasks, sizeof(TaskStatus_t));
     if (!task_array) {
         ESP_LOGE(TAG, "Memory allocation for task list failed.");
         return -1;
@@ -77,7 +78,7 @@ static int cpu_dump_cli_handler(int argc, char *argv[])
 #ifndef CONFIG_FREERTOS_GENERATE_RUN_TIME_STATS
     printf("%s: To use this utility enable: Component config --> FreeRTOS --> Enable FreeRTOS to collect run time stats\n", TAG);
 #else
-    char *buf = calloc(1, 2 * 1024);
+    char *buf = MEM_CALLOC_EXTRAM(1, 2 * 1024);
     if (!buf) {
         ESP_LOGE(TAG, "Memory allocation for cpu dump failed.");
         return -1;
@@ -157,7 +158,7 @@ static heap_trace_record_t *heap_trace_records_buf;
 static int cli_heap_trace_start()
 {
     if (!heap_trace_records_buf) {
-        heap_trace_records_buf = malloc(heap_trace_records * sizeof(heap_trace_record_t));
+        heap_trace_records_buf = MEM_CALLOC_EXTRAM(heap_trace_records * sizeof(heap_trace_record_t));
         if (!heap_trace_records_buf) {
             printf("%s: Failed to allocate records buffer\n", TAG);
             return -1;
