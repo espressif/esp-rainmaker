@@ -15,4 +15,3 @@ esp_err_t esp_rmaker_mqtt_budgeting_stop(void);
 esp_err_t esp_rmaker_mqtt_budgeting_start(void);
 esp_err_t esp_rmaker_mqtt_increase_budget(uint8_t budget);
 esp_err_t esp_rmaker_mqtt_decrease_budget(uint8_t budget);
-bool esp_rmaker_mqtt_is_budget_available(void);

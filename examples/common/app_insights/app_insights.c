@@ -38,6 +38,12 @@ static int app_insights_data_send(void *data, size_t len)
     if (!node_id) {
         return -1;
     }
+    if (esp_rmaker_mqtt_is_budget_available() == false) {
+        /* the API `esp_rmaker_mqtt_publish` already checks if the budget is available.
+            This also raises an error message, which we do not want for esp-insights.
+            silently return with error */
+        return ESP_FAIL;
+    }
     esp_rmaker_create_mqtt_topic(topic, sizeof(topic), INSIGHTS_TOPIC_SUFFIX, INSIGHTS_TOPIC_RULE);
     esp_rmaker_mqtt_publish(topic, data, len, RMAKER_MQTT_QOS1, &msg_id);
     return msg_id;
