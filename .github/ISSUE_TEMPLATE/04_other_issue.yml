@@ -1,0 +1,23 @@
+name: General issue / query report
+description: File an issue report
+body:
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Answers checklist.
+      description: Before submitting a new issue, please follow the checklist and try to find the answer.
+      options:
+        - label: I have read the [Rainmaker documentation](https://rainmaker.espressif.com/docs/get-started.html) and the issue is not addressed there.
+          required: true
+        - label: I have updated my IDF branch (release/vX.Y) to the latest version and checked that the issue is present there. This is not applicable if you are using Rainmaker with Arduino.
+          required: true
+        - label: I have searched the [Rainmaker forum](https://www.esp32.com/viewforum.php?f=41) and issue tracker for a similar issue and not found a similar issue.
+          required: true
+  - type: textarea
+    id: issue
+    attributes:
+      label: General issue report
+      description: Your issue report goes here.
+      placeholder: ex. How do I run...
+    validations:
+      required: true
