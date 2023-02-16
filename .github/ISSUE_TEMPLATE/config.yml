@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Getting Started - ESP Rainmaker
+    url: https://rainmaker.espressif.com/docs/get-started.html
+    about: Guide for getting started with Rainmaker
+  - name: ESP Rainmaker API Guide
+    url: https://rainmaker.espressif.com/docs/api.html
+    about: Documentation for using Rainmaker APIs
+  - name: Espressif Rainmaker Forum
+    url: https://www.esp32.com/viewforum.php?f=41
+    about: For asking questions to the community about using ESP Rainmaker, create a discussion topic here.
