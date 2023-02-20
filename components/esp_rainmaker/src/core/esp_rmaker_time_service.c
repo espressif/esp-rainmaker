@@ -14,8 +14,6 @@
 #include <string.h>
 #include <esp_log.h>
 #include <nvs.h>
-#include <lwip/apps/sntp.h>
-
 #include <esp_rmaker_standard_types.h>
 #include <esp_rmaker_standard_services.h>
 #include <esp_rmaker_utils.h>
