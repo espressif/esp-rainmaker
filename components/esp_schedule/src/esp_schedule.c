@@ -16,6 +16,7 @@
 #include <inttypes.h>
 #include <esp_log.h>
 #include <esp_sntp.h>
+#include <esp_rmaker_utils.h>
 #include "esp_schedule_internal.h"
 
 static const char *TAG = "esp_schedule";
@@ -491,7 +492,7 @@ esp_schedule_handle_t esp_schedule_create(esp_schedule_config_t *schedule_config
         return NULL;
     }
 
-    esp_schedule_t *schedule = (esp_schedule_t *)calloc(1, sizeof(esp_schedule_t));
+    esp_schedule_t *schedule = (esp_schedule_t *)MEM_CALLOC_EXTRAM(1, sizeof(esp_schedule_t));
     if (schedule == NULL) {
         ESP_LOGE(TAG, "Could not allocate handle");
         return NULL;

@@ -57,7 +57,7 @@ esp_err_t esp_rmaker_system_service_enable(esp_rmaker_system_serv_config_t *conf
         ESP_LOGE(TAG, "Atleast one flag should be set for system service.");
         return ESP_ERR_INVALID_ARG;
     }
-    esp_rmaker_system_serv_config_t *priv_config = calloc(1, sizeof(esp_rmaker_system_serv_config_t));
+    esp_rmaker_system_serv_config_t *priv_config = MEM_CALLOC_EXTRAM(1, sizeof(esp_rmaker_system_serv_config_t));
     if (!priv_config) {
         ESP_LOGE(TAG, "Failed to allocate data for system service config.");
         return ESP_ERR_NO_MEM;

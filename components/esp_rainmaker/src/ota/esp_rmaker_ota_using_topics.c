@@ -23,10 +23,12 @@
 #include <esp_rmaker_work_queue.h>
 #include <esp_rmaker_core.h>
 #include <esp_rmaker_ota.h>
+#include <esp_rmaker_utils.h>
 
 #include "esp_rmaker_internal.h"
 #include "esp_rmaker_ota_internal.h"
 #include "esp_rmaker_mqtt.h"
+#include "esp_rmaker_mqtt_topics.h"
 
 #ifdef CONFIG_ESP_RMAKER_OTA_AUTOFETCH
 #include <esp_timer.h>
@@ -39,10 +41,6 @@ static uint64_t ota_autofetch_period = (OTA_AUTOFETCH_PERIOD * 60 * 60 * 1000000
 
 static const char *TAG = "esp_rmaker_ota_using_topics";
 
-#define OTAURL_TOPIC_SUFFIX     "otaurl"
-#define OTAFETCH_TOPIC_SUFFIX   "otafetch"
-#define OTASTATUS_TOPIC_SUFFIX  "otastatus"
-
 esp_err_t esp_rmaker_ota_report_status_using_topics(esp_rmaker_ota_handle_t ota_handle, ota_status_t status, char *additional_info)
 {
     if (!ota_handle) {
@@ -51,7 +49,6 @@ esp_err_t esp_rmaker_ota_report_status_using_topics(esp_rmaker_ota_handle_t ota_
     esp_rmaker_ota_t *ota = (esp_rmaker_ota_t *)ota_handle;
 
     char publish_payload[200];
-    char *node_id = esp_rmaker_get_node_id();
     json_gen_str_t jstr;
     json_gen_str_start(&jstr, publish_payload, sizeof(publish_payload), NULL, NULL);
     json_gen_start_object(&jstr);
@@ -78,9 +75,9 @@ esp_err_t esp_rmaker_ota_report_status_using_topics(esp_rmaker_ota_handle_t ota_
     json_gen_end_object(&jstr);
     json_gen_str_end(&jstr);
 
-    char publish_topic[100];
+    char publish_topic[MQTT_TOPIC_BUFFER_SIZE];
+    esp_rmaker_create_mqtt_topic(publish_topic, sizeof(publish_topic), OTASTATUS_TOPIC_SUFFIX, OTASTATUS_TOPIC_RULE);
     ESP_LOGI(TAG, "%s",publish_payload);
-    snprintf(publish_topic, sizeof(publish_topic), "node/%s/%s", node_id, OTASTATUS_TOPIC_SUFFIX);
     esp_err_t err = esp_rmaker_mqtt_publish(publish_topic, publish_payload, strlen(publish_payload),
                         RMAKER_MQTT_QOS1, NULL);
     if (err != ESP_OK) {
@@ -145,14 +142,14 @@ static void ota_url_handler(const char *topic, void *payload, size_t payload_len
     int len = 0;
     ret = json_obj_get_strlen(&jctx, "ota_job_id", &len);
     if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "Aborted. OTA Updated ID not found in JSON");
+        ESP_LOGE(TAG, "Aborted. OTA Job ID not found in JSON");
         esp_rmaker_ota_report_status(ota_handle, OTA_STATUS_FAILED, "Aborted. OTA Updated ID not found in JSON");
         goto end;
     }
     len++; /* Increment for NULL character */
-    ota_job_id = calloc(1, len);
+    ota_job_id = MEM_CALLOC_EXTRAM(1, len);
     if (!ota_job_id) {
-        ESP_LOGE(TAG, "Aborted. OTA Updated ID memory allocation failed");
+        ESP_LOGE(TAG, "Aborted. OTA Job ID memory allocation failed");
         esp_rmaker_ota_report_status(ota_handle, OTA_STATUS_FAILED, "Aborted. OTA Updated ID memory allocation failed");
         goto end;
     }
@@ -173,7 +170,7 @@ static void ota_url_handler(const char *topic, void *payload, size_t payload_len
         goto end;
     }
     len++; /* Increment for NULL character */
-    url = calloc(1, len);
+    url = MEM_CALLOC_EXTRAM(1, len);
     if (!url) {
         ESP_LOGE(TAG, "Aborted. URL memory allocation failed");
         esp_rmaker_ota_report_status(ota_handle, OTA_STATUS_FAILED, "Aborted. URL memory allocation failed");
@@ -190,7 +187,7 @@ static void ota_url_handler(const char *topic, void *payload, size_t payload_len
     ret = json_obj_get_strlen(&jctx, "fw_version", &len);
     if (ret == ESP_OK && len > 0) {
         len++; /* Increment for NULL character */
-        fw_version = calloc(1, len);
+        fw_version = MEM_CALLOC_EXTRAM(1, len);
         if (!fw_version) {
             ESP_LOGE(TAG, "Aborted. Firmware version memory allocation failed");
             esp_rmaker_ota_report_status(ota_handle, OTA_STATUS_FAILED, "Aborted. Firmware version memory allocation failed");
@@ -205,7 +202,7 @@ static void ota_url_handler(const char *topic, void *payload, size_t payload_len
     ret = json_obj_get_object_strlen(&jctx, "metadata", &metadata_size);
     if (ret == ESP_OK && metadata_size > 0) {
         metadata_size++; /* Increment for NULL character */
-        metadata = calloc(1, metadata_size);
+        metadata = MEM_CALLOC_EXTRAM(1, metadata_size);
         if (!metadata) {
             ESP_LOGE(TAG, "Aborted. OTA metadata memory allocation failed");
             esp_rmaker_ota_report_status(ota_handle, OTA_STATUS_FAILED, "Aborted. OTA metadata memory allocation failed");
@@ -255,8 +252,8 @@ esp_err_t esp_rmaker_ota_fetch(void)
     json_gen_obj_set_string(&jstr, "fw_version", info->fw_version);
     json_gen_end_object(&jstr);
     json_gen_str_end(&jstr);
-    char publish_topic[100];
-    snprintf(publish_topic, sizeof(publish_topic), "node/%s/%s", esp_rmaker_get_node_id(), OTAFETCH_TOPIC_SUFFIX);
+    char publish_topic[MQTT_TOPIC_BUFFER_SIZE];
+    esp_rmaker_create_mqtt_topic(publish_topic, sizeof(publish_topic), OTAFETCH_TOPIC_SUFFIX, OTAFETCH_TOPIC_RULE);
     esp_err_t err = esp_rmaker_mqtt_publish(publish_topic, publish_payload, strlen(publish_payload),
                         RMAKER_MQTT_QOS1, NULL);
     if (err != ESP_OK) {
@@ -272,7 +269,7 @@ void esp_rmaker_ota_autofetch_timer_cb(void *priv)
 
 static esp_err_t esp_rmaker_ota_subscribe(void *priv_data)
 {
-    char subscribe_topic[100];
+    char subscribe_topic[MQTT_TOPIC_BUFFER_SIZE];
 
     snprintf(subscribe_topic, sizeof(subscribe_topic),"node/%s/%s", esp_rmaker_get_node_id(), OTAURL_TOPIC_SUFFIX);
 

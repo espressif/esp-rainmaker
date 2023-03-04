@@ -24,6 +24,7 @@
 #include <esp_rmaker_factory.h>
 #include <esp_rmaker_work_queue.h>
 #include <esp_rmaker_common_events.h>
+#include <esp_rmaker_utils.h>
 
 #include <esp_rmaker_core.h>
 #include <esp_rmaker_user_mapping.h>
@@ -81,6 +82,21 @@ esp_rmaker_state_t esp_rmaker_get_state(void)
     return ESP_RMAKER_STATE_DEINIT;
 }
 
+static void reset_event_handler(void* arg, esp_event_base_t event_base,
+                          int32_t event_id, void* event_data)
+{
+        switch (event_id) {
+            case RMAKER_EVENT_WIFI_RESET:
+                esp_rmaker_mqtt_disconnect();
+                break;
+            case RMAKER_EVENT_FACTORY_RESET:
+                esp_rmaker_reset_user_node_mapping();
+                break;
+            default:
+                break;
+        }
+}
+
 static char *esp_rmaker_populate_node_id(bool use_claiming)
 {
     char *node_id = esp_rmaker_factory_get("node_id");
@@ -92,7 +108,7 @@ static char *esp_rmaker_populate_node_id(bool use_claiming)
             ESP_LOGE(TAG, "Could not fetch MAC address. Please initialise Wi-Fi first");
             return NULL;
         }
-        node_id = calloc(1, ESP_CLAIM_NODE_ID_SIZE + 1); /* +1 for NULL terminatation */
+        node_id = MEM_CALLOC_EXTRAM(1, ESP_CLAIM_NODE_ID_SIZE + 1); /* +1 for NULL terminatation */
         snprintf(node_id, ESP_CLAIM_NODE_ID_SIZE + 1, "%02X%02X%02X%02X%02X%02X",
                 eth_mac[0], eth_mac[1], eth_mac[2], eth_mac[3], eth_mac[4], eth_mac[5]);
     }
@@ -427,7 +443,7 @@ static esp_err_t esp_rmaker_init(const esp_rmaker_config_t *config, bool use_cla
         ESP_LOGE(TAG, "Failed to initialise storage");
         return ESP_FAIL;
     }
-    esp_rmaker_priv_data = calloc(1, sizeof(esp_rmaker_priv_data_t));
+    esp_rmaker_priv_data = MEM_CALLOC_EXTRAM(1, sizeof(esp_rmaker_priv_data_t));
     if (!esp_rmaker_priv_data) {
         ESP_LOGE(TAG, "Failed to allocate memory");
         return ESP_ERR_NO_MEM;
@@ -540,6 +556,7 @@ esp_err_t esp_rmaker_start(void)
         ESP_LOGE(TAG, "Couldn't create RainMaker Work Queue task");
         return ESP_FAIL;
     }
+    ESP_ERROR_CHECK(esp_event_handler_register(RMAKER_COMMON_EVENT, ESP_EVENT_ANY_ID, &reset_event_handler, NULL));
     return ESP_OK;
 }
 
@@ -549,4 +566,3 @@ esp_err_t esp_rmaker_stop()
     esp_rmaker_priv_data->state = ESP_RMAKER_STATE_STOP_REQUESTED;
     return ESP_OK;
 }
-

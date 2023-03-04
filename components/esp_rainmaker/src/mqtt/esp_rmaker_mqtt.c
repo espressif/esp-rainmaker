@@ -15,6 +15,11 @@
 #include <esp_log.h>
 #include <esp_rmaker_mqtt_glue.h>
 #include <esp_rmaker_client_data.h>
+#include <esp_rmaker_core.h>
+
+#include "esp_rmaker_mqtt.h"
+#include "esp_rmaker_mqtt_budget.h"
+
 static const char *TAG = "esp_rmaker_mqtt";
 static esp_rmaker_mqtt_config_t g_mqtt_config;
 
@@ -40,23 +45,44 @@ esp_err_t esp_rmaker_mqtt_init(esp_rmaker_mqtt_conn_params_t *conn_params)
         esp_rmaker_mqtt_glue_setup(&g_mqtt_config);
     }
     if (g_mqtt_config.init) {
-        return g_mqtt_config.init(conn_params);
+        esp_err_t err =  g_mqtt_config.init(conn_params);
+        if (err == ESP_OK) {
+            if (esp_rmaker_mqtt_budgeting_init() != ESP_OK) {
+                ESP_LOGE(TAG, "Failied to initialise MQTT Budgeting.");
+            }
+        }
+        return err;
     }
     ESP_LOGW(TAG, "esp_rmaker_mqtt_init not registered");
     return ESP_OK;
 }
 
+void esp_rmaker_mqtt_deinit(void)
+{
+    esp_rmaker_mqtt_budgeting_deinit();
+    if (g_mqtt_config.deinit) {
+        return g_mqtt_config.deinit();
+    }
+    ESP_LOGW(TAG, "esp_rmaker_mqtt_deinit not registered");
+}
+
 esp_err_t esp_rmaker_mqtt_connect(void)
 {
     if (g_mqtt_config.connect) {
-        return g_mqtt_config.connect();
+        esp_err_t err = g_mqtt_config.connect();
+        if (err == ESP_OK) {
+            esp_rmaker_mqtt_budgeting_start();
+        }
+        return err;
     }
     ESP_LOGW(TAG, "esp_rmaker_mqtt_connect not registered");
     return ESP_OK;
 }
 
+
 esp_err_t esp_rmaker_mqtt_disconnect(void)
 {
+    esp_rmaker_mqtt_budgeting_stop();
     if (g_mqtt_config.disconnect) {
         return g_mqtt_config.disconnect();
     }
@@ -84,9 +110,26 @@ esp_err_t esp_rmaker_mqtt_unsubscribe(const char *topic)
 
 esp_err_t esp_rmaker_mqtt_publish(const char *topic, void *data, size_t data_len, uint8_t qos, int *msg_id)
 {
+    if (esp_rmaker_mqtt_is_budget_available() != true) {
+        ESP_LOGE(TAG, "Out of MQTT Budget. Dropping publish message.");
+        return ESP_FAIL;
+    }
     if (g_mqtt_config.publish) {
-        return g_mqtt_config.publish(topic, data, data_len, qos, msg_id);
+        esp_err_t err = g_mqtt_config.publish(topic, data, data_len, qos, msg_id);
+        if (err == ESP_OK) {
+            esp_rmaker_mqtt_decrease_budget(1);
+        }
+        return err;
     }
     ESP_LOGW(TAG, "esp_rmaker_mqtt_publish not registered");
     return ESP_OK;
+}
+
+void esp_rmaker_create_mqtt_topic(char *buf, size_t buf_size, const char *topic_suffix, const char *rule)
+{
+#ifdef CONFIG_ESP_RMAKER_MQTT_USE_BASIC_INGEST_TOPICS
+    snprintf(buf, buf_size, "$aws/rules/%s/node/%s/%s", rule, esp_rmaker_get_node_id(), topic_suffix);
+#else
+    snprintf(buf, buf_size, "node/%s/%s", esp_rmaker_get_node_id(), topic_suffix);
+#endif
 }

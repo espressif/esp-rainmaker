@@ -22,6 +22,7 @@
 #include <esp_rmaker_standard_services.h>
 #include <esp_rmaker_standard_types.h>
 #include <esp_rmaker_scenes.h>
+#include <esp_rmaker_utils.h>
 
 #define MAX_ID_LEN 8
 #define MAX_NAME_LEN 32
@@ -217,7 +218,7 @@ static esp_err_t esp_rmaker_scenes_parse_info_and_flags(jparse_ctx_t *jctx, char
 
         if (strlen(_info) > 0) {
             /* +1 for NULL termination */
-            *info = (char *)calloc(1, strlen(_info) + 1);
+            *info = (char *)MEM_CALLOC_EXTRAM(1, strlen(_info) + 1);
             if (*info) {
                 strncpy(*info, _info, strlen(_info));
             }
@@ -247,7 +248,7 @@ static esp_err_t esp_rmaker_scenes_parse_action(jparse_ctx_t *jctx, esp_rmaker_s
     if (action->data) {
         free(action->data);
     }
-    action->data = (void *)calloc(1, action->data_len);
+    action->data = (void *)MEM_CALLOC_EXTRAM(1, action->data_len);
     if (!action->data) {
         ESP_LOGE(TAG, "Could not allocate action");
         return ESP_ERR_NO_MEM;
@@ -276,7 +277,7 @@ static esp_rmaker_scene_t *esp_rmaker_scenes_find_or_create(jparse_ctx_t *jctx, 
         }
 
         /* This is a new scene. Fill it. */
-        scene = (esp_rmaker_scene_t *)calloc(1, sizeof(esp_rmaker_scene_t));
+        scene = (esp_rmaker_scene_t *)MEM_CALLOC_EXTRAM(1, sizeof(esp_rmaker_scene_t));
         if (!scene) {
             ESP_LOGE(TAG, "Couldn't allocate scene with id: %s", id);
             return NULL;
@@ -466,7 +467,7 @@ static char *esp_rmaker_scenes_get_params(void)
         ESP_LOGE(TAG, "Failed to get required size for scenes JSON.");
         return NULL;
     }
-    char *data = calloc(1, req_size);
+    char *data = MEM_CALLOC_EXTRAM(1, req_size);
     if (!data) {
         ESP_LOGE(TAG, "Failed to allocate %d bytes for scenes.", req_size);
         return NULL;
@@ -520,7 +521,7 @@ static esp_err_t write_cb(const esp_rmaker_device_t *device, const esp_rmaker_pa
 
 esp_err_t esp_rmaker_scenes_enable(void)
 {
-    scenes_priv_data = (esp_rmaker_scenes_priv_data_t *)calloc(1, sizeof(esp_rmaker_scenes_priv_data_t));
+    scenes_priv_data = (esp_rmaker_scenes_priv_data_t *)MEM_CALLOC_EXTRAM(1, sizeof(esp_rmaker_scenes_priv_data_t));
     if (!scenes_priv_data) {
         ESP_LOGE(TAG, "Couldn't allocate scenes_priv_data");
         return ESP_ERR_NO_MEM;

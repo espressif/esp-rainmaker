@@ -16,6 +16,7 @@
 #include <freertos/FreeRTOS.h>
 #include <freertos/timers.h>
 #include <freertos/task.h>
+#include <esp_efuse.h>
 #include <esp_event.h>
 #include <esp_log.h>
 #include <esp_ota_ops.h>
@@ -30,7 +31,7 @@
 
 #include <esp_rmaker_utils.h>
 #include <esp_rmaker_common_events.h>
-
+#include <esp_rmaker_utils.h>
 #include "esp_rmaker_internal.h"
 #include "esp_rmaker_ota_internal.h"
 
@@ -139,6 +140,7 @@ void esp_rmaker_ota_common_cb(void *priv)
         .url = ota->url,
         .filesize = ota->filesize,
         .fw_version = ota->fw_version,
+        .ota_job_id = (char *)ota->transient_priv,
         .server_cert = ota->server_cert,
         .priv = ota->priv,
         .metadata = ota->metadata
@@ -182,6 +184,13 @@ static esp_err_t validate_image_header(esp_rmaker_ota_handle_t ota_handle,
     }
 #endif
 
+#ifndef CONFIG_ESP_RMAKER_SKIP_SECURE_VERSION_CHECK
+    if (esp_efuse_check_secure_version(new_app_info->secure_version) == false) {
+        ESP_LOGW(TAG, "New secure version is lower than stored in efuse. We will not continue the update.");
+        esp_rmaker_ota_report_status(ota_handle, OTA_STATUS_REJECTED, "Lower secure version received");
+        return ESP_FAIL;
+    }
+#endif
 
     return ESP_OK;
 }
@@ -268,6 +277,10 @@ esp_err_t esp_rmaker_ota_default_cb(esp_rmaker_ota_handle_t ota_handle, esp_rmak
     int count = 0;
     while (1) {
         err = esp_https_ota_perform(https_ota_handle);
+        if (err == ESP_ERR_INVALID_VERSION) {
+            esp_rmaker_ota_report_status(ota_handle, OTA_STATUS_REJECTED, "Chip revision mismatch");
+            goto ota_end;
+        }
         if (err != ESP_ERR_HTTPS_OTA_IN_PROGRESS) {
             break;
         }
@@ -456,7 +469,7 @@ esp_err_t esp_rmaker_ota_enable(esp_rmaker_ota_config_t *ota_config, esp_rmaker_
         ESP_LOGE(TAG, "OTA already initialised");
         return ESP_FAIL;
     }
-    esp_rmaker_ota_t *ota = calloc(1, sizeof(esp_rmaker_ota_t));
+    esp_rmaker_ota_t *ota = MEM_CALLOC_EXTRAM(1, sizeof(esp_rmaker_ota_t));
     if (!ota) {
         ESP_LOGE(TAG, "Failed to allocate memory for esp_rmaker_ota_t");
         return ESP_ERR_NO_MEM;
