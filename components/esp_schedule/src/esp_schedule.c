@@ -508,7 +508,7 @@ esp_schedule_handle_t esp_schedule_create(esp_schedule_config_t *schedule_config
 
 esp_schedule_handle_t *esp_schedule_init(bool enable_nvs, char *nvs_partition, uint8_t *schedule_count)
 {
-    if (!sntp_enabled()) {
+    if (!esp_sntp_enabled()) {
         ESP_LOGI(TAG, "Initializing SNTP");
         sntp_setoperatingmode(SNTP_OPMODE_POLL);
         sntp_setservername(0, "pool.ntp.org");

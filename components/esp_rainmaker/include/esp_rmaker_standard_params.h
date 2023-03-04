@@ -30,7 +30,8 @@ extern "C"
  */
 
 #define ESP_RMAKER_DEF_NAME_PARAM           "Name"
-#define ESP_RMAKER_DEF_POWER_NAME           "Power"
+#define ESP_RMAKER_DEF_POWER_NAME           "Power"         // "on/off" state
+#define ESP_RMAKER_DEF_POWER_METER_NAME     "Power Meter"   // Watts, Volts, Amperes
 #define ESP_RMAKER_DEF_BRIGHTNESS_NAME      "Brightness"
 #define ESP_RMAKER_DEF_HUE_NAME             "Hue"
 #define ESP_RMAKER_DEF_SATURATION_NAME      "Saturation"
@@ -71,7 +72,7 @@ extern "C"
 esp_rmaker_param_t *esp_rmaker_name_param_create(const char *param_name, const char *val);
 
 /**
- * Create standard Power param
+ * Create standard Power on/off state param
  *
  * This will create the standard power parameter.
  *
@@ -82,6 +83,19 @@ esp_rmaker_param_t *esp_rmaker_name_param_create(const char *param_name, const c
  * @return NULL in case of failures.
  */
 esp_rmaker_param_t *esp_rmaker_power_param_create(const char *param_name, bool val);
+
+/**
+ * Create standard Power metering param
+ *
+ * This will create power metering parameter(s).
+ *
+ * @param[in] param_name Name of the parameter
+ * @param[in] val Default Value of the parameter
+ *
+ * @return Parameter handle on success.
+ * @return NULL in case of failures.
+ */
+esp_rmaker_param_t *esp_rmaker_power_meter_param_create(const char *param_name, int val);
 
 /**
  * Create standard Brightness param

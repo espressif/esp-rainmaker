@@ -91,6 +91,23 @@ esp_rmaker_device_t *esp_rmaker_fan_device_create(const char *dev_name,
 esp_rmaker_device_t *esp_rmaker_temp_sensor_device_create(const char *dev_name,
             void *priv_data, float temperature);
 
+/** Create a standard Power Meter Sensor device
+ *
+ * This creates a Power Meter Sensor device with the mandatory parameters and also assigns
+ * the primary parameter. The default parameter names will be used.
+ * Refer \ref esp_rmaker_standard_params.h for default names.
+ *
+ * @param[in] dev_name The unique device name
+ * @param[in] priv_data (Optional) Private data associated with the device. This should stay
+ * allocated throughout the lifetime of the device
+ * @param[in] power Default value of the mandatory parameter "power"
+ *
+ * @return Device handle on success.
+ * @return NULL in case of failures.
+ */
+esp_rmaker_device_t *esp_rmaker_power_meter_sensor_device_create(const char *dev_name,
+            void *priv_data, int power);
+
 #ifdef __cplusplus
 }
 #endif
