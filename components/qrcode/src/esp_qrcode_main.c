@@ -15,7 +15,7 @@
 #include <stdio.h>
 #include <esp_err.h>
 #include "esp_log.h"
-
+#include <esp_rmaker_utils.h>
 #include "qrcodegen.h"
 #include "qrcode.h"
 
@@ -74,12 +74,12 @@ esp_err_t esp_qrcode_generate(esp_qrcode_config_t *cfg, const char *text)
     uint8_t *qrcode, *tempbuf;
     esp_err_t err = ESP_FAIL;
 
-    qrcode = calloc(1, qrcodegen_BUFFER_LEN_FOR_VERSION(cfg->max_qrcode_version));
+    qrcode = MEM_CALLOC_EXTRAM(1, qrcodegen_BUFFER_LEN_FOR_VERSION(cfg->max_qrcode_version));
     if (!qrcode) {
         return ESP_ERR_NO_MEM;
     }
 
-    tempbuf = calloc(1, qrcodegen_BUFFER_LEN_FOR_VERSION(cfg->max_qrcode_version));
+    tempbuf = MEM_CALLOC_EXTRAM(1, qrcodegen_BUFFER_LEN_FOR_VERSION(cfg->max_qrcode_version));
     if (!tempbuf) {
         free(qrcode);
         return ESP_ERR_NO_MEM;

@@ -8,6 +8,7 @@
 */
 
 #include <string.h>
+#include <inttypes.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
 #include <esp_log.h>
@@ -18,9 +19,10 @@
 #include <esp_rmaker_standard_types.h>
 #include <esp_rmaker_standard_params.h>
 #include <esp_rmaker_standard_devices.h>
-#include <esp_rmaker_ota.h>
 #include <esp_rmaker_schedule.h>
+#include <esp_rmaker_scenes.h>
 #include <esp_rmaker_console.h>
+#include <esp_rmaker_ota.h>
 
 #include <esp_rmaker_common_events.h>
 
@@ -67,7 +69,7 @@ static void event_handler(void* arg, esp_event_base_t event_base,
                 ESP_LOGI(TAG, "RainMaker Claim Failed.");
                 break;
             default:
-                ESP_LOGW(TAG, "Unhandled RainMaker Event: %d", event_id);
+                ESP_LOGW(TAG, "Unhandled RainMaker Event: %"PRIi32, event_id);
         }
     } else if (event_base == RMAKER_COMMON_EVENT) {
         switch (event_id) {
@@ -90,7 +92,49 @@ static void event_handler(void* arg, esp_event_base_t event_base,
                 ESP_LOGI(TAG, "MQTT Published. Msg id: %d.", *((int *)event_data));
                 break;
             default:
-                ESP_LOGW(TAG, "Unhandled RainMaker Common Event: %d", event_id);
+                ESP_LOGW(TAG, "Unhandled RainMaker Common Event: %"PRIi32, event_id);
+        }
+    } else if (event_base == APP_WIFI_EVENT) {
+        switch (event_id) {
+            case APP_WIFI_EVENT_QR_DISPLAY:
+                ESP_LOGI(TAG, "Provisioning QR : %s", (char *)event_data);
+                break;
+            case APP_WIFI_EVENT_PROV_TIMEOUT:
+                ESP_LOGI(TAG, "Provisioning Timed Out. Please reboot.");
+                break;
+            case APP_WIFI_EVENT_PROV_RESTART:
+                ESP_LOGI(TAG, "Provisioning has restarted due to failures.");
+                break;
+            default:
+                ESP_LOGW(TAG, "Unhandled App Wi-Fi Event: %"PRIi32, event_id);
+                break;
+        }
+    } else if (event_base == RMAKER_OTA_EVENT) {
+        switch(event_id) {
+            case RMAKER_OTA_EVENT_STARTING:
+                ESP_LOGI(TAG, "Starting OTA.");
+                break;
+            case RMAKER_OTA_EVENT_IN_PROGRESS:
+                ESP_LOGI(TAG, "OTA is in progress.");
+                break;
+            case RMAKER_OTA_EVENT_SUCCESSFUL:
+                ESP_LOGI(TAG, "OTA successful.");
+                break;
+            case RMAKER_OTA_EVENT_FAILED:
+                ESP_LOGI(TAG, "OTA Failed.");
+                break;
+            case RMAKER_OTA_EVENT_REJECTED:
+                ESP_LOGI(TAG, "OTA Rejected.");
+                break;
+            case RMAKER_OTA_EVENT_DELAYED:
+                ESP_LOGI(TAG, "OTA Delayed.");
+                break;
+            case RMAKER_OTA_EVENT_REQ_FOR_REBOOT:
+                ESP_LOGI(TAG, "Firmware image downloaded. Please reboot your device to apply the upgrade.");
+                break;
+            default:
+                ESP_LOGW(TAG, "Unhandled OTA Event: %"PRIi32, event_id);
+                break;
         }
     } else {
         ESP_LOGW(TAG, "Invalid event received!");
@@ -120,6 +164,9 @@ void app_main()
 
     /* Register an event handler to catch RainMaker events */
     ESP_ERROR_CHECK(esp_event_handler_register(RMAKER_EVENT, ESP_EVENT_ANY_ID, &event_handler, NULL));
+    ESP_ERROR_CHECK(esp_event_handler_register(RMAKER_COMMON_EVENT, ESP_EVENT_ANY_ID, &event_handler, NULL));
+    ESP_ERROR_CHECK(esp_event_handler_register(APP_WIFI_EVENT, ESP_EVENT_ANY_ID, &event_handler, NULL));
+    ESP_ERROR_CHECK(esp_event_handler_register(RMAKER_OTA_EVENT, ESP_EVENT_ANY_ID, &event_handler, NULL));
 
     /* Initialize the ESP RainMaker Agent.
      * Note that this should be called after app_wifi_init() but before app_wifi_start()
@@ -166,10 +213,7 @@ void app_main()
     esp_rmaker_node_add_device(node, switch_device);
 
     /* Enable OTA */
-    esp_rmaker_ota_config_t ota_config = {
-        .server_cert = ESP_RMAKER_OTA_DEFAULT_SERVER_CERT,
-    };
-    esp_rmaker_ota_enable(&ota_config, OTA_USING_PARAMS);
+    esp_rmaker_ota_enable_default();
 
     /* Enable timezone service which will be require for setting appropriate timezone
      * from the phone apps for scheduling to work correctly.
@@ -180,6 +224,9 @@ void app_main()
 
     /* Enable scheduling. */
     esp_rmaker_schedule_enable();
+
+    /* Enable Scenes */
+    esp_rmaker_scenes_enable();
 
     /* Enable Insights. Requires CONFIG_ESP_INSIGHTS_ENABLED=y */
     app_insights_enable();

@@ -51,7 +51,29 @@ esp_rmaker_device_t *esp_rmaker_create_schedule_service(const char *serv_name, e
     return service;
 }
 
+esp_rmaker_device_t *esp_rmaker_create_scenes_service(const char *serv_name, esp_rmaker_device_write_cb_t write_cb,
+        esp_rmaker_device_read_cb_t read_cb, int max_scenes, bool deactivation_support, void *priv_data)
+{
+    esp_rmaker_device_t *service = esp_rmaker_service_create(serv_name, ESP_RMAKER_SERVICE_SCENES, priv_data);
+    if (service) {
+        esp_rmaker_device_add_cb(service, write_cb, read_cb);
+        esp_rmaker_device_add_param(service, esp_rmaker_scenes_param_create(ESP_RMAKER_DEF_SCENES_NAME, max_scenes));
+        esp_rmaker_device_add_attribute(service, "deactivation_support", deactivation_support ? "yes" : "no");
+    }
+    return service;
+}
+
 esp_rmaker_device_t *esp_rmaker_create_system_service(const char *serv_name, void *priv_data)
 {
     return esp_rmaker_service_create(serv_name, ESP_RMAKER_SERVICE_SYSTEM, priv_data);
+}
+
+esp_rmaker_device_t *esp_rmaker_create_local_control_service(const char *serv_name, const char *pop, int sec_type, void *priv_data)
+{
+    esp_rmaker_device_t *service = esp_rmaker_service_create(serv_name, ESP_RMAKER_SERVICE_LOCAL_CONTROL, priv_data);
+    if (service) {
+        esp_rmaker_device_add_param(service, esp_rmaker_local_control_pop_param_create(ESP_RMAKER_DEF_LOCAL_CONTROL_POP, pop));
+        esp_rmaker_device_add_param(service, esp_rmaker_local_control_type_param_create(ESP_RMAKER_DEF_LOCAL_CONTROL_TYPE, sec_type));
+    }
+    return service;
 }

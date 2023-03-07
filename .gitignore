@@ -79,3 +79,7 @@ docs/docusaurus/website/node_modules
 
 # cli logs
 **/logs
+
+# IDF package manager
+**/managed_components/
+*.lock

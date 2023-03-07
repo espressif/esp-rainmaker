@@ -25,6 +25,10 @@ extern "C"
 #define ESP_RMAKER_UI_DROPDOWN          "esp.ui.dropdown"
 #define ESP_RMAKER_UI_TEXT              "esp.ui.text"
 #define ESP_RMAKER_UI_HUE_SLIDER        "esp.ui.hue-slider"
+#define ESP_RMAKER_UI_HUE_CIRCLE        "esp.ui.hue-circle"
+#define ESP_RMAKER_UI_PUSHBUTTON        "esp.ui.push-btn-big"
+#define ESP_RMAKER_UI_TRIGGER           "esp.ui.trigger"
+#define ESP_RMAKER_UI_HIDDEN            "esp.ui.hidden"
 
 /********** STANDARD PARAM TYPES **********/
 
@@ -45,10 +49,19 @@ extern "C"
 #define ESP_RMAKER_PARAM_TIMEZONE       "esp.param.tz"
 #define ESP_RMAKER_PARAM_TIMEZONE_POSIX       "esp.param.tz_posix"
 #define ESP_RMAKER_PARAM_SCHEDULES      "esp.param.schedules"
+#define ESP_RMAKER_PARAM_SCENES         "esp.param.scenes"
 #define ESP_RMAKER_PARAM_REBOOT         "esp.param.reboot"
 #define ESP_RMAKER_PARAM_FACTORY_RESET  "esp.param.factory-reset"
 #define ESP_RMAKER_PARAM_WIFI_RESET     "esp.param.wifi-reset"
-
+#define ESP_RMAKER_PARAM_LOCAL_CONTROL_POP      "esp.param.local_control_pop"
+#define ESP_RMAKER_PARAM_LOCAL_CONTROL_TYPE     "esp.param.local_control_type"
+#define ESP_RMAKER_PARAM_TOGGLE         "esp.param.toggle"
+#define ESP_RMAKER_PARAM_RANGE          "esp.param.range"
+#define ESP_RMAKER_PARAM_MODE           "esp.param.mode"
+#define ESP_RMAKER_PARAM_BLINDS_POSITION     "esp.param.blinds-position"
+#define ESP_RMAKER_PARAM_GARAGE_POSITION     "esp.param.garage-position"
+#define ESP_RMAKER_PARAM_LIGHT_MODE     "esp.param.light-mode"
+#define ESP_RMAKER_PARAM_AC_MODE        "esp.param.ac-mode"
 
 /********** STANDARD DEVICE TYPES **********/
 
@@ -57,13 +70,29 @@ extern "C"
 #define ESP_RMAKER_DEVICE_FAN           "esp.device.fan"
 #define ESP_RMAKER_DEVICE_TEMP_SENSOR   "esp.device.temperature-sensor"
 #define ESP_RMAKER_DEVICE_HUMD_SENSOR   "esp.device.humidity-sensor"
-
+#define ESP_RMAKER_DEVICE_LIGHT         "esp.device.light"
+#define ESP_RMAKER_DEVICE_OUTLET        "esp.device.outlet"
+#define ESP_RMAKER_DEVICE_PLUG          "esp.device.plug"
+#define ESP_RMAKER_DEVICE_SOCKET        "esp.device.socket"
+#define ESP_RMAKER_DEVICE_LOCK          "esp.device.lock"
+#define ESP_RMAKER_DEVICE_BLINDS_INTERNAL   "esp.device.blinds-internal"
+#define ESP_RMAKER_DEVICE_BLINDS_EXTERNAL   "esp.device.blinds-external"
+#define ESP_RMAKER_DEVICE_GARAGE_DOOR   "esp.device.garage-door"
+#define ESP_RMAKER_DEVICE_GARAGE_LOCK   "esp.device.garage-door-lock"
+#define ESP_RMAKER_DEVICE_SPEAKER       "esp.device.speaker"
+#define ESP_RMAKER_DEVICE_AIR_CONDITIONER   "esp.device.air-conditioner"
+#define ESP_RMAKER_DEVICE_THERMOSTAT    "esp.device.thermostat"
+#define ESP_RMAKER_DEVICE_TV            "esp.device.tv"
+#define ESP_RMAKER_DEVICE_WASHER        "esp.device.washer"
+#define ESP_RMAKER_DEVICE_OTHER         "esp.device.other"
 
 /********** STANDARD SERVICE TYPES **********/
 #define ESP_RMAKER_SERVICE_OTA          "esp.service.ota"
 #define ESP_RMAKER_SERVICE_TIME         "esp.service.time"
 #define ESP_RMAKER_SERVICE_SCHEDULE     "esp.service.schedule"
+#define ESP_RMAKER_SERVICE_SCENES       "esp.service.scenes"
 #define ESP_RMAKER_SERVICE_SYSTEM       "esp.service.system"
+#define ESP_RMAKER_SERVICE_LOCAL_CONTROL    "esp.service.local_control"
 
 #ifdef __cplusplus
 }

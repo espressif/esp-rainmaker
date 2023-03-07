@@ -17,6 +17,7 @@
 #include <esp_rmaker_standard_params.h>
 #include <esp_rmaker_standard_devices.h>
 #include <esp_rmaker_schedule.h>
+#include <esp_rmaker_scenes.h>
 
 #include <app_wifi.h>
 #include <app_insights.h>
@@ -119,6 +120,9 @@ void app_main()
     temp_sensor_device = esp_rmaker_temp_sensor_device_create("Temperature Sensor", NULL, app_get_current_temperature());
     esp_rmaker_node_add_device(node, temp_sensor_device);
 
+    /* Enable OTA */
+    esp_rmaker_ota_enable_default();
+
     /* Enable timezone service which will be require for setting appropriate timezone
      * from the phone apps for scheduling to work correctly.
      * For more information on the various ways of setting timezone, please check
@@ -128,6 +132,9 @@ void app_main()
 
     /* Enable scheduling. */
     esp_rmaker_schedule_enable();
+
+    /* Enable Scenes */
+    esp_rmaker_scenes_enable();
 
     /* Enable Insights. Requires CONFIG_ESP_INSIGHTS_ENABLED=y */
     app_insights_enable();

@@ -23,6 +23,8 @@
 
 #include <esp_rmaker_factory.h>
 #include <esp_rmaker_work_queue.h>
+#include <esp_rmaker_common_events.h>
+#include <esp_rmaker_utils.h>
 
 #include <esp_rmaker_core.h>
 #include <esp_rmaker_user_mapping.h>
@@ -33,7 +35,8 @@
 #include "esp_rmaker_client_data.h"
 
 static const int WIFI_CONNECTED_EVENT = BIT0;
-static EventGroupHandle_t wifi_event_group;
+static const int MQTT_CONNECTED_EVENT = BIT1;
+static EventGroupHandle_t rmaker_core_event_group;
 
 ESP_EVENT_DEFINE_BASE(RMAKER_EVENT);
 
@@ -79,6 +82,21 @@ esp_rmaker_state_t esp_rmaker_get_state(void)
     return ESP_RMAKER_STATE_DEINIT;
 }
 
+static void reset_event_handler(void* arg, esp_event_base_t event_base,
+                          int32_t event_id, void* event_data)
+{
+        switch (event_id) {
+            case RMAKER_EVENT_WIFI_RESET:
+                esp_rmaker_mqtt_disconnect();
+                break;
+            case RMAKER_EVENT_FACTORY_RESET:
+                esp_rmaker_reset_user_node_mapping();
+                break;
+            default:
+                break;
+        }
+}
+
 static char *esp_rmaker_populate_node_id(bool use_claiming)
 {
     char *node_id = esp_rmaker_factory_get("node_id");
@@ -90,7 +108,7 @@ static char *esp_rmaker_populate_node_id(bool use_claiming)
             ESP_LOGE(TAG, "Could not fetch MAC address. Please initialise Wi-Fi first");
             return NULL;
         }
-        node_id = calloc(1, ESP_CLAIM_NODE_ID_SIZE + 1); /* +1 for NULL terminatation */
+        node_id = MEM_CALLOC_EXTRAM(1, ESP_CLAIM_NODE_ID_SIZE + 1); /* +1 for NULL terminatation */
         snprintf(node_id, ESP_CLAIM_NODE_ID_SIZE + 1, "%02X%02X%02X%02X%02X%02X",
                 eth_mac[0], eth_mac[1], eth_mac[2], eth_mac[3], eth_mac[4], eth_mac[5]);
     }
@@ -130,13 +148,21 @@ static void esp_rmaker_event_handler(void* arg, esp_event_base_t event_base,
             ESP_LOGE(TAG, "Please update your phone apps and repeat Wi-Fi provisioning with BLE transport.");
         }
 #endif
-        if (wifi_event_group) {
+        if (rmaker_core_event_group) {
             /* Signal rmaker thread to continue execution */
-            xEventGroupSetBits(wifi_event_group, WIFI_CONNECTED_EVENT);
+            xEventGroupSetBits(rmaker_core_event_group, WIFI_CONNECTED_EVENT);
         }
-    } else if (event_base == RMAKER_EVENT && event_id == RMAKER_EVENT_USER_NODE_MAPPING_DONE) {
+    } else if (event_base == RMAKER_EVENT &&
+            (event_id == RMAKER_EVENT_USER_NODE_MAPPING_DONE ||
+            event_id == RMAKER_EVENT_USER_NODE_MAPPING_RESET)) {
+        esp_event_handler_unregister(RMAKER_EVENT, event_id, &esp_rmaker_event_handler);
         esp_rmaker_params_mqtt_init();
-        esp_event_handler_unregister(RMAKER_EVENT, RMAKER_EVENT_USER_NODE_MAPPING_DONE, &esp_rmaker_event_handler);
+        esp_rmaker_cmd_response_enable();
+    } else if (event_base == RMAKER_COMMON_EVENT && event_id == RMAKER_MQTT_EVENT_CONNECTED) {
+        if (rmaker_core_event_group) {
+            /* Signal rmaker thread to continue execution */
+            xEventGroupSetBits(rmaker_core_event_group, MQTT_CONNECTED_EVENT);
+        }
     }
 }
 
@@ -223,12 +249,17 @@ static void esp_rmaker_task(void *data)
     esp_rmaker_priv_data->state = ESP_RMAKER_STATE_STARTING;
     esp_err_t err = ESP_FAIL;
     wifi_ap_record_t ap_info;
-    wifi_event_group = xEventGroupCreate();
-    if (!wifi_event_group) {
+    rmaker_core_event_group = xEventGroupCreate();
+    if (!rmaker_core_event_group) {
         ESP_LOGE(TAG, "Failed to create event group. Aborting");
         goto rmaker_end;
     }
     err = esp_event_handler_register(IP_EVENT, IP_EVENT_STA_GOT_IP, &esp_rmaker_event_handler, esp_rmaker_priv_data);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to register event handler. Error: %d. Aborting", err);
+        goto rmaker_end;
+    }
+    err = esp_event_handler_register(RMAKER_COMMON_EVENT, RMAKER_MQTT_EVENT_CONNECTED, &esp_rmaker_event_handler, esp_rmaker_priv_data);
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "Failed to register event handler. Error: %d. Aborting", err);
         goto rmaker_end;
@@ -258,7 +289,7 @@ static void esp_rmaker_task(void *data)
     /* Check if already connected to Wi-Fi */
     if (esp_wifi_sta_get_ap_info(&ap_info) != ESP_OK) {
         /* Wait for Wi-Fi connection */
-        xEventGroupWaitBits(wifi_event_group, WIFI_CONNECTED_EVENT, false, true, portMAX_DELAY);
+        xEventGroupWaitBits(rmaker_core_event_group, WIFI_CONNECTED_EVENT, false, true, portMAX_DELAY);
     }
     esp_event_handler_unregister(IP_EVENT, IP_EVENT_STA_GOT_IP, &esp_rmaker_event_handler);
 
@@ -309,6 +340,9 @@ static void esp_rmaker_task(void *data)
         ESP_LOGE(TAG, "esp_rmaker_mqtt_connect() returned %d. Aborting", err);
         goto rmaker_end;
     }
+    ESP_LOGI(TAG, "Waiting for MQTT connection");
+    xEventGroupWaitBits(rmaker_core_event_group, MQTT_CONNECTED_EVENT, false, true, portMAX_DELAY);
+    esp_event_handler_unregister(RMAKER_COMMON_EVENT, RMAKER_MQTT_EVENT_CONNECTED, &esp_rmaker_event_handler);
     esp_rmaker_priv_data->mqtt_connected = true;
     esp_rmaker_priv_data->state = ESP_RMAKER_STATE_STARTED;
     err = esp_rmaker_report_node_config();
@@ -322,6 +356,11 @@ static void esp_rmaker_task(void *data)
             ESP_LOGE(TAG, "Aborting!!!");
             goto rmaker_end;
         }
+        err = esp_rmaker_cmd_response_enable();
+        if (err != ESP_OK) {
+            ESP_LOGE(TAG, "Aborting!!!");
+            goto rmaker_end;
+        }
     } else {
         /* If network is connected without even starting the user-node mapping workflow,
          * it could mean that some incorrect app was used to provision the device. Even
@@ -331,15 +370,15 @@ static void esp_rmaker_task(void *data)
          * status.
          */
         if (esp_rmaker_user_node_mapping_get_state() != ESP_RMAKER_USER_MAPPING_STARTED) {
-            esp_rmaker_start_user_node_mapping("esp-rmaker", "failed");
+            esp_rmaker_reset_user_node_mapping();
+            /* Wait for user reset to finish. */
+            err = esp_event_handler_register(RMAKER_EVENT, RMAKER_EVENT_USER_NODE_MAPPING_RESET,
+                    &esp_rmaker_event_handler, NULL);
+        } else {
+            /* Wait for User Node mapping to finish. */
+            err = esp_event_handler_register(RMAKER_EVENT, RMAKER_EVENT_USER_NODE_MAPPING_DONE,
+                    &esp_rmaker_event_handler, NULL);
         }
-        /* Wait for User Node mapping to finish. This will also consider the above dummy user
-         * node mapping request as a successful  mapping, but that is still fine since the
-         * cloud would have reset the mappings. This allows other alternative user node mappings
-         * to be used after this point, which may be independent of provisioning.
-         */
-        err = esp_event_handler_register(RMAKER_EVENT, RMAKER_EVENT_USER_NODE_MAPPING_DONE,
-                &esp_rmaker_event_handler, NULL);
         if (err != ESP_OK) {
             ESP_LOGE(TAG, "Aborting!!!");
             goto rmaker_end;
@@ -349,10 +388,10 @@ static void esp_rmaker_task(void *data)
     err = ESP_OK;
 
 rmaker_end:
-    if (wifi_event_group) {
-        vEventGroupDelete(wifi_event_group);
+    if (rmaker_core_event_group) {
+        vEventGroupDelete(rmaker_core_event_group);
     }
-    wifi_event_group = NULL;
+    rmaker_core_event_group = NULL;
     if (err == ESP_OK) {
         return;
     }
@@ -404,7 +443,7 @@ static esp_err_t esp_rmaker_init(const esp_rmaker_config_t *config, bool use_cla
         ESP_LOGE(TAG, "Failed to initialise storage");
         return ESP_FAIL;
     }
-    esp_rmaker_priv_data = calloc(1, sizeof(esp_rmaker_priv_data_t));
+    esp_rmaker_priv_data = MEM_CALLOC_EXTRAM(1, sizeof(esp_rmaker_priv_data_t));
     if (!esp_rmaker_priv_data) {
         ESP_LOGE(TAG, "Failed to allocate memory");
         return ESP_ERR_NO_MEM;
@@ -517,6 +556,7 @@ esp_err_t esp_rmaker_start(void)
         ESP_LOGE(TAG, "Couldn't create RainMaker Work Queue task");
         return ESP_FAIL;
     }
+    ESP_ERROR_CHECK(esp_event_handler_register(RMAKER_COMMON_EVENT, ESP_EVENT_ANY_ID, &reset_event_handler, NULL));
     return ESP_OK;
 }
 
@@ -526,4 +566,3 @@ esp_err_t esp_rmaker_stop()
     esp_rmaker_priv_data->state = ESP_RMAKER_STATE_STOP_REQUESTED;
     return ESP_OK;
 }
-

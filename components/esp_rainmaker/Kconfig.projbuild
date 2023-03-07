@@ -1,12 +1,42 @@
 menu "ESP RainMaker Config"
 
-    config ESP_RMAKER_SELF_CLAIM
-        bool "Use Self Claiming"
-        depends on IDF_TARGET_ESP32S2
-        default y
+    choice ESP_RMAKER_CLAIM_TYPE
+        bool "Claiming Type"
+        default ESP_RMAKER_SELF_CLAIM
+        default ESP_RMAKER_ASSISTED_CLAIM if IDF_TARGET_ESP32
         help
-            Use Self Claiming i.e. get the MQTT credentials
-            directly from the claiming service.
+            Claiming type to be used.
+
+        config ESP_RMAKER_NO_CLAIM
+            bool "Do not use Claiming"
+            help
+                Do not use any claiming. The MQTT credentials need to
+                be pre-programmed for this to work. This should be used
+                for all private RainMaker deployments.
+
+        config ESP_RMAKER_SELF_CLAIM
+            bool "Use Self Claiming"
+            depends on !IDF_TARGET_ESP32
+            help
+                Use Self Claiming i.e. get the MQTT credentials
+                directly from the claiming service.
+
+        config ESP_RMAKER_ASSISTED_CLAIM
+            bool "Use Assisted Claiming"
+            depends on BT_ENABLED && !IDF_TARGET_ESP32S2
+            help
+                Use Assisted Claiming i.e. get the MQTT credentials
+                from the claiming service via assistance from clients,
+                like the phone apps.
+
+    endchoice
+
+
+    config ESP_RMAKER_CLAIM_TYPE
+        int
+        default 0 if ESP_RMAKER_NO_CLAIM
+        default 1 if ESP_RMAKER_SELF_CLAIM
+        default 2 if ESP_RMAKER_ASSISTED_CLAIM
 
     config ESP_RMAKER_CLAIM_SERVICE_BASE_URL
         string "ESP RainMaker Claiming Service Base URL"
@@ -15,22 +45,59 @@ menu "ESP RainMaker Config"
         help
             ESP RainMaker Claiming Service Base URL.
 
-    config ESP_RMAKER_ASSISTED_CLAIM
-        bool "Use Assisted Claiming"
-        depends on BT_ENABLED
-        select MBEDTLS_HARDWARE_MPI
-        default y
-        help
-            Use Assisted Claiming i.e. get the MQTT credentials
-            from the claiming service via assistance from clients,
-            like the phone apps.
-
     config ESP_RMAKER_MQTT_HOST
         string "ESP RainMaker MQTT Host"
         depends on ESP_RMAKER_SELF_CLAIM || ESP_RMAKER_ASSISTED_CLAIM
         default "a1p72mufdu6064-ats.iot.us-east-1.amazonaws.com"
         help
             ESP RainMaker MQTT Host name.
+
+    config ESP_RMAKER_MQTT_USE_BASIC_INGEST_TOPICS
+        bool "Use Basic Ingest Topics"
+        default y
+        help
+            This config enables the use of AWS Basic Ingest Topics for Node to Cloud communication, 
+            which eliminates the MQTT Broker and thus reduces messaging cost.
+
+    config ESP_RMAKER_MQTT_ENABLE_BUDGETING
+        bool "Enable MQTT budgeting"
+        default y
+        help
+            Enable MQTT budgeting, which will control the number of MQTT messages sent by the node.
+
+    config ESP_RMAKER_MQTT_DEFAULT_BUDGET
+        int "Default MQTT Budget"
+        depends on ESP_RMAKER_MQTT_ENABLE_BUDGETING
+        default 100
+        range 64 ESP_RMAKER_MQTT_MAX_BUDGET
+        help
+            Default MQTT budget. Budget will reduce on sending an MQTT message and increase based on
+            ESP_RMAKER_MQTT_BUDGET_REVIVE_PERIOD. If no budget is available, MQTT message will be dropped.
+
+    config ESP_RMAKER_MQTT_MAX_BUDGET
+        int "Max MQTT Budget"
+        depends on ESP_RMAKER_MQTT_ENABLE_BUDGETING
+        default 1024
+        range 64 2048
+        help
+            Maximum budget that the node can have. No additional budget will be allocated if this count is reached.
+
+    config ESP_RMAKER_MQTT_BUDGET_REVIVE_PERIOD
+        int "MQTT Budget revive period"
+        depends on ESP_RMAKER_MQTT_ENABLE_BUDGETING
+        default 5
+        range 5 600
+        help
+            Period in seconds after which the MQTT budget should revive (by ESP_RMAKER_MQTT_BUDGET_REVIVE_COUNT).
+            This is used to limit the messages being sent by the node.
+
+    config ESP_RMAKER_MQTT_BUDGET_REVIVE_COUNT
+        int "MQTT Budget revive count"
+        depends on ESP_RMAKER_MQTT_ENABLE_BUDGETING
+        default 1
+        range 1 16
+        help
+            The count by which the budget will be increased periodically based on ESP_RMAKER_MQTT_BUDGET_REVIVE_PERIOD.
 
     config ESP_RMAKER_MAX_PARAM_DATA_SIZE
         int "Maximum Parameters' data size"
@@ -59,6 +126,14 @@ menu "ESP RainMaker Config"
             can take appropriate action w.r.t user permissions. It is recommended to enable this option
             for security reasons.
 
+    config RMAKER_NAME_PARAM_CB
+        bool "Call device callback for Name param"
+        default n
+        help
+            By default, the "Name" parameter (esp.param.name) changes are handled internally. If Applications
+            want to handle this themselves, this config option can be enabled. Please ensure that you update
+            and report the name parameter in your callback so that it reflects correctly everywhere.
+            If no device callback is registered, the name paramater will be handled internally.
 
     config ESP_RMAKER_LOCAL_CTRL_ENABLE
         bool "ESP RainMaker Local Control"
@@ -77,6 +152,24 @@ menu "ESP RainMaker Config"
         help
             The port number to be used for http for local control.
 
+    choice ESP_RMAKER_LOCAL_CTRL_SECURITY
+        prompt "Local Control Security Type"
+        depends on ESP_RMAKER_LOCAL_CTRL_ENABLE
+        default ESP_RMAKER_LOCAL_CTRL_SECURITY_1
+        help
+            Security type to be selected for local control.
+
+        config ESP_RMAKER_LOCAL_CTRL_SECURITY_0
+            bool "sec0"
+        config ESP_RMAKER_LOCAL_CTRL_SECURITY_1
+            bool "sec1"
+    endchoice
+
+    config ESP_RMAKER_LOCAL_CTRL_SECURITY
+        int
+        default 0 if ESP_RMAKER_LOCAL_CTRL_SECURITY_0
+        default 1 if ESP_RMAKER_LOCAL_CTRL_SECURITY_1
+
     choice ESP_RMAKER_CONSOLE_UART_NUM
         prompt "UART for console input"
         default ESP_RMAKER_CONSOLE_UART_NUM_0
@@ -93,6 +186,15 @@ menu "ESP RainMaker Config"
         int
         default 0 if ESP_RMAKER_CONSOLE_UART_NUM_0
         default 1 if ESP_RMAKER_CONSOLE_UART_NUM_1
+
+    config ESP_RMAKER_USE_CERT_BUNDLE
+        bool "Use Certificate Bundle"
+        default y
+        select ESP_RMAKER_MQTT_USE_CERT_BUNDLE
+        help
+            Use Certificate Bundle for server authentication. Enabling this is recommended to safeguard
+            against any changes in the server certificates in future. This has an impact on the binary
+            size as well as heap requirement.
 
     menu "ESP RainMaker OTA Config"
 
@@ -129,6 +231,13 @@ menu "ESP RainMaker Config"
                 This allows you to skip the firmware version check. Useful during development,
                 but not for production.
 
+        config ESP_RMAKER_SKIP_SECURE_VERSION_CHECK
+            bool "Skip secure version check"
+            default n
+            help
+                This allows you to skip the secure version check. Useful during development,
+                but not for production. Check out ESP IDF's Anti-rollback feature for more details.
+
         config ESP_RMAKER_SKIP_PROJECT_NAME_CHECK
             bool "Skip project name check"
             default n
@@ -140,10 +249,27 @@ menu "ESP RainMaker Config"
             default 1024
             range 512 LWIP_TCP_WND_DEFAULT
             help
-                Increasing this value beyond the default would speed up the OTA download process. 
-                However, please ensure that your application has enough memory headroom to allow this, 
+                Increasing this value beyond the default would speed up the OTA download process.
+                However, please ensure that your application has enough memory headroom to allow this,
                 else, the OTA may fail.
-                
+
+        config ESP_RMAKER_OTA_ROLLBACK_WAIT_PERIOD
+            int "OTA Rollback Wait Period (Seconds)"
+            default 90
+            range 30 600
+            help
+                After an OTA Update, if CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE is set, then the firmware will wait for MQTT
+                connection to mark the new firmware as valid. However, if it is not able to do so within
+                this wait period (in seconds), the firmware will be marked as invalid and the older
+                firmware will be booted into.
+
+        config ESP_RMAKER_OTA_DISABLE_AUTO_REBOOT
+            bool "Disable auto reboot"
+            default n
+            help
+                After OTA image is flashed and active partition changed, the device automatically reboots. To disable this
+                behaviour and handle reboot on your own, based on RMAKER_OTA event, enable this option.
+
     endmenu
 
     menu "ESP RainMaker Scheduling"
@@ -154,6 +280,46 @@ menu "ESP RainMaker Config"
             range 1 50
             help
                 Maximum Number of schedules allowed. The json size for report params increases as the number of schedules increases.
+
+    endmenu
+
+    menu "ESP RainMaker Scenes"
+
+        config ESP_RMAKER_SCENES_MAX_SCENES
+            int "Maximum scenes"
+            default 10
+            range 1 50
+            help
+                Maximum Number of scenes allowed. The json size for report params increases as the number of scenes increases.
+
+        config ESP_RMAKER_SCENES_DEACTIVATE_SUPPORT
+            bool "Enable Deactivate support"
+            default n
+            help
+                This enables the deactivate callback support. The application callback will be invoked with the source
+                set to ESP_RMAKER_REQ_SRC_SCENE_DEACTIVATE when the deactivate operation is received. However, the
+                param values would be the same as those for activate, since the RainMaker core does not know what the
+                expected values are for scene deactivation.
+
+    endmenu
+
+    menu "ESP RainMaker Command-Response"
+
+        config ESP_RMAKER_CMD_RESP_ENABLE
+            bool "Enable Command-Response Module"
+            default y
+            help
+                Enable the ESP RainMaker Command-Response module for semi-synchronous communication. Please refer the RainMaker documents
+                for additional information.
+
+        config ESP_RMAKER_CMD_RESP_TEST_ENABLE
+            bool "Enable Command-Response Testing"
+            default n
+            depends on ESP_RMAKER_CMD_RESP_ENABLE
+            help
+                Enable testing for Command-Response module. This enables triggering commands and parsing response from the node itself,
+                rather than receiving the commands from cloud. C API or the serial console can be used to trigger the commands.
+                This should be enabled only while testing commands, but should always be disabled in production firmware.
 
     endmenu
 

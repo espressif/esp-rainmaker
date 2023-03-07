@@ -14,10 +14,17 @@
 #include <sdkconfig.h>
 #include <string.h>
 #include <esp_log.h>
+#include <esp_ota_ops.h>
 #include <json_generator.h>
 #include <esp_rmaker_core.h>
+#include <esp_rmaker_utils.h>
 #include "esp_rmaker_internal.h"
 #include "esp_rmaker_mqtt.h"
+#include "esp_rmaker_mqtt_topics.h"
+
+#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 0, 0)
+#include <esp_app_desc.h>
+#endif
 
 #define NODE_CONFIG_TOPIC_SUFFIX        "config"
 
@@ -32,7 +39,18 @@ static esp_err_t esp_rmaker_report_info(json_gen_str_t *jptr)
     json_gen_obj_set_string(jptr, "name",  info->name);
     json_gen_obj_set_string(jptr, "fw_version",  info->fw_version);
     json_gen_obj_set_string(jptr, "type",  info->type);
+    if (info->subtype) {
+        json_gen_obj_set_string(jptr, "subtype",  info->subtype);
+    }
     json_gen_obj_set_string(jptr, "model",  info->model);
+    const esp_app_desc_t *app_desc;
+#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 0, 0)
+    app_desc = esp_app_get_description();
+#else
+    app_desc = esp_ota_get_app_description();
+#endif
+    json_gen_obj_set_string(jptr, "project_name", (char *)app_desc->project_name);
+    json_gen_obj_set_string(jptr, "platform", CONFIG_IDF_TARGET);
     json_gen_pop_object(jptr);
     return ESP_OK;
 }
@@ -94,29 +112,29 @@ esp_err_t esp_rmaker_report_value(const esp_rmaker_param_val_t *val, char *key, 
     return ESP_OK;
 }
 
-esp_err_t esp_rmaker_report_data_type(esp_rmaker_val_type_t type, json_gen_str_t *jptr)
+esp_err_t esp_rmaker_report_data_type(esp_rmaker_val_type_t type, char *data_type_key, json_gen_str_t *jptr)
 {
     switch (type) {
         case RMAKER_VAL_TYPE_BOOLEAN:
-            json_gen_obj_set_string(jptr, "data_type", "bool");
+            json_gen_obj_set_string(jptr, data_type_key, "bool");
             break;
         case RMAKER_VAL_TYPE_INTEGER:
-            json_gen_obj_set_string(jptr, "data_type", "int");
+            json_gen_obj_set_string(jptr, data_type_key, "int");
             break;
         case RMAKER_VAL_TYPE_FLOAT:
-            json_gen_obj_set_string(jptr, "data_type", "float");
+            json_gen_obj_set_string(jptr, data_type_key, "float");
             break;
         case RMAKER_VAL_TYPE_STRING:
-            json_gen_obj_set_string(jptr, "data_type", "string");
+            json_gen_obj_set_string(jptr, data_type_key, "string");
             break;
         case RMAKER_VAL_TYPE_OBJECT:
-            json_gen_obj_set_string(jptr, "data_type", "object");
+            json_gen_obj_set_string(jptr, data_type_key, "object");
             break;
         case RMAKER_VAL_TYPE_ARRAY:
-            json_gen_obj_set_string(jptr, "data_type", "array");
+            json_gen_obj_set_string(jptr, data_type_key, "array");
             break;
         default:
-            json_gen_obj_set_string(jptr, "data_type", "invalid");
+            json_gen_obj_set_string(jptr, data_type_key, "invalid");
             break;
     }
     return ESP_OK;
@@ -131,7 +149,7 @@ static esp_err_t esp_rmaker_report_param_config(_esp_rmaker_param_t *param, json
     if (param->type) {
         json_gen_obj_set_string(jptr, "type", param->type);
     }
-    esp_rmaker_report_data_type(param->val.type, jptr);
+    esp_rmaker_report_data_type(param->val.type, "data_type", jptr);
     json_gen_push_array(jptr, "properties");
     if (param->prop_flags & PROP_FLAG_READ) {
         json_gen_arr_set_string(jptr, "read");
@@ -187,6 +205,9 @@ static esp_err_t esp_rmaker_report_devices_or_services(json_gen_str_t *jptr, cha
             if (device->subtype) {
                 json_gen_obj_set_string(jptr, "subtype", device->subtype);
             }
+            if (device->model) {
+                json_gen_obj_set_string(jptr, "model", device->model);
+            }
             if (device->attributes) {
                 json_gen_push_array(jptr, "attributes");
                 esp_rmaker_attr_t *attr = device->attributes;
@@ -239,7 +260,7 @@ char *esp_rmaker_get_node_config(void)
         ESP_LOGE(TAG, "Failed to get required size for Node config JSON.");
         return NULL;
     }
-    char *node_config = calloc(1, req_size);
+    char *node_config = MEM_CALLOC_EXTRAM(1, req_size);
     if (!node_config) {
         ESP_LOGE(TAG, "Failed to allocate %d bytes for node config", req_size);
         return NULL;
@@ -260,9 +281,8 @@ esp_err_t esp_rmaker_report_node_config()
         ESP_LOGE(TAG, "Could not get node configuration for reporting to cloud");
         return ESP_FAIL;
     }
-
-    char publish_topic[100];
-    snprintf(publish_topic, sizeof(publish_topic), "node/%s/%s", esp_rmaker_get_node_id(), NODE_CONFIG_TOPIC_SUFFIX);
+    char publish_topic[MQTT_TOPIC_BUFFER_SIZE];
+    esp_rmaker_create_mqtt_topic(publish_topic, MQTT_TOPIC_BUFFER_SIZE, NODE_CONFIG_TOPIC_SUFFIX, NODE_CONFIG_TOPIC_RULE);
     ESP_LOGI(TAG, "Reporting Node Configuration of length %d bytes.", strlen(publish_payload));
     ESP_LOGD(TAG, "%s", publish_payload);
     esp_err_t ret = esp_rmaker_mqtt_publish(publish_topic, publish_payload, strlen(publish_payload),

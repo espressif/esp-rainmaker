@@ -63,6 +63,9 @@ void app_main()
     esp_rmaker_device_add_param(temp_sensor_device, esp_rmaker_humidity_param_create(ESP_RMAKER_DEF_HUMIDITY_NAME, app_get_current_humidity()));
     esp_rmaker_node_add_device(node, temp_sensor_device);
 
+    /* Enable OTA */
+    esp_rmaker_ota_enable_default();
+
     /* Enable Insights. Requires CONFIG_ESP_INSIGHTS_ENABLED=y */
     app_insights_enable();
 

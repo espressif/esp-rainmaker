@@ -1,0 +1,101 @@
+name: Compilation error report
+description: Report build issues
+labels: ['Type: Bug']
+body:
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Answers checklist.
+      description: Before submitting a new issue, please follow the checklist and try to find the answer.
+      options:
+        - label: I have read the [Rainmaker documentation](https://rainmaker.espressif.com/docs/get-started.html) and the issue is not addressed there.
+          required: true
+        - label: I have updated my IDF branch (release/vX.Y) to the latest version and checked that the issue is present there. This is not applicable if you are using Rainmaker with Arduino.
+          required: true
+        - label: I have searched the [Rainmaker forum](https://www.esp32.com/viewforum.php?f=41) and issue tracker for a similar issue and not found a similar issue.
+          required: true
+  - type: input
+    id: idf_version
+    attributes:
+      label: IDF / ESP32-Arduino version.
+      description: On which IDF version does this issue occur on? Run `git describe --tags` or `idf.py --version` to find it. For Arduino users, mention the version of ESP32-Arduino (from Boards manager).
+      placeholder: ex. v3.2-dev-1148-g96cd3b75c / ESP32-Arduino 2.0.6
+    validations:
+      required: true
+  - type: dropdown
+    id: operating_system
+    attributes:
+      label: Operating System used.
+      multiple: false
+      options:
+        - Windows
+        - Linux
+        - macOS
+    validations:
+      required: true
+  - type: dropdown
+    id: build
+    attributes:
+      label: How did you build your project?
+      multiple: false
+      options:
+        - Command line with Make
+        - Command line with CMake
+        - Command line with idf.py
+        - Arduino IDE
+        - Other (please specify in More Information)
+    validations:
+      required: true
+  - type: input
+    id: devkit
+    attributes:
+      label: Development Kit.
+      description: On which Development Kit does this issue occur on?
+      placeholder: ex. ESP32-Wrover-Kit v2 | Custom Board
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What is the expected behavior?
+      description: Please provide a clear and concise description of the expected behavior.
+      placeholder: I expected it to...
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: What is the actual behavior?
+      description: Please describe actual behavior.
+      placeholder: Instead it...
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce.
+      description: 'How do you trigger this bug? Please walk us through it step by step. Please attach sdkconfig file (from your project folder). Please attach your code here or the name of the rainmaker example.'
+      value: |
+        1. Step
+        2. Step
+        3. Step
+        ...
+    validations:
+      required: true
+  - type: textarea
+    id: debug_logs
+    attributes:
+      label: Build Logs.
+      description: Compilation log goes here, should contain the backtrace, as well as the reset source if it is a crash.
+      placeholder: Your log goes here.
+      render: plain
+    validations:
+      required: false
+  - type: textarea
+    id: more-info
+    attributes:
+      label: More Information.
+      description: Do you have any other information from investigating this?
+      placeholder: ex. I tried on my friend's Windows 10 PC and the command works there.
+    validations:
+      required: false

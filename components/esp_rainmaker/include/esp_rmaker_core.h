@@ -47,6 +47,10 @@ typedef enum {
      * Associated data is the NULL terminated user id.
      */
     RMAKER_EVENT_USER_NODE_MAPPING_DONE,
+    /** Local control started. Associated data is the NULL terminated Service Name */
+    RMAKER_EVENT_LOCAL_CTRL_STARTED,
+    /* User reset request successfully sent to ESP RainMaker Cloud */
+    RMAKER_EVENT_USER_NODE_MAPPING_RESET,
 } esp_rmaker_event_t;
 
 /** ESP RainMaker Node information */
@@ -59,6 +63,8 @@ typedef struct {
     char *fw_version;
     /** Model (Optional). If not set, PROJECT_NAME is used as default (recommended)*/
     char *model;
+    /** Subtype (Optional). */
+    char *subtype;
 } esp_rmaker_node_info_t;
 
 /** ESP RainMaker Configuration */
@@ -150,6 +156,10 @@ typedef enum {
     ESP_RMAKER_REQ_SRC_CLOUD,
     /** Request received when a schedule has triggered */
     ESP_RMAKER_REQ_SRC_SCHEDULE,
+    /** Request received when a scene has been activated */
+    ESP_RMAKER_REQ_SRC_SCENE_ACTIVATE,
+    /** Request received when a scene has been deactivated */
+    ESP_RMAKER_REQ_SRC_SCENE_DEACTIVATE,
     /** Request received from a local controller */
     ESP_RMAKER_REQ_SRC_LOCAL,
     /** This will always be the last value. Any value equal to or
@@ -377,7 +387,7 @@ esp_err_t esp_rmaker_node_deinit(const esp_rmaker_node_t *node);
 const esp_rmaker_node_t *esp_rmaker_get_node(void);
 
 /** Get Node Id
- * 
+ *
  * Returns pointer to the NULL terminated Node ID string.
  *
  * @return Pointer to a NULL terminated Node ID string.
@@ -422,10 +432,11 @@ esp_err_t esp_rmaker_node_add_attribute(const esp_rmaker_node_t *node, const cha
  */
 esp_err_t esp_rmaker_node_add_fw_version(const esp_rmaker_node_t *node, const char *fw_version);
 
-/** Add model for a node (Not recommended)
+/** Add model for a node
  *
  * Model is set internally to the project name. This API can be used to
- * override that name.
+ * override that name, now that a new field "project" has also been added
+ * internally to the node info.
  *
  * @param node Node handle.
  * @param[in] model New model string.
@@ -434,6 +445,16 @@ esp_err_t esp_rmaker_node_add_fw_version(const esp_rmaker_node_t *node, const ch
  * @return error in case of failure.
  */
 esp_err_t esp_rmaker_node_add_model(const esp_rmaker_node_t *node, const char *model);
+
+/** Add subtype for a node
+ *
+ * @param node Node handle.
+ * @param[in] subtype Subtype string.
+ *
+ * @return ESP_OK on success.
+ * @return error in case of failure.
+ */
+esp_err_t esp_rmaker_node_add_subtype(const esp_rmaker_node_t *node, const char *subtype);
 
 /**
  * Create a Device
@@ -541,7 +562,7 @@ esp_rmaker_device_t *esp_rmaker_node_get_device_by_name(const esp_rmaker_node_t 
  * @note Device attributes are reported only once after a boot-up as part of the node
  * configuration.
  * Eg. Serial Number
- * 
+ *
  * @param[in] device Device handle.
  * @param[in] attr_name Name of the attribute.
  * @param[in] val Value of the attribute.
@@ -563,6 +584,18 @@ esp_err_t esp_rmaker_device_add_attribute(const esp_rmaker_device_t *device, con
  * @return error in case of failure.
  */
 esp_err_t esp_rmaker_device_add_subtype(const esp_rmaker_device_t *device, const char *subtype);
+
+/** Add a Device model
+ *
+ * This would primarily be used by the phone apps to render different icons for the same device type.
+ *
+ * @param[in] device Device handle.
+ * @param[in] model String describing the model.
+ *
+ * @return ESP_OK if the model was added successfully.
+ * @return error in case of failure.
+ */
+esp_err_t esp_rmaker_device_add_model(const esp_rmaker_device_t *device, const char *model);
 
 /** Get device name from handle
  *
@@ -729,6 +762,30 @@ esp_err_t esp_rmaker_param_add_valid_str_list(const esp_rmaker_param_t *param, c
  */
 esp_err_t esp_rmaker_param_add_array_max_count(const esp_rmaker_param_t *param, int count);
 
+
+/* Update a parameter
+ *
+ * This will just update the value of a parameter with esp rainmaker core, without actually reporting
+ * it. This can be used when multiple parameters need to be reported together.
+ * Eg. If x parameters are to be reported, this API can be used for the first x -1 parameters
+ * and the last one can be updated using esp_rmaker_param_update_and_report().
+ * This will report all parameters which were updated prior to this call.
+ *
+ * Sample:
+ *
+ * esp_rmaker_param_update(param1, esp_rmaker_float(10.2));
+ * esp_rmaker_param_update(param2, esp_rmaker_int(55));
+ * esp_rmaker_param_update(param3, esp_rmaker_int(95));
+ * esp_rmaker_param_update_and_report(param1, esp_rmaker_bool(true));
+ *
+ * @param[in] param Parameter handle.
+ * @param[in] val New value of the parameter.
+ *
+ * @return ESP_OK if the parameter was updated successfully.
+ * @return error in case of failure.
+ */
+esp_err_t esp_rmaker_param_update(const esp_rmaker_param_t *param, esp_rmaker_param_val_t val);
+
 /** Update and report a parameter
  *
  * Calling this API will update the parameter and report it to ESP RainMaker cloud.
@@ -852,7 +909,42 @@ esp_err_t esp_rmaker_timezone_service_enable(void);
  */
 esp_err_t esp_rmaker_system_service_enable(esp_rmaker_system_serv_config_t *config);
 
+/**
+ * Check if local_ctrl service has started
+ *
+ * @return true if service has started
+ * @return false if the service has not started
+ */
+bool esp_rmaker_local_ctrl_service_started(void);
 
+/**
+ * Enable Default RainMaker OTA Firmware Upgrade
+ *
+ * This enables the default recommended RainMaker OTA Firmware Upgrade, which is
+ * "Using the Topics", which allows performing OTA from Dashboard.
+ * This OTA can be triggered by Admin Users only.
+ * On Public RainMaker deployment, for nodes using "Self Claiming", since there
+ * is no associated admin user, the Primary user will automatically become the admin
+ * and can perform OTA from dashboard.
+ *
+ * @return ESP_OK on success
+ * @return error on failure
+ */
+esp_err_t esp_rmaker_ota_enable_default(void);
+
+/*
+ * Send a command to self (TESTING only)
+ *
+ * This is to be passed as an argument to esp_rmaker_cmd_resp_test_send().
+ *
+ * @param[in] cmd The TLV encoded command data.
+ * @param[in] cmd_len Length of the command data.
+ * @param[in] priv_data Private data passed to esp_rmaker_cmd_resp_test_send().
+ *
+ * @return ESP_OK on success
+ * @return error on failure
+ */
+esp_err_t esp_rmaker_test_cmd_resp(const void *cmd, size_t cmd_len, void *priv_data);
 #ifdef __cplusplus
 }
 #endif

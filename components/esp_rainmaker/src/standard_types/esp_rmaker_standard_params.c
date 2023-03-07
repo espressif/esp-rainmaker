@@ -114,7 +114,10 @@ esp_rmaker_param_t *esp_rmaker_speed_param_create(const char *param_name, int va
 esp_rmaker_param_t *esp_rmaker_temperature_param_create(const char *param_name, float val)
 {
     esp_rmaker_param_t *param = esp_rmaker_param_create(param_name, ESP_RMAKER_PARAM_TEMPERATURE,
-            esp_rmaker_float(val), PROP_FLAG_READ);
+            esp_rmaker_float(val), PROP_FLAG_READ | PROP_FLAG_TIME_SERIES);
+    if (param) {
+        esp_rmaker_param_add_ui_type(param, ESP_RMAKER_UI_TEXT);
+    }
     return param;
 }
 
@@ -168,6 +171,14 @@ esp_rmaker_param_t *esp_rmaker_schedules_param_create(const char *param_name, in
     return param;
 }
 
+esp_rmaker_param_t *esp_rmaker_scenes_param_create(const char *param_name, int max_scenes)
+{
+    esp_rmaker_param_t *param = esp_rmaker_param_create(param_name, ESP_RMAKER_PARAM_SCENES,
+            esp_rmaker_array("[]"), PROP_FLAG_READ | PROP_FLAG_WRITE | PROP_FLAG_PERSIST);
+    esp_rmaker_param_add_array_max_count(param, max_scenes);
+    return param;
+}
+
 esp_rmaker_param_t *esp_rmaker_reboot_param_create(const char *param_name)
 {
     esp_rmaker_param_t *param = esp_rmaker_param_create(param_name, ESP_RMAKER_PARAM_REBOOT,
@@ -186,5 +197,19 @@ esp_rmaker_param_t *esp_rmaker_wifi_reset_param_create(const char *param_name)
 {
     esp_rmaker_param_t *param = esp_rmaker_param_create(param_name, ESP_RMAKER_PARAM_WIFI_RESET,
             esp_rmaker_bool(false), PROP_FLAG_READ | PROP_FLAG_WRITE);
+    return param;
+}
+
+esp_rmaker_param_t *esp_rmaker_local_control_pop_param_create(const char *param_name, const char *val)
+{
+    esp_rmaker_param_t *param = esp_rmaker_param_create(param_name, ESP_RMAKER_PARAM_LOCAL_CONTROL_POP,
+            esp_rmaker_str(val), PROP_FLAG_READ);
+    return param;
+}
+
+esp_rmaker_param_t *esp_rmaker_local_control_type_param_create(const char *param_name, int val)
+{
+    esp_rmaker_param_t *param = esp_rmaker_param_create(param_name, ESP_RMAKER_PARAM_LOCAL_CONTROL_TYPE,
+            esp_rmaker_int(val), PROP_FLAG_READ);
     return param;
 }

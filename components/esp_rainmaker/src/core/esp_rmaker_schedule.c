@@ -14,6 +14,7 @@
 
 #include <time.h>
 #include <string.h>
+#include <inttypes.h>
 #include <esp_log.h>
 #include <esp_err.h>
 #include <freertos/FreeRTOS.h>
@@ -23,6 +24,7 @@
 #include <esp_rmaker_core.h>
 #include <esp_rmaker_utils.h>
 #include <esp_rmaker_internal.h>
+#include <esp_rmaker_utils.h>
 #include <esp_rmaker_standard_services.h>
 #include <esp_rmaker_standard_types.h>
 #include <esp_rmaker_schedule.h>
@@ -47,7 +49,7 @@ typedef enum trigger_type {
 typedef struct esp_rmaker_schedule_trigger {
     trigger_type_t type;
     /* Relative Seconds */
-    uint16_t relative_seconds;
+    int relative_seconds;
     /* Minutes from 12am */
     uint16_t minutes;
     struct {
@@ -157,12 +159,12 @@ static esp_rmaker_schedule_t *esp_rmaker_schedule_get_schedule_from_index(int32_
     esp_rmaker_schedule_t *schedule = schedule_priv_data->schedule_list;
     while(schedule) {
         if (schedule->index == index) {
-            ESP_LOGD(TAG, "Schedule with index %d found in list for get.", index);
+            ESP_LOGD(TAG, "Schedule with index %"PRIi32" found in list for get.", index);
             return schedule;
         }
         schedule = schedule->next;
     }
-    ESP_LOGD(TAG, "Schedule with index %d not found in list for get.", index);
+    ESP_LOGD(TAG, "Schedule with index %"PRIi32" not found in list for get.", index);
     return NULL;
 }
 
@@ -293,7 +295,7 @@ static void esp_rmaker_schedule_trigger_work_cb(void *priv_data)
     int32_t index = (int32_t)priv_data;
     esp_rmaker_schedule_t *schedule = esp_rmaker_schedule_get_schedule_from_index(index);
     if (!schedule) {
-        ESP_LOGE(TAG, "Schedule with index %d not found for trigger work callback", index);
+        ESP_LOGE(TAG, "Schedule with index %"PRIi32" not found for trigger work callback", index);
         return;
     }
     esp_rmaker_schedule_process_action(&schedule->action);
@@ -315,7 +317,7 @@ static void esp_rmaker_schedule_timestamp_common_cb(esp_schedule_handle_t handle
     int32_t index = (int32_t)priv_data;
     esp_rmaker_schedule_t *schedule = esp_rmaker_schedule_get_schedule_from_index(index);
     if (!schedule) {
-        ESP_LOGE(TAG, "Schedule with index %d not found for timestamp callback", index);
+        ESP_LOGE(TAG, "Schedule with index %"PRIi32" not found for timestamp callback", index);
         return;
     }
     schedule->trigger.next_timestamp = next_timestamp;
@@ -562,7 +564,7 @@ static esp_err_t esp_rmaker_schedule_parse_action(jparse_ctx_t *jctx, esp_rmaker
     if (action->data) {
         free(action->data);
     }
-    action->data = (void *)calloc(1, action->data_len);
+    action->data = (void *)MEM_CALLOC_EXTRAM(1, action->data_len);
     if (!action->data) {
         ESP_LOGE(TAG, "Could not allocate action");
         return ESP_ERR_NO_MEM;
@@ -634,7 +636,7 @@ static esp_err_t esp_rmaker_schedule_parse_info_and_flags(jparse_ctx_t *jctx, ch
 
         if (strlen(_info) > 0) {
             /* +1 for NULL termination */
-            *info = (char *)calloc(1, strlen(_info) + 1);
+            *info = (char *)MEM_CALLOC_EXTRAM(1, strlen(_info) + 1);
             if (*info) {
                 strncpy(*info, _info, strlen(_info));
             }
@@ -671,7 +673,7 @@ static esp_rmaker_schedule_t *esp_rmaker_schedule_find_or_create(jparse_ctx_t *j
         }
 
         /* This is a new schedule. Fill it. */
-        schedule = (esp_rmaker_schedule_t *)calloc(1, sizeof(esp_rmaker_schedule_t));
+        schedule = (esp_rmaker_schedule_t *)MEM_CALLOC_EXTRAM(1, sizeof(esp_rmaker_schedule_t));
         if (!schedule) {
             ESP_LOGE(TAG, "Couldn't allocate schedule with id: %s", id);
             return NULL;
@@ -890,7 +892,7 @@ static char *esp_rmaker_schedule_get_params(void)
         ESP_LOGE(TAG, "Failed to get required size for schedules JSON.");
         return NULL;
     }
-    char *data = calloc(1, req_size);
+    char *data = MEM_CALLOC_EXTRAM(1, req_size);
     if (!data) {
         ESP_LOGE(TAG, "Failed to allocate %d bytes for schedule.", req_size);
         return NULL;
@@ -939,7 +941,7 @@ static esp_err_t write_cb(const esp_rmaker_device_t *device, const esp_rmaker_pa
 
 esp_err_t esp_rmaker_schedule_enable(void)
 {
-    schedule_priv_data = (esp_rmaker_schedule_priv_data_t *)calloc(1, sizeof(esp_rmaker_schedule_priv_data_t));
+    schedule_priv_data = (esp_rmaker_schedule_priv_data_t *)MEM_CALLOC_EXTRAM(1, sizeof(esp_rmaker_schedule_priv_data_t));
     if (!schedule_priv_data) {
         ESP_LOGE(TAG, "Couldn't allocate schedule_priv_data");
         return ESP_ERR_NO_MEM;

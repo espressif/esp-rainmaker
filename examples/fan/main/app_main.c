@@ -17,6 +17,7 @@
 #include <esp_rmaker_standard_params.h>
 #include <esp_rmaker_standard_devices.h>
 #include <esp_rmaker_schedule.h>
+#include <esp_rmaker_scenes.h>
 
 #include <app_wifi.h>
 #include <app_insights.h>
@@ -70,7 +71,7 @@ void app_main()
     /* Initialize Wi-Fi. Note that, this should be called before esp_rmaker_node_init()
      */
     app_wifi_init();
-    
+
     /* Initialize the ESP RainMaker Agent.
      * Note that this should be called after app_wifi_init() but before app_wifi_start()
      * */
@@ -90,6 +91,9 @@ void app_main()
     esp_rmaker_device_add_param(fan_device, esp_rmaker_speed_param_create(ESP_RMAKER_DEF_SPEED_NAME, DEFAULT_SPEED));
     esp_rmaker_node_add_device(node, fan_device);
 
+    /* Enable OTA */
+    esp_rmaker_ota_enable_default();
+
     /* Enable timezone service which will be require for setting appropriate timezone
      * from the phone apps for scheduling to work correctly.
      * For more information on the various ways of setting timezone, please check
@@ -99,6 +103,9 @@ void app_main()
 
     /* Enable scheduling. */
     esp_rmaker_schedule_enable();
+
+    /* Enable Scenes */
+    esp_rmaker_scenes_enable();
 
     /* Enable Insights. Requires CONFIG_ESP_INSIGHTS_ENABLED=y */
     app_insights_enable();

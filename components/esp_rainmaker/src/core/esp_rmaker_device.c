@@ -17,6 +17,7 @@
 
 #include <esp_rmaker_core.h>
 #include <esp_rmaker_standard_types.h>
+#include <esp_rmaker_utils.h>
 
 #include "esp_rmaker_internal.h"
 
@@ -45,6 +46,9 @@ esp_err_t esp_rmaker_device_delete(const esp_rmaker_device_t *device)
         if (_device->subtype) {
             free(_device->subtype);
         }
+        if (_device->model) {
+            free(_device->model);
+        }
         if (_device->name) {
             free(_device->name);
         }
@@ -62,7 +66,7 @@ static esp_rmaker_device_t *__esp_rmaker_device_create(const char *name, const c
         ESP_LOGE(TAG, "%s name is mandatory", is_service ? "Service":"Device");
         return NULL;
     }
-    _esp_rmaker_device_t *_device = calloc(1, sizeof(_esp_rmaker_device_t));
+    _esp_rmaker_device_t *_device = MEM_CALLOC_EXTRAM(1, sizeof(_esp_rmaker_device_t));
     if (!_device) {
         ESP_LOGE(TAG, "Failed to allocate memory for %s %s", is_service ? "Service":"Device", name);
         return NULL;
@@ -170,10 +174,6 @@ esp_err_t esp_rmaker_device_add_attribute(const esp_rmaker_device_t *device, con
         return ESP_ERR_INVALID_ARG;
     }
     _esp_rmaker_device_t *_device = ( _esp_rmaker_device_t *)device;
-    if (_device->is_service) {
-        ESP_LOGE(TAG, "Cannot add attribute to a service");
-        return ESP_ERR_INVALID_ARG;
-    }
     esp_rmaker_attr_t *attr = _device->attributes;
     while(attr) {
         if (strcmp(attr_name, attr->name) == 0) {
@@ -186,7 +186,7 @@ esp_err_t esp_rmaker_device_add_attribute(const esp_rmaker_device_t *device, con
             break;
         }
     }
-    esp_rmaker_attr_t *new_attr = calloc(1, sizeof(esp_rmaker_attr_t));
+    esp_rmaker_attr_t *new_attr = MEM_CALLOC_EXTRAM(1, sizeof(esp_rmaker_attr_t));
     if (!new_attr) {
         ESP_LOGE(TAG, "Failed to allocate memory for device attribute");
         return ESP_ERR_NO_MEM;
@@ -221,6 +221,26 @@ esp_err_t esp_rmaker_device_add_subtype(const esp_rmaker_device_t *device, const
     if ((_device->subtype = strdup(subtype)) != NULL ){
         return ESP_OK;
     } else {
+        ESP_LOGE(TAG, "Failed to allocate memory for device subtype");
+        return ESP_ERR_NO_MEM;
+    }
+}
+
+/* Add a device model */
+esp_err_t esp_rmaker_device_add_model(const esp_rmaker_device_t *device, const char *model)
+{
+    if (!device || !model) {
+        ESP_LOGE(TAG, "Device handle or model cannot be NULL.");
+        return ESP_ERR_INVALID_ARG;
+    }
+    _esp_rmaker_device_t *_device = (_esp_rmaker_device_t *)device;
+    if (_device->model) {
+        free(_device->model);
+    }
+    if ((_device->model = strdup(model)) != NULL ){
+        return ESP_OK;
+    } else {
+        ESP_LOGE(TAG, "Failed to allocate memory for device model");
         return ESP_ERR_NO_MEM;
     }
 }

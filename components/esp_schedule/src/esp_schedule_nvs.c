@@ -64,18 +64,23 @@ esp_err_t esp_schedule_nvs_add(esp_schedule_t *schedule)
         uint8_t schedule_count;
         err = nvs_get_u8(nvs_handle, ESP_SCHEDULE_COUNT_KEY, &schedule_count);
         if (err != ESP_OK) {
-            ESP_LOGE(TAG, "NVS set failed for schedule count with error %d", err);
-            nvs_close(nvs_handle);
-            return err;
+            if (err == ESP_ERR_NVS_NOT_FOUND) {
+                schedule_count = 0;
+            } else {
+                ESP_LOGE(TAG, "NVS get failed with error %d", err);
+                nvs_close(nvs_handle);
+                return err;
+            }
         }
         schedule_count++;
         err = nvs_set_u8(nvs_handle, ESP_SCHEDULE_COUNT_KEY, schedule_count);
         if (err != ESP_OK) {
-            ESP_LOGE(TAG, "NVS get failed for schedule count with error %d", err);
+            ESP_LOGE(TAG, "NVS set failed for schedule count with error %d", err);
             nvs_close(nvs_handle);
             return err;
         }
     }
+    nvs_commit(nvs_handle);
     nvs_close(nvs_handle);
     ESP_LOGI(TAG, "Schedule %s added in NVS", schedule->name);
     return ESP_OK;
@@ -95,16 +100,11 @@ esp_err_t esp_schedule_nvs_remove_all(void)
     }
     err = nvs_erase_all(nvs_handle);
     if (err != ESP_OK) {
-        ESP_LOGE(TAG, "NVS set failed with error %d", err);
+        ESP_LOGE(TAG, "NVS erase all keys failed with error %d", err);
         nvs_close(nvs_handle);
         return err;
     }
-    err = nvs_set_u8(nvs_handle, ESP_SCHEDULE_COUNT_KEY, 0);
-    if (err != ESP_OK) {
-        ESP_LOGE(TAG, "NVS get failed for schedule count with error %d", err);
-        nvs_close(nvs_handle);
-        return err;
-    }
+    nvs_commit(nvs_handle);
     nvs_close(nvs_handle);
     ESP_LOGI(TAG, "All schedules removed from NVS");
     return ESP_OK;
@@ -124,24 +124,25 @@ esp_err_t esp_schedule_nvs_remove(esp_schedule_t *schedule)
     }
     err = nvs_erase_key(nvs_handle, schedule->name);
     if (err != ESP_OK) {
-        ESP_LOGE(TAG, "NVS set failed with error %d", err);
+        ESP_LOGE(TAG, "NVS erase key failed with error %d", err);
         nvs_close(nvs_handle);
         return err;
     }
     uint8_t schedule_count;
     err = nvs_get_u8(nvs_handle, ESP_SCHEDULE_COUNT_KEY, &schedule_count);
     if (err != ESP_OK) {
-        ESP_LOGE(TAG, "NVS set failed for schedule count with error %d", err);
+        ESP_LOGE(TAG, "NVS get failed for schedule count with error %d", err);
         nvs_close(nvs_handle);
         return err;
     }
     schedule_count--;
     err = nvs_set_u8(nvs_handle, ESP_SCHEDULE_COUNT_KEY, schedule_count);
     if (err != ESP_OK) {
-        ESP_LOGE(TAG, "NVS get failed for schedule count with error %d", err);
+        ESP_LOGE(TAG, "NVS set failed for schedule count with error %d", err);
         nvs_close(nvs_handle);
         return err;
     }
+    nvs_commit(nvs_handle);
     nvs_close(nvs_handle);
     ESP_LOGI(TAG, "Schedule %s removed from NVS", schedule->name);
     return ESP_OK;
@@ -154,7 +155,7 @@ static uint8_t esp_schedule_nvs_get_count(void)
         return 0;
     }
     nvs_handle_t nvs_handle;
-    esp_err_t err = nvs_open_from_partition(esp_schedule_nvs_partition, ESP_SCHEDULE_NVS_NAMESPACE, NVS_READWRITE, &nvs_handle);
+    esp_err_t err = nvs_open_from_partition(esp_schedule_nvs_partition, ESP_SCHEDULE_NVS_NAMESPACE, NVS_READONLY, &nvs_handle);
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "NVS open failed with error %d", err);
         return 0;
@@ -162,7 +163,7 @@ static uint8_t esp_schedule_nvs_get_count(void)
     uint8_t schedule_count;
     err = nvs_get_u8(nvs_handle, ESP_SCHEDULE_COUNT_KEY, &schedule_count);
     if (err != ESP_OK) {
-        ESP_LOGE(TAG, "NVS set failed for schedule count with error %d", err);
+        ESP_LOGE(TAG, "NVS get failed for schedule count with error %d", err);
         nvs_close(nvs_handle);
         return 0;
     }
@@ -186,7 +187,7 @@ static esp_schedule_handle_t esp_schedule_nvs_get(char *nvs_key)
     }
     err = nvs_get_blob(nvs_handle, nvs_key, NULL, &buf_size);
     if (err != ESP_OK) {
-        ESP_LOGE(TAG, "NVS set failed with error %d", err);
+        ESP_LOGE(TAG, "NVS get failed with error %d", err);
         nvs_close(nvs_handle);
         return NULL;
     }
@@ -198,7 +199,7 @@ static esp_schedule_handle_t esp_schedule_nvs_get(char *nvs_key)
     }
     err = nvs_get_blob(nvs_handle, nvs_key, schedule, &buf_size);
     if (err != ESP_OK) {
-        ESP_LOGE(TAG, "NVS set failed with error %d", err);
+        ESP_LOGE(TAG, "NVS get failed with error %d", err);
         nvs_close(nvs_handle);
         free(schedule);
         return NULL;
@@ -227,7 +228,27 @@ esp_schedule_handle_t *esp_schedule_nvs_get_all(uint8_t *schedule_count)
         return NULL;
     }
     int handle_count = 0;
+
     nvs_entry_info_t nvs_entry;
+#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 0, 0)
+    nvs_iterator_t nvs_iterator = NULL;
+    esp_err_t err = nvs_entry_find(esp_schedule_nvs_partition, ESP_SCHEDULE_NVS_NAMESPACE, NVS_TYPE_BLOB, &nvs_iterator);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "No entry found in NVS");
+        return NULL;;
+    }
+    while (err == ESP_OK) {
+        nvs_entry_info(nvs_iterator, &nvs_entry);
+        ESP_LOGI(TAG, "Found schedule in NVS with key: %s", nvs_entry.key);
+        handle_list[handle_count] = esp_schedule_nvs_get(nvs_entry.key);
+        if (handle_list[handle_count] != NULL) {
+            /* Increase count only if nvs_get was successful */
+            handle_count++;
+        }
+        err = nvs_entry_next(&nvs_iterator);
+    }
+    nvs_release_iterator(nvs_iterator);
+#else
     nvs_iterator_t nvs_iterator = nvs_entry_find(esp_schedule_nvs_partition, ESP_SCHEDULE_NVS_NAMESPACE, NVS_TYPE_BLOB);
     if (nvs_iterator == NULL) {
         ESP_LOGE(TAG, "No entry found in NVS");
@@ -243,6 +264,7 @@ esp_schedule_handle_t *esp_schedule_nvs_get_all(uint8_t *schedule_count)
         }
         nvs_iterator = nvs_entry_next(nvs_iterator);
     }
+#endif
     *schedule_count = handle_count;
     ESP_LOGI(TAG, "Found %d schedules in NVS", *schedule_count);
     return handle_list;

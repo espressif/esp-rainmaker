@@ -40,6 +40,10 @@ void esp_rmaker_ota_finish_using_params(esp_rmaker_ota_t *ota)
     if (ota->transient_priv) {
         ota->transient_priv = NULL;
     }
+    if (ota->metadata) {
+        free(ota->metadata);
+        ota->metadata = NULL;
+    }
     ota->ota_in_progress = false;
 }
 static esp_err_t esp_rmaker_ota_service_cb(const esp_rmaker_device_t *device, const esp_rmaker_param_t *param,
@@ -66,6 +70,7 @@ static esp_err_t esp_rmaker_ota_service_cb(const esp_rmaker_device_t *device, co
             ota->filesize = 0;
             ota->ota_in_progress = true;
             ota->transient_priv = (void *)device;
+            ota->metadata = NULL;
             if (esp_rmaker_work_queue_add_task(esp_rmaker_ota_common_cb, ota) != ESP_OK) {
                 esp_rmaker_ota_finish_using_params(ota);
             } else {
@@ -79,11 +84,10 @@ static esp_err_t esp_rmaker_ota_service_cb(const esp_rmaker_device_t *device, co
 
 esp_err_t esp_rmaker_ota_report_status_using_params(esp_rmaker_ota_handle_t ota_handle, ota_status_t status, char *additional_info)
 {
-    if (!ota_handle) {
+    const esp_rmaker_device_t *device = esp_rmaker_node_get_device_by_name(esp_rmaker_get_node(), ESP_RMAKER_OTA_SERV_NAME);
+    if (!device) {
         return ESP_FAIL;
     }
-    esp_rmaker_ota_t *ota = (esp_rmaker_ota_t *)ota_handle;
-    const esp_rmaker_device_t *device = (esp_rmaker_device_t *)ota->transient_priv;
     esp_rmaker_param_t *info_param = esp_rmaker_device_get_param_by_type(device, ESP_RMAKER_PARAM_OTA_INFO);
     esp_rmaker_param_t *status_param = esp_rmaker_device_get_param_by_type(device, ESP_RMAKER_PARAM_OTA_STATUS);
 

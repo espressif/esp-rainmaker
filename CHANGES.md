@@ -1,5 +1,96 @@
 # Changes
 
+## 21-Nov-2022 (esp_rmaker_mqtt: Add MQTT budgeting to control the number of messages sent)
+
+- Due to some poor, non-optimised coding or bugs, it is possible that the node keeps bombarding the MQTT
+broker with publish messages. To prevent this, a concept of MQTT Budgeting has been added.
+- By default, a node will be given a budget of 100 (`CONFIG_ESP_RMAKER_MQTT_DEFAULT_BUDGET`), which will
+  go on incrementing by 1 (`CONFIG_ESP_RMAKER_MQTT_BUDGET_REVIVE_COUNT` every 5 seconds (`CONFIG_ESP_RMAKER_MQTT_BUDGET_REVIVE_PERIOD`),
+  limited to a max value of 1024 (`CONFIG_ESP_RMAKER_MQTT_MAX_BUDGET`).
+- Budget will be decremented by 1 for every MQTT publish and messages will be dropped if budget is 0.
+- This behaviour is enabled by default and can be disabled by disabling `CONFIG_ESP_RMAKER_MQTT_ENABLE_BUDGETING`.
+
+## 16-Nov-2022 (mqtt_topics: Added support for AWS basic ingest topics.)
+
+- AWS Basic Ingest Topics optimize data flow by removing the publish/subscribe message broker from the ingestion path, making it more cost effective. You can refer the official docs [here](https://docs.aws.amazon.com/iot/latest/developerguide/iot-basic-ingest.html).
+- This setting is turned on by default and can be turned off by running `idf.py menuconfig` and disabling `CONFIG_ESP_RMAKER_MQTT_USE_BASIC_INGEST_TOPICS` option.
+
+## 2-Nov-2022 (Added MQTT disconnect and user node mapping reset calls on WiFi/Factory Reset.)
+
+- On a Wi-Fi reset triggered via esp_rmaker_wifi_reset(), the rmaker core will first disconnect from MQTT so that its offline state reflects immediately.
+- On a Factory reset triggered via esp_rmaker_factory_reset(), the rmaker core will trigger a user mapping reset (if mqtt connection is active) so that the node gets removed from the user's account immediately.
+- The reset delay time for the push button based reset has been changed from 0 to 2 seconds to give some time for the above mentioned operations.
+
+Note: This config is enabled by default. You can disable it using `idf.py menuconfig`
+## 28-Jun-2022 (examples: Enable CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE in all examples)
+
+`CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE` has been enabled in all examples by default,
+as a safety measure to prevent devices getting bricked after a faulty firmware upgrade.
+The OTA firmware upgrade will be marked as successful only if the firmware can connect to
+MQTT within 90 seconds of calling `esp_rmaker_ota_enable_default()` (or other esp_emaker_enable APIs).
+The time out is configurable using `CONFIG_ESP_RMAKER_OTA_ROLLBACK_WAIT_PERIOD`.
+
+Note that this is a bootloader feature and so, just enabling this feature and pushing out updated
+firmware to existing devices won't be of any use. Please flash new bootloader on the devices to
+make this work.
+
+## 26-May-2022 (claiming and ota)
+
+- claiming: Make self claiming as the default for esp32s3 and esp32c3
+- ota: Make "OTA using Topics" as default and provide a simplified API for that
+
+Self claiming is much more convenient and fast since the node directly gets the
+credentials from the claiming service over HTTPS, instead of using the slower BLE based
+Assisted claiming, wherein the phone app acts as a proxy between the node and the
+claiming service. However, with self claiming, there was no concept of
+[Admin Role](https://rainmaker.espressif.com/docs/user-roles.html#admin-users) and so, it was
+not possible to access the node via the RainMaker or Insights dashboards. This was one
+reason why Assisted Claiming was kept as a default for esp32c3 and esp32s3 even though
+they support self claiming.
+
+With recent changes in the Public RainMaker backend, the primary user (the user who performs the [user-node
+mapping](https://rainmaker.espressif.com/docs/user-node-mapping.html)) for a self claimed
+node is now made as the admin. This gives the primary user the access to the node for OTA and Insights.
+So, self claiming has now been made as the default for all chips (except esp32) and the OTA Using Topics
+has also been made as the default, since it is convenient and also the correct option for
+production devices. A simpler API `esp_rmaker_ota_enable_default()` as also been added in esp_rmaker_core.h.
+
+Note: Nodes that are already claimed via Assisted/Host Claiming will not have any effect, even if the
+new firmware is enabled with self claiming. The self claiming will take effect only if the flash is
+erased. **This will result in a change of node_id, since mac address is the node_id for self claimed nodes.**
+If you want to contine using Assisted Claiming (probably because there is quite some data associated
+with the node_id), please set is explicitly in your sdkconfig.
+
+## 25-Jan-2022 (app_wifi: Minor feature additions to provisioning workflow)
+
+Added a 30 minute timeout for Wi-Fi provisioning as a security measure. A device reboot will be
+required to restart provisioning after it times out. The value can changed using the
+`CONFIG_APP_WIFI_PROV_TIMEOUT_PERIOD` config option. A value of 0 will disable the timeout logic.
+`APP_WIFI_EVENT_PROV_TIMEOUT` event will be triggerd to indicate that the provisioning has timed out.
+
+## 25-Jan-2022 (examples: Enable some security features and change order of component dirs)
+
+A couple of security features were added some time back, viz.
+
+1. esp_rmaker_local_ctrl: Added support for sec1
+2. esp_rmaker_user_mapping: Add checks for user id for better security
+
+These are kept disabled by default at component level to maintain backward compatibility and not
+change any existing projects. However, since enabling them is recommended, these are added in
+the sdkconfig.defaults of all examples.
+
+A minor change in CMakeLists.txt has also been done for all examples so that the rmaker_common
+component from esp-rainmaker gets used, rather than the one from esp-insights.
+
+## 12-Jan-2022 (esp_rmaker_local_ctrl: Added support for sec1)
+
+This commit adds support for security1 for local control. This can be enabled by setting
+`CONFIG_ESP_RMAKER_LOCAL_CTRL_SECURITY_1` when using local control feature (this is the
+default security level when enabling local control). This would also require the latest
+phone apps which have the support for security1.
+
+You can check the docs [here](https://rainmaker.espressif.com/docs/local-control.html) for more details.
+
 ## 24-Aug-2021 (esp_rmaker_user_mapping: Add checks for user id for better security)
 
 This commit adds some logic to detect a reset to factory or a user change during the
@@ -197,12 +288,12 @@ esp_err_t esp_rmaker_create_device(const char *dev_name, const char *type, esp_r
 ```
 
 #### New
-```		
+```
 typedef esp_err_t (*esp_rmaker_device_write_cb_t)(const esp_rmaker_device_t *device, const esp_rmaker_param_t *param,
         const esp_rmaker_param_val_t val, void *priv_data, esp_rmaker_write_ctx_t *ctx);
 typedef esp_err_t (*esp_rmaker_device_read_cb_t)(const esp_rmaker_device_t *device, const esp_rmaker_param_t *param,
         void *priv_data, esp_rmaker_read_ctx_t *ctx);
-        
+
 esp_rmaker_device_t *esp_rmaker_device_create(const char *dev_name, const char *type, void *priv_data);
 esp_err_t esp_rmaker_device_add_cb(const esp_rmaker_device_t *device, esp_rmaker_device_write_cb_t write_cb, esp_rmaker_device_read_cb_t read_cb);
 esp_err_t esp_rmaker_node_add_device(const esp_rmaker_node_t *node, const esp_rmaker_device_t *device);
@@ -239,6 +330,3 @@ esp_err_t esp_rmaker_param_update_and_report(const esp_rmaker_param_t *param, es
 - `esp_rmaker_device_add_param()` modified to accept the device and param handles.
 - `esp_rmaker_param_add_type()` removed because the type is now included in `esp_rmaker_param_create()`
 - `esp_rmaker_update_param()` changed to `esp_rmaker_param_update_and_report()`. It now accepts param handle, instead of device and parameter names.
-
-
-

@@ -13,8 +13,10 @@
 // limitations under the License.
 
 #include <string.h>
+#include <inttypes.h>
 #include <esp_log.h>
 #include <esp_sntp.h>
+#include <esp_rmaker_utils.h>
 #include "esp_schedule_internal.h"
 
 static const char *TAG = "esp_schedule";
@@ -231,7 +233,7 @@ static uint32_t esp_schedule_get_next_schedule_time_diff(esp_schedule_t *schedul
     } else if (current_time.tm_isdst && !schedule_time.tm_isdst ) {
         dst_adjust = 3600;
     }
-    ESP_LOGD(TAG, "DST adjust seconds: %ld", dst_adjust);
+    ESP_LOGD(TAG, "DST adjust seconds: %lld", (long long) dst_adjust);
     schedule_time.tm_sec += dst_adjust;
     mktime(&schedule_time);
 
@@ -255,7 +257,7 @@ static bool esp_schedule_is_expired(esp_schedule_t *schedule)
     struct tm current_time = {0};
     time(&current_timestamp);
     localtime_r(&current_timestamp, &current_time);
-    
+
     if (schedule->trigger.type == ESP_SCHEDULE_TYPE_RELATIVE) {
         if (schedule->trigger.next_scheduled_time_utc > 0 && schedule->trigger.next_scheduled_time_utc <= current_timestamp) {
             /* Relative seconds based schedule has expired */
@@ -265,6 +267,9 @@ static bool esp_schedule_is_expired(esp_schedule_t *schedule)
         if (schedule->trigger.day.repeat_days == ESP_SCHEDULE_DAY_ONCE) {
             if (schedule->trigger.next_scheduled_time_utc > 0 && schedule->trigger.next_scheduled_time_utc <= current_timestamp) {
                 /* One time schedule has expired */
+                return true;
+            } else if (schedule->trigger.next_scheduled_time_utc == 0) {
+                /* Schedule has been disabled , so it is as good as expired. */
                 return true;
             }
         }
@@ -316,7 +321,7 @@ static void esp_schedule_start_timer(esp_schedule_t *schedule)
     }
 
     schedule->next_scheduled_time_diff = esp_schedule_get_next_schedule_time_diff(schedule);
-    ESP_LOGI(TAG, "Starting a timer for %u seconds for schedule %s", schedule->next_scheduled_time_diff, schedule->name);
+    ESP_LOGI(TAG, "Starting a timer for %"PRIu32" seconds for schedule %s", schedule->next_scheduled_time_diff, schedule->name);
 
     if (schedule->timestamp_cb) {
         schedule->timestamp_cb((esp_schedule_handle_t)schedule, schedule->trigger.next_scheduled_time_utc, schedule->priv_data);
@@ -487,7 +492,7 @@ esp_schedule_handle_t esp_schedule_create(esp_schedule_config_t *schedule_config
         return NULL;
     }
 
-    esp_schedule_t *schedule = (esp_schedule_t *)calloc(1, sizeof(esp_schedule_t));
+    esp_schedule_t *schedule = (esp_schedule_t *)MEM_CALLOC_EXTRAM(1, sizeof(esp_schedule_t));
     if (schedule == NULL) {
         ESP_LOGE(TAG, "Could not allocate handle");
         return NULL;
@@ -528,7 +533,7 @@ esp_schedule_handle_t *esp_schedule_init(bool enable_nvs, char *nvs_partition, u
         ESP_LOGI(TAG, "No schedules found in NVS");
         return NULL;
     }
-    ESP_LOGI(TAG, "Schedules found in NVS: %d", *schedule_count);
+    ESP_LOGI(TAG, "Schedules found in NVS: %"PRIu8, *schedule_count);
     /* Start/Delete the schedules */
     esp_schedule_t *schedule = NULL;
     for (size_t handle_count = 0; handle_count < *schedule_count; handle_count++) {

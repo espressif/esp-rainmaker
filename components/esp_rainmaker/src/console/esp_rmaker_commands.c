@@ -14,6 +14,7 @@
 
 #include <stdio.h>
 #include <string.h>
+#include <inttypes.h>
 #include <ctype.h>
 #include <nvs_flash.h>
 #include <esp_log.h>
@@ -22,6 +23,7 @@
 #include <esp_system.h>
 #include <argtable3/argtable3.h>
 #include <esp_heap_caps.h>
+#include <esp_rmaker_utils.h>
 #ifdef CONFIG_HEAP_TRACING
 #include <esp_heap_trace.h>
 #endif
@@ -34,6 +36,7 @@
 #include <esp_rmaker_core.h>
 #include <esp_rmaker_user_mapping.h>
 #include <esp_rmaker_utils.h>
+#include <esp_rmaker_cmd_resp.h>
 
 #include <esp_rmaker_console_internal.h>
 
@@ -51,7 +54,7 @@ static int task_dump_cli_handler(int argc, char *argv[])
     printf("%s: To use this utility enable: Component config --> FreeRTOS --> Enable FreeRTOS trace facility\n", TAG);
 #else
     int num_of_tasks = uxTaskGetNumberOfTasks();
-    TaskStatus_t *task_array = calloc(num_of_tasks, sizeof(TaskStatus_t));
+    TaskStatus_t *task_array = MEM_CALLOC_EXTRAM(num_of_tasks, sizeof(TaskStatus_t));
     if (!task_array) {
         ESP_LOGE(TAG, "Memory allocation for task list failed.");
         return -1;
@@ -59,7 +62,7 @@ static int task_dump_cli_handler(int argc, char *argv[])
     num_of_tasks = uxTaskGetSystemState(task_array, num_of_tasks, NULL);
     printf("%s: \tName\tNumber\tPriority\tStackWaterMark\n", TAG);
     for (int i = 0; i < num_of_tasks; i++) {
-        printf("%16s\t%d\t%d\t%d\n",
+        printf("%16s\t%d\t%d\t%"PRIu32"\n",
                task_array[i].pcTaskName,
                task_array[i].xTaskNumber,
                task_array[i].uxCurrentPriority,
@@ -75,7 +78,7 @@ static int cpu_dump_cli_handler(int argc, char *argv[])
 #ifndef CONFIG_FREERTOS_GENERATE_RUN_TIME_STATS
     printf("%s: To use this utility enable: Component config --> FreeRTOS --> Enable FreeRTOS to collect run time stats\n", TAG);
 #else
-    char *buf = calloc(1, 2 * 1024);
+    char *buf = MEM_CALLOC_EXTRAM(1, 2 * 1024);
     if (!buf) {
         ESP_LOGE(TAG, "Memory allocation for cpu dump failed.");
         return -1;
@@ -155,7 +158,7 @@ static heap_trace_record_t *heap_trace_records_buf;
 static int cli_heap_trace_start()
 {
     if (!heap_trace_records_buf) {
-        heap_trace_records_buf = malloc(heap_trace_records * sizeof(heap_trace_record_t));
+        heap_trace_records_buf = MEM_CALLOC_EXTRAM(heap_trace_records * sizeof(heap_trace_record_t));
         if (!heap_trace_records_buf) {
             printf("%s: Failed to allocate records buffer\n", TAG);
             return -1;
@@ -402,6 +405,31 @@ static void register_time_commands()
     esp_console_cmd_register(&tz_set_cmd);
 }
 
+static int cmd_resp_cli_handler(int argc, char *argv[])
+{
+    if (argc != 5) {
+        printf("Usage: cmd <req_id> <user_role> <cmd> <data>\n");
+        return -1;
+    }
+    char *req_id = argv[1];
+    uint8_t user_role = atoi(argv[2]);
+    uint16_t cmd = atoi(argv[3]);
+    esp_rmaker_cmd_resp_test_send(req_id, user_role, cmd, (void *)argv[4], strlen(argv[4]), esp_rmaker_test_cmd_resp, NULL);
+    return 0;
+}
+
+static void register_cmd_resp_command()
+{
+    const esp_console_cmd_t cmd_resp_cmd = {
+        .command = "cmd",
+        .help = "Send command to command-response module. Usage cmd <req_id> <cmd> <user_role> <data>",
+        .func = &cmd_resp_cli_handler,
+    };
+    ESP_LOGI(TAG, "Registering command: %s", cmd_resp_cmd.command);
+    esp_console_cmd_register(&cmd_resp_cmd);
+}
+
+
 void register_commands()
 {
     register_generic_debug_commands();
@@ -410,4 +438,5 @@ void register_commands()
     register_get_node_id();
     register_wifi_prov();
     register_time_commands();
+    register_cmd_resp_command();
 }
