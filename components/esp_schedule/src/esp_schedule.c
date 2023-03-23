@@ -508,12 +508,21 @@ esp_schedule_handle_t esp_schedule_create(esp_schedule_config_t *schedule_config
 
 esp_schedule_handle_t *esp_schedule_init(bool enable_nvs, char *nvs_partition, uint8_t *schedule_count)
 {
+#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 1, 0)
+    if (!esp_sntp_enabled()) {
+        ESP_LOGI(TAG, "Initializing SNTP");
+        esp_sntp_setoperatingmode(SNTP_OPMODE_POLL);
+        esp_sntp_setservername(0, "pool.ntp.org");
+        esp_sntp_init();
+    }
+#else
     if (!sntp_enabled()) {
         ESP_LOGI(TAG, "Initializing SNTP");
         sntp_setoperatingmode(SNTP_OPMODE_POLL);
         sntp_setservername(0, "pool.ntp.org");
         sntp_init();
     }
+#endif
 
     if (!enable_nvs) {
         return NULL;

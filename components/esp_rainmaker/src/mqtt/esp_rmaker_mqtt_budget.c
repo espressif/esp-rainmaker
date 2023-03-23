@@ -7,7 +7,8 @@
 
 #include <sdkconfig.h>
 #include <esp_log.h>
-
+#include <esp_err.h>
+#include <stdbool.h>
 static const char *TAG = "esp_rmaker_mqtt_budget";
 
 #ifdef CONFIG_ESP_RMAKER_MQTT_ENABLE_BUDGETING
