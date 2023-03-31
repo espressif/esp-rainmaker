@@ -13,6 +13,19 @@
 extern "C" {
 #endif
 
+#define MFG_DATA_HEADER                     0xe5, 0x02
+#define MGF_DATA_APP_ID                     'N', 'o', 'v'
+#define MFG_DATA_VERSION                    'a'
+#define MFG_DATA_CUSTOMER_ID                0x00, 0x01
+
+#define MGF_DATA_DEVICE_TYPE_LIGHT          0x0005
+#define MGF_DATA_DEVICE_TYPE_SWITCH         0x0080
+
+#define MFG_DATA_DEVICE_SUBTYPE_SWITCH      0x01
+#define MFG_DATA_DEVICE_SUBTYPE_LIGHT       0x01
+
+#define MFG_DATA_DEVICE_EXTRA_CODE          0x00
+
 /** ESP RainMaker Event Base */
 ESP_EVENT_DECLARE_BASE(APP_WIFI_EVENT);
 
@@ -40,6 +53,7 @@ typedef enum {
 
 void app_wifi_init();
 esp_err_t app_wifi_start(app_wifi_pop_type_t pop_type);
+esp_err_t app_wifi_set_custom_mfg_data(uint16_t device_type, uint8_t device_subtype);
 
 #ifdef __cplusplus
 }

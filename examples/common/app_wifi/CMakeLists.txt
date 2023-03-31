@@ -1,4 +1,4 @@
-set(priv_req wifi_provisioning qrcode nvs_flash esp_event)
+set(priv_req wifi_provisioning qrcode nvs_flash esp_event rmaker_common)
 
 idf_component_register(SRCS "app_wifi.c"
                     INCLUDE_DIRS "."
