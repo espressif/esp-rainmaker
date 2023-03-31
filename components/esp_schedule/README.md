@@ -1,8 +1,13 @@
 # ESP Scheduling
 
-By default, the time is w.r.t. UTC. If the timezone has been set, then the time is w.r.t. the specified timezone.
+[![Component Registry](https://components.espressif.com/components/espressif/esp_schedule/badge.svg)](https://components.espressif.com/components/espressif/esp_schedule)
+
+This component is used internally by ESP RainMaker to implement schedules.
+
+> Note: By default, the time is w.r.t. UTC. If the timezone has been set, then the time is w.r.t. the specified timezone.
 
 ## Test code:
+
 ```
 #include <esp_schedule.h>
 
