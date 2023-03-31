@@ -31,6 +31,29 @@ menu "ESP RainMaker Config"
 
     endchoice
 
+    choice ESP_RMAKER_CHOOSE_PKI_ACCESS_METHOD
+        prompt "Choose PKI credentials access method"
+        default ESP_RMAKER_USE_NVS
+        help
+            ESP devices support multiple ways to secure store the PKI credentials.
+            Currently, NVS and ESP Secure Cert Manager are supported.
+            The default behaviour is to access the PKI credentials from the NVS.
+            Consult the ESP-TLS documentation in ESP-IDF Programming guide for more details.
+
+        config ESP_RMAKER_USE_ESP_SECURE_CERT_MGR
+        bool "Use ESP Secure Certificate Manager"
+        depends on ESP_RMAKER_NO_CLAIM
+        help
+            Enable the use of ESP Secure Certificate Manager APIs for the example.
+            Please refer to ESP Secure Certificate Manager documentation for more details.
+
+        config ESP_RMAKER_USE_NVS
+        bool "Use NVS (default)"
+        help
+            This option expects the Private key and Device certificate to be in the NVS.
+            This is the default behaviour.
+    endchoice
+
 
     config ESP_RMAKER_CLAIM_TYPE
         int
