@@ -63,6 +63,21 @@ char * esp_rmaker_get_client_cert()
     return esp_rmaker_factory_get(ESP_RMAKER_CLIENT_CERT_NVS_KEY);
 }
 
+size_t esp_rmaker_get_client_cert_len()
+{
+#ifdef CONFIG_ESP_RMAKER_USE_ESP_SECURE_CERT_MGR
+    uint32_t client_cert_len = 0;
+    char *client_cert_addr = NULL;
+    if (esp_secure_cert_get_device_cert(&client_cert_addr, &client_cert_len) == ESP_OK) {
+        return client_cert_len;
+    } else {
+        ESP_LOGE(TAG, "Failed to obtain flash address of device cert");
+        ESP_LOGI(TAG, "Attempting to fetch client certificate from NVS");
+    }
+#endif /* CONFIG_ESP_RMAKER_USE_ESP_SECURE_CERT_MGR */
+    return esp_rmaker_factory_get_size(ESP_RMAKER_CLIENT_CERT_NVS_KEY);
+}
+
 char * esp_rmaker_get_client_key()
 {
 #ifdef CONFIG_ESP_RMAKER_USE_ESP_SECURE_CERT_MGR
@@ -76,6 +91,21 @@ char * esp_rmaker_get_client_key()
     }
 #endif /* CONFIG_ESP_RMAKER_USE_ESP_SECURE_CERT_MGR */
     return esp_rmaker_factory_get(ESP_RMAKER_CLIENT_KEY_NVS_KEY);
+}
+
+size_t esp_rmaker_get_client_key_len()
+{
+#ifdef CONFIG_ESP_RMAKER_USE_ESP_SECURE_CERT_MGR
+    uint32_t client_key_len = 0;
+    char *client_key_addr = NULL;
+    if (esp_secure_cert_get_priv_key(&client_key_addr, &client_key_len) == ESP_OK) {
+        return client_key_len;
+    } else {
+        ESP_LOGE(TAG, "Failed to obtain flash address of private_key");
+        ESP_LOGI(TAG, "Attempting to fetch key from NVS");
+    }
+#endif /* CONFIG_ESP_RMAKER_USE_ESP_SECURE_CERT_MGR */
+    return esp_rmaker_factory_get_size(ESP_RMAKER_CLIENT_KEY_NVS_KEY);
 }
 
 char * esp_rmaker_get_client_csr()
@@ -95,10 +125,12 @@ esp_rmaker_mqtt_conn_params_t *esp_rmaker_get_mqtt_conn_params()
         if ((mqtt_conn_params->client_key = esp_rmaker_get_client_key()) == NULL) {
             goto init_err;
         }
+        mqtt_conn_params->client_key_len = esp_rmaker_get_client_key_len();
     }
     if ((mqtt_conn_params->client_cert = esp_rmaker_get_client_cert()) == NULL) {
         goto init_err;
     }
+        mqtt_conn_params->client_cert_len = esp_rmaker_get_client_cert_len();
     if ((mqtt_conn_params->mqtt_host = esp_rmaker_get_mqtt_host()) == NULL) {
         goto init_err;
     }
