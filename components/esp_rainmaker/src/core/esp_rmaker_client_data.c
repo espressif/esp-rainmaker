@@ -75,7 +75,7 @@ size_t esp_rmaker_get_client_cert_len()
         ESP_LOGI(TAG, "Attempting to fetch client certificate from NVS");
     }
 #endif /* CONFIG_ESP_RMAKER_USE_ESP_SECURE_CERT_MGR */
-    return esp_rmaker_factory_get_size(ESP_RMAKER_CLIENT_CERT_NVS_KEY);
+    return esp_rmaker_factory_get_size(ESP_RMAKER_CLIENT_CERT_NVS_KEY) + 1; /* +1 for NULL terminating byte */
 }
 
 char * esp_rmaker_get_client_key()
@@ -105,7 +105,7 @@ size_t esp_rmaker_get_client_key_len()
         ESP_LOGI(TAG, "Attempting to fetch key from NVS");
     }
 #endif /* CONFIG_ESP_RMAKER_USE_ESP_SECURE_CERT_MGR */
-    return esp_rmaker_factory_get_size(ESP_RMAKER_CLIENT_KEY_NVS_KEY);
+    return esp_rmaker_factory_get_size(ESP_RMAKER_CLIENT_KEY_NVS_KEY) + 1; /* +1 for NULL terminating byte */
 }
 
 char * esp_rmaker_get_client_csr()
