@@ -80,6 +80,17 @@ static void rmaker_common_event_handler(void* arg, esp_event_base_t event_base,
 esp_err_t app_insights_enable(void)
 {
 #ifdef CONFIG_ESP_INSIGHTS_ENABLED
+    /* Initialize the event loop, if not done already. */
+    esp_err_t err = esp_event_loop_create_default();
+    /* If the default event loop is already initialized, we get ESP_ERR_INVALID_STATE */
+    if (err != ESP_OK) {
+        if (err == ESP_ERR_INVALID_STATE) {
+            ESP_LOGW(TAG, "Event loop creation failed with ESP_ERR_INVALID_STATE. Proceeding since it must have been created elsewhere.");
+        } else {
+            ESP_LOGE(TAG, "Failed to create default event loop, err = %x", err);
+            return err;
+        }
+    }
 #ifdef CONFIG_ESP_RMAKER_SELF_CLAIM
     ESP_LOGW(TAG, "Nodes with Self Claiming may not be accessible for Insights.");
 #endif
