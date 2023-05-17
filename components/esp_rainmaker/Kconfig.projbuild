@@ -175,6 +175,13 @@ menu "ESP RainMaker Config"
         help
             The port number to be used for http for local control.
 
+    config ESP_RMAKER_LOCAL_CTRL_STACK_SIZE
+        int "Local Control HTTP Server task stack size"
+        default 6144
+        depends on ESP_RMAKER_LOCAL_CTRL_ENABLE
+        help
+            The task stack size to be used for http server for local control.
+
     choice ESP_RMAKER_LOCAL_CTRL_SECURITY
         prompt "Local Control Security Type"
         depends on ESP_RMAKER_LOCAL_CTRL_ENABLE

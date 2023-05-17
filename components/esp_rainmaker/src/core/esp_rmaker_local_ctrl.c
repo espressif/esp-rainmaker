@@ -247,6 +247,7 @@ static esp_err_t __esp_rmaker_start_local_ctrl_service(const char *serv_name)
     https_conf.transport_mode = HTTPD_SSL_TRANSPORT_INSECURE;
     https_conf.port_insecure = CONFIG_ESP_RMAKER_LOCAL_CTRL_HTTP_PORT;
     https_conf.httpd.ctrl_port = ESP_RMAKER_LOCAL_CTRL_HTTP_CTRL_PORT;
+    https_conf.httpd.stack_size = CONFIG_ESP_RMAKER_LOCAL_CTRL_STACK_SIZE;
 
     mdns_init();
     mdns_hostname_set(serv_name);
