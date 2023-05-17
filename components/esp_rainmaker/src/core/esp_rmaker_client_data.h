@@ -22,6 +22,7 @@
 #define ESP_RMAKER_CLIENT_RANDOM_NVS_KEY "random"
 
 char *esp_rmaker_get_client_cert();
+size_t esp_rmaker_get_client_cert_len();
 char *esp_rmaker_get_client_key();
 size_t esp_rmaker_get_client_key_len();
 char *esp_rmaker_get_client_csr();

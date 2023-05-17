@@ -118,9 +118,50 @@ static void esp_rmaker_mqtt_event_handler(void* arg, esp_event_base_t event_base
     }
 }
 
+#ifdef CONFIG_ESP_RMAKER_READ_NODE_ID_FROM_CERT_CN
+
+#include "mbedtls/x509_crt.h"
+#include "mbedtls/oid.h"
+
+static char* esp_rmaker_populate_node_id_from_cert()
+{ 
+    void *addr = NULL;
+    size_t len = 0;
+    addr = esp_rmaker_get_client_cert();
+    if (addr) {
+        len = esp_rmaker_get_client_cert_len();
+    } else { 
+        ESP_LOGE(TAG, "Failed to get device certificate."); 
+        return NULL; 
+    }
+    mbedtls_x509_crt crt;
+    mbedtls_x509_crt_init(&crt);
+    char *node_id = NULL;
+    int ret = mbedtls_x509_crt_parse(&crt, addr, len); 
+    if (ret != 0) {
+        ESP_LOGE(TAG, "Parsing of device certificate failed, returned %02X", ret); 
+    } else {
+        mbedtls_asn1_named_data *cn_data;
+        cn_data = mbedtls_asn1_find_named_data(&crt.subject, MBEDTLS_OID_AT_CN, 
+                                                MBEDTLS_OID_SIZE(MBEDTLS_OID_AT_CN));
+        if (cn_data) {
+            node_id = MEM_CALLOC_EXTRAM(1, cn_data->val.len + 1);
+            memcpy(node_id, (const char *)cn_data->val.p, cn_data->val.len);
+        }
+    }
+    mbedtls_x509_crt_free(&crt); 
+    return node_id; 
+}
+#endif
+
 static char *esp_rmaker_populate_node_id(bool use_claiming)
 {
+#ifdef CONFIG_ESP_RMAKER_READ_NODE_ID_FROM_CERT_CN
+    char *node_id = esp_rmaker_populate_node_id_from_cert();
+#else /* !CONFIG_ESP_RMAKER_READ_NODE_ID_FROM_CERT_CN */
     char *node_id = esp_rmaker_factory_get("node_id");
+#endif /* CONFIG_ESP_RMAKER_READ_NODE_ID_FROM_CERT_CN */
+
 #ifdef ESP_RMAKER_CLAIM_ENABLED
     if (!node_id && use_claiming) {
         uint8_t eth_mac[6];
