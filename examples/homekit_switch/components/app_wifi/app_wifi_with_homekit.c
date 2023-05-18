@@ -80,10 +80,10 @@ static void app_wifi_print_qr(const char *name, const char *pop, const char *tra
                 PROV_QR_VERSION, name, transport);
     }
 #ifdef CONFIG_APP_WIFI_PROV_SHOW_QR
-    ESP_LOGI(TAG, "Scan this QR code from the phone app for Provisioning.");
+    printf("Scan this QR code from the phone app for Provisioning.\n");
     qrcode_display(payload);
 #endif /* CONFIG_APP_WIFI_PROV_SHOW_QR */
-    ESP_LOGI(TAG, "If QR code is not visible, copy paste the below URL in a browser.\n%s?data=%s", QRCODE_BASE_URL, payload);
+    printf("If QR code is not visible, copy paste the below URL in a browser.\n%s?data=%s\n", QRCODE_BASE_URL, payload);
     esp_event_post(APP_WIFI_EVENT, APP_WIFI_EVENT_QR_DISPLAY, payload, strlen(payload) + 1, portMAX_DELAY);
 }
 

@@ -34,9 +34,8 @@ CONFIG_FREERTOS_TIMER_TASK_STACK_DEPTH=3120
 # For additional security on reset to factory
 CONFIG_ESP_RMAKER_USER_ID_CHECK=y
 
-# Secure Local Control
-CONFIG_ESP_RMAKER_LOCAL_CTRL_ENABLE=y
-CONFIG_ESP_RMAKER_LOCAL_CTRL_SECURITY_1=y
-
 # Application Rollback
 CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE=y
+
+# Change default log level to reduce binary size
+CONFIG_LOG_DEFAULT_LEVEL_WARN=y
