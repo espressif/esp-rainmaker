@@ -34,10 +34,10 @@ static void app_homekit_show_qr(void)
     char *setup_payload =  esp_hap_get_setup_payload(CONFIG_EXAMPLE_SETUP_CODE,
             CONFIG_EXAMPLE_SETUP_ID, false, HAP_CID_SWITCH);
     if (setup_payload) {
-        ESP_LOGI(TAG, "-----QR Code for HomeKit-----");
-        ESP_LOGI(TAG, "Scan this QR code from the Home app on iOS");
+        printf("-----QR Code for HomeKit-----\n");
+        printf("Scan this QR code from the Home app on iOS\n");
         qrcode_display(setup_payload);
-        ESP_LOGI(TAG, "If QR code is not visible, copy paste the below URL in a browser.\n%s?data=%s",
+        printf("If QR code is not visible, copy paste the below URL in a browser.\n%s?data=%s\n",
                 QRCODE_BASE_URL, setup_payload);
         free(setup_payload);
     }
