@@ -301,8 +301,17 @@ void app_wifi_init(void)
     tcpip_adapter_init();
 #endif
 
-    /* Initialize the event loop */
-    ESP_ERROR_CHECK(esp_event_loop_create_default());
+    /* Initialize the event loop, if not done already. */
+    esp_err_t err = esp_event_loop_create_default();
+    /* If the default event loop is already initialized, we get ESP_ERR_INVALID_STATE */
+    if (err != ESP_OK) {
+        if (err == ESP_ERR_INVALID_STATE) {
+            ESP_LOGW(TAG, "Event loop creation failed with ESP_ERR_INVALID_STATE. Proceeding since it must have been created elsewhere.");
+        } else {
+            ESP_LOGE(TAG, "Failed to create default event loop, err = %x", err);
+            return;
+        }
+    }
     wifi_event_group = xEventGroupCreate();
 
     /* Register our event handler for Wi-Fi, IP and Provisioning related events */
