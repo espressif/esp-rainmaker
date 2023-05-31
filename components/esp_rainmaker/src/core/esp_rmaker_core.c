@@ -74,6 +74,14 @@ typedef struct {
 
 static esp_rmaker_priv_data_t *esp_rmaker_priv_data;
 
+bool esp_rmaker_is_mqtt_connected()
+{
+    if (esp_rmaker_priv_data) {        
+        return esp_rmaker_priv_data->mqtt_connected;
+    }
+    return false;
+}
+
 esp_rmaker_state_t esp_rmaker_get_state(void)
 {
     if (esp_rmaker_priv_data) {
@@ -95,6 +103,19 @@ static void reset_event_handler(void* arg, esp_event_base_t event_base,
             default:
                 break;
         }
+}
+
+static void esp_rmaker_mqtt_event_handler(void* arg, esp_event_base_t event_base,
+                          int32_t event_id, void* event_data)
+{
+    if (!esp_rmaker_priv_data) {
+        return;
+    }
+    if (event_base == RMAKER_COMMON_EVENT && event_id == RMAKER_MQTT_EVENT_CONNECTED) {
+        esp_rmaker_priv_data->mqtt_connected = true;
+    } else if (event_base == RMAKER_COMMON_EVENT && event_id == RMAKER_MQTT_EVENT_DISCONNECTED) {
+        esp_rmaker_priv_data->mqtt_connected = false;
+    }
 }
 
 static char *esp_rmaker_populate_node_id(bool use_claiming)
@@ -249,6 +270,9 @@ static void esp_rmaker_task(void *data)
     esp_rmaker_priv_data->state = ESP_RMAKER_STATE_STARTING;
     esp_err_t err = ESP_FAIL;
     wifi_ap_record_t ap_info;
+    esp_rmaker_priv_data->mqtt_connected = false;
+    esp_event_handler_register(RMAKER_COMMON_EVENT, RMAKER_MQTT_EVENT_CONNECTED, &esp_rmaker_mqtt_event_handler, NULL);
+    esp_event_handler_register(RMAKER_COMMON_EVENT, RMAKER_MQTT_EVENT_DISCONNECTED, &esp_rmaker_mqtt_event_handler, NULL);
     rmaker_core_event_group = xEventGroupCreate();
     if (!rmaker_core_event_group) {
         ESP_LOGE(TAG, "Failed to create event group. Aborting");
@@ -343,7 +367,6 @@ static void esp_rmaker_task(void *data)
     ESP_LOGI(TAG, "Waiting for MQTT connection");
     xEventGroupWaitBits(rmaker_core_event_group, MQTT_CONNECTED_EVENT, false, true, portMAX_DELAY);
     esp_event_handler_unregister(RMAKER_COMMON_EVENT, RMAKER_MQTT_EVENT_CONNECTED, &esp_rmaker_event_handler);
-    esp_rmaker_priv_data->mqtt_connected = true;
     esp_rmaker_priv_data->state = ESP_RMAKER_STATE_STARTED;
     err = esp_rmaker_report_node_config();
     if (err != ESP_OK) {
@@ -397,7 +420,6 @@ rmaker_end:
     }
     if (esp_rmaker_priv_data->mqtt_connected) {
         esp_rmaker_mqtt_disconnect();
-        esp_rmaker_priv_data->mqtt_connected = false;
     }
     esp_rmaker_priv_data->state = ESP_RMAKER_STATE_INIT_DONE;
 }
