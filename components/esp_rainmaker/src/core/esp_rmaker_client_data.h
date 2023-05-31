@@ -23,6 +23,7 @@
 
 char *esp_rmaker_get_client_cert();
 char *esp_rmaker_get_client_key();
+size_t esp_rmaker_get_client_key_len();
 char *esp_rmaker_get_client_csr();
 char *esp_rmaker_get_mqtt_host();
 esp_rmaker_mqtt_conn_params_t *esp_rmaker_get_mqtt_conn_params();
