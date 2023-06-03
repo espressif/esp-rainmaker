@@ -83,3 +83,6 @@ docs/docusaurus/website/node_modules
 # IDF package manager
 **/managed_components/
 *.lock
+
+.vscode
+.nyc_output

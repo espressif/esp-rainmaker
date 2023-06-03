@@ -39,6 +39,7 @@ extern "C"
 #define ESP_RMAKER_DEF_DIRECTION_NAME       "Direction"
 #define ESP_RMAKER_DEF_SPEED_NAME           "Speed"
 #define ESP_RMAKER_DEF_TEMPERATURE_NAME     "Temperature"
+#define ESP_RMAKER_DEF_HUMIDITY_NAME        "Humidity"
 #define ESP_RMAKER_DEF_OTA_STATUS_NAME      "Status"
 #define ESP_RMAKER_DEF_OTA_INFO_NAME        "Info"
 #define ESP_RMAKER_DEF_OTA_URL_NAME         "URL"
@@ -186,6 +187,19 @@ esp_rmaker_param_t *esp_rmaker_speed_param_create(const char *param_name, int va
  * @return NULL in case of failures.
  */
 esp_rmaker_param_t *esp_rmaker_temperature_param_create(const char *param_name, float val);
+
+/**
+ * Create standard Humidity param
+ *
+ * This will create the standard humidity parameter.
+ *
+ * @param[in] param_name Name of the parameter
+ * @param[in] val Default Value of the parameter
+ *
+ * @return Parameter handle on success.
+ * @return NULL in case of failures.
+ */
+esp_rmaker_param_t *esp_rmaker_humidity_param_create(const char *param_name, float val);
 
 /**
  * Create standard OTA Status param
