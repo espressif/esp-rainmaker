@@ -39,6 +39,9 @@ extern uint8_t mqtt_server_root_ca_pem_end[] asm("_binary_rmaker_mqtt_server_crt
 
 char * esp_rmaker_get_mqtt_host()
 {
+#ifdef CONFIG_ESP_RMAKER_READ_MQTT_HOST_FROM_CONFIG
+    return strdup(CONFIG_ESP_RMAKER_MQTT_HOST);
+#else
     char *host = esp_rmaker_factory_get(ESP_RMAKER_MQTT_HOST_NVS_KEY);
 #if defined(CONFIG_ESP_RMAKER_SELF_CLAIM) || defined(CONFIG_ESP_RMAKER_ASSISTED_CLAIM)
     if (!host) {
@@ -46,6 +49,7 @@ char * esp_rmaker_get_mqtt_host()
     }
 #endif /* defined(CONFIG_ESP_RMAKER_SELF_CLAIM) || defined(CONFIG_ESP_RMAKER_ASSISTED_CLAIM) */
     return host;
+#endif /* !CONFIG_ESP_RMAKER_READ_MQTT_HOST_FROM_CONFIG */
 }
 
 char * esp_rmaker_get_client_cert()
