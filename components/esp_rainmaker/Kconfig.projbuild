@@ -76,6 +76,13 @@ menu "ESP RainMaker Config"
             ESP_RMAKER_MQTT_HOST, independent of this config option. However, if this is set, even if
             an MQTT host value is found in NVS, it will be overriden with ESP_RMAKER_MQTT_HOST.
 
+    config ESP_RMAKER_READ_NODE_ID_FROM_CERT_CN
+        bool "Read Node ID from Device Certificate"
+        default n
+        help
+            If enabled, the device will get its node id from the device certificate's CN field. If not enabled, 
+            it will read the node id either from nvs factory partition or mac address, depending on the configuration.
+
     config ESP_RMAKER_MQTT_HOST
         string "ESP RainMaker MQTT Host"
         depends on ESP_RMAKER_SELF_CLAIM || ESP_RMAKER_ASSISTED_CLAIM || ESP_RMAKER_READ_MQTT_HOST_FROM_CONFIG
