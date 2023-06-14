@@ -28,7 +28,60 @@ static const char *TAG = "app_main";
 
 esp_rmaker_device_t *light_device;
 
-/* Callback to handle commands received from the RainMaker cloud */
+#ifdef CONFIG_ESP_RMAKER_CMD_RESP_ENABLE
+
+#include <json_parser.h>
+#include <esp_rmaker_cmd_resp.h>
+#include <esp_rmaker_standard_types.h>
+
+static char resp_data[100];
+/* Callback to handle commands received from the RainMaker cloud via the Command - Response Framework
+ *
+ * Sample payloads:
+ *     - {"on":true}
+ *     - {"brightness":30}
+ */
+esp_err_t led_light_cmd_handler(const void *in_data, size_t in_len, void **out_data, size_t *out_len, esp_rmaker_cmd_ctx_t *ctx, void *priv)
+{
+    if (in_data == NULL ){
+        ESP_LOGE(TAG, "No data received");
+        return ESP_FAIL;
+    }
+    ESP_LOGI(TAG, "Got command: %.*s", in_len, (char *)in_data);
+    jparse_ctx_t jctx;
+    if (json_parse_start(&jctx, (char *)in_data, in_len) != 0) {
+        snprintf(resp_data, sizeof(resp_data), "{\"status\":\"fail\", \"description\":\"invalid json\"}");
+    } else {
+        int brightness;
+        bool on_state;
+        if (json_obj_get_int(&jctx, "brightness", &brightness) == 0) {
+            if (brightness < 0 || brightness > 100) {
+                snprintf(resp_data, sizeof(resp_data), "{\"status\":\"fail\", \"description\":\"out of bounds\"}");
+            } else {
+                app_light_set_brightness(brightness);
+                esp_rmaker_param_update_and_report(
+                        esp_rmaker_device_get_param_by_type(light_device, ESP_RMAKER_PARAM_BRIGHTNESS),
+                        esp_rmaker_int(brightness));
+                snprintf(resp_data, sizeof(resp_data), "{\"status\":\"success\"}");
+            }
+        } else if (json_obj_get_bool(&jctx, "on", &on_state) == 0) {
+            app_light_set_power(on_state);
+            esp_rmaker_param_update_and_report(
+                    esp_rmaker_device_get_param_by_type(light_device, ESP_RMAKER_PARAM_POWER),
+                    esp_rmaker_bool(on_state));
+            snprintf(resp_data, sizeof(resp_data), "{\"status\":\"success\"}");
+        } else {
+            snprintf(resp_data, sizeof(resp_data), "{\"status\":\"fail\", \"description\":\"invalid param\"}");
+        }
+    }
+    *out_data = resp_data;
+    *out_len = strlen(resp_data);
+    return ESP_OK;
+}
+
+#endif /* CONFIG_ESP_RMAKER_CMD_RESP_ENABLE */
+
+/* Callback to handle param updates received from the RainMaker cloud */
 static esp_err_t write_cb(const esp_rmaker_device_t *device, const esp_rmaker_param_t *param,
             const esp_rmaker_param_val_t val, void *priv_data, esp_rmaker_write_ctx_t *ctx)
 {
@@ -121,6 +174,11 @@ void app_main()
 
     /* Enable Insights. Requires CONFIG_ESP_INSIGHTS_ENABLED=y */
     app_insights_enable();
+
+#ifdef CONFIG_ESP_RMAKER_CMD_RESP_ENABLE
+    /* Register a command for demonstration */
+    esp_rmaker_cmd_register(ESP_RMAKER_CMD_CUSTOM_START, ESP_RMAKER_USER_ROLE_PRIMARY_USER | ESP_RMAKER_USER_ROLE_SECONDARY_USER, led_light_cmd_handler, false, NULL);
+#endif
 
     /* Start the ESP RainMaker Agent */
     esp_rmaker_start();

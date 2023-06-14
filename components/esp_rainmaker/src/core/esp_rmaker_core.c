@@ -219,7 +219,6 @@ static void esp_rmaker_event_handler(void* arg, esp_event_base_t event_base,
             event_id == RMAKER_EVENT_USER_NODE_MAPPING_RESET)) {
         esp_event_handler_unregister(RMAKER_EVENT, event_id, &esp_rmaker_event_handler);
         esp_rmaker_params_mqtt_init();
-        esp_rmaker_cmd_response_enable();
     } else if (event_base == RMAKER_COMMON_EVENT && event_id == RMAKER_MQTT_EVENT_CONNECTED) {
         if (rmaker_core_event_group) {
             /* Signal rmaker thread to continue execution */
@@ -393,6 +392,15 @@ static void esp_rmaker_task(void *data)
         esp_rmaker_priv_data->need_claim = false;
     }
 #endif /* ESP_RMAKER_CLAIM_ENABLED */
+#ifdef CONFIG_ESP_RMAKER_CMD_RESP_ENABLE
+        err = esp_rmaker_cmd_response_enable();
+        if (err != ESP_OK) {
+            ESP_LOGE(TAG, "Failed to enable Command - Response module. Aborting!!!");
+            goto rmaker_end;
+        }
+#else
+    ESP_LOGW(TAG, "Command-Response Module not enabled. Set CONFIG_ESP_RMAKER_CMD_RESP_ENABLE=y to use it.");
+#endif /* !CONFIG_ESP_RMAKER_CMD_RESP_ENABLE */
 #ifdef CONFIG_ESP_RMAKER_LOCAL_CTRL_ENABLE
     err = esp_rmaker_start_local_ctrl_service(esp_rmaker_get_node_id());
     if (err != ESP_OK) {
@@ -416,11 +424,6 @@ static void esp_rmaker_task(void *data)
     }
     if (esp_rmaker_user_node_mapping_get_state() == ESP_RMAKER_USER_MAPPING_DONE) {
         err = esp_rmaker_params_mqtt_init();
-        if (err != ESP_OK) {
-            ESP_LOGE(TAG, "Aborting!!!");
-            goto rmaker_end;
-        }
-        err = esp_rmaker_cmd_response_enable();
         if (err != ESP_OK) {
             ESP_LOGE(TAG, "Aborting!!!");
             goto rmaker_end;
