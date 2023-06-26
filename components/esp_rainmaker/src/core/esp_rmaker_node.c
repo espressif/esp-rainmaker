@@ -18,6 +18,7 @@
 #include <esp_ota_ops.h>
 #include <esp_rmaker_utils.h>
 #include <esp_rmaker_core.h>
+#include <esp_rmaker_secure_boot_digest.h>
 
 #include "esp_rmaker_internal.h"
 
@@ -44,6 +45,10 @@ static void esp_rmaker_node_info_free(esp_rmaker_node_info_t *info)
         }
         if (info->subtype) {
             free(info->subtype);
+        }
+        if (info->secure_boot_digest) {
+            esp_rmaker_secure_boot_digest_free(info->secure_boot_digest);
+            info->secure_boot_digest = NULL;
         }
         free(info);
     }
@@ -133,6 +138,12 @@ esp_rmaker_node_t *esp_rmaker_node_create(const char *name, const char *type)
 #endif
     node->info->fw_version = strdup(app_desc->version);
     node->info->model = strdup(app_desc->project_name);
+    if (esp_secure_boot_enabled()) {
+        node->info->secure_boot_digest = esp_rmaker_get_secure_boot_digest();
+        if (!node->info->secure_boot_digest) {
+            goto node_create_err;
+        }
+    }
     if (!node->info->name || !node->info->type
             || !node->info->fw_version || !node->info->model) {
         ESP_LOGE(TAG, "Failed to allocate memory for node info.");
