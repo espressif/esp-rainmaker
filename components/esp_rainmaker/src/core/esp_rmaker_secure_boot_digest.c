@@ -3,7 +3,15 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  */
+
+#include <inttypes.h>
+#include <sys/time.h>
+#include <esp_log.h>
+#include <esp_idf_version.h>
+#include <esp_rmaker_utils.h>
 #include "esp_rmaker_secure_boot_digest.h"
+
+static const char *TAG = "rmaker_secure_boot";
 
 #ifdef CONFIG_SECURE_BOOT_V2_ENABLED
 
@@ -89,6 +97,7 @@ esp_err_t esp_rmaker_secure_boot_digest_free(char **digest)
 
 char** esp_rmaker_get_secure_boot_digest()
 {
+    ESP_LOGI(TAG, "Secure boot is not enabled. Could not get digest.");
     return NULL;
 }
 
