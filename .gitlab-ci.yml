@@ -19,31 +19,63 @@ before_script:
     # Create esp-rainmaker-bins-${CI_JOB_ID}/ dir (to copy binaries into for artifacts)
     - mkdir -p $CI_PROJECT_DIR/esp-rainmaker-bins-${CI_JOB_ID}
 
+.build_matter_examples: &build_matter_examples
+  - pip install --upgrade idf-component-manager
+  # setup esp_matter
+  - git clone --depth 1 https://github.com/espressif/esp-matter.git
+  - cd esp-matter
+  - git submodule update --init --depth 1
+  - cd ./connectedhomeip/connectedhomeip
+  - ./scripts/checkout_submodules.py --platform linux esp32 --shallow
+  - cd ../..
+  # `|| true` below ignores errors in the process, it's okay, since we are
+  # only interested pigweed setup which goes through as expected
+  - ./install.sh || true
+  - . ./export.sh
+  # start building examples
+  - for EXAMPLE in $EXAMPLES; do
+  - cd $CI_PROJECT_DIR/examples/$EXAMPLE
+  - echo Building $EXAMPLE
+  # build examples for the targets
+  - for TARGET in $EXAMPLE_TARGETS; do
+  - echo Building for $TARGET
+  - idf.py set-target $TARGET
+  - idf.py build
+  - mkdir -p $CI_PROJECT_DIR/esp-rainmaker-bins-${CI_JOB_ID}/$EXAMPLE/$TARGET/
+  - cp $CI_PROJECT_DIR/examples/$EXAMPLE/build/*.bin $CI_PROJECT_DIR/esp-rainmaker-bins-${CI_JOB_ID}/$EXAMPLE/$TARGET/
+  - done
+  - echo Build Complete for $EXAMPLE
+  - done
+  # Generating zip file for binaries generated
+  - cd $CI_PROJECT_DIR
+  - echo Generating zip file for binaries generated
+  - tar -zcvf esp-rainmaker-bins-${CI_JOB_ID}.zip esp-rainmaker-bins-${CI_JOB_ID}/
+
 .build_all_examples: &build_all_examples
-- pip install --upgrade idf-component-manager
-- for EXAMPLE in $EXAMPLES; do
-- cd $CI_PROJECT_DIR/examples/$EXAMPLE
-- echo Building $EXAMPLE
-- if [[ "$EXAMPLE" == "homekit_switch" ]]; then
-- cd components
-- echo Cloning esp-homekit-sdk
-- git clone --recursive --branch master --depth 1 https://github.com/espressif/esp-homekit-sdk.git
-- cd ..
-- export HOMEKIT_PATH=$PWD/components/esp-homekit-sdk
-- fi
-- for TARGET in $EXAMPLE_TARGETS; do
-- echo Building for $TARGET
-- idf.py set-target $TARGET
-- idf.py build
-- mkdir -p $CI_PROJECT_DIR/esp-rainmaker-bins-${CI_JOB_ID}/$EXAMPLE/$TARGET/
-- cp $CI_PROJECT_DIR/examples/$EXAMPLE/build/*.bin $CI_PROJECT_DIR/esp-rainmaker-bins-${CI_JOB_ID}/$EXAMPLE/$TARGET/
-- done
-- echo Build Complete for $EXAMPLE
-- done
-# Generating zip file for binaries generated
-- cd $CI_PROJECT_DIR
-- echo Generating zip file for binaries generated
-- tar -zcvf esp-rainmaker-bins-${CI_JOB_ID}.zip esp-rainmaker-bins-${CI_JOB_ID}/
+  - pip install --upgrade idf-component-manager
+  - for EXAMPLE in $EXAMPLES; do
+  - cd $CI_PROJECT_DIR/examples/$EXAMPLE
+  - echo Building $EXAMPLE
+  - if [[ "$EXAMPLE" == "homekit_switch" ]]; then
+  - cd components
+  - echo Cloning esp-homekit-sdk
+  - git clone --recursive --branch master --depth 1 https://github.com/espressif/esp-homekit-sdk.git
+  - cd ..
+  - export HOMEKIT_PATH=$PWD/components/esp-homekit-sdk
+  - fi
+  - for TARGET in $EXAMPLE_TARGETS; do
+  - echo Building for $TARGET
+  - idf.py set-target $TARGET
+  - idf.py build
+  - mkdir -p $CI_PROJECT_DIR/esp-rainmaker-bins-${CI_JOB_ID}/$EXAMPLE/$TARGET/
+  - cp $CI_PROJECT_DIR/examples/$EXAMPLE/build/*.bin $CI_PROJECT_DIR/esp-rainmaker-bins-${CI_JOB_ID}/$EXAMPLE/$TARGET/
+  - done
+  - echo Build Complete for $EXAMPLE
+  - done
+  # Generating zip file for binaries generated
+  - cd $CI_PROJECT_DIR
+  - echo Generating zip file for binaries generated
+  - tar -zcvf esp-rainmaker-bins-${CI_JOB_ID}.zip esp-rainmaker-bins-${CI_JOB_ID}/
 
 .build_template:
   stage: build
@@ -92,6 +124,18 @@ build_idf_v5.1:
   image: espressif/idf:release-v5.1
   variables:
     EXAMPLE_TARGETS: "esp32 esp32s2 esp32c3 esp32s3"
+
+build_matter:
+  stage: build
+  image: espressif/idf:release-v5.1
+  tags:
+    - build
+  variables:
+    PEDANTIC_FLAGS: ""
+    EXAMPLE_TARGETS: "esp32 esp32c3 esp32s3"
+    EXAMPLES: "matter/matter_light matter/matter_switch"
+  script:
+    - *build_matter_examples
 
 build_docs:
     stage: build
