@@ -398,6 +398,7 @@ static void esp_rmaker_task(void *data)
             ESP_LOGE(TAG, "Failed to enable Command - Response module. Aborting!!!");
             goto rmaker_end;
         }
+        esp_rmaker_node_add_attribute(esp_rmaker_get_node(), "cmd-resp", "1");
 #else
     ESP_LOGW(TAG, "Command-Response Module not enabled. Set CONFIG_ESP_RMAKER_CMD_RESP_ENABLE=y to use it.");
 #endif /* !CONFIG_ESP_RMAKER_CMD_RESP_ENABLE */
