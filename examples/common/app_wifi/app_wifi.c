@@ -413,7 +413,7 @@ esp_err_t app_wifi_start(app_wifi_pop_type_t pop_type)
 
     bool provisioned = false;
     /* Let's find out if the device is provisioned */
-    ESP_ERROR_CHECK(wifi_prov_mgr_is_provisioned(&provisioned));
+    wifi_prov_mgr_is_provisioned(&provisioned);
     /* If device is not yet provisioned start provisioning service */
     if (!provisioned) {
         ESP_LOGI(TAG, "Starting provisioning");
