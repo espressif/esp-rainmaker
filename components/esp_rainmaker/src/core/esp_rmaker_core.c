@@ -69,7 +69,6 @@ typedef struct {
     bool need_claim;
     esp_rmaker_claim_data_t *claim_data;
 #endif /* ESP_RMAKER_CLAIM_ENABLED */
-    QueueHandle_t work_queue;
 } esp_rmaker_priv_data_t;
 
 static esp_rmaker_priv_data_t *esp_rmaker_priv_data;
@@ -403,7 +402,7 @@ static void esp_rmaker_task(void *data)
     ESP_LOGW(TAG, "Command-Response Module not enabled. Set CONFIG_ESP_RMAKER_CMD_RESP_ENABLE=y to use it.");
 #endif /* !CONFIG_ESP_RMAKER_CMD_RESP_ENABLE */
 #ifdef CONFIG_ESP_RMAKER_LOCAL_CTRL_ENABLE
-    err = esp_rmaker_start_local_ctrl_service(esp_rmaker_get_node_id());
+    err = esp_rmaker_local_ctrl_enable();
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "Failed to start local control service. Aborting!!!");
         goto rmaker_end;
