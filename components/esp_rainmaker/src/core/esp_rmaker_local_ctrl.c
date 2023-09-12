@@ -22,6 +22,7 @@
 #include <esp_rmaker_internal.h>
 #include <esp_rmaker_standard_services.h>
 #include <esp_https_server.h>
+#include <esp_rmaker_work_queue.h>
 #include <mdns.h>
 #include <esp_rmaker_utils.h>
 
@@ -45,11 +46,12 @@ static const char * TAG = "esp_rmaker_local";
 /* Random Port number that will be used by the local control http instance
  * for internal control communication.
  */
+#define ESP_RMAKER_LOCAL_CTRL_DEVICE_NAME       "Local Control"
 #define ESP_RMAKER_LOCAL_CTRL_HTTP_CTRL_PORT    12312
 #define ESP_RMAKER_NVS_PART_NAME                "nvs"
 #define ESP_RMAKER_NVS_LOCAL_CTRL_NAMESPACE     "local_ctrl"
 #define ESP_RMAKER_NVS_LOCAL_CTRL_POP           "pop"
-#define ESP_RMAKER_POP_LEN    9
+#define ESP_RMAKER_POP_LEN                      9
 
 /* Custom allowed property types */
 enum property_types {
@@ -216,9 +218,9 @@ static esp_err_t esp_rmaker_local_ctrl_service_enable(void)
     }
     int sec_ver = esp_rmaker_local_ctrl_get_security_type();
 
-    esp_rmaker_device_t *local_ctrl_service = esp_rmaker_create_local_control_service("Local Control", pop_str, sec_ver, NULL);
+    esp_rmaker_device_t *local_ctrl_service = esp_rmaker_create_local_control_service(ESP_RMAKER_LOCAL_CTRL_DEVICE_NAME, pop_str, sec_ver, NULL);;
     if (!local_ctrl_service) {
-        ESP_LOGE(TAG, "Failed to create Schedule Service");
+        ESP_LOGE(TAG, "Failed to create Local Control Service.");
         free(pop_str);
         return ESP_FAIL;
     }
@@ -226,12 +228,40 @@ static esp_err_t esp_rmaker_local_ctrl_service_enable(void)
 
     esp_err_t err = esp_rmaker_node_add_device(esp_rmaker_get_node(), local_ctrl_service);
     if (err != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to add service Service");
+        ESP_LOGE(TAG, "Failed to add Local Control Service to Node. err=0x%x", err);
         return err;
     }
-
-    ESP_LOGD(TAG, "Local Control Service Enabled");
+#ifndef CONFIG_ESP_RMAKER_LOCAL_CTRL_ENABLE
+    /* Report node details only if the local control is not enabled via config option,
+     * but instead via an API call.
+     */
+    err = esp_rmaker_report_node_details();
+#endif
+    ESP_LOGI(TAG, "Local Control Service Enabled");
     return err;
+}
+
+static esp_err_t esp_rmaker_local_ctrl_service_disable(void)
+{
+    const esp_rmaker_node_t *node = esp_rmaker_get_node();
+    esp_rmaker_device_t *local_ctrl_service = esp_rmaker_node_get_device_by_name(node, ESP_RMAKER_LOCAL_CTRL_DEVICE_NAME);
+    esp_err_t err = esp_rmaker_node_remove_device(node, local_ctrl_service);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to remove Local Control Service from Node. err=0x%x", err);
+        return err;
+    }
+    err = esp_rmaker_device_delete(local_ctrl_service);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to delete Local Control Service. err=0x%x", err);
+        return err;
+    }
+#ifndef CONFIG_ESP_RMAKER_LOCAL_CTRL_ENABLE
+    /* Report node details only if the local control is not enabled via config option,
+     * but instead via an API call.
+     */
+    err = esp_rmaker_report_node_details();
+#endif
+    return ESP_OK;
 }
 
 static esp_err_t __esp_rmaker_start_local_ctrl_service(const char *serv_name)
@@ -407,4 +437,47 @@ esp_err_t esp_rmaker_start_local_ctrl_service(const char *serv_name)
         return ESP_OK;
     }
     return ESP_ERR_NO_MEM;
+}
+
+esp_err_t esp_rmaker_local_ctrl_enable(void)
+{
+    if (g_local_ctrl_is_started) {
+        return ESP_ERR_INVALID_STATE;
+    }
+    ESP_LOGI(TAG, "Enabling Local Control");
+    esp_rmaker_init_local_ctrl_service();
+    esp_err_t err;
+    if ((err = esp_rmaker_start_local_ctrl_service(esp_rmaker_get_node_id())) != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to start Local Control Service. err=0x%x", err);
+    }
+    return err;
+}
+
+esp_err_t esp_rmaker_local_ctrl_disable(void)
+{
+    ESP_LOGI(TAG, "Disabling Local Control");
+    if (g_serv_name) {
+        free(g_serv_name);
+        g_serv_name = NULL;
+    }
+    esp_event_handler_unregister(WIFI_PROV_EVENT, WIFI_PROV_START, &esp_rmaker_local_ctrl_prov_event_handler);
+    esp_event_handler_unregister(WIFI_PROV_EVENT, WIFI_PROV_DEINIT, &esp_rmaker_local_ctrl_prov_event_handler);
+    if (!g_local_ctrl_is_started) {
+        return ESP_OK;
+    }
+    mdns_free();
+    esp_err_t err = esp_local_ctrl_stop();
+    if (err != ESP_OK) {
+        return err;
+    }
+    if (ESP_RMAKER_LOCAL_CTRL_SECURITY_TYPE == 1) {
+        err = esp_rmaker_local_ctrl_service_disable();
+        if (err != ESP_OK) {
+            return err;
+        }
+    }
+    /* update the global status */
+    g_local_ctrl_is_started = false;
+    esp_rmaker_post_event(RMAKER_EVENT_LOCAL_CTRL_STOPPED, NULL, 0);
+    return err;
 }

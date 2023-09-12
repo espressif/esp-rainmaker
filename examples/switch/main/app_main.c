@@ -68,6 +68,12 @@ static void event_handler(void* arg, esp_event_base_t event_base,
             case RMAKER_EVENT_CLAIM_FAILED:
                 ESP_LOGI(TAG, "RainMaker Claim Failed.");
                 break;
+            case RMAKER_EVENT_LOCAL_CTRL_STARTED:
+                ESP_LOGI(TAG, "Local Control Started.");
+                break;
+            case RMAKER_EVENT_LOCAL_CTRL_STOPPED:
+                ESP_LOGI(TAG, "Local Control Stopped.");
+                break;
             default:
                 ESP_LOGW(TAG, "Unhandled RainMaker Event: %"PRIi32, event_id);
         }
