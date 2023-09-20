@@ -20,18 +20,6 @@ before_script:
     - mkdir -p $CI_PROJECT_DIR/esp-rainmaker-bins-${CI_JOB_ID}
 
 .build_matter_examples: &build_matter_examples
-  - pip install --upgrade idf-component-manager
-  # setup esp_matter
-  - git clone --depth 1 https://github.com/espressif/esp-matter.git
-  - cd esp-matter
-  - git submodule update --init --depth 1
-  - cd ./connectedhomeip/connectedhomeip
-  - ./scripts/checkout_submodules.py --platform linux esp32 --shallow
-  - cd ../..
-  # `|| true` below ignores errors in the process, it's okay, since we are
-  # only interested pigweed setup which goes through as expected
-  - ./install.sh || true
-  - . ./export.sh
   # start building examples
   - for EXAMPLE in $EXAMPLES; do
   - cd $CI_PROJECT_DIR/examples/$EXAMPLE
@@ -127,7 +115,7 @@ build_idf_v5.1:
 
 build_matter:
   stage: build
-  image: espressif/idf:release-v5.1
+  image: espressif/esp-matter:latest_idf_v5.1.1
   tags:
     - build
   variables:
