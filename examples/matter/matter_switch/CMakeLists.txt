@@ -39,13 +39,17 @@ set(EXTRA_COMPONENT_DIRS
     "${ESP_MATTER_PATH}/device_hal/device"
     "${ESP_MATTER_PATH}/examples/common"
     "${RMAKER_PATH}/examples/common/app_insights"
-    "${RMAKER_PATH}/components/esp-insights/components"
     "${RMAKER_PATH}/components/esp_rainmaker"
     "${RMAKER_PATH}/components/esp_schedule"
     "${RMAKER_PATH}/components/json_generator"
     "${RMAKER_PATH}/components/json_parser"
     "${RMAKER_PATH}/components/rmaker_common"
     ${extra_components_dirs_append})
+
+# Include insights only for IDF <= v4.4 as it is already included by esp-matter for >= v5.0
+if("${IDF_VERSION_MAJOR}.${IDF_VERSION_MINOR}" VERSION_LESS_EQUAL "4.4")
+    list(APPEND EXTRA_COMPONENT_DIRS "${RMAKER_PATH}/components/esp-insights/components")
+endif()
 
 project(matter_switch)
 
