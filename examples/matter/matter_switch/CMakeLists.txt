@@ -39,7 +39,6 @@ set(EXTRA_COMPONENT_DIRS
     "${ESP_MATTER_PATH}/device_hal/device"
     "${ESP_MATTER_PATH}/examples/common"
     "${RMAKER_PATH}/examples/common/app_insights"
-    "${RMAKER_PATH}/components/esp-insights/components"
     "${RMAKER_PATH}/components/esp_rainmaker"
     "${RMAKER_PATH}/components/esp_schedule"
     "${RMAKER_PATH}/components/json_generator"
@@ -47,9 +46,14 @@ set(EXTRA_COMPONENT_DIRS
     "${RMAKER_PATH}/components/rmaker_common"
     ${extra_components_dirs_append})
 
+# Include insights only for IDF <= v4.4 as it is already included by esp-matter for >= v5.0
+if("${IDF_VERSION_MAJOR}.${IDF_VERSION_MINOR}" VERSION_LESS_EQUAL "4.4")
+    list(APPEND EXTRA_COMPONENT_DIRS "${RMAKER_PATH}/components/esp-insights/components")
+endif()
+
 project(matter_switch)
 
-idf_build_set_property(CXX_COMPILE_OPTIONS "-std=gnu++14;-Os;-DCHIP_HAVE_CONFIG_H" APPEND)
+idf_build_set_property(CXX_COMPILE_OPTIONS "-std=gnu++17;-Os;-DCHIP_HAVE_CONFIG_H" APPEND)
 idf_build_set_property(C_COMPILE_OPTIONS "-Os" APPEND)
 # For RISCV chips, project_include.cmake sets -Wno-format, but does not clear various
 # flags that depend on -Wformat
