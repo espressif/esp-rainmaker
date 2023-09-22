@@ -39,6 +39,22 @@ before_script:
   - echo Generating zip file for binaries generated
   - tar -zcvf esp-rainmaker-bins-${CI_JOB_ID}.zip esp-rainmaker-bins-${CI_JOB_ID}/
 
+.build_matter_controller_example: &build_matter_controller_example
+  # start build controller example for the targets
+  - cd $CI_PROJECT_DIR/examples/matter/matter_controller
+  - for TARGET in $CONTROLLER_EXAMPLE_TARGET; do
+  - echo Build matter controller for $TARGET
+  - idf.py set-target $CONTROLLER_EXAMPLE_TARGET
+  - idf.py build
+  - mkdir -p $CI_PROJECT_DIR/esp-rainmaker-bins-${CI_JOB_ID}/matter/matter_controller/$TARGET/
+  - cp $CI_PROJECT_DIR/examples/matter/matter_controller/build/*.bin $CI_PROJECT_DIR/esp-rainmaker-bins-${CI_JOB_ID}/matter/matter_controller/$TARGET/
+  - done
+  - echo Build Complete for matter_controller
+  # Generating zip file for binaries generated
+  - cd $CI_PROJECT_DIR
+  - echo Generating zip file for binaries generated
+  - tar -zcvf esp-rainmaker-bins-${CI_JOB_ID}.zip esp-rainmaker-bins-${CI_JOB_ID}/
+
 .build_all_examples: &build_all_examples
   - pip install --upgrade idf-component-manager
   - for EXAMPLE in $EXAMPLES; do
@@ -122,8 +138,10 @@ build_matter:
     PEDANTIC_FLAGS: ""
     EXAMPLE_TARGETS: "esp32 esp32c3 esp32s3"
     EXAMPLES: "matter/matter_light matter/matter_switch"
+    CONTROLLER_EXAMPLE_TARGET: "esp32s3"
   script:
     - *build_matter_examples
+    - *build_matter_controller_example
 
 build_docs:
     stage: build
