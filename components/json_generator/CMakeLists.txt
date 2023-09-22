@@ -1,3 +1,3 @@
-idf_component_register(SRCS "upstream/json_generator.c"
-                    INCLUDE_DIRS "upstream"
+idf_component_register(SRCS "src/json_generator.c"
+                    INCLUDE_DIRS "include"
                     )
