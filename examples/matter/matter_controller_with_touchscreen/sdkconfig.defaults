@@ -145,3 +145,7 @@ CONFIG_BSP_BOARD_ESP32_S3_BOX_3=y
 
 # Enable custom commission data to use dynamic qrcode
 CONFIG_CUSTOM_COMMISSIONABLE_DATA_PROVIDER=y
+
+# If ESP-Insights is enabled, we need MQTT transport selected
+# Takes out manual efforts to enable this option
+CONFIG_ESP_INSIGHTS_TRANSPORT_MQTT=y
