@@ -6,7 +6,8 @@
 version: 2
 build:
   os: "ubuntu-22.04" # RTD only supports ubuntu-22.04 and ubuntu-20.04.
-  tools: "3.6" # keep it the same as used in build doc image, for easy debugging
+  tools: 
+    python: "3.6" # keep it the same as used in build doc image, for easy debugging
 
 # Optionally build your docs in additional formats such as PDF and ePub
 formats:
