@@ -3,3 +3,4 @@
 #
 sphinx==2.3.1
 breathe==4.14.1
+sphinx_rtd_theme # This theme is no longer a hard dependency since version 1.4.0. Need to install it manually.
