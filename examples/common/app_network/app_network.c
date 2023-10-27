@@ -47,7 +47,10 @@
 #endif /* CONFIG_APP_NETWORK_PROV_TRANSPORT_BLE */
 #endif
 
+#ifdef CONFIG_APP_NETWORK_PROV_SHOW_QR
 #include <qrcode.h>
+#endif
+
 #include <nvs.h>
 #include <nvs_flash.h>
 #include <esp_timer.h>
@@ -122,6 +125,16 @@ static void intro_print(bool provisioned)
 }
 
 #endif /* !APP_NETWORK_SHOW_DEMO_INTRO_TEXT */
+
+#ifdef CONFIG_APP_NETWORK_PROV_SHOW_QR
+static esp_err_t qrcode_display(const char *text)
+{
+#define MAX_QRCODE_VERSION 5
+    esp_qrcode_config_t cfg = ESP_QRCODE_CONFIG_DEFAULT();
+    cfg.max_qrcode_version = MAX_QRCODE_VERSION;
+    return esp_qrcode_generate(&cfg, text);
+}
+#endif
 
 static uint8_t *custom_mfg_data = NULL;
 static size_t custom_mfg_data_len = 0;

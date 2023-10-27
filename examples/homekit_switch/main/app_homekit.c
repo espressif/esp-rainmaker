@@ -1,5 +1,5 @@
 /* HomeKit Switch control
-   
+
    This example code is in the Public Domain (or CC0 licensed, at your option.)
 
    Unless required by applicable law or agreed to in writing, this
@@ -26,6 +26,16 @@
 static const char *TAG = "app_homekit";
 
 static hap_char_t *on_char;
+
+#ifdef CONFIG_EXAMPLE_USE_HARDCODED_SETUP_CODE
+static esp_err_t qrcode_display(const char *text)
+{
+#define MAX_QRCODE_VERSION 5
+    esp_qrcode_config_t cfg = ESP_QRCODE_CONFIG_DEFAULT();
+    cfg.max_qrcode_version = MAX_QRCODE_VERSION;
+    return esp_qrcode_generate(&cfg, text);
+}
+#endif
 
 static void app_homekit_show_qr(void)
 {
