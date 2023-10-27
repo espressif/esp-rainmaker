@@ -127,7 +127,7 @@ build_idf_v5.1:
   extends: .build_template
   image: espressif/idf:release-v5.1
   variables:
-    EXAMPLE_TARGETS: "esp32 esp32s2 esp32c3 esp32s3"
+    EXAMPLE_TARGETS: "esp32 esp32s2 esp32c3 esp32s3 esp32c6"
 
 build_matter:
   stage: build
@@ -136,7 +136,7 @@ build_matter:
     - build
   variables:
     PEDANTIC_FLAGS: ""
-    EXAMPLE_TARGETS: "esp32 esp32c3 esp32s3"
+    EXAMPLE_TARGETS: "esp32 esp32c3 esp32s3 esp32c6"
     EXAMPLES: "matter/matter_light matter/matter_switch"
     CONTROLLER_EXAMPLE_TARGET: "esp32s3"
   script:

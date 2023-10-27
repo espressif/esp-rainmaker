@@ -47,7 +47,7 @@ $ ./mfg_tool.py -v 0x131B -p 0x2 -cd $RMAKER_PATH/examples/matter/mfg/cd_131B_00
 
 This not only generates the factory nvs binary required for matter, but also embeds the RainMaker MQTT Host url into it via the master.csv file. Optionally, you can embed the MQTT host into the firmware itself by using `idf.py menuconfig -> ESP RainMaker Config -> ESP_RMAKER_READ_MQTT_HOST_FROM_CONFIG` and then skipping the --csv and --mcsv options to mfg_tool
 
-The factory binary generated above should be flashed onto the fctry partition (default : 0x3e0000, but check your partition table for exact address)
+The factory binary generated above should be flashed onto the fctry partition (default : `0x3fa000` for ESP32-C6 and `0x3e0000` for other chips. Do check your partition table for exact address).
 
 ```
 $ esptool.py write_flash 0x3e0000 $ESP_MATTER_PATH/tools/mfg_tool/out/131b_2/<node-id>/<node-id>-partition.bin

@@ -2,15 +2,15 @@ menu "Example Configuration"
 
     config EXAMPLE_BOARD_BUTTON_GPIO
         int "Boot Button GPIO"
-        default 0 if !IDF_TARGET_ESP32C3
-        default 9 if IDF_TARGET_ESP32C3
+        default 9 if IDF_TARGET_ESP32C3 || IDF_TARGET_ESP32C6
+        default 0
         help
             GPIO number on which the "Boot" button is connected. This is generally used
             by the application for custom operations like toggling states, resetting to defaults, etc.
 
     config EXAMPLE_OUTPUT_GPIO_RED
         int "Red GPIO"
-        default 2 
+        default 2
         help
             Control digital RGB LEDs. Need to connect this GPIO to the red pin of the LED.
 
