@@ -82,7 +82,35 @@ static int wifi_prov_handler(int argc, char** argv)
     if (argc == 3) {
         memcpy(wifi_config.sta.password, argv[2], strlen(argv[2]));
     }
-    wifi_prov_mgr_configure_sta(&wifi_config);
+
+    /* If device is still provisioning, use  wifi_prov_mgr_configure_sta */
+    bool provisioned = false;
+    wifi_prov_mgr_is_provisioned(&provisioned);
+    if (!provisioned) { // provisioning in progress
+        wifi_prov_mgr_configure_sta(&wifi_config);
+        return ESP_OK;
+    }
+
+    /* If already provisioned, just set the new credentials */
+    /* Stop the Wi-Fi */
+    if (esp_wifi_stop() != ESP_OK) {
+        printf("%s: Failed to stop wifi\n", TAG);
+    }
+    /* Configure Wi-Fi station with provided host credentials */
+    if (esp_wifi_set_config(ESP_IF_WIFI_STA, &wifi_config) != ESP_OK) {
+        printf("%s: Failed to set WiFi configuration\n", TAG);
+        return ESP_FAIL;
+    }
+    /* (Re)Start Wi-Fi */
+    if (esp_wifi_start() != ESP_OK) {
+        printf("%s: Failed to start WiFi\n", TAG);
+        return ESP_FAIL;
+    }
+    /* Connect to AP */
+    if (esp_wifi_connect() != ESP_OK) {
+        printf("%s: Failed to connect WiFi\n", TAG);
+        return ESP_FAIL;
+    }
     return ESP_OK;
 }
 
