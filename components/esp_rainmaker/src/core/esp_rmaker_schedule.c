@@ -1,16 +1,8 @@
-// Copyright 2020 Espressif Systems (Shanghai) PTE LTD
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+/*
+ * SPDX-FileCopyrightText: 2023 Espressif Systems (Shanghai) CO LTD
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
 
 #include <time.h>
 #include <string.h>
@@ -87,6 +79,7 @@ typedef struct esp_rmaker_schedule {
     esp_schedule_handle_t handle;
     esp_rmaker_schedule_action_t action;
     esp_rmaker_schedule_trigger_t trigger;
+    esp_schedule_validity_t validity;
     struct esp_rmaker_schedule *next;
 } esp_rmaker_schedule_t;
 
@@ -367,6 +360,7 @@ static esp_err_t esp_rmaker_schedule_prepare_config(esp_rmaker_schedule_t *sched
     /* Just passing the schedule pointer as priv_data could create a race condition between the schedule getting a
     callback and the schedule getting removed. Using this unique index as the priv_data solves it to some extent. */
     schedule_config->priv_data = (void *)schedule->index;
+    schedule_config->validity = schedule->validity;
     return ESP_OK;
 }
 
@@ -653,6 +647,16 @@ static esp_err_t esp_rmaker_schedule_parse_info_and_flags(jparse_ctx_t *jctx, ch
     return ESP_OK;
 }
 
+static esp_err_t esp_rmaker_schedule_parse_validity(jparse_ctx_t *jctx, esp_schedule_validity_t *validity)
+{
+    if (json_obj_get_object(jctx, "validity") == OS_SUCCESS) {
+        json_obj_get_int64(jctx, "start", (int64_t *)&validity->start_time);
+        json_obj_get_int64(jctx, "end", (int64_t *)&validity->end_time);
+        json_obj_leave_object(jctx);
+    }
+    return ESP_OK;
+}
+
 static esp_rmaker_schedule_t *esp_rmaker_schedule_find_or_create(jparse_ctx_t *jctx, char *id, schedule_operation_t operation)
 {
     char name[MAX_NAME_LEN + 1] = {0};      /* +1 for NULL termination */
@@ -807,6 +811,9 @@ static esp_err_t esp_rmaker_schedule_parse_json(void *data, size_t data_len, esp
 
             /* Get info and flags */
             esp_rmaker_schedule_parse_info_and_flags(&jctx, &schedule->info, &schedule->flags);
+
+            /* Get validity */
+            esp_rmaker_schedule_parse_validity(&jctx, &schedule->validity);
         }
 
         /* Perform operation */
@@ -841,7 +848,17 @@ static esp_err_t __esp_rmaker_schedule_get_params(char *buf, size_t *buf_size)
         if (schedule->flags != 0) {
             json_gen_obj_set_int(&jstr, "flags", schedule->flags);
         }
-
+        /* Add validity */
+        if (schedule->validity.start_time != 0 || schedule->validity.end_time != 0) {
+            json_gen_push_object(&jstr, "validity");
+            if (schedule->validity.start_time != 0) {
+                json_gen_obj_set_int(&jstr, "start", schedule->validity.start_time);
+            }
+            if (schedule->validity.end_time != 0) {
+                json_gen_obj_set_int(&jstr, "end", schedule->validity.end_time);
+            }
+            json_gen_pop_object(&jstr);
+        }
         /* Add action */
         json_gen_push_object_str(&jstr, "action", schedule->action.data);
 
