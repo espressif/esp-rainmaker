@@ -1,17 +1,8 @@
-// Copyright 2020 Espressif Systems (Shanghai) PTE LTD
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-
+/*
+ * SPDX-FileCopyrightText: 2023 Espressif Systems (Shanghai) CO LTD
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
 #include <string.h>
 #include <inttypes.h>
 #include <esp_log.h>
@@ -344,10 +335,38 @@ static void esp_schedule_common_timer_cb(TimerHandle_t timer)
         return;
     }
     esp_schedule_t *schedule = (esp_schedule_t *)priv_data;
+    time_t now;
+    time(&now);
+    struct tm validity_time;
+    char time_str[64] = {0};
+    if (schedule->validity.start_time != 0) {
+        if (now < schedule->validity.start_time) {
+            memset(time_str, 0, sizeof(time_str));
+            localtime_r(&schedule->validity.start_time, &validity_time);
+            strftime(time_str, sizeof(time_str), "%c %z[%Z]", &validity_time);
+            ESP_LOGW(TAG, "Schedule %s skipped. It will be active only after: %s. DST: %s.", schedule->name, time_str, validity_time.tm_isdst ? "Yes" : "No");
+            /* TODO: Start the timer such that the next time it triggeres, it will be within the valid window.
+             * Currently, it will just keep triggering and then get skipped if not in valid range.
+             */
+            goto restart_schedule;
+        }
+    }
+    if (schedule->validity.end_time != 0) {
+        if (now > schedule->validity.end_time) {
+            localtime_r(&schedule->validity.end_time, &validity_time);
+            strftime(time_str, sizeof(time_str), "%c %z[%Z]", &validity_time);
+            ESP_LOGW(TAG, "Schedule %s skipped. It can't be active after: %s. DST: %s.", schedule->name, time_str, validity_time.tm_isdst ? "Yes" : "No");
+            /* Return from here will ensure that the timer does not start again for this schedule */
+            return;
+        }
+    }
     ESP_LOGI(TAG, "Schedule %s triggered", schedule->name);
     if (schedule->trigger_cb) {
         schedule->trigger_cb((esp_schedule_handle_t)schedule, schedule->priv_data);
     }
+
+restart_schedule:
+
     if (esp_schedule_is_expired(&schedule->trigger)) {
         /* Not deleting the schedule here. Just not starting it again. */
         return;
@@ -397,6 +416,7 @@ esp_err_t esp_schedule_get(esp_schedule_handle_t handle, esp_schedule_config_t *
     schedule_config->trigger_cb = schedule->trigger_cb;
     schedule_config->timestamp_cb = schedule->timestamp_cb;
     schedule_config->priv_data = schedule->priv_data;
+    schedule_config->validity = schedule->validity;
     return ESP_OK;
 }
 
@@ -448,6 +468,7 @@ static esp_err_t esp_schedule_set(esp_schedule_t *schedule, esp_schedule_config_
     schedule->trigger_cb = schedule_config->trigger_cb;
     schedule->timestamp_cb = schedule_config->timestamp_cb;
     schedule->priv_data = schedule_config->priv_data;
+    schedule->validity = schedule_config->validity;
     esp_schedule_nvs_add(schedule);
     return ESP_OK;
 }
