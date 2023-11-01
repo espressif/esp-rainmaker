@@ -262,6 +262,9 @@ static bool esp_schedule_is_expired(esp_schedule_t *schedule)
         if (schedule->trigger.next_scheduled_time_utc > 0 && schedule->trigger.next_scheduled_time_utc <= current_timestamp) {
             /* Relative seconds based schedule has expired */
             return true;
+        } else if (schedule->trigger.next_scheduled_time_utc == 0) {
+            /* Schedule has been disabled , so it is as good as expired. */
+            return true;
         }
     } else if (schedule->trigger.type == ESP_SCHEDULE_TYPE_DAYS_OF_WEEK) {
         if (schedule->trigger.day.repeat_days == ESP_SCHEDULE_DAY_ONCE) {
