@@ -305,6 +305,9 @@ static bool esp_schedule_is_expired(esp_schedule_t *schedule)
         if (schedule_timestamp < current_timestamp) {
             return true;
         }
+    } else {
+        /* Invalid type. Mark as expired */
+        return true;
     }
     return false;
 }
@@ -492,6 +495,11 @@ esp_schedule_handle_t esp_schedule_create(esp_schedule_config_t *schedule_config
     }
     if (strlen(schedule_config->name) <= 0) {
         ESP_LOGE(TAG, "Set schedule failed. Please enter a unique valid name for the schedule.");
+        return NULL;
+    }
+
+    if (schedule_config->trigger.type == ESP_SCHEDULE_TYPE_INVALID) {
+        ESP_LOGE(TAG, "Schedule type is invalid.");
         return NULL;
     }
 
