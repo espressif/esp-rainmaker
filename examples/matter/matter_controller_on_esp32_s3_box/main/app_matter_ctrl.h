@@ -48,6 +48,8 @@ void matter_ctrl_read_device_state();
 esp_err_t matter_ctrl_get_device(void *dev_list);
 void matter_ctrl_subscribe_device_state(subscribe_device_type_t sub_type);
 
+void read_dev_info(void);
+
 #ifdef __cplusplus
 }
 #endif

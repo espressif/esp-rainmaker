@@ -27,6 +27,8 @@
 #include "app_matter_ctrl.h"
 #include "ui_matter_ctrl.h"
 
+#include <read_node_info.h>
+
 /* maintain a local subscribe list for Matter only device */
 typedef struct local_device_subscribe_list {
     esp_matter::controller::subscribe_command *subscribe_ptr;
@@ -125,11 +127,15 @@ static void attribute_data_cb(uint64_t remote_node_id, const chip::app::Concrete
 
                     if (dev_ptr->OnOff == value) {
                         ESP_LOGI(TAG, "%llx OnOff attribute no change", remote_node_id);
+                        std::string update_val = std::to_string(value);
+                        change_data_model_attribute(remote_node_id, path.mEndpointId,path.mClusterId, path.mAttributeId,update_val);
                         return;
                     }
 
                     dev_ptr->OnOff = value;
                     ESP_LOGE(TAG, "%llx OnOff attribute change %d", remote_node_id, value);
+                    std::string update_val = std::to_string(value);
+                    change_data_model_attribute(remote_node_id, path.mEndpointId,path.mClusterId, path.mAttributeId,update_val);
                     if (xRefresh_Ui_Handle) {
                         xTaskNotifyGive(xRefresh_Ui_Handle);
                     }
@@ -314,7 +320,7 @@ static void _read_device_state(intptr_t arg)
 
     esp_matter::controller::read_command *cmd =
         chip::Platform::New<read_command>(ptr->node_id, ptr->endpoint_id, cluster_id, attribute_id,
-                                          esp_matter::controller::READ_ATTRIBUTE, attribute_data_cb, nullptr);
+                                          esp_matter::controller::READ_ATTRIBUTE, attribute_data_cb,nullptr, nullptr);
 
     if (!cmd) {
         ESP_LOGE(TAG, "Failed to alloc memory for read_command");
@@ -532,4 +538,24 @@ matter_get_device_fail:
     m_device_ptr = NULL;
     ESP_LOGE(TAG, "matter get device fail!");
     return ESP_FAIL;
+}
+void read_dev_info(void)
+{
+    device_list_lock my_device_lock;
+    std::vector<uint64_t> nid_list;
+    node_endpoint_id_list_t *dev_ptr = device_to_control.dev_list;
+    while (dev_ptr) {
+        //if (dev_ptr->is_Rainmaker_device && dev_ptr->is_online && !dev_ptr->is_subscribed) 
+        //{
+            //chip::DeviceLayer::PlatformMgr().ScheduleWork(_read_device_state, (intptr_t)dev_ptr);
+            //dev_ptr->is_subscribed = true;
+        //}
+        nid_list.push_back(dev_ptr->node_id);
+        ESP_LOGI(TAG,"\nnodeid-> %llx\n",dev_ptr->node_id);
+        dev_ptr = dev_ptr->next;
+    }
+    
+    read_node_info(nid_list);
+
+    nid_list.clear();
 }
