@@ -1,0 +1,11 @@
+## IDF Component Manager Manifest File
+dependencies:
+  idf: ">=5.1"
+  espressif/led_strip: "^1.0.0"
+  espressif/qrcode: ^0.1.0
+
+# TODO: use remote bsp component instead (IDF-8409)
+  # espressif/bsp:
+  #   path: components/bsp
+  #   git: https://github.com/espressif/esp-box.git
+  #   version: "e2d289fdc622bb6488de27291797005e3be66529"
