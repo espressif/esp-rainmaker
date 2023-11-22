@@ -255,6 +255,27 @@ static esp_err_t read_random_bytes_from_nvs(uint8_t **random_bytes, size_t *len)
     return ESP_ERR_NO_MEM;
 }
 
+static char *custom_pop;
+esp_err_t app_wifi_set_custom_pop(const char *pop)
+{
+    /* NULL PoP is not allowed here. Use POP_TYPE_NONE instead. */
+    if (!pop) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    /* Freeing up the PoP in case it is already allocated */
+    if (custom_pop) {
+        free(custom_pop);
+        custom_pop = NULL;
+    }
+
+    custom_pop = strdup(pop);
+    if (!custom_pop) {
+        return ESP_ERR_NO_MEM;
+    }
+    return ESP_OK;
+}
+
 static esp_err_t get_device_service_name(char *service_name, size_t max)
 {
     uint8_t *nvs_random = NULL;
@@ -279,6 +300,12 @@ static char *get_device_pop(app_wifi_pop_type_t pop_type)
 {
     if (pop_type == POP_TYPE_NONE) {
         return NULL;
+    } else if (pop_type == POP_TYPE_CUSTOM) {
+        if (!custom_pop) {
+            ESP_LOGE(TAG, "Custom PoP not set. Please use app_wifi_set_custom_pop().");
+            return NULL;
+        }
+        return strdup(custom_pop);
     }
     char *pop = calloc(1, POP_STR_SIZE);
     if (!pop) {
