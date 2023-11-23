@@ -128,6 +128,7 @@ build_idf_v5.1:
   image: espressif/idf:release-v5.1
   variables:
     EXAMPLE_TARGETS: "esp32 esp32s2 esp32c3 esp32s3 esp32c6"
+    EXAMPLES: "switch led_light fan temperature_sensor multi_device gpio"
 
 build_matter:
   stage: build
