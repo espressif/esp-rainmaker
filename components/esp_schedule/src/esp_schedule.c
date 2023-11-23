@@ -1,17 +1,8 @@
-// Copyright 2020 Espressif Systems (Shanghai) PTE LTD
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-
+/*
+ * SPDX-FileCopyrightText: 2023 Espressif Systems (Shanghai) CO LTD
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
 #include <string.h>
 #include <inttypes.h>
 #include <esp_log.h>
@@ -26,7 +17,7 @@ static const char *TAG = "esp_schedule";
 
 static bool init_done = false;
 
-static int esp_schedule_get_no_of_days(esp_schedule_t *schedule, struct tm *current_time, struct tm *schedule_time)
+static int esp_schedule_get_no_of_days(esp_schedule_trigger_t *trigger, struct tm *current_time, struct tm *schedule_time)
 {
     /* for day, monday = 0, sunday = 6. */
     int next_day = 0;
@@ -34,7 +25,7 @@ static int esp_schedule_get_no_of_days(esp_schedule_t *schedule, struct tm *curr
     int today = ((current_time->tm_wday + 7 - 1) % 7);
 
     esp_schedule_days_t today_bit = 1 << today;
-    uint8_t repeat_days = schedule->trigger.day.repeat_days;
+    uint8_t repeat_days = trigger->day.repeat_days;
     int current_seconds = (current_time->tm_hour * 60 + current_time->tm_min) * 60 + current_time->tm_sec;
     int schedule_seconds = (schedule_time->tm_hour * 60 + schedule_time->tm_min) * 60;
 
@@ -76,7 +67,7 @@ static int esp_schedule_get_no_of_days(esp_schedule_t *schedule, struct tm *curr
     return 0;
 }
 
-static uint8_t esp_schedule_get_next_month(esp_schedule_t *schedule, struct tm *current_time, struct tm *schedule_time)
+static uint8_t esp_schedule_get_next_month(esp_schedule_trigger_t *trigger, struct tm *current_time, struct tm *schedule_time)
 {
     int current_seconds = (current_time->tm_hour * 60 + current_time->tm_min) * 60 + current_time->tm_sec;
     int schedule_seconds = (schedule_time->tm_hour * 60 + schedule_time->tm_min) * 60;
@@ -85,11 +76,11 @@ static uint8_t esp_schedule_get_next_month(esp_schedule_t *schedule, struct tm *
     /* -1 because month_bit starts from 0b1. So for January, it should be 1 << 0. And current_month starts from 1. */
     uint16_t current_month_bit = 1 << (current_month - 1);
     uint8_t next_schedule_month = 0;
-    uint16_t repeat_months = schedule->trigger.date.repeat_months;
+    uint16_t repeat_months = trigger->date.repeat_months;
 
     /* Check if month is not specified */
     if (repeat_months == ESP_SCHEDULE_MONTH_ONCE) {
-        if (schedule->trigger.date.day == current_time->tm_mday) {
+        if (trigger->date.day == current_time->tm_mday) {
             /* The schedule day is same. Check if time has already passed */
             if (schedule_seconds > current_seconds) {
                 /* The schedule is today and is yet to go off */
@@ -98,7 +89,7 @@ static uint8_t esp_schedule_get_next_month(esp_schedule_t *schedule, struct tm *
                 /* Today's time has passed */
                 return (current_month + 1);
             }
-        } else if (schedule->trigger.date.day > current_time->tm_mday) {
+        } else if (trigger->date.day > current_time->tm_mday) {
             /* The day is yet to come in this month */
             return current_month;
         } else {
@@ -108,7 +99,7 @@ static uint8_t esp_schedule_get_next_month(esp_schedule_t *schedule, struct tm *
     }
 
     /* Check if schedule is not this year itself, it is in future. */
-    if (schedule->trigger.date.year > (current_time->tm_year + 1900)) {
+    if (trigger->date.year > (current_time->tm_year + 1900)) {
         /* Find first schedule month of next year */
         next_schedule_month = ffs(repeat_months);
         /* Year will be handled by the caller. So no need to add any additional months */
@@ -117,14 +108,14 @@ static uint8_t esp_schedule_get_next_month(esp_schedule_t *schedule, struct tm *
 
     /* Check if schedule is this month and is yet to come */
     if (current_month_bit & repeat_months) {
-        if (schedule->trigger.date.day == current_time->tm_mday) {
+        if (trigger->date.day == current_time->tm_mday) {
             /* The schedule day is same. Check if time has already passed */
             if (schedule_seconds > current_seconds) {
                 /* The schedule is today and is yet to go off */
                 return current_month;
             }
         }
-        if (schedule->trigger.date.day > current_time->tm_mday) {
+        if (trigger->date.day > current_time->tm_mday) {
             /* The day is yet to come in this month */
             return current_month;
         }
@@ -138,8 +129,8 @@ static uint8_t esp_schedule_get_next_month(esp_schedule_t *schedule, struct tm *
     }
 
     /* Check if schedule is for this year and does not repeat */
-    if (!schedule->trigger.date.repeat_every_year) {
-        if (schedule->trigger.date.year <= (current_time->tm_year + 1900)) {
+    if (!trigger->date.repeat_every_year) {
+        if (trigger->date.year <= (current_time->tm_year + 1900)) {
             ESP_LOGE(TAG, "Schedule does not repeat next year, but get_next_month has been called.");
             return 0;
         }
@@ -152,10 +143,10 @@ static uint8_t esp_schedule_get_next_month(esp_schedule_t *schedule, struct tm *
     return (next_schedule_month + 12);
 }
 
-static uint16_t esp_schedule_get_next_year(esp_schedule_t *schedule, struct tm *current_time, struct tm *schedule_time)
+static uint16_t esp_schedule_get_next_year(esp_schedule_trigger_t *trigger, struct tm *current_time, struct tm *schedule_time)
 {
     uint16_t current_year = current_time->tm_year + 1900;
-    uint16_t schedule_year = schedule->trigger.date.year;
+    uint16_t schedule_year = trigger->date.year;
     if (schedule_year > current_year) {
         return schedule_year;
     }
@@ -164,7 +155,7 @@ static uint16_t esp_schedule_get_next_year(esp_schedule_t *schedule, struct tm *
     return current_year;
 }
 
-static uint32_t esp_schedule_get_next_schedule_time_diff(esp_schedule_t *schedule)
+static uint32_t esp_schedule_get_next_schedule_time_diff(const char *schedule_name, esp_schedule_trigger_t *trigger)
 {
     struct tm current_time, schedule_time;
     time_t now;
@@ -176,24 +167,24 @@ static uint32_t esp_schedule_get_next_schedule_time_diff(esp_schedule_t *schedul
     /* Handling ESP_SCHEDULE_TYPE_RELATIVE first since it doesn't require any
      * computation based on days, hours, minutes, etc.
      */
-    if (schedule->trigger.type == ESP_SCHEDULE_TYPE_RELATIVE) {
+    if (trigger->type == ESP_SCHEDULE_TYPE_RELATIVE) {
         /* If next scheduled time is already set, just compute the difference
          * between current time and next scheduled time and return that diff.
          */
         time_t target;
-        if (schedule->trigger.next_scheduled_time_utc > 0) {
-            target = (time_t)schedule->trigger.next_scheduled_time_utc;
+        if (trigger->next_scheduled_time_utc > 0) {
+            target = (time_t)trigger->next_scheduled_time_utc;
             time_diff = difftime(target, now);
         } else {
-            target = now + (time_t)schedule->trigger.relative_seconds;
-            time_diff = schedule->trigger.relative_seconds;
+            target = now + (time_t)trigger->relative_seconds;
+            time_diff = trigger->relative_seconds;
         }
         localtime_r(&target, &schedule_time);
-        schedule->trigger.next_scheduled_time_utc = mktime(&schedule_time);
+        trigger->next_scheduled_time_utc = mktime(&schedule_time);
         /* Print schedule time */
         memset(time_str, 0, sizeof(time_str));
         strftime(time_str, sizeof(time_str), "%c %z[%Z]", &schedule_time);
-        ESP_LOGI(TAG, "Schedule %s will be active on: %s. DST: %s", schedule->name, time_str, schedule_time.tm_isdst ? "Yes" : "No");
+        ESP_LOGI(TAG, "Schedule %s will be active on: %s. DST: %s", schedule_name, time_str, schedule_time.tm_isdst ? "Yes" : "No");
         return time_diff;
     }
     localtime_r(&now, &current_time);
@@ -201,20 +192,20 @@ static uint32_t esp_schedule_get_next_schedule_time_diff(esp_schedule_t *schedul
     /* Get schedule time */
     localtime_r(&now, &schedule_time);
     schedule_time.tm_sec = 0;
-    schedule_time.tm_min = schedule->trigger.minutes;
-    schedule_time.tm_hour = schedule->trigger.hours;
+    schedule_time.tm_min = trigger->minutes;
+    schedule_time.tm_hour = trigger->hours;
     mktime(&schedule_time);
 
     /* Adjust schedule day */
-    if (schedule->trigger.type == ESP_SCHEDULE_TYPE_DAYS_OF_WEEK) {
+    if (trigger->type == ESP_SCHEDULE_TYPE_DAYS_OF_WEEK) {
         int no_of_days = 0;
-        no_of_days = esp_schedule_get_no_of_days(schedule, &current_time, &schedule_time);
+        no_of_days = esp_schedule_get_no_of_days(trigger, &current_time, &schedule_time);
         schedule_time.tm_sec += no_of_days * SECONDS_IN_DAY;
     }
-    if (schedule->trigger.type == ESP_SCHEDULE_TYPE_DATE) {
-        schedule_time.tm_mday = schedule->trigger.date.day;
-        schedule_time.tm_mon = esp_schedule_get_next_month(schedule, &current_time, &schedule_time) - 1;
-        schedule_time.tm_year = esp_schedule_get_next_year(schedule, &current_time, &schedule_time) - 1900;
+    if (trigger->type == ESP_SCHEDULE_TYPE_DATE) {
+        schedule_time.tm_mday = trigger->date.day;
+        schedule_time.tm_mon = esp_schedule_get_next_month(trigger, &current_time, &schedule_time) - 1;
+        schedule_time.tm_year = esp_schedule_get_next_year(trigger, &current_time, &schedule_time) - 1900;
         if (schedule_time.tm_mon < 0) {
             ESP_LOGE(TAG, "Invalid month found: %d. Setting it to next month.", schedule_time.tm_mon);
             schedule_time.tm_mon = current_time.tm_mon + 1;
@@ -240,66 +231,66 @@ static uint32_t esp_schedule_get_next_schedule_time_diff(esp_schedule_t *schedul
     /* Print schedule time */
     memset(time_str, 0, sizeof(time_str));
     strftime(time_str, sizeof(time_str), "%c %z[%Z]", &schedule_time);
-    ESP_LOGI(TAG, "Schedule %s will be active on: %s. DST: %s", schedule->name, time_str, schedule_time.tm_isdst ? "Yes" : "No");
+    ESP_LOGI(TAG, "Schedule %s will be active on: %s. DST: %s", schedule_name, time_str, schedule_time.tm_isdst ? "Yes" : "No");
 
     /* Calculate difference */
     time_diff = difftime((mktime(&schedule_time)), mktime(&current_time));
 
     /* For one time schedules to check for expiry after a reboot. If NVS is enabled, this should be stored in NVS. */
-    schedule->trigger.next_scheduled_time_utc = mktime(&schedule_time);
+    trigger->next_scheduled_time_utc = mktime(&schedule_time);
 
     return time_diff;
 }
 
-static bool esp_schedule_is_expired(esp_schedule_t *schedule)
+static bool esp_schedule_is_expired(esp_schedule_trigger_t *trigger)
 {
     time_t current_timestamp = 0;
     struct tm current_time = {0};
     time(&current_timestamp);
     localtime_r(&current_timestamp, &current_time);
 
-    if (schedule->trigger.type == ESP_SCHEDULE_TYPE_RELATIVE) {
-        if (schedule->trigger.next_scheduled_time_utc > 0 && schedule->trigger.next_scheduled_time_utc <= current_timestamp) {
+    if (trigger->type == ESP_SCHEDULE_TYPE_RELATIVE) {
+        if (trigger->next_scheduled_time_utc > 0 && trigger->next_scheduled_time_utc <= current_timestamp) {
             /* Relative seconds based schedule has expired */
             return true;
-        } else if (schedule->trigger.next_scheduled_time_utc == 0) {
+        } else if (trigger->next_scheduled_time_utc == 0) {
             /* Schedule has been disabled , so it is as good as expired. */
             return true;
         }
-    } else if (schedule->trigger.type == ESP_SCHEDULE_TYPE_DAYS_OF_WEEK) {
-        if (schedule->trigger.day.repeat_days == ESP_SCHEDULE_DAY_ONCE) {
-            if (schedule->trigger.next_scheduled_time_utc > 0 && schedule->trigger.next_scheduled_time_utc <= current_timestamp) {
+    } else if (trigger->type == ESP_SCHEDULE_TYPE_DAYS_OF_WEEK) {
+        if (trigger->day.repeat_days == ESP_SCHEDULE_DAY_ONCE) {
+            if (trigger->next_scheduled_time_utc > 0 && trigger->next_scheduled_time_utc <= current_timestamp) {
                 /* One time schedule has expired */
                 return true;
-            } else if (schedule->trigger.next_scheduled_time_utc == 0) {
+            } else if (trigger->next_scheduled_time_utc == 0) {
                 /* Schedule has been disabled , so it is as good as expired. */
                 return true;
             }
         }
-    } else if (schedule->trigger.type == ESP_SCHEDULE_TYPE_DATE) {
-        if (schedule->trigger.date.repeat_months == 0) {
-            if (schedule->trigger.next_scheduled_time_utc > 0 && schedule->trigger.next_scheduled_time_utc <= current_timestamp) {
+    } else if (trigger->type == ESP_SCHEDULE_TYPE_DATE) {
+        if (trigger->date.repeat_months == 0) {
+            if (trigger->next_scheduled_time_utc > 0 && trigger->next_scheduled_time_utc <= current_timestamp) {
                 /* One time schedule has expired */
                 return true;
             } else {
                 return false;
             }
         }
-        if (schedule->trigger.date.repeat_every_year == true) {
+        if (trigger->date.repeat_every_year == true) {
             return false;
         }
 
         struct tm schedule_time = {0};
         localtime_r(&current_timestamp, &schedule_time);
         schedule_time.tm_sec = 0;
-        schedule_time.tm_min = schedule->trigger.minutes;
-        schedule_time.tm_hour = schedule->trigger.hours;
-        schedule_time.tm_mday = schedule->trigger.date.day;
+        schedule_time.tm_min = trigger->minutes;
+        schedule_time.tm_hour = trigger->hours;
+        schedule_time.tm_mday = trigger->date.day;
         /* For expiry, just check the last month of the repeat_months. */
         /* '-1' because struct tm has months starting from 0 and we have months starting from 1. */
-        schedule_time.tm_mon = fls(schedule->trigger.date.repeat_months) - 1;
+        schedule_time.tm_mon = fls(trigger->date.repeat_months) - 1;
         /* '-1900' because struct tm has number of years after 1900 */
-        schedule_time.tm_year = schedule->trigger.date.year - 1900;
+        schedule_time.tm_year = trigger->date.year - 1900;
         time_t schedule_timestamp = mktime(&schedule_time);
 
         if (schedule_timestamp < current_timestamp) {
@@ -326,7 +317,7 @@ static void esp_schedule_start_timer(esp_schedule_t *schedule)
         return;
     }
 
-    schedule->next_scheduled_time_diff = esp_schedule_get_next_schedule_time_diff(schedule);
+    schedule->next_scheduled_time_diff = esp_schedule_get_next_schedule_time_diff(schedule->name, &schedule->trigger);
     ESP_LOGI(TAG, "Starting a timer for %"PRIu32" seconds for schedule %s", schedule->next_scheduled_time_diff, schedule->name);
 
     if (schedule->timestamp_cb) {
@@ -344,11 +335,39 @@ static void esp_schedule_common_timer_cb(TimerHandle_t timer)
         return;
     }
     esp_schedule_t *schedule = (esp_schedule_t *)priv_data;
+    time_t now;
+    time(&now);
+    struct tm validity_time;
+    char time_str[64] = {0};
+    if (schedule->validity.start_time != 0) {
+        if (now < schedule->validity.start_time) {
+            memset(time_str, 0, sizeof(time_str));
+            localtime_r(&schedule->validity.start_time, &validity_time);
+            strftime(time_str, sizeof(time_str), "%c %z[%Z]", &validity_time);
+            ESP_LOGW(TAG, "Schedule %s skipped. It will be active only after: %s. DST: %s.", schedule->name, time_str, validity_time.tm_isdst ? "Yes" : "No");
+            /* TODO: Start the timer such that the next time it triggeres, it will be within the valid window.
+             * Currently, it will just keep triggering and then get skipped if not in valid range.
+             */
+            goto restart_schedule;
+        }
+    }
+    if (schedule->validity.end_time != 0) {
+        if (now > schedule->validity.end_time) {
+            localtime_r(&schedule->validity.end_time, &validity_time);
+            strftime(time_str, sizeof(time_str), "%c %z[%Z]", &validity_time);
+            ESP_LOGW(TAG, "Schedule %s skipped. It can't be active after: %s. DST: %s.", schedule->name, time_str, validity_time.tm_isdst ? "Yes" : "No");
+            /* Return from here will ensure that the timer does not start again for this schedule */
+            return;
+        }
+    }
     ESP_LOGI(TAG, "Schedule %s triggered", schedule->name);
     if (schedule->trigger_cb) {
         schedule->trigger_cb((esp_schedule_handle_t)schedule, schedule->priv_data);
     }
-    if (esp_schedule_is_expired(schedule)) {
+
+restart_schedule:
+
+    if (esp_schedule_is_expired(&schedule->trigger)) {
         /* Not deleting the schedule here. Just not starting it again. */
         return;
     }
@@ -364,7 +383,7 @@ static void esp_schedule_create_timer(esp_schedule_t *schedule)
 {
     if (esp_schedule_nvs_is_enabled()) {
         /* This is just used for calculating next_scheduled_time_utc for ESP_SCHEDULE_DAY_ONCE (in case of ESP_SCHEDULE_TYPE_DAYS_OF_WEEK) or for ESP_SCHEDULE_MONTH_ONCE (in case of ESP_SCHEDULE_TYPE_DATE), and only used when NVS is enabled. And if NVS is enabled, time will already be synced and the time will be correctly calculated. */
-        schedule->next_scheduled_time_diff = esp_schedule_get_next_schedule_time_diff(schedule);
+        schedule->next_scheduled_time_diff = esp_schedule_get_next_schedule_time_diff(schedule->name, &schedule->trigger);
     }
 
     /* Temporarily setting the timer for 1 (anything greater than 0) tick. This will get changed when xTimerChangePeriod() is called. */
@@ -397,6 +416,7 @@ esp_err_t esp_schedule_get(esp_schedule_handle_t handle, esp_schedule_config_t *
     schedule_config->trigger_cb = schedule->trigger_cb;
     schedule_config->timestamp_cb = schedule->timestamp_cb;
     schedule_config->priv_data = schedule->priv_data;
+    schedule_config->validity = schedule->validity;
     return ESP_OK;
 }
 
@@ -448,6 +468,7 @@ static esp_err_t esp_schedule_set(esp_schedule_t *schedule, esp_schedule_config_
     schedule->trigger_cb = schedule_config->trigger_cb;
     schedule->timestamp_cb = schedule_config->timestamp_cb;
     schedule->priv_data = schedule_config->priv_data;
+    schedule->validity = schedule_config->validity;
     esp_schedule_nvs_add(schedule);
     return ESP_OK;
 }
@@ -561,7 +582,7 @@ esp_schedule_handle_t *esp_schedule_init(bool enable_nvs, char *nvs_partition, u
         schedule->trigger_cb = NULL;
         schedule->timer = NULL;
         /* Check for ONCE and expired schedules and delete them. */
-        if (esp_schedule_is_expired(schedule)) {
+        if (esp_schedule_is_expired(&schedule->trigger)) {
             /* This schedule has already expired. */
             ESP_LOGI(TAG, "Schedule %s does not repeat and has already expired. Deleting it.", schedule->name);
             esp_schedule_delete((esp_schedule_handle_t)schedule);

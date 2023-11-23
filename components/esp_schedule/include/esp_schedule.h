@@ -1,16 +1,8 @@
-// Copyright 2020 Espressif Systems (Shanghai) PTE LTD
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+/*
+ * SPDX-FileCopyrightText: 2023 Espressif Systems (Shanghai) CO LTD
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
 
 #pragma once
 
@@ -116,6 +108,16 @@ typedef struct esp_schedule_trigger {
     time_t next_scheduled_time_utc;
 } esp_schedule_trigger_t;
 
+/** Schedule Validity
+ * Start and end time within which the schedule will be applicable.
+ */
+typedef struct esp_schedule_validity {
+    /* Start time as UTC timestamp */
+    time_t start_time;
+    /* End time as UTC timestamp */
+    time_t end_time;
+} esp_schedule_validity_t;
+
 /** Schedule config */
 typedef struct esp_schedule_config {
     /** Name of the schedule. This is like a primary key for the schedule. This is required. +1 for NULL termination. */
@@ -128,6 +130,8 @@ typedef struct esp_schedule_config {
     esp_schedule_timestamp_cb_t timestamp_cb;
     /** Private data associated with the schedule. This will be passed to callbacks. */
     void *priv_data;
+    /** Validity of schedules. */
+    esp_schedule_validity_t validity;
 } esp_schedule_config_t;
 
 /** Initialize ESP Schedule
