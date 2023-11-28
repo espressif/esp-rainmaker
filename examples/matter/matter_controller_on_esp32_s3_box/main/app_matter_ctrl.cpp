@@ -190,7 +190,7 @@ static void subscribe_failed_cb(void *subscribe_cmd)
 }
 
 /* be called when subscribe timeout */
-static void subscribe_done_cb(uint64_t remote_node_id)
+static void subscribe_done_cb(uint64_t remote_node_id, uint32_t subscription_id)
 {
     ESP_LOGE(TAG, "subscribe done callback");
     device_list_lock my_device_lock;
@@ -217,7 +217,7 @@ static void subscribe_done_cb(uint64_t remote_node_id)
                         /* after subscribe timeout, re-send subscribe to check state */
                         sub_ptr->subscribe_ptr = chip::Platform::New<subscribe_command>(
                             sub_ptr->node_id, sub_ptr->endpoint_id, cluster_id, attribute_id, SUBSCRIBE_ATTRIBUTE,
-                            min_interval, max_interval, attribute_data_cb, nullptr, subscribe_done_cb,
+                            min_interval, max_interval,true, attribute_data_cb, nullptr, subscribe_done_cb,
                             subscribe_failed_cb);
 
                         if (!sub_ptr->subscribe_ptr) {
@@ -256,7 +256,7 @@ static void _subscribe_rainmaker_device_state(intptr_t arg)
     }
 
     esp_matter::controller::subscribe_command *cmd = chip::Platform::New<subscribe_command>(
-        ptr->node_id, ptr->endpoint_id, cluster_id, attribute_id, SUBSCRIBE_ATTRIBUTE, min_interval, max_interval,
+        ptr->node_id, ptr->endpoint_id, cluster_id, attribute_id, SUBSCRIBE_ATTRIBUTE, min_interval, max_interval, true,
         attribute_data_cb, nullptr, nullptr, nullptr);
 
     if (!cmd) {
@@ -288,7 +288,7 @@ void matter_ctrl_subscribe_device_state(subscribe_device_type_t sub_type)
             if (!sub_ptr->subscribe_ptr) {
                 sub_ptr->subscribe_ptr = chip::Platform::New<subscribe_command>(
                     sub_ptr->node_id, sub_ptr->endpoint_id, cluster_id, attribute_id, SUBSCRIBE_ATTRIBUTE, min_interval,
-                    max_interval, attribute_data_cb, nullptr, subscribe_done_cb, subscribe_failed_cb);
+                    max_interval, true,attribute_data_cb, nullptr, subscribe_done_cb, subscribe_failed_cb);
             }
             if (!sub_ptr->subscribe_ptr) {
                 ESP_LOGE(TAG, "Failed to alloc memory for subscribe-local-device command");
