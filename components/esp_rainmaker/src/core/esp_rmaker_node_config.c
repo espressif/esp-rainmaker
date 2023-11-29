@@ -172,8 +172,11 @@ static esp_err_t esp_rmaker_report_param_config(_esp_rmaker_param_t *param, json
     if (param->prop_flags & PROP_FLAG_WRITE) {
         json_gen_arr_set_string(jptr, "write");
     }
+    /* A parameter cannot have both, PROP_FLAG_TIME_SERIES and PROP_FLAG_SIMPLE_TIME_SERIES */
     if (param->prop_flags & PROP_FLAG_TIME_SERIES) {
         json_gen_arr_set_string(jptr, "time_series");
+    } else if (param->prop_flags & PROP_FLAG_SIMPLE_TIME_SERIES) {
+        json_gen_arr_set_string(jptr, "simple_ts");
     }
     json_gen_pop_array(jptr);
     if (param->bounds) {

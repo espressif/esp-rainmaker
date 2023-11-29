@@ -13,6 +13,7 @@
 #define OTAFETCH_TOPIC_RULE                     "esp_node_otafetch"
 #define OTASTATUS_TOPIC_RULE                    "esp_node_otastatus"
 #define TIME_SERIES_DATA_TOPIC_RULE             "esp_ts_ingest"
+#define SIMPLE_TS_DATA_TOPIC_RULE               "esp_simple_ts_ingest"
 #define CMD_RESP_TOPIC_RULE                     "esp_cmd_resp"
 
 
@@ -21,6 +22,7 @@
 #define NODE_PARAMS_LOCAL_INIT_TOPIC_SUFFIX     "params/local/init"
 #define NODE_PARAMS_REMOTE_TOPIC_SUFFIX         "params/remote"
 #define TIME_SERIES_DATA_TOPIC_SUFFIX           "tsdata"
+#define SIMPLE_TS_DATA_TOPIC_SUFFIX             "simple_tsdata"
 #define NODE_PARAMS_ALERT_TOPIC_SUFFIX          "alert"
 #define NODE_CONFIG_TOPIC_SUFFIX                "config"
 #define OTAURL_TOPIC_SUFFIX                     "otaurl"

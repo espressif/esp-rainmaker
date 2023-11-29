@@ -123,7 +123,8 @@ typedef enum {
     PROP_FLAG_WRITE = (1 << 0),
     PROP_FLAG_READ = (1 << 1),
     PROP_FLAG_TIME_SERIES = (1 << 2),
-    PROP_FLAG_PERSIST = (1 << 3)
+    PROP_FLAG_PERSIST = (1 << 3),
+    PROP_FLAG_SIMPLE_TIME_SERIES = (1 << 4)
 } esp_param_property_flags_t;
 
 /** System Service Reboot Flag */
