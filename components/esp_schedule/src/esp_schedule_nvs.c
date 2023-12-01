@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include <string.h>
+#include <time.h>
 #include <esp_log.h>
 #include <nvs.h>
 #include "esp_schedule_internal.h"
