@@ -5,7 +5,6 @@
  */
 
 #include "ui_matter_ctrl.h"
-#include "app_matter_ctrl.h"
 #include "bsp_board.h"
 #include "esp_heap_caps.h"
 #include "esp_log.h"
@@ -16,7 +15,6 @@ static const char *TAG = "ui_matter_ctrl";
 static bool IsCommission = false;
 
 LV_FONT_DECLARE(font_en_16);
-LV_IMG_DECLARE(QR_matter)
 LV_IMG_DECLARE(icon_light_on)
 LV_IMG_DECLARE(icon_light_off)
 LV_IMG_DECLARE(icon_switch_on)
@@ -47,29 +45,21 @@ static const btn_img_src_t img_src_list[] = {
 
 extern device_to_control_t device_to_control;
 
-static void ui_matter_ctrl_set_state(lv_obj_t *g_func_btn, node_endpoint_id_list_t *ptr, bool state)
+void ui_set_onoff_state(lv_obj_t *g_func_btn, size_t size_type, bool state)
 {
-    size_t type = ptr->device_type;
     if (NULL == g_func_btn) {
         return;
     }
-
-    if (ptr->device_type == CONTROL_LIGHT_DEVICE || ptr->device_type == CONTROL_PLUG_DEVICE) {
-        lv_obj_t *img = (lv_obj_t *)g_func_btn->user_data;
-        ui_acquire();
-        if (state) {
-            ptr->OnOff = !ptr->OnOff;
-            lv_obj_add_state(g_func_btn, LV_STATE_CHECKED);
-            lv_img_set_src(img, img_src_list[type].img_on);
-        } else {
-            ptr->OnOff = !ptr->OnOff;
-            lv_obj_clear_state(g_func_btn, LV_STATE_CHECKED);
-            lv_img_set_src(img, img_src_list[type].img_off);
-        }
-        ui_release();
-        matter_ctrl_send_command((intptr_t)ptr);
+    lv_obj_t *img = (lv_obj_t *)g_func_btn->user_data;
+    ui_acquire();
+    if (state) {
+        lv_obj_add_state(g_func_btn, LV_STATE_CHECKED);
+        lv_img_set_src(img, img_src_list[size_type].img_on);
+    } else {
+        lv_obj_clear_state(g_func_btn, LV_STATE_CHECKED);
+        lv_img_set_src(img, img_src_list[size_type].img_off);
     }
-    /* For switch device, binding is not supported yet */
+    ui_release();
 }
 
 static void device_image_click_cb(lv_event_t *e)
@@ -79,12 +69,7 @@ static void device_image_click_cb(lv_event_t *e)
         ESP_LOGI(TAG, "NULL ptr");
         return;
     }
-    lv_obj_t *g_func_btn = lv_event_get_target(e);
-    if (NULL == g_func_btn) {
-        return;
-    }
-
-    ui_matter_ctrl_set_state(g_func_btn, ptr, !ptr->OnOff);
+    matter_ctrl_change_state((intptr_t)ptr);
 }
 
 static void ui_dev_ctrl_page_return_click_cb(lv_event_t *e)
@@ -99,6 +84,7 @@ static void ui_dev_ctrl_page_return_click_cb(lv_event_t *e)
     lv_obj_del(obj);
     g_page = NULL;
     QRcode = NULL;
+    matter_ctrl_lv_obj_clear();
     if (g_dev_ctrl_end_cb) {
         g_dev_ctrl_end_cb();
     }
@@ -110,9 +96,11 @@ static void ui_list_device(void)
     uint8_t kind_to_show = 0;
     uint8_t online_no = 0;
     uint8_t offline_no = device_to_control.online_num;
+    matter_device_list_lock();
     node_endpoint_id_list_t *ptr = device_to_control.dev_list;
     while (ptr) {
         lv_obj_t *g_func_btn = lv_btn_create(g_page);
+        ptr->lv_obj = g_func_btn;
         lv_obj_set_size(g_func_btn, 80, 100);
         lv_obj_add_style(g_func_btn, &ui_button_styles()->style_focus, LV_STATE_FOCUS_KEY);
         lv_obj_add_style(g_func_btn, &ui_button_styles()->style_focus, LV_STATE_FOCUSED);
@@ -194,9 +182,7 @@ static void ui_list_device(void)
         lv_label_set_text(g_hint_label, "No device list, please refresh");
         lv_obj_clear_flag(g_hint_label, LV_OBJ_FLAG_HIDDEN);
     }
-    ESP_LOGI(TAG, "Device Current Free Memory\t%d\t SPIRAM:%d\n",
-             heap_caps_get_free_size(MALLOC_CAP_8BIT) - heap_caps_get_free_size(MALLOC_CAP_SPIRAM),
-             heap_caps_get_free_size(MALLOC_CAP_SPIRAM));
+    matter_device_list_unlock();
 }
 
 #if !CONFIG_BSP_BOARD_ESP32_S3_BOX_Lite
@@ -239,7 +225,7 @@ void ui_matter_config_update_cb(ui_matter_state_t state)
         break;
     case UI_MATTER_EVT_COMMISSIONCOMPLETE:
     case UI_MATTER_EVT_REFRESH:
-        // IsCommission = true;
+        IsCommission = true;
         if (QRcode) {
             lv_obj_add_flag(QRcode, LV_OBJ_FLAG_HIDDEN);
         }
@@ -290,7 +276,6 @@ void clean_screen_with_button(void)
 
 void ui_matter_ctrl_start(void (*fn)(void))
 {
-    ESP_LOGI(TAG, "device control initialize");
     g_dev_ctrl_end_cb = fn;
 
     g_page = lv_obj_create(lv_scr_act());
@@ -318,23 +303,23 @@ void ui_matter_ctrl_start(void (*fn)(void))
 #if !CONFIG_BSP_BOARD_ESP32_S3_BOX_Lite
     bsp_btn_register_callback(BSP_BUTTON_MAIN, BUTTON_PRESS_UP, btn_return_down_cb, (void *)btn_return);
 #endif
+
+    g_hint_label = lv_label_create(g_page);
+    lv_obj_set_style_text_color(g_hint_label, lv_color_make(40, 40, 40), LV_STATE_DEFAULT);
+    lv_obj_set_style_text_font(g_hint_label, &font_en_16, LV_STATE_DEFAULT);
+    lv_obj_align(g_hint_label, LV_ALIGN_CENTER, 0, 60);
+
     if (!IsCommission) {
         QRcode = lv_qrcode_create(g_page, 108, lv_color_black(), lv_color_white());
         lv_obj_align(QRcode, LV_ALIGN_TOP_MID, 0, 8);
         const char *qrcode_data = "MT:U9VJ0EPJ01ZD6100000";
         ESP_LOGI(TAG, "QR Data: %s", qrcode_data);
         lv_qrcode_update(QRcode, qrcode_data, strlen(qrcode_data));
-
-        ESP_LOGI(TAG, "QRcode Current Free Memory\t%d\t SPIRAM:%d ALL:%d\n",
-                 heap_caps_get_free_size(MALLOC_CAP_8BIT) - heap_caps_get_free_size(MALLOC_CAP_SPIRAM),
-                 heap_caps_get_free_size(MALLOC_CAP_SPIRAM), heap_caps_get_free_size(MALLOC_CAP_8BIT));
+        lv_label_set_text_static(g_hint_label, "Scan the QR code on your phone");
     }
-
-    g_hint_label = lv_label_create(g_page);
-    lv_label_set_text_static(g_hint_label, "Scan the QR code on your phone");
-    lv_obj_set_style_text_color(g_hint_label, lv_color_make(40, 40, 40), LV_STATE_DEFAULT);
-    lv_obj_set_style_text_font(g_hint_label, &font_en_16, LV_STATE_DEFAULT);
-    lv_obj_align(g_hint_label, LV_ALIGN_CENTER, 0, 60);
+    ESP_LOGI(TAG, "Current Free Memory Internal:\t%d\t SPIRAM:%d",
+             heap_caps_get_free_size(MALLOC_CAP_8BIT) - heap_caps_get_free_size(MALLOC_CAP_SPIRAM),
+             heap_caps_get_free_size(MALLOC_CAP_SPIRAM));
 
     ui_matter_config_update_cb(g_matter_state);
 }

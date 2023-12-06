@@ -56,6 +56,7 @@ void on_device_list_update(void)
 
     if (!s_device_ptr) {
         ESP_LOGE(TAG, "No device list");
+        device_get_flag = true;
         esp_matter::controller::device_mgr::free_device_list(s_device_ptr);
         /* After removing the only one device, invoking matter_ctrl_get_device to update */
         matter_ctrl_get_device((void *)s_device_ptr);
@@ -82,7 +83,6 @@ void on_device_list_update(void)
         } else {
             /* device list has changed, reestablishing the device-list */
             matter_ctrl_get_device((void *)s_device_ptr);
-            matter_ctrl_read_device_state();
             matter_ctrl_subscribe_device_state(SUBSCRIBE_LOCAL_DEVICE);
             if (xRefresh_Ui_Handle) {
                 xTaskNotifyGive(xRefresh_Ui_Handle);
@@ -92,12 +92,11 @@ void on_device_list_update(void)
     } else {
         /* don't refresh at the first time */
         matter_ctrl_get_device((void *)s_device_ptr);
-        matter_ctrl_read_device_state();
         matter_ctrl_subscribe_device_state(SUBSCRIBE_LOCAL_DEVICE);
+        device_get_flag = true;
         if (xRefresh_Ui_Handle) {
             xTaskNotifyGive(xRefresh_Ui_Handle);
         }
-        device_get_flag = true;
     }
     device_node_id = node_id;
     esp_matter::controller::device_mgr::free_device_list(s_device_ptr);
@@ -119,12 +118,8 @@ static void refresh_ui_task(void *pvParameters)
     while (true) {
         if (ulTaskNotifyTake(pdTRUE, portMAX_DELAY) == true) {
             /* refresh ui */
-            if (device_get_flag) {
-                clean_screen_with_button();
-                ui_matter_config_update_cb(UI_MATTER_EVT_REFRESH);
-            } else {
-                ui_matter_config_update_cb(UI_MATTER_EVT_COMMISSIONCOMPLETE);
-            }
+            clean_screen_with_button();
+            ui_matter_config_update_cb(UI_MATTER_EVT_REFRESH);
         }
     }
 }

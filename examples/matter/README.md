@@ -68,7 +68,8 @@ $ idf.py set-target esp32c3
 $ idf.py build
 $ idf.py flash monitor
 ```
-> Note: for 'matter_controller_on_esp32_s3_box' example, input `idf.py menuconfig`, select `HMI Board Config`->`Selece BSP board`->`BSP board ESP32-S3-BOX` before `idf.py build`
+> Note: for 'matter_controller_on_esp32_s3_box' example, before `idf.py build`, input `idf.py menuconfig` and select `HMI Board Config`->`Selece BSP board` to choose the development board (esp32-s3-box or esp32-s3-box-3, default is esp32-s3-box-3). 
+> If the platform is esp32-s3-box-3, IDF should be on github/master branch, and commit should be later than [this](https://github.com/espressif/esp-idf/commit/0df6afadef44eeb454457c379283db41cd6e47aa)
 
 ### Commissioning
 The QR Code required for commissioning your device can be found at `${ESP_MATTER_PATH}/tools/mfg_tool/out/<vendor-id>_<product-id>/<node-id>/<node-id>-qrcode.png`

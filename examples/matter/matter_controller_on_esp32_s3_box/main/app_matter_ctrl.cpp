@@ -34,7 +34,6 @@ typedef struct local_device_subscribe_list {
     esp_matter::controller::subscribe_command *subscribe_ptr;
     bool is_searched;
     bool is_subscribed;
-    uint8_t offline_time;
     uint16_t endpoint_id;
     uint64_t node_id;
     struct local_device_subscribe_list *next;
@@ -51,7 +50,7 @@ static void _subscribe_local_device_state(intptr_t arg);
 static uint32_t cluster_id = 0x6;
 static uint32_t attribute_id = 0x0;
 static uint32_t min_interval = 0;
-static uint32_t max_interval = 20;
+static uint32_t max_interval = 10;
 static SemaphoreHandle_t device_list_mutex = NULL;
 static local_device_subscribe_list_t *local_subscribe_list = NULL;
 static const char *TAG = "app_matter_ctrl";
@@ -91,7 +90,7 @@ static node_endpoint_id_list_t *get_tail_device(node_endpoint_id_list_t *dev_lis
 static void attribute_data_cb(uint64_t remote_node_id, const chip::app::ConcreteDataAttributePath &path,
                               chip::TLV::TLVReader *data)
 {
-    ESP_LOGI(TAG, "attribute subscribe  callback");
+    ESP_LOGI(TAG, "subscribe attribute callback");
     switch (path.mClusterId) {
     case OnOff::Id: {
         switch (path.mAttributeId) {
@@ -109,36 +108,18 @@ static void attribute_data_cb(uint64_t remote_node_id, const chip::app::Concrete
                         dev_ptr->OnOff = value;
                         ++device_to_control.online_num;
                         dev_ptr->is_online = true;
-                        local_device_subscribe_list_t *s_ptr = local_subscribe_list;
-                        while (s_ptr) {
-                            if (s_ptr->node_id == dev_ptr->node_id && s_ptr->endpoint_id == dev_ptr->endpoint_id) {
-                                s_ptr->offline_time = 0u;
-                                s_ptr->is_subscribed = true;
-                                break;
-                            }
-                            s_ptr = s_ptr->next;
-                        }
-                        ESP_LOGI(TAG, "local device comes online");
+                        ESP_LOGI(TAG, "device %llx comes online", dev_ptr->node_id);
                         if (xRefresh_Ui_Handle) {
                             xTaskNotifyGive(xRefresh_Ui_Handle);
                         }
                         return;
                     }
 
-                    if (dev_ptr->OnOff == value) {
-                        ESP_LOGI(TAG, "%llx OnOff attribute no change", remote_node_id);
-                        std::string update_val = std::to_string(value);
-                        change_data_model_attribute(remote_node_id, path.mEndpointId,path.mClusterId, path.mAttributeId,update_val);
-                        return;
-                    }
-
                     dev_ptr->OnOff = value;
-                    ESP_LOGE(TAG, "%llx OnOff attribute change %d", remote_node_id, value);
                     std::string update_val = std::to_string(value);
                     change_data_model_attribute(remote_node_id, path.mEndpointId,path.mClusterId, path.mAttributeId,update_val);
-                    if (xRefresh_Ui_Handle) {
-                        xTaskNotifyGive(xRefresh_Ui_Handle);
-                    }
+                    ESP_LOGI(TAG, "%llx OnOff attribute change %d", remote_node_id, value);
+                    ui_set_onoff_state(dev_ptr->lv_obj, dev_ptr->device_type, dev_ptr->OnOff);
                     return;
                 }
                 dev_ptr = dev_ptr->next;
@@ -162,7 +143,7 @@ static void subscribe_failed_cb(void *subscribe_cmd)
     device_list_lock my_device_lock;
 
     /* the subscribe command will be removed automatically after connecting failed, set the ptr in local device
-     * subscribe list to null */
+       subscribe list to null */
     local_device_subscribe_list_t *sub_ptr = local_subscribe_list;
     while (sub_ptr) {
         if (sub_ptr->subscribe_ptr == sub_cmd) {
@@ -177,18 +158,12 @@ static void subscribe_failed_cb(void *subscribe_cmd)
                         xTaskNotifyGive(xRefresh_Ui_Handle);
                     }
                     break;
-                } else if (dev_ptr->is_Rainmaker_device && dev_ptr->node_id == sub_ptr->node_id &&
-                           dev_ptr->endpoint_id == sub_ptr->endpoint_id) {
-                    ESP_LOGE(TAG, "Rainmaker device %llx subscribe connecting failed", sub_ptr->node_id);
-                    dev_ptr->is_subscribed = false;
-                    break;
                 }
                 dev_ptr = dev_ptr->next;
             }
-
-            sub_ptr->offline_time = 0;
+            sub_ptr->is_subscribed = false;
             sub_ptr->subscribe_ptr = NULL;
-            ESP_LOGI(TAG, "SET subscribe ptr of node %llx to null", sub_ptr->node_id);
+            ESP_LOGI(TAG, "device %llx goes offline", sub_ptr->node_id);
             break;
         }
         sub_ptr = sub_ptr->next;
@@ -198,24 +173,21 @@ static void subscribe_failed_cb(void *subscribe_cmd)
 /* be called when subscribe timeout */
 static void subscribe_done_cb(uint64_t remote_node_id, uint32_t subscription_id)
 {
-    ESP_LOGE(TAG, "subscribe done callback");
+    ESP_LOGI(TAG, "subscribe done callback");
     device_list_lock my_device_lock;
     node_endpoint_id_list_t *ptr = device_to_control.dev_list;
     while (ptr) {
-        /* for rainmaker device, on/offline is not subscribed, but sometimes subscribe_done happens */
         if (ptr->node_id == remote_node_id) {
             if (ptr->is_Rainmaker_device) {
                 ESP_LOGE(TAG, "Rainmaker device %llx subscribe done", remote_node_id);
-                ptr->is_subscribed = false;
                 break;
             }
 
-            /* set the ptr in local device subscribe list to null */
+            /* set the ptr in subscribe list to null */
             local_device_subscribe_list_t *sub_ptr = local_subscribe_list;
             while (sub_ptr) {
                 if (sub_ptr->node_id == remote_node_id) {
                     /* the memory allocated for subscribe command is freed by chip::Platform::Delete() automaticaly */
-                    ++sub_ptr->offline_time;
                     sub_ptr->subscribe_ptr = NULL;
                     sub_ptr->is_subscribed = false;
 
@@ -231,8 +203,15 @@ static void subscribe_done_cb(uint64_t remote_node_id, uint32_t subscription_id)
                             return;
                         }
                         chip::DeviceLayer::PlatformMgr().ScheduleWork(_subscribe_local_device_state, (intptr_t)sub_ptr);
+                        sub_ptr->is_subscribed = true;
+
+                        --device_to_control.online_num;
+                        ptr->is_online = false;
+                        if (xRefresh_Ui_Handle) {
+                            xTaskNotifyGive(xRefresh_Ui_Handle);
+                        }
                     }
-                    ESP_LOGE(TAG, "device %llx subscribe done", remote_node_id);
+                    ESP_LOGI(TAG, "device %llx subscribe done", remote_node_id);
                     break;
                 }
                 sub_ptr = sub_ptr->next;
@@ -273,15 +252,14 @@ static void _subscribe_rainmaker_device_state(intptr_t arg)
     cmd->send_command();
 }
 
-/* subscribe device ON/OFF state. For rainmaker device, use the state in dev_list form 'get_device_list_clone()' instead.
-   For local device (matter-only device), subscribe its' ON/OFF state and change on/off-line state */
+/* subscribe device ON/OFF attribute. If subscribe_success, change offline to online.
+   If subscribe_connecting_failed, change online to offline */
 void matter_ctrl_subscribe_device_state(subscribe_device_type_t sub_type)
 {
     if (SUBSCRIBE_RAINMAKER_DEVICE == sub_type) {
         node_endpoint_id_list_t *dev_ptr = device_to_control.dev_list;
         while (dev_ptr) {
-            if (dev_ptr->is_Rainmaker_device && dev_ptr->is_online && !dev_ptr->is_subscribed) {
-                dev_ptr->is_subscribed = true;
+            if (dev_ptr->is_Rainmaker_device && dev_ptr->is_online) {
                 chip::DeviceLayer::PlatformMgr().ScheduleWork(_subscribe_rainmaker_device_state, (intptr_t)dev_ptr);
             }
             dev_ptr = dev_ptr->next;
@@ -302,50 +280,18 @@ void matter_ctrl_subscribe_device_state(subscribe_device_type_t sub_type)
             }
 
             /* only for offline device */
-            if (!sub_ptr->is_subscribed && sub_ptr->offline_time == 0u) {
+            if (!sub_ptr->is_subscribed) {
                 chip::DeviceLayer::PlatformMgr().ScheduleWork(_subscribe_local_device_state, (intptr_t)sub_ptr);
+                sub_ptr->is_subscribed = true;
             }
             sub_ptr = sub_ptr->next;
         }
     }
 }
 
-static void _read_device_state(intptr_t arg)
-{
-    node_endpoint_id_list_t *ptr = (node_endpoint_id_list_t *)arg;
-    if (!ptr) {
-        ESP_LOGE(TAG, "Read device state with null ptr");
-        return;
-    }
-
-    esp_matter::controller::read_command *cmd =
-        chip::Platform::New<read_command>(ptr->node_id, ptr->endpoint_id, cluster_id, attribute_id,
-                                          esp_matter::controller::READ_ATTRIBUTE, attribute_data_cb,nullptr, nullptr);
-
-    if (!cmd) {
-        ESP_LOGE(TAG, "Failed to alloc memory for read_command");
-        return;
-    }
-
-    cmd->send_command();
-}
-
-/* For rainmaker device, read the initial ON/OFF state */
-void matter_ctrl_read_device_state(void)
-{
-    device_list_lock my_device_lock;
-    node_endpoint_id_list_t *dev_ptr = device_to_control.dev_list;
-    while (dev_ptr) {
-        if (dev_ptr->is_Rainmaker_device && dev_ptr->is_online && !dev_ptr->is_subscribed) {
-            chip::DeviceLayer::PlatformMgr().ScheduleWork(_read_device_state, (intptr_t)dev_ptr);
-            dev_ptr->is_subscribed = true;
-        }
-        dev_ptr = dev_ptr->next;
-    }
-}
-
 static void send_command_cb(intptr_t arg)
 {
+    device_list_lock my_device_lock;
     node_endpoint_id_list_t *ptr = (node_endpoint_id_list_t *)arg;
     const char *cmd_data[] = {"0x6" /* on-off-cluster*/, "0x2" /* toggle */};
     if (ptr) {
@@ -355,9 +301,59 @@ static void send_command_cb(intptr_t arg)
         ESP_LOGE(TAG, "send command with null ptr");
 }
 
-void matter_ctrl_send_command(intptr_t arg)
+void matter_ctrl_change_state(intptr_t arg)
 {
-    chip::DeviceLayer::PlatformMgr().ScheduleWork(send_command_cb, arg);
+    device_list_lock my_device_lock;
+    node_endpoint_id_list_t *ptr = (node_endpoint_id_list_t *)arg;
+    if (NULL == ptr) {
+        return;
+    }
+
+    bool find_ptr = false;
+    node_endpoint_id_list_t *dev_ptr = device_to_control.dev_list;
+    /* make sure that ptr is in the device_list */
+    while (dev_ptr) {
+        if (dev_ptr == ptr) {
+            find_ptr = true;
+            break;
+        }
+        dev_ptr = dev_ptr->next;
+    }
+    if (!find_ptr) {
+        ESP_LOGE(TAG, "device ptr has been already modified");
+        return;
+    }
+
+    if (ptr->device_type == CONTROL_LIGHT_DEVICE || ptr->device_type == CONTROL_PLUG_DEVICE) {
+        /* for light and plug matter device, on/off server is supported */
+        ptr->OnOff = !ptr->OnOff;
+        ui_set_onoff_state(ptr->lv_obj, ptr->device_type, ptr->OnOff);
+        chip::DeviceLayer::PlatformMgr().ScheduleWork(send_command_cb, arg);
+    }
+}
+
+void matter_device_list_lock()
+{
+    if (device_list_mutex) {
+        xSemaphoreTake(device_list_mutex, portMAX_DELAY);
+    }
+}
+
+void matter_device_list_unlock()
+{
+    if (device_list_mutex) {
+        xSemaphoreGive(device_list_mutex);
+    }
+}
+
+void matter_ctrl_lv_obj_clear()
+{
+    device_list_lock my_device_lock;
+    node_endpoint_id_list_t *ptr = device_to_control.dev_list;
+    while (ptr) {
+        ptr->lv_obj = NULL;
+        ptr = ptr->next;
+    }
 }
 
 /* The dev_list from 'get_device_list_clone()' does not contain attributes, maintain a local device_list */
@@ -384,13 +380,6 @@ esp_err_t matter_ctrl_get_device(void *dev_list)
             bool search_node_flag = false;
             while (ptr) {
                 if (dev->node_id == ptr->node_id && dev->endpoints[i].endpoint_id == ptr->endpoint_id) {
-                    if (ptr->is_Rainmaker_device) {
-                        if (!ptr->is_online && dev->reachable)
-                            ++device_to_control.online_num;
-                        else if (ptr->is_online && !dev->reachable)
-                            --device_to_control.online_num;
-                        ptr->is_online = dev->reachable;
-                    }
                     ptr->is_searched = true;
                     search_node_flag = true;
                     break;
@@ -428,39 +417,33 @@ esp_err_t matter_ctrl_get_device(void *dev_list)
                     ESP_LOGE(TAG, "node-endpoint memory malloc failed!");
                     goto matter_get_device_fail;
                 }
+                new_ptr->lv_obj = NULL;
                 new_ptr->next = NULL;
-                new_ptr->is_subscribed = false;
                 new_ptr->is_searched = true;
                 new_ptr->node_id = dev->node_id;
                 new_ptr->endpoint_id = dev->endpoints[i].endpoint_id;
                 new_ptr->device_type = type;
-                new_ptr->is_Rainmaker_device = dev->is_rainmaker_device;
-                if (new_ptr->is_Rainmaker_device) {
-                    new_ptr->is_online = dev->reachable;
-                    if (new_ptr->is_online)
-                        ++device_to_control.online_num;
-                } else {
-                    /* for local device, set state as offline first time */
-                    new_ptr->is_online = false;
+                /* don't use the IsRainmaker flag, subscribe all */
+                new_ptr->is_Rainmaker_device = false;
+                /* set state as offline first time */
+                new_ptr->is_online = false;
 
-                    /* for local device, add the node to the local subscribe list */
-                    local_device_subscribe_list_t *new_s_ptr =
-                        (local_device_subscribe_list_t *)malloc(sizeof(local_device_subscribe_list_t));
-                    if (!new_s_ptr) {
-                        ESP_LOGE(TAG, "subscribe list memory malloc failed!");
-                        goto matter_get_device_fail;
-                    }
-
-                    new_s_ptr->offline_time = 0;
-                    new_s_ptr->is_subscribed = false;
-                    new_s_ptr->is_searched = true;
-                    new_s_ptr->subscribe_ptr = NULL;
-                    new_s_ptr->node_id = dev->node_id;
-                    new_s_ptr->endpoint_id = dev->endpoints[i].endpoint_id;
-
-                    new_s_ptr->next = local_subscribe_list;
-                    local_subscribe_list = new_s_ptr;
+                /* add the node to subscribe list */
+                local_device_subscribe_list_t *new_s_ptr =
+                    (local_device_subscribe_list_t *)malloc(sizeof(local_device_subscribe_list_t));
+                if (!new_s_ptr) {
+                    ESP_LOGE(TAG, "subscribe list memory malloc failed!");
+                    goto matter_get_device_fail;
                 }
+
+                new_s_ptr->is_subscribed = false;
+                new_s_ptr->is_searched = true;
+                new_s_ptr->subscribe_ptr = NULL;
+                new_s_ptr->node_id = dev->node_id;
+                new_s_ptr->endpoint_id = dev->endpoints[i].endpoint_id;
+
+                new_s_ptr->next = local_subscribe_list;
+                local_subscribe_list = new_s_ptr;
 
                 /* insert in tail */
                 node_endpoint_id_list_t *tail = get_tail_device(device_to_control.dev_list);
@@ -470,15 +453,13 @@ esp_err_t matter_ctrl_get_device(void *dev_list)
                     device_to_control.dev_list = new_ptr;
                 ++device_to_control.device_num;
             } else {
-                if (!dev->is_rainmaker_device) {
-                    local_device_subscribe_list_t *s_ptr = local_subscribe_list;
-                    while (s_ptr) {
-                        if (s_ptr->node_id == dev->node_id && s_ptr->endpoint_id == dev->endpoints[i].endpoint_id) {
-                            s_ptr->is_searched = true;
-                            break;
-                        }
-                        s_ptr = s_ptr->next;
+                local_device_subscribe_list_t *s_ptr = local_subscribe_list;
+                while (s_ptr) {
+                    if (s_ptr->node_id == dev->node_id && s_ptr->endpoint_id == dev->endpoints[i].endpoint_id) {
+                        s_ptr->is_searched = true;
+                        break;
                     }
+                    s_ptr = s_ptr->next;
                 }
             }
         }
