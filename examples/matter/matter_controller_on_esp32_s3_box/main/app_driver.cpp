@@ -64,7 +64,7 @@ void on_device_list_update(void)
         }
         return;
     }
-
+    int dev_count=0;
     while (ptr) {
         if (ptr->reachable) {
             node_id += ptr->node_id;
@@ -72,6 +72,7 @@ void on_device_list_update(void)
             node_id -= ptr->node_id;
         }
         ptr = ptr->next;
+        dev_count++;
     }
 
     if (device_get_flag) {
@@ -101,6 +102,8 @@ void on_device_list_update(void)
     device_node_id = node_id;
     esp_matter::controller::device_mgr::free_device_list(s_device_ptr);
     s_device_ptr = NULL;
+    ESP_LOGI(TAG,"\ngot %d devices from cloud\n",dev_count);
+    read_dev_info();
 }
 
 app_driver_handle_t app_driver_button_init(void *user_data)

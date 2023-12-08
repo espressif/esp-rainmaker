@@ -23,6 +23,8 @@
 
 #include "box_main.h"
 
+#include "matter_ctrl_service.h"
+
 static const char *TAG = "app_main";
 
 bool rmaker_init_done = false;
@@ -99,6 +101,8 @@ extern "C" void app_main()
 
     /* Enable Scenes */
     esp_rmaker_scenes_enable();
+
+    esp_rmaker_controller_service_enable();
 
     /* Enable Insights. Requires CONFIG_ESP_INSIGHTS_ENABLED=y */
     app_insights_enable();
