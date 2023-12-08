@@ -11,6 +11,7 @@ extern "C" {
 #endif
 
 #include <stdint.h>
+#include <time.h>
 
 /** Schedule Handle */
 typedef void *esp_schedule_handle_t;
