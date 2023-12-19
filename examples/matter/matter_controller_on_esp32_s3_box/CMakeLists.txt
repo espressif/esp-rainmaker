@@ -20,13 +20,8 @@ if(NOT DEFINED ENV{ESP_MATTER_DEVICE_PATH})
     endif()
 endif(NOT DEFINED ENV{ESP_MATTER_DEVICE_PATH})
 
-if(NOT DEFINED ENV{ESP_BOX_PATH})
-    message(FATAL_ERROR "Please set ESP_BOX_PATH to the path of esp-box repo")
-endif(NOT DEFINED ENV{ESP_BOX_PATH})
-
 set(ESP_MATTER_PATH $ENV{ESP_MATTER_PATH})
 set(MATTER_SDK_PATH ${ESP_MATTER_PATH}/connectedhomeip/connectedhomeip)
-set(ESP_BOX_PATH $ENV{ESP_BOX_PATH})
 
 # This should be done before using the IDF_TARGET variable.
 include($ENV{IDF_PATH}/tools/cmake/project.cmake)
