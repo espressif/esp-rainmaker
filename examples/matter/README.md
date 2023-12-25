@@ -44,11 +44,6 @@ $ export ESP_SECURE_CERT_PATH=/path/to/esp_secure_cert_mgr
 $ cd $ESP_MATTER_PATH/tools/mfg_tool
 $ ./mfg_tool.py -v 0x131B -p 0x2 -cd $RMAKER_PATH/examples/matter/mfg/cd_131B_0002.der --csv $RMAKER_PATH/examples/matter/mfg/keys.csv --mcsv $RMAKER_PATH/examples/matter/mfg/master.csv
 ```
-In the 'matter_controller_on_esp32_s3_box' example, make sure to configure the passcode as 125 and set the discriminator to 521 to match the QR code on the ESP32-S3-BOX. The command is:
-```
-$ cd $ESP_MATTER_PATH/tools/mfg_tool
-$ ./mfg_tool.py -v 0x131B -p 0x2 --passcode 125 --discriminator 521 -cd $RMAKER_PATH/examples/matter/mfg/cd_131B_0002.der --csv $RMAKER_PATH/examples/matter/mfg/keys.csv --mcsv $RMAKER_PATH/examples/matter/mfg/master.csv
-```
 
 This not only generates the factory nvs binary required for matter, but also embeds the RainMaker MQTT Host url into it via the master.csv file. Optionally, you can embed the MQTT host into the firmware itself by using `idf.py menuconfig -> ESP RainMaker Config -> ESP_RMAKER_READ_MQTT_HOST_FROM_CONFIG` and then skipping the --csv and --mcsv options to mfg_tool
 
@@ -68,8 +63,6 @@ $ idf.py set-target esp32c3
 $ idf.py build
 $ idf.py flash monitor
 ```
-> Note: for 'matter_controller_on_esp32_s3_box' example, before `idf.py build`, input `idf.py menuconfig` and select `HMI Board Config`->`Selece BSP board` to choose the development board (esp32-s3-box or esp32-s3-box-3, default is esp32-s3-box-3). 
-> If the platform is esp32-s3-box-3, IDF should be on github/master branch, and commit should be later than [this](https://github.com/espressif/esp-idf/commit/0df6afadef44eeb454457c379283db41cd6e47aa)
 
 ### Commissioning
 The QR Code required for commissioning your device can be found at `${ESP_MATTER_PATH}/tools/mfg_tool/out/<vendor-id>_<product-id>/<node-id>/<node-id>-qrcode.png`
