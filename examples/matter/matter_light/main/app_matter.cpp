@@ -14,6 +14,7 @@
 #include <led_driver.h>
 #include <esp_matter_rainmaker.h>
 #include <platform/ESP32/route_hook/ESP32RouteHook.h>
+#include <app/clusters/color-control-server/color-control-server.h>
 #include <app/server/Server.h>
 #include <esp_matter_console.h>
 #include <app_matter.h>
@@ -244,8 +245,9 @@ esp_err_t app_matter_light_create(app_driver_handle_t driver_handle)
     light_config.on_off.lighting.start_up_on_off = nullptr;
     light_config.level_control.current_level = DEFAULT_BRIGHTNESS;
     light_config.level_control.lighting.start_up_current_level = DEFAULT_BRIGHTNESS;
-    light_config.color_control.color_mode = EMBER_ZCL_COLOR_MODE_COLOR_TEMPERATURE;
-    light_config.color_control.enhanced_color_mode = EMBER_ZCL_COLOR_MODE_COLOR_TEMPERATURE;
+    light_config.color_control.color_mode = static_cast<uint8_t>(ColorControl::ColorMode::kColorTemperature);
+    light_config.color_control.enhanced_color_mode =
+        static_cast<uint8_t>(ColorControlServer::EnhancedColorMode::kColorTemperature);
     light_config.color_control.color_temperature.startup_color_temperature_mireds = nullptr;
     endpoint_t *endpoint = extended_color_light::create(node, &light_config, ENDPOINT_FLAG_NONE, driver_handle);
 
