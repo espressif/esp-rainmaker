@@ -17,6 +17,7 @@
 #include <esp_rmaker_standard_params.h>
 #include <esp_rmaker_standard_devices.h>
 #include <esp_rmaker_schedule.h>
+#include <esp_rmaker_console.h>
 #include <esp_rmaker_scenes.h>
 
 #include <app_wifi.h>
@@ -119,6 +120,7 @@ void app_main()
     /* Initialize Application specific hardware drivers and
      * set initial state.
      */
+    esp_rmaker_console_init();
     app_driver_init();
 
     /* Initialize NVS. */
@@ -132,7 +134,7 @@ void app_main()
     /* Initialize Wi-Fi. Note that, this should be called before esp_rmaker_node_init()
      */
     app_wifi_init();
-    
+
     /* Initialize the ESP RainMaker Agent.
      * Note that this should be called after app_wifi_init() but before app_wifi_start()
      * */

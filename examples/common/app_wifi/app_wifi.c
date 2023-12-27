@@ -482,7 +482,9 @@ esp_err_t app_wifi_start(app_wifi_pop_type_t pop_type)
     if (!provisioned) {
         ESP_LOGI(TAG, "Starting provisioning");
 #ifdef ESP_NETIF_SUPPORTED
+#if CONFIG_ESP_WIFI_SOFTAP_SUPPORT
         esp_netif_create_default_wifi_ap();
+#endif
 #endif
 
         /* What is the Device Service Name that we want
