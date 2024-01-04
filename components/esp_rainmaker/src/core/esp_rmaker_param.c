@@ -532,9 +532,13 @@ esp_rmaker_param_t *esp_rmaker_param_create(const char *param_name, const char *
         ESP_LOGE(TAG, "Param name is mandatory");
         return NULL;
     }
-    if (properties & PROP_FLAG_TIME_SERIES) {
+    if ((properties & PROP_FLAG_TIME_SERIES) && (properties & PROP_FLAG_SIMPLE_TIME_SERIES)) {
+        ESP_LOGE(TAG, "A paramater cannot have both, PROP_FLAG_TIME_SERIES and PROP_FLAG_SIMPLE_TIME_SERIES.");
+        return NULL;
+    }
+    if ((properties & PROP_FLAG_TIME_SERIES) || (properties & PROP_FLAG_SIMPLE_TIME_SERIES)) {
         if ((val.type == RMAKER_VAL_TYPE_ARRAY) || (val.type == RMAKER_VAL_TYPE_OBJECT)) {
-            ESP_LOGE(TAG, "PROP_FLAG_TIME_SERIES not allowed for array/object param types.");
+            ESP_LOGE(TAG, "PROP_FLAG_TIME_SERIES/PROP_FLAG_SIMPLE_TIME_SERIES not allowed for array/object param types.");
             return NULL;
         }
     }
@@ -568,7 +572,7 @@ esp_rmaker_param_t *esp_rmaker_param_create(const char *param_name, const char *
     } else {
         param->val.val = val.val;
     }
-    if (properties & PROP_FLAG_TIME_SERIES) {
+    if ((properties & PROP_FLAG_TIME_SERIES) || (properties & PROP_FLAG_SIMPLE_TIME_SERIES)) {
         /* Time series params will require time sync */
         esp_rmaker_time_sync_init(NULL);
     }
@@ -738,6 +742,8 @@ static esp_err_t __esp_rmaker_param_report_time_series_records(json_gen_str_t *j
     json_gen_end_object(jptr);
     return ESP_OK;
 }
+
+
 static esp_err_t __esp_rmaker_param_report_time_series(json_gen_str_t *jptr, const esp_rmaker_param_t *param)
 {
     json_gen_start_object(jptr);
@@ -802,6 +808,53 @@ static esp_err_t esp_rmaker_param_report_time_series(const esp_rmaker_param_t *p
     return ESP_OK;
 }
 
+static esp_err_t esp_rmaker_param_report_simple_time_series(const esp_rmaker_param_t *param)
+{
+    if (!param) {
+        ESP_LOGE(TAG, "Param handle cannot be NULL.");
+        return ESP_ERR_INVALID_ARG;
+    }
+    _esp_rmaker_param_t *_param = (_esp_rmaker_param_t *)param;
+    _esp_rmaker_device_t *_device = _param->parent;
+    if (!_device) {
+        ESP_LOGE(TAG, "Param \"%s\" has not been added to any device.", _param->name);
+        return ESP_FAIL;
+    }
+    if (esp_rmaker_time_check() != true) {
+        ESP_LOGE(TAG, "Current time not yet available. Cannot report time series data.");
+        return ESP_ERR_INVALID_STATE;
+    }
+    /* node_params_buf will be NULL during the first publish */
+    char * node_params_buf = esp_rmaker_param_get_buf(max_node_params_size);
+    if (!node_params_buf) {
+        return ESP_ERR_NO_MEM;
+    }
+
+    json_gen_str_t jstr;
+    int buf_len = max_node_params_size;
+    json_gen_str_start(&jstr, node_params_buf, buf_len, NULL, NULL);
+    json_gen_start_object(&jstr);
+    char param_name[MAX_TS_DATA_PARAM_NAME];
+    snprintf(param_name, sizeof(param_name), "%s.%s", _device->name, _param->name);
+    json_gen_obj_set_string(&jstr, "name", param_name);
+    esp_rmaker_report_data_type(_param->val.type, "dt", &jstr);
+    time_t current_timestamp = 0;
+    time(&current_timestamp);
+    json_gen_obj_set_int(&jstr, "t", (int)current_timestamp);
+    esp_rmaker_report_value(&_param->val, "v", &jstr);
+    json_gen_end_object(&jstr);
+    json_gen_str_end(&jstr);
+
+    esp_rmaker_create_mqtt_topic(publish_topic, sizeof(publish_topic), SIMPLE_TS_DATA_TOPIC_SUFFIX, SIMPLE_TS_DATA_TOPIC_RULE);
+    if (esp_rmaker_params_mqtt_init_done) {
+        _esp_rmaker_param_t *_param = (_esp_rmaker_param_t *)param;
+        _esp_rmaker_device_t *_device = _param->parent;
+        ESP_LOGI(TAG, "Reporting Simple Time Series Data for %s.%s", _device->name, _param->name);
+        esp_rmaker_mqtt_publish(publish_topic, node_params_buf, strlen(node_params_buf), RMAKER_MQTT_QOS1, NULL);
+    }
+    return ESP_OK;
+}
+
 esp_err_t esp_rmaker_param_notify(const esp_rmaker_param_t *param)
 {
     if (!param) {
@@ -823,6 +876,8 @@ esp_err_t esp_rmaker_param_update_and_report(const esp_rmaker_param_t *param, es
     if ((err == ESP_OK) && (esp_rmaker_get_state() == ESP_RMAKER_STATE_STARTED)) {
         if (((_esp_rmaker_param_t *)param)->prop_flags & PROP_FLAG_TIME_SERIES) {
             esp_rmaker_param_report_time_series(param);
+        } else if (((_esp_rmaker_param_t *)param)->prop_flags & PROP_FLAG_SIMPLE_TIME_SERIES) {
+            esp_rmaker_param_report_simple_time_series(param);
         }
         err = esp_rmaker_param_report(param);
     }
@@ -836,6 +891,8 @@ esp_err_t esp_rmaker_param_update_and_notify(const esp_rmaker_param_t *param, es
     if ((err == ESP_OK) && (esp_rmaker_get_state() == ESP_RMAKER_STATE_STARTED)) {
         if (((_esp_rmaker_param_t *)param)->prop_flags & PROP_FLAG_TIME_SERIES) {
             esp_rmaker_param_report_time_series(param);
+        } else if (((_esp_rmaker_param_t *)param)->prop_flags & PROP_FLAG_SIMPLE_TIME_SERIES) {
+            esp_rmaker_param_report_simple_time_series(param);
         }
         err = esp_rmaker_param_notify(param);
     }
@@ -850,6 +907,8 @@ static esp_err_t esp_rmaker_report_all_ts_params(void)
         while (param) {
             if (param->prop_flags & PROP_FLAG_TIME_SERIES) {
                 esp_rmaker_param_report_time_series((esp_rmaker_param_t *)param);
+            } else if (param->prop_flags & PROP_FLAG_SIMPLE_TIME_SERIES) {
+                esp_rmaker_param_report_simple_time_series((esp_rmaker_param_t *)param);
             }
             param = param->next;
         }
