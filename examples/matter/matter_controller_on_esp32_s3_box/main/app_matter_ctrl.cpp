@@ -293,10 +293,9 @@ static void send_command_cb(intptr_t arg)
 {
     device_list_lock my_device_lock;
     node_endpoint_id_list_t *ptr = (node_endpoint_id_list_t *)arg;
-    const char *cmd_data[] = {"0x6" /* on-off-cluster*/, "0x2" /* toggle */};
     if (ptr) {
         ESP_LOGI(TAG, "send command to node %llx endpoint %d", ptr->node_id, ptr->endpoint_id);
-        esp_matter::controller::send_invoke_cluster_command(ptr->node_id, ptr->endpoint_id, 2, (char **)cmd_data);
+        esp_matter::controller::send_invoke_cluster_command(ptr->node_id, ptr->endpoint_id,OnOff::Id, OnOff::Commands::Toggle::Id, NULL);
     } else
         ESP_LOGE(TAG, "send command with null ptr");
 }
@@ -526,7 +525,7 @@ void read_dev_info(void)
     std::vector<uint64_t> nid_list;
     node_endpoint_id_list_t *dev_ptr = device_to_control.dev_list;
     while (dev_ptr) {
-        //if (dev_ptr->is_Rainmaker_device && dev_ptr->is_online && !dev_ptr->is_subscribed) 
+        //if (dev_ptr->is_Rainmaker_device && dev_ptr->is_online && !dev_ptr->is_subscribed)
         //{
             //chip::DeviceLayer::PlatformMgr().ScheduleWork(_read_device_state, (intptr_t)dev_ptr);
             //dev_ptr->is_subscribed = true;
@@ -535,7 +534,7 @@ void read_dev_info(void)
         ESP_LOGI(TAG,"\nnodeid-> %llx\n",dev_ptr->node_id);
         dev_ptr = dev_ptr->next;
     }
-    
+
     read_node_info(nid_list);
 
     nid_list.clear();

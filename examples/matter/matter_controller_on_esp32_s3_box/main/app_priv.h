@@ -23,7 +23,7 @@ typedef void *app_driver_handle_t;
  * This initializes the button driver associated with the selected board.
  *
  * @param[in] user_data Custom user data that will be used in button toggle callback.
- * 
+ *
  * @return Handle on success.
  * @return NULL in case of failure.
  */

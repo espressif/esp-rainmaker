@@ -7,11 +7,11 @@
 
 static const char *TAG = "esp_matter_controller_service";
 
-#define ESP_MATTER_CONTROLLER_SERV_NAME    "matter-controller"
+#define ESP_MATTER_CONTROLLER_SERV_NAME    "Matter-Controller"
 #define ESP_MATTER_CONTROLLER_SERV_TYPE    "esp.service.matter-controller"
-#define ESP_MATTER_CONTROLLER_DATA_PARAM_NAME   "matter-controller-data"
-#define ESP_MATTER_CONTROLLER_DATA_PARAM_TYPE   "esp.param.matter-controller-data"
-#define ESP_MATTER_CONTROLLER_DATA_VERSION_PARAM_NAME   "matter-controller-data-version"
+#define ESP_MATTER_CONTROLLER_DATA_PARAM_NAME   "Matter-Devices"
+#define ESP_MATTER_CONTROLLER_DATA_PARAM_TYPE   "esp.param.matter-devices"
+#define ESP_MATTER_CONTROLLER_DATA_VERSION_PARAM_NAME   "Matter-Controller-Data-Version"
 #define ESP_MATTER_CONTROLLER_DATA_VERSION_PARAM_TYPE   "esp.param.matter-controller-data-version"
 
 
@@ -30,7 +30,7 @@ static esp_err_t controller_parse_json_get_node_id(jparse_ctx_t* jctx, void *dat
         if(json_arr_get_object(jctx,node_index)==0)
         {
             int val_size = 0;
-            if (json_obj_get_strlen(jctx, "matter-node-id", &val_size) == 0) 
+            if (json_obj_get_strlen(jctx, "matter-node-id", &val_size) == 0)
             {
                 val_size++; /* For NULL termination */
                 char* node_id = (char*)calloc(1, val_size);
@@ -42,12 +42,12 @@ static esp_err_t controller_parse_json_get_node_id(jparse_ctx_t* jctx, void *dat
                     ESP_LOGI(TAG,"\nnode-id: %s\n",node_id);
 
                     *nodeid = std::stoull(node_id, nullptr, 16);
-    
+
                 }
                 else
                     ESP_LOGE(TAG,"\nError in matter-node-id retrieval.\n");
 
-                
+                free(node_id);
 
             }
             else
@@ -57,7 +57,7 @@ static esp_err_t controller_parse_json_get_node_id(jparse_ctx_t* jctx, void *dat
             ESP_LOGE(TAG,"\nError in matter-nodes array.\n");
 
 
-        
+
     }
     return ESP_OK;
 }
@@ -70,13 +70,13 @@ static esp_err_t controller_parse_json_get_endpoint_id(jparse_ctx_t* jctx, void 
             ESP_LOGI(TAG,"\nendpoints: %d\n",num_endpoints);
         else
             ESP_LOGE(TAG,"\nendpoint error.\n");
-        
+
         for(int ep_index=0;ep_index<num_endpoints;ep_index++)
         {
             if(json_arr_get_object(jctx,ep_index)==0)
             {
                 int val_size = 0;
-                if (json_obj_get_strlen(jctx, "endpoint-id", &val_size) == 0) 
+                if (json_obj_get_strlen(jctx, "endpoint-id", &val_size) == 0)
                 {
                     val_size++; /* For NULL termination */
                     char* ep_id = (char*)calloc(1, val_size);
@@ -92,7 +92,7 @@ static esp_err_t controller_parse_json_get_endpoint_id(jparse_ctx_t* jctx, void 
                     else
                         ESP_LOGE(TAG,"\nError in endpoint-id retrieval.\n");
 
-                    
+                    free(ep_id);
 
                 }
                 else
@@ -106,7 +106,7 @@ static esp_err_t controller_parse_json_get_endpoint_id(jparse_ctx_t* jctx, void 
 
 }
 
-static esp_err_t controller_parse_json_get_cluster_id(jparse_ctx_t* jctx, void *data, char* &cl_id)
+static esp_err_t controller_parse_json_get_cluster_id(jparse_ctx_t* jctx, void *data, uint32_t* cluster_id)
 {
     int num_clusters=0;
 
@@ -114,13 +114,13 @@ static esp_err_t controller_parse_json_get_cluster_id(jparse_ctx_t* jctx, void *
             ESP_LOGI(TAG,"\nclusters: %d\n",num_clusters);
         else
             ESP_LOGE(TAG,"\nclusters error.\n");
-        
+
         for(int cls_index=0;cls_index<num_clusters;cls_index++)
         {
             if(json_arr_get_object(jctx,cls_index)==0)
             {
                 int val_size = 0;
-                if (json_obj_get_strlen(jctx, "cluster-id", &val_size) == 0) 
+                if (json_obj_get_strlen(jctx, "cluster-id", &val_size) == 0)
                 {
                     val_size++; /* For NULL termination */
                     char* cls_id = (char*)calloc(1, val_size);
@@ -130,14 +130,14 @@ static esp_err_t controller_parse_json_get_cluster_id(jparse_ctx_t* jctx, void *
                     if(json_obj_get_string(jctx, "cluster-id", cls_id, val_size)==0)
                     {
                         ESP_LOGI(TAG,"\ncluster-id: %s\n",cls_id);
-                        cl_id = new char[strlen(cls_id) + 1];
-                        strcpy(cl_id,cls_id);
-                        free(cls_id);
+                        *cluster_id = std::stoul(cls_id, nullptr, 16);
+
                     }
                     else
                         ESP_LOGE(TAG,"\nError in cluster-id retrieval.\n");
 
-                    
+                    free(cls_id);
+
 
                 }
                 else
@@ -151,7 +151,7 @@ static esp_err_t controller_parse_json_get_cluster_id(jparse_ctx_t* jctx, void *
 
 }
 
-static esp_err_t controller_parse_json_get_command_id(jparse_ctx_t* jctx, void *data, char* &cmdid)
+static esp_err_t controller_parse_json_get_command_id(jparse_ctx_t* jctx, void *data, uint32_t* command_id)
 {
     int num_commands=0;
 
@@ -159,13 +159,13 @@ static esp_err_t controller_parse_json_get_command_id(jparse_ctx_t* jctx, void *
             ESP_LOGI(TAG,"\ncommands: %d\n",num_commands);
         else
             ESP_LOGE(TAG,"\ncommands error.\n");
-        
+
         for(int cmd_index=0;cmd_index<num_commands;cmd_index++)
         {
             if(json_arr_get_object(jctx,cmd_index)==0)
             {
                 int val_size = 0;
-                if (json_obj_get_strlen(jctx, "command-id", &val_size) == 0) 
+                if (json_obj_get_strlen(jctx, "command-id", &val_size) == 0)
                 {
                     val_size++; /* For NULL termination */
                     char* cmd_id = (char*)calloc(1, val_size);
@@ -175,15 +175,14 @@ static esp_err_t controller_parse_json_get_command_id(jparse_ctx_t* jctx, void *
                     if(json_obj_get_string(jctx, "command-id", cmd_id, val_size)==0)
                     {
                         ESP_LOGI(TAG,"\ncommand-id: %s\n",cmd_id);
-                        
-                        cmdid = new char[strlen(cmd_id) + 1];
-                        strcpy(cmdid,cmd_id);
-                        free(cmd_id);
+
+                        *command_id = std::stoul(cmd_id, nullptr, 16);
+
                     }
                     else
                         ESP_LOGE(TAG,"\nError in command-id retrieval.\n");
 
-                    
+                    free(cmd_id);
 
                 }
                 else
@@ -197,52 +196,37 @@ static esp_err_t controller_parse_json_get_command_id(jparse_ctx_t* jctx, void *
 
 }
 
-static esp_err_t controller_parse_json_get_data(jparse_ctx_t* jctx, void *data, std::vector<std::string>& cmd_data)
+static esp_err_t controller_parse_json_get_data(jparse_ctx_t* jctx, void *data, char* &cmd_data)
 {
-    //data 
+    //data
 
-        if(json_obj_get_object(jctx,"data")== OS_SUCCESS)
-            ESP_LOGI(TAG,"\ndata present\n");
-        else
-            ESP_LOGE(TAG,"\ndata absent\n");
-
-        int data_id = 0;
-        while(true)
-        {
-            
-            int val_size = 0;
-            
-            if (json_obj_get_strlen(jctx, std::to_string(data_id).c_str(), &val_size) == 0) 
-            {
-                val_size++; /* For NULL termination */
-                char* data_val = (char*)calloc(1, val_size);
-                if (!data_val) {
-                    return ESP_ERR_NO_MEM;
-                }
-                if(json_obj_get_string(jctx, std::to_string(data_id).c_str(), data_val, val_size)==0)
-                {
-                    ESP_LOGI(TAG,"\ndata val: %s\n",data_val);
-                    std::string val(data_val);
-                    cmd_data.push_back(val);
-
-                    free(data_val);
-                }
-                else
-                    ESP_LOGE(TAG,"\nError in data val retrieval.\n");
-
-                
-
-            }
-            else
-                {
-                    ESP_LOGE(TAG,"\nError in data val retrieval or end of data object\n");
-                    break;
-                }
-
-            data_id++;
-        }
-
+    int data_len = 0;
+    if(json_obj_get_object_strlen(jctx,"data",&data_len)==OS_SUCCESS)
+        printf("\ndata len: %d\n",data_len);
+    else
+    {
+        ESP_LOGE(TAG,"\ndata absent\n");
         return ESP_OK;
+    }
+    data_len++;
+    char* cmd_data_json = (char*)calloc(1, data_len);
+    if (!cmd_data_json)
+        return ESP_ERR_NO_MEM;
+
+    if(json_obj_get_object_str(jctx,"data",cmd_data_json,data_len)==OS_SUCCESS)
+    {
+        ESP_LOGI(TAG,"\ncommand-data: %s\n",cmd_data_json);
+        cmd_data = new char[strlen(cmd_data_json) + 1];
+        strcpy(cmd_data,cmd_data_json);
+    }
+    else
+    {
+        ESP_LOGE(TAG,"\nError in data json retrieval.\n");
+    }
+
+    free(cmd_data_json);
+
+    return ESP_OK;
 }
 
 static esp_err_t controller_parse_json(void *data, size_t data_len, esp_rmaker_req_src_t src)
@@ -260,28 +244,25 @@ static esp_err_t controller_parse_json(void *data, size_t data_len, esp_rmaker_r
     controller_parse_json_get_node_id(&jctx,data,&node_id);
     uint16_t endpoint_id;
     controller_parse_json_get_endpoint_id(&jctx,data,&endpoint_id);
+    uint32_t cluster_id;
+    controller_parse_json_get_cluster_id(&jctx,data,&cluster_id);
+    uint32_t command_id;
+    controller_parse_json_get_command_id(&jctx,data,&command_id);
 
-    
-
-
-    std::vector<std::string> cmd_data;
-
-    char* cl_id;
-    controller_parse_json_get_cluster_id(&jctx,data,cl_id);
-
-    char* cmd_id;
-    controller_parse_json_get_command_id(&jctx,data,cmd_id);
-
-    cmd_data.push_back(cl_id);
-    cmd_data.push_back(cmd_id);
-
+    char* cmd_data=NULL;
     controller_parse_json_get_data(&jctx,data,cmd_data);
-    
-    send_cmd_format* cmd = new send_command_format(node_id,endpoint_id,cmd_data);
 
-    cmd_data.clear();
+    send_cmd_format* cmd = new send_command_format(node_id,endpoint_id,cluster_id,command_id,cmd_data);
 
-    send_command((intptr_t)cmd);
+    delete cmd_data;
+
+    CHIP_ERROR err = send_command((intptr_t)cmd);
+    if(err !=CHIP_NO_ERROR)
+    {
+        ChipLogError(chipSystemLayer, "Failed to schedule send command: %" CHIP_ERROR_FORMAT, err.Format());
+        delete cmd;
+        return ESP_FAIL;
+    }
 
     json_parse_end(&jctx);
     return ESP_OK;
@@ -298,20 +279,20 @@ static esp_err_t controller_write_cb(const esp_rmaker_device_t *device, const es
     if (ctx) {
         ESP_LOGI(TAG, "Received write request via : %s", esp_rmaker_device_cb_src_to_str(ctx->src));
     }
-  
+
     /* Check if the write is on the "Trigger" parameter. We aren't really checking true/false as that
      * is not much of a concern in this context. But you can add checks on the values too.
      */
     // printf("\n%s\n",esp_rmaker_param_get_name(param));
-    if (strcmp(esp_rmaker_param_get_name(param), ESP_MATTER_CONTROLLER_DATA_PARAM_NAME) == 0) 
+    if (strcmp(esp_rmaker_param_get_name(param), ESP_MATTER_CONTROLLER_DATA_PARAM_NAME) == 0)
     {
         /* Here we start some dummy diagnostics and populate the appropriate values to be passed
          * to "Timestamp" and "Data".
          */
-        
-        
+
+
         /* The values are reported by updating appropriate parameters */
-        
+
         ESP_LOGI(TAG, "Received value = %s for %s - %s",
                 val.val.s, esp_rmaker_device_get_name(device), esp_rmaker_param_get_name(param));
         // esp_rmaker_param_update_and_report(esp_rmaker_device_get_param_by_name(device, "controller-data"),
@@ -327,20 +308,20 @@ static esp_err_t controller_write_cb(const esp_rmaker_device_t *device, const es
 esp_rmaker_device_t *esp_rmaker_controller_service_create(const char *serv_name, void *priv_data)
 {
     esp_rmaker_device_t *matter_ctrl_service = esp_rmaker_service_create(serv_name, ESP_MATTER_CONTROLLER_SERV_TYPE,priv_data);
-    if (matter_ctrl_service) 
+    if (matter_ctrl_service)
     {
         esp_rmaker_device_add_cb(matter_ctrl_service,controller_write_cb, NULL);
 
 
         esp_rmaker_device_add_param(matter_ctrl_service, esp_rmaker_param_create(ESP_MATTER_CONTROLLER_DATA_PARAM_NAME, ESP_MATTER_CONTROLLER_DATA_PARAM_TYPE, esp_rmaker_obj("{}"), PROP_FLAG_READ));
 
-        esp_rmaker_device_add_param(matter_ctrl_service, esp_rmaker_param_create(ESP_MATTER_CONTROLLER_DATA_VERSION_PARAM_NAME, ESP_MATTER_CONTROLLER_DATA_VERSION_PARAM_TYPE, esp_rmaker_str("1.0.0"), PROP_FLAG_READ));
+        esp_rmaker_device_add_param(matter_ctrl_service, esp_rmaker_param_create(ESP_MATTER_CONTROLLER_DATA_VERSION_PARAM_NAME, ESP_MATTER_CONTROLLER_DATA_VERSION_PARAM_TYPE, esp_rmaker_str("1.0.1"), PROP_FLAG_READ));
 
         esp_err_t err = esp_rmaker_node_add_device(esp_rmaker_get_node(), matter_ctrl_service);
-        if (err == ESP_OK) 
+        if (err == ESP_OK)
         {
             ESP_LOGI(TAG, "Matter Controller service enabled.");
-        } else 
+        } else
         {
             esp_rmaker_device_delete(matter_ctrl_service);
         }
@@ -351,7 +332,7 @@ esp_rmaker_device_t *esp_rmaker_controller_service_create(const char *serv_name,
 
 esp_err_t esp_rmaker_controller_service_enable()
 {
-    
+
     esp_rmaker_device_t *service = esp_rmaker_controller_service_create(ESP_MATTER_CONTROLLER_SERV_NAME, NULL);
     if (service)
         return ESP_OK;
@@ -367,10 +348,10 @@ esp_err_t esp_rmaker_controller_report_status_using_params(char *additional_info
         return ESP_FAIL;
     }
     esp_rmaker_param_t *controller_param = esp_rmaker_device_get_param_by_type(device, ESP_MATTER_CONTROLLER_DATA_PARAM_TYPE);
-    
+
     esp_rmaker_param_update_and_report(controller_param, esp_rmaker_obj(additional_info));
 
     // esp_err_t err = esp_rmaker_param_update(info_param, esp_rmaker_obj(additional_info));
-    
+
     return ESP_OK;
 }

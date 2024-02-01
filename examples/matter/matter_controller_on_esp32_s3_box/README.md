@@ -16,26 +16,26 @@
 
 ```
 $ cd $RMAKER_PATH/cli
-$ ./rainmaker.py login --email <rainmaker-account-email> 
-$ ./rainmaker.py getparams <rainmaker-node-id-of-controller> 
+$ ./rainmaker.py login --email <rainmaker-account-email>
+$ ./rainmaker.py getparams <rainmaker-node-id-of-controller>
 ```
-**Note**: 
+**Note**:
 1) Please use the same account credentials that are used to claim the controller and signed into the Rainmaker app.
-2) Get the rainmaker-node-id-of-controller by logging into [ESP Rainmaker Dashboard](https://dashboard.rainmaker.espressif.com/login). 
+2) Get the rainmaker-node-id-of-controller by logging into [ESP Rainmaker Dashboard](https://dashboard.rainmaker.espressif.com/login).
 
 ## Controlling the devices remotely using rainmaker cli:
 
 ```
 $ cd $RMAKER_PATH/cli
-$ ./rainmaker.py login --email <rainmaker-account-email> 
+$ ./rainmaker.py login --email <rainmaker-account-email>
 ```
 _Toggle command:_
 ```
-$ ./rainmaker.py setparams --data '{"matter-controller":{"matter-controller-data":{"matter-nodes":[{"matter-node-id": "<matter-node-id-of-device>","endpoints":[{"endpoint-id":"0x1","clusters":[{"cluster-id":"0x6","commands":[{"command-id":"0x2"}]}]}]}]}}}' <rainmaker-node-id-of-controller>
+$ ./rainmaker.py setparams --data '{"Matter-Controller":{"Matter-Devices":{"matter-nodes":[{"matter-node-id":"<matter-node-id-of-device>","endpoints":[{"endpoint-id":"0x1","clusters":[{"cluster-id":"0x6","commands":[{"command-id":"0x2"}]}]}]}]}}}' <rainmaker-node-id-of-controller>
 ```
 _Set Brightness command:_
 ```
-./rainmaker.py setparams --data '{"matter-controller":{"matter-controller-data":{"matter-nodes":[{"matter-node-id":"<matter-node-id-of-device>","endpoints":[{"endpoint-id":"0x1","clusters":[{"cluster-id":"0x8","commands":[{"command-id":"0x0","data":{"0":"10","1":"0","2":"0","3":"0"}}]}]}]}]}}}' <rainmaker-node-id-of-controller> 
+$ ./rainmaker.py setparams --data '{"Matter-Controller":{"Matter-Devices":{"matter-nodes":[{"matter-node-id":"<matter-node-id-of-device>","endpoints":[{"endpoint-id":"0x1","clusters":[{"cluster-id":"0x8","commands":[{"command-id":"0x0","data":{"0:U8": 10, "1:U16": 0, "2:U8": 0, "3:U8": 0}}]}]}]}]}}}' <rainmaker-node-id-of-controller>
 ```
-**Note**: 
+**Note**:
 1) Get the matter-node-id-of-device from the details reported by the controller using getparams command.
