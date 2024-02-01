@@ -28,31 +28,24 @@ using namespace chip::app::Clusters;
 static const char *TAG = "controller-ctrl";
 
 
-static void send_command_cb(intptr_t arg) 
+static void send_command_cb(intptr_t arg)
 {
     send_cmd_format*ptr = (send_cmd_format *)arg;
-    // const char *cmd_data[] = { "0x6"/* on-off-cluster*/, "0x2" /* toggle */};
 
-    const char* cmd_data_cstr[ptr->cmd_data.size()];
+    if(ptr->cmd_data)
+        ESP_LOGI(TAG,"\ncmd_data: %s\n",ptr->cmd_data);
 
-    for (size_t i = 0; i < ptr->cmd_data.size(); ++i) 
-    {
-        cmd_data_cstr[i] = ptr->cmd_data[i].c_str();
-        ESP_LOGI(TAG,"\ndata: %d : %s\n",i,cmd_data_cstr[i]);
-    }
-    
     if (ptr) {
-        ESP_LOGI(TAG, "send command to node %llx endpoint %d", ptr->node_id, ptr->endpoint_id);
-        esp_matter::controller::send_invoke_cluster_command(ptr->node_id, ptr->endpoint_id, ptr->cmd_data.size(), (char **)cmd_data_cstr);
+        ESP_LOGI(TAG, "send command to node %llx endpoint %d cluster %d command %d", ptr->node_id, ptr->endpoint_id, ptr->cluster_id, ptr->command_id);
+        esp_matter::controller::send_invoke_cluster_command(ptr->node_id, ptr->endpoint_id, ptr->cluster_id, ptr->command_id, ptr->cmd_data);
     }
     else
         ESP_LOGE(TAG, "send command with null ptr");
 
-    ptr->cmd_data.clear();
-    free(ptr);
+    delete ptr;
 }
 
-void send_command(intptr_t arg)
+CHIP_ERROR send_command(intptr_t arg)
 {
-    chip::DeviceLayer::PlatformMgr().ScheduleWork(send_command_cb, arg);
+    return chip::DeviceLayer::PlatformMgr().ScheduleWork(send_command_cb, arg);
 }

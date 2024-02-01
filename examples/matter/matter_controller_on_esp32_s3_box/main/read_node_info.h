@@ -60,7 +60,7 @@ typedef struct callback_data
     chip::TLV::TLVReader* tlv_data;
 
     callback_data(uint64_t nodeid, chip::app::ConcreteDataAttributePath attrpath, chip::TLV::TLVReader * tlvdata): node_id(nodeid),attr_path(attrpath), tlv_data(tlvdata){}
-    
+
 }cb_data;
 
 void print_data_model();

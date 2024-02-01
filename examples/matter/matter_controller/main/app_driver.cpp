@@ -40,10 +40,9 @@ void on_device_list_update()
 
 static void send_toggle_command(intptr_t context)
 {
-    const char* cmd_data[] = { "0x6" /* on-off-cluster*/, "0x2" /* toggle */ };
     if (s_selected_device) {
         esp_matter::controller::send_invoke_cluster_command(s_selected_device->node_id, s_selected_device->endpoints[0].endpoint_id,
-                                                            2, (char**)cmd_data);
+                                                            OnOff::Id, OnOff::Commands::Toggle::Id, NULL);
     }
 }
 
