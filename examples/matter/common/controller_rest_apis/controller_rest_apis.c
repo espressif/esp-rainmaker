@@ -123,7 +123,7 @@ esp_err_t fetch_access_token(const char *endpoint_url,
                           access_token_buf_len - 1) != 0) {
     ESP_LOGE(TAG,
              "Failed to parse the access token from the HTTP response json");
-    ret = ESP_FAIL;
+    ret = ESP_ERR_INVALID_RESPONSE;
   } else {
     access_token[access_token_len] = 0;
   }
@@ -1007,6 +1007,112 @@ exit:
   }
   if (noc_pem) {
     free(noc_pem);
+  }
+  return ret;
+}
+
+esp_err_t create_matter_controller(const char *endpoint_url, const char *access_token,
+                                   const char *rainmaker_node_id, const char *rainmaker_group_id,
+                                   uint64_t *matter_node_id)
+{
+  ESP_RETURN_ON_FALSE(endpoint_url, ESP_ERR_INVALID_ARG, TAG, "endpoint_url cannot be NULL");
+  ESP_RETURN_ON_FALSE(access_token, ESP_ERR_INVALID_ARG, TAG, "access_token cannot be NULL");
+  ESP_RETURN_ON_FALSE(rainmaker_node_id, ESP_ERR_INVALID_ARG, TAG, "rainmaker_node_id cannot be NULL");
+  ESP_RETURN_ON_FALSE(rainmaker_group_id, ESP_ERR_INVALID_ARG, TAG, "rainmaker_group_id cannot be NULL");
+  ESP_RETURN_ON_FALSE(matter_node_id, ESP_ERR_INVALID_ARG, TAG, "rainmaker_group_id cannot be NULL");
+  esp_err_t ret = ESP_OK;
+  char url[256];
+  snprintf(url, sizeof(url), "%s/%s/%s?matter_controller=true", endpoint_url, HTTP_API_VERSION,
+           "user/node_group");
+  esp_http_client_config_t config = {
+      .url = url,
+      .transport_type = HTTP_TRANSPORT_OVER_SSL,
+      .buffer_size = 2048,
+      .buffer_size_tx = 2048,
+      .skip_cert_common_name_check = false,
+      .crt_bundle_attach = esp_crt_bundle_attach,
+  };
+  json_gen_str_t jstr;
+  jparse_ctx_t jctx;
+  int http_len, http_status_code;
+  char *http_payload = NULL;
+  const size_t http_payload_size = 512;
+  char status_str[10];
+  char matter_node_id_str[17];
+  size_t http_payload_len = 0;
+
+  esp_http_client_handle_t client = esp_http_client_init(&config);
+  ESP_RETURN_ON_FALSE(client, ESP_FAIL, TAG,
+                      "Failed to initialise HTTP Client.");
+  ESP_GOTO_ON_ERROR(
+      esp_http_client_set_header(client, "accept", "application/json"), cleanup,
+      TAG, "Failed to set HTTP header accept");
+  ESP_GOTO_ON_ERROR(
+      esp_http_client_set_header(client, "Authorization", access_token),
+      cleanup, TAG, "Failed to set HTTP header Authorization");
+  ESP_GOTO_ON_ERROR(
+      esp_http_client_set_header(client, "Content-Type", "application/json"),
+      cleanup, TAG, "Failed to set HTTP header Content-Type");
+  ESP_GOTO_ON_ERROR(esp_http_client_set_method(client, HTTP_METHOD_PUT),
+                    cleanup, TAG, "Failed to set HTTP method");
+
+  http_payload = (char *)MEM_CALLOC_EXTRAM(http_payload_size, sizeof(char));
+  ESP_GOTO_ON_FALSE(http_payload, ESP_ERR_NO_MEM, cleanup, TAG,
+                    "Failed to alloc memory for http_payload");
+
+  // Generate the JSON payload
+  json_gen_str_start(&jstr, http_payload, http_payload_size - 1, NULL, NULL);
+  json_gen_start_object(&jstr);
+  json_gen_obj_set_string(&jstr, "node_id", rainmaker_node_id);
+  json_gen_obj_set_string(&jstr, "group_id", rainmaker_group_id);
+  json_gen_end_object(&jstr);
+  json_gen_str_end(&jstr);
+  ESP_LOGI(TAG, "HTTP write payload: %s", http_payload);
+
+  // Send POST data
+  http_payload_len = strnlen(http_payload, http_payload_size - 1);
+  ESP_GOTO_ON_ERROR(esp_http_client_open(client, http_payload_len), cleanup,
+                    TAG, "Failed to open HTTP connection");
+  http_len = esp_http_client_write(client, http_payload, http_payload_len);
+  ESP_GOTO_ON_FALSE(http_len == http_payload_len, ESP_FAIL, close, TAG,
+                    "Failed to write Payload. Returned len = %d.", http_len);
+
+  // Read response
+  http_len = esp_http_client_fetch_headers(client);
+  http_status_code = esp_http_client_get_status_code(client);
+  if ((http_len > 0) && (http_status_code == 200)) {
+    http_len = esp_http_client_read_response(client, http_payload,
+                                             http_payload_size - 1);
+    http_payload[http_len] = 0;
+  } else {
+    http_len = esp_http_client_read_response(client, http_payload,
+                                             http_payload_size - 1);
+    http_payload[http_len] = 0;
+    ESP_LOGE(TAG, "Invalid response for %s", url);
+    ESP_LOGE(TAG, "Status = %d, Data = %s", http_status_code,
+             http_len > 0 ? http_payload : "None");
+    ret = http_status_code == 401 ? ESP_ERR_INVALID_STATE : ESP_FAIL;
+    goto close;
+  }
+
+  // Parse http response
+  ESP_LOGI(TAG, "http_response %s", http_payload);
+  ESP_GOTO_ON_FALSE(
+      json_parse_start(&jctx, http_payload, http_len) == 0, ESP_FAIL, close,
+      TAG, "Failed to parse the HTTP response json on json_parse_start");
+  if (json_obj_get_string(&jctx, "status", status_str, sizeof(status_str)) == 0 &&
+      strcmp(status_str, "success") == 0) {
+    if (json_obj_get_string(&jctx, "matter_node_id", matter_node_id_str, sizeof(matter_node_id_str)) == 0) {
+      *matter_node_id = strtoull(matter_node_id_str, NULL, 16);
+    }
+  }
+  json_parse_end(&jctx);
+close:
+  esp_http_client_close(client);
+cleanup:
+  esp_http_client_cleanup(client);
+  if (http_payload) {
+    free(http_payload);
   }
   return ret;
 }

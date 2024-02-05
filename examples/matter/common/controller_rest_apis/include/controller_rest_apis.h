@@ -121,6 +121,21 @@ esp_err_t issue_noc_with_csr(const char *endpoint_url, const char *access_token,
                              uint64_t *matter_node_id, unsigned char *noc_der, size_t *noc_der_len);
 
 /**
+ * Create a Matter Controller
+ *
+ * @param[in] endpoint_url The base endpoint URL
+ * @param[in] access_token The access token to be passed in the "Authorization" HTTP header as the authentication token
+ * @param[in] rainmaker_node_id The RainMaker Node ID of the Matter Controller
+ * @param[in] rainmaker_group_id The Rainmaker Group ID for the Matter Fabric of the Controller
+ * @param[out] matter_node_id The generate Matter Node ID for the Controller
+ *
+ * @return ESP_OK on sussess
+ * @return error in case of failure
+ */
+esp_err_t create_matter_controller(const char *endpoint_url, const char *access_token, const char *rainmaker_node_id,
+                                   const char *rainmaker_group_id, uint64_t *matter_node_id);
+
+/**
  * Fetch Matter device list in Matter Fabric(RainMaker Group)
  *
  * Note:this function will allocate memory for the newly fetched device list
