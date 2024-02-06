@@ -1,10 +1,12 @@
-# ESP RainMaker (Beta)
+# ESP RainMaker
 
-> Note: We have recently made some changes to the APIs. Please refer [this file](CHANGES.md) for details.
+> Note: For major changes, please refer [this file](CHANGES.md).
 
 ## Introduction
 
-ESP RainMaker is an end-to-end solution offered by Espressif to enable remote control and monitoring for ESP32-S2 and ESP32 based products without any configuration required in the Cloud. The primary components of this solution are:
+ESP RainMaker is an end-to-end solution offered by Espressif to enable remote control and monitoring for ESP32 series of SoCs (e.g., ESP32, ESP32-S2, ESP32-C3, ESP32-C6, ESP32-C2, etc.) based products without any configuration required in the Cloud. <br>
+
+The primary components of this solution are:
 
 - Claiming Service (to get the Cloud connectivity credentials)
 - RainMaker Agent (i.e. this repo, to develop the firmware)
@@ -34,7 +36,7 @@ Each example has its own README with additional information about using the exam
 
 ## Supported ESP-IDF versions
 
-ESP RainMaker can work with ESP IDF 4.0 and above.
+ESP RainMaker can work with ESP IDF 4.1 and above.
 
 ## Phone Apps
 
