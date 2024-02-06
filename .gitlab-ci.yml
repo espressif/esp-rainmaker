@@ -7,6 +7,8 @@ variables:
   MAKEFLAGS: "-j8 --no-keep-going"
   APP_BUILD: "all"
   GIT_SUBMODULE_STRATEGY: recursive
+  ESP_DOCS_ENV_IMAGE: "$CI_DOCKER_REGISTRY/esp-idf-doc-env-v5.0:2-2"
+  ESP_DOCS_PATH: "$CI_PROJECT_DIR"
 
 before_script:
    # add gitlab ssh key
@@ -170,31 +172,68 @@ build_matter:
     - *build_matter_controller_example
 
 build_docs:
-    stage: build
-    image: $CI_DOCKER_REGISTRY/esp32-ci-env
-    tags:
-      - build
-    artifacts:
-      paths:
-        - $CI_PROJECT_DIR/esp-rainmaker-docs-${CI_JOB_ID}.zip
-    script:
-      # Building sphinx docs
-      - echo Building sphinx docs
-      - cd docs
-      # unset IDF_PATH
-      - echo Unset IDF_PATH
-      - unset IDF_PATH
-      # Run requirements.txt
-      - echo Run requirements.txt
-      - python3 -m pip install -r requirements.txt
-      # Run make html
-      - echo Run make html
-      - make html
-      - cd $CI_PROJECT_DIR
-      - echo Generating tar files
-      - mkdir -p esp-rainmaker-docs-${CI_JOB_ID}/html
-      - cp -rf $CI_PROJECT_DIR/docs/_build/html/ esp-rainmaker-docs-${CI_JOB_ID}/html/
-      - tar -zcvf esp-rainmaker-docs-${CI_JOB_ID}.zip esp-rainmaker-docs-${CI_JOB_ID}
+  stage: build
+  image: $ESP_DOCS_ENV_IMAGE
+  tags:
+    - build_docs
+  artifacts:
+    paths:
+      - docs/_build/*/*/*.txt
+      - docs/_build/*/*/html/*
+    expire_in: 4 days
+  # No cleaning when the artifacts
+  after_script: []
+  script:
+    - cd docs
+    - pip install -r requirements.txt
+    - build-docs -l en -t esp32
+
+.deploy_docs_template:
+  stage: deploy
+  image: $ESP_DOCS_ENV_IMAGE
+  tags:
+    - deploy_docs
+  needs:
+    - build_docs
+  only:
+    changes:
+      - "docs/**/*"
+  script:
+    - source ${CI_PROJECT_DIR}/docs/utils.sh
+    - add_doc_server_ssh_keys $DOCS_DEPLOY_PRIVATEKEY $DOCS_DEPLOY_SERVER $DOCS_DEPLOY_SERVER_USER
+    - export GIT_VER=$(git describe --always)
+    - pip install -r ${CI_PROJECT_DIR}/docs/requirements.txt
+    - deploy-docs
+
+deploy_docs_preview:
+  extends:
+    - .deploy_docs_template
+  except:
+    refs:
+      - master
+  variables:
+    TYPE: "preview"
+    DOCS_BUILD_DIR: "${CI_PROJECT_DIR}/docs/_build/"
+    DOCS_DEPLOY_PRIVATEKEY: "$DOCS_PREVIEW_PRIVATEKEY"
+    DOCS_DEPLOY_SERVER: "$DOCS_PREVIEW_SERVER"
+    DOCS_DEPLOY_SERVER_USER: "$DOCS_PREVIEW_USER"
+    DOCS_DEPLOY_PATH: "$DOCS_PREVIEW_PATH"
+    DOCS_DEPLOY_URL_BASE: "$DOCS_PREVIEW_URL_BASE"
+
+deploy_docs_production:
+  extends:
+    - .deploy_docs_template
+  only:
+    refs:
+      - master
+  variables:
+    TYPE: "production"
+    DOCS_BUILD_DIR: "${CI_PROJECT_DIR}/docs/_build/"
+    DOCS_DEPLOY_PRIVATEKEY: "$DOCS_PROD_PRIVATEKEY"
+    DOCS_DEPLOY_SERVER: "$DOCS_PROD_SERVER"
+    DOCS_DEPLOY_SERVER_USER: "$DOCS_PROD_USER"
+    DOCS_DEPLOY_PATH: "$DOCS_PROD_PATH"
+    DOCS_DEPLOY_URL_BASE: "$DOCS_PROD_URL_BASE"
 
 push_master_to_github:
   stage: deploy
