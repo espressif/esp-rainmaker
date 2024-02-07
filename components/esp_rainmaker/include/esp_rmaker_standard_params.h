@@ -64,6 +64,7 @@ extern "C"
  * and changes will be managed internally.
  *
  * @param[in] param_name Name of the parameter
+ * @param[in] val The device name
  *
  * @return Parameter handle on success.
  * @return NULL in case of failures.

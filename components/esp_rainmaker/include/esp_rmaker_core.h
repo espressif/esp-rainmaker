@@ -377,7 +377,7 @@ esp_err_t esp_rmaker_stop(void);
  *
  * @param[in] node Node Handle returned by esp_rmaker_node_init().
  *
- * @retur ESP_OK on success.
+ * @return ESP_OK on success.
  * @return error in case of failure.
  */
 esp_err_t esp_rmaker_node_deinit(const esp_rmaker_node_t *node);
@@ -952,7 +952,7 @@ esp_err_t esp_rmaker_ota_enable_default(void);
 esp_err_t esp_rmaker_test_cmd_resp(const void *cmd, size_t cmd_len, void *priv_data);
 
 /** This API signs the challenge with RainMaker private key.
-* 
+*
 * @param[in] challenge Pointer to the data to be signed
 * @param[in] inlen Length of the challenge
 * @param[out] response Pointer to the signature.

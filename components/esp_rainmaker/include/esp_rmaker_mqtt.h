@@ -25,7 +25,7 @@ esp_rmaker_mqtt_conn_params_t *esp_rmaker_mqtt_get_conn_params(void);
 
 /** Initialize ESP RainMaker MQTT
  *
- * @param[in] config The MQTT configuration data
+ * @param[in] conn_params The MQTT configuration data
  *
  * @return ESP_OK on success.
  * @return error in case of any error.
@@ -64,6 +64,7 @@ esp_err_t esp_rmaker_mqtt_disconnect(void);
  * @param[in] data Data to be published
  * @param[in] data_len Length of the data
  * @param[in] qos Quality of Service for the Publish. Can be 0, 1 or 2. Also depends on what the MQTT broker supports.
+ * @param[out] msg_id   msg_id for tracking if message is queued
  *
  * @return ESP_OK on success.
  * @return error in case of any error.
