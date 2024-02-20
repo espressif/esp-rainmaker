@@ -44,6 +44,7 @@ std::unordered_map <uint64_t,dev_data*> get_dev_ptr; //actual physical device
 std::vector<uint64_t> node_id_list;
 int node_id_list_index=0;
 
+std::unordered_map <uint64_t,bool> online_devices;
 
 char * esp_controller_get_datamodel_json(void);
 
@@ -182,6 +183,19 @@ esp_err_t change_data_model_attribute(uint64_t node_id, uint16_t endpoint_id, ui
 
     return ESP_OK;
 }
+esp_err_t change_node_reachability(uint64_t node_id, bool updated_val)
+{
+    if(get_dev_ptr.find(node_id)!=get_dev_ptr.end())
+    {
+        ESP_LOGI(TAG,"Reachability changed for nodeid: %016llx",node_id);
+        dev_data* dev = get_dev_ptr[node_id];
+        dev->reachable = updated_val;
+    }
+
+    report_data_model();
+
+    return ESP_OK;
+}
 
 int get_data_model_json(char *buf, size_t buf_size)
 {
@@ -229,8 +243,8 @@ static esp_err_t json_gen(json_gen_str_t *jstr)
         std::snprintf(nodeid, sizeof(nodeid), "%016llx", static_cast<unsigned long long>(dev_ptr.second->node_id));
         json_gen_push_object(jstr,nodeid);
 
-        json_gen_obj_set_bool(jstr, "enabled",true);
-        json_gen_obj_set_bool(jstr, "reachable",true);
+        json_gen_obj_set_bool(jstr, "enabled",dev_ptr.second->enabled);
+        json_gen_obj_set_bool(jstr, "reachable",dev_ptr.second->reachable);
 
         json_gen_push_object(jstr,"endpoints");
 
@@ -497,9 +511,24 @@ static void _read_node_wild_info(uint64_t nodeid)
     ESP_LOGI(TAG,"\nfetching info of node_id: %016llx\n",node_id_list[node_id_list_index]);
 }
 
+void update_and_report_reachability(std::vector<uint64_t> nodeid_list)
+{
+    for(auto &node_id  : online_devices)
+        node_id.second=false;
+    for(auto &node_id : nodeid_list)
+        online_devices[node_id]=true;
+    for(auto &node_id  : online_devices)
+    {
+        if (node_id.second==false)
+        {
+            change_node_reachability(node_id.first,false);
+        }
+    }
+}
 
 void read_node_info(std::vector<uint64_t> nodeid_list)
 {
+    update_and_report_reachability(nodeid_list);
     clear_data_model();
     node_id_list.clear();
     node_id_list_index=0;

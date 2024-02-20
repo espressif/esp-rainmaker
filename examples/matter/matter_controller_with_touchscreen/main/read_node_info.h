@@ -47,6 +47,8 @@ typedef struct cloud_data_model
 typedef struct dev_data
 {
     uint64_t node_id;
+    bool enabled = true;
+    bool reachable = true;
     std::unordered_map<uint16_t, data_model*> get_endpoint_ptr;
 
     dev_data(uint64_t remote_nodeid): node_id(remote_nodeid){}
@@ -70,6 +72,8 @@ void clear_data_model();
 void report_data_model();
 
 esp_err_t change_data_model_attribute(uint64_t node_id, uint16_t endpoint_id, uint32_t cluster_id, uint32_t attribute_id, std::string);
+
+esp_err_t change_node_reachability(uint64_t node_id, bool);
 
 void read_node_info(std::vector<uint64_t>);
 
