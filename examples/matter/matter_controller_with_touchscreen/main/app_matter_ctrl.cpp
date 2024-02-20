@@ -531,18 +531,26 @@ void read_dev_info(void)
     device_list_lock my_device_lock;
     std::vector<uint64_t> nid_list;
     node_endpoint_id_list_t *dev_ptr = device_to_control.dev_list;
-    while (dev_ptr) {
-        //if (dev_ptr->is_Rainmaker_device && dev_ptr->is_online && !dev_ptr->is_subscribed)
-        //{
-            //chip::DeviceLayer::PlatformMgr().ScheduleWork(_read_device_state, (intptr_t)dev_ptr);
-            //dev_ptr->is_subscribed = true;
-        //}
-        nid_list.push_back(dev_ptr->node_id);
-        ESP_LOGI(TAG,"\nnodeid-> %llx\n",dev_ptr->node_id);
+    while (dev_ptr)
+    {
+        if(dev_ptr->is_online)
+        {
+            nid_list.push_back(dev_ptr->node_id);
+        }
+        ESP_LOGI(TAG,"nodeid-> %llx is %d",dev_ptr->node_id,dev_ptr->is_online);
         dev_ptr = dev_ptr->next;
     }
 
-    read_node_info(nid_list);
+
+    if(nid_list.size()>0)
+    {
+        read_node_info(nid_list);
+    }
+    else
+    {
+        ESP_LOGE(TAG, "No devices online!");
+    }
+
 
     nid_list.clear();
 }
