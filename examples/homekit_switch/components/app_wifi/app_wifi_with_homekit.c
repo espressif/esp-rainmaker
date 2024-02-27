@@ -63,6 +63,12 @@ static esp_timer_handle_t prov_stop_timer;
 /* Autofetch period in micro-seconds */
 static uint64_t prov_timeout_period = (APP_WIFI_PROV_TIMEOUT_PERIOD * 60 * 1000000LL);
 
+#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 1, 3)
+#define APP_PROV_STOP_ON_CREDS_MISMATCH
+#elif (CONFIG_APP_WIFI_PROV_MAX_RETRY_CNT > 0)
+#warning "Provisioning window stop on max credentials failures, needs IDF version >= 5.1.3"
+#endif
+
 static void app_wifi_print_qr(const char *name, const char *pop, const char *transport)
 {
     if (!name || !transport) {
@@ -115,6 +121,9 @@ static void event_handler(void* arg, esp_event_base_t event_base,
 {
 #ifdef CONFIG_APP_WIFI_RESET_PROV_ON_FAILURE
     static int retries = 0;
+#endif
+#ifdef APP_PROV_STOP_ON_CREDS_MISMATCH
+    static int failed_cnt = 0;
 #endif
     if (event_base == WIFI_PROV_EVENT) {
         switch (event_id) {
@@ -171,6 +180,28 @@ static void event_handler(void* arg, esp_event_base_t event_base,
             default:
                 break;
         }
+#ifdef APP_PROV_STOP_ON_CREDS_MISMATCH
+    } else if (event_base == PROTOCOMM_SECURITY_SESSION_EVENT) {
+        switch (event_id) {
+            case PROTOCOMM_SECURITY_SESSION_SETUP_OK:
+                ESP_LOGI(TAG, "Secured session established!");
+                break;
+            case PROTOCOMM_SECURITY_SESSION_INVALID_SECURITY_PARAMS:
+                /* fall-through */
+            case PROTOCOMM_SECURITY_SESSION_CREDENTIALS_MISMATCH:
+                ESP_LOGE(TAG, "Received incorrect PoP or invalid security params! event: %d", (int) event_id);
+                if (CONFIG_APP_WIFI_PROV_MAX_POP_MISMATCH &&
+                        (++failed_cnt >= CONFIG_APP_WIFI_PROV_MAX_POP_MISMATCH)) {
+                    /* stop provisioning for security reasons */
+                    wifi_prov_mgr_stop_provisioning();
+                    ESP_LOGW(TAG, "Max PoP attempts reached! Provisioning disabled for security reasons. Please reboot device to restart provisioning");
+                    esp_event_post(APP_WIFI_EVENT, APP_WIFI_EVENT_PROV_CRED_MISMATCH, NULL, 0, portMAX_DELAY);
+                }
+                break;
+            default:
+                break;
+        }
+#endif
     } else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_START) {
         esp_wifi_connect();
     } else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_CONNECTED) {
@@ -332,6 +363,9 @@ void app_wifi_with_homekit_init(void)
     ESP_ERROR_CHECK(esp_event_handler_register(WIFI_EVENT, ESP_EVENT_ANY_ID, &event_handler, NULL));
 #endif
     ESP_ERROR_CHECK(esp_event_handler_register(WIFI_PROV_EVENT, ESP_EVENT_ANY_ID, &event_handler, NULL));
+#ifdef APP_PROV_STOP_ON_CREDS_MISMATCH
+    ESP_ERROR_CHECK(esp_event_handler_register(PROTOCOMM_SECURITY_SESSION_EVENT, ESP_EVENT_ANY_ID, &event_handler, NULL));
+#endif
     ESP_ERROR_CHECK(esp_event_handler_register(IP_EVENT, IP_EVENT_STA_GOT_IP, &event_handler, NULL));
     ESP_ERROR_CHECK(esp_event_handler_register(IP_EVENT, IP_EVENT_GOT_IP6, &event_handler, NULL));
 

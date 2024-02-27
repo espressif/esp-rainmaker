@@ -6,6 +6,17 @@ menu "App Wi-Fi Provisioning"
         help
             Show the QR code for provisioning.
 
+    config APP_WIFI_PROV_MAX_POP_MISMATCH
+        int
+        default 5
+        range 0 20
+        prompt "Max wrong pop attempts allowed"
+        help
+            Set the maximum wrong pop attempts allowed before stopping provisioning.
+            Set 0 for the feature to be disabled.
+            This safeguards the device from brute-force attempt by limiting the wrong pop allowed.
+            Needs IDF version >= 5.1.3
+
     choice APP_WIFI_PROV_TRANSPORT
         bool "Provisioning Transport method"
         default APP_WIFI_PROV_TRANSPORT_BLE

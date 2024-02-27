@@ -20,6 +20,8 @@ typedef enum {
     APP_WIFI_EVENT_PROV_TIMEOUT,
     /** Provisioning has restarted due to failures (Invalid SSID/Passphrase) */
     APP_WIFI_EVENT_PROV_RESTART,
+    /** Provisioning closed due to invalid credentials */
+    APP_WIFI_EVENT_PROV_CRED_MISMATCH,
 } app_wifi_event_t;
 
 /** Types of Proof of Possession */
