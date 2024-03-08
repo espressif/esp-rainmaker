@@ -1,0 +1,4 @@
+#
+# Bluetooth
+#
+CONFIG_BT_ENABLED=n
