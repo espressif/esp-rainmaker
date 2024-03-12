@@ -42,6 +42,7 @@ extern "C"
 #define ESP_RMAKER_PARAM_SPEED          "esp.param.speed"
 #define ESP_RMAKER_PARAM_DIRECTION      "esp.param.direction"
 #define ESP_RMAKER_PARAM_TEMPERATURE    "esp.param.temperature"
+#define ESP_RMAKER_PARAM_HUMIDITY    "esp.param.humidity"
 #define ESP_RMAKER_PARAM_OTA_STATUS     "esp.param.ota_status"
 #define ESP_RMAKER_PARAM_OTA_INFO       "esp.param.ota_info"
 #define ESP_RMAKER_PARAM_OTA_URL        "esp.param.ota_url"
@@ -62,13 +63,13 @@ extern "C"
 #define ESP_RMAKER_PARAM_LIGHT_MODE     "esp.param.light-mode"
 #define ESP_RMAKER_PARAM_AC_MODE        "esp.param.ac-mode"
 
-
 /********** STANDARD DEVICE TYPES **********/
 
 #define ESP_RMAKER_DEVICE_SWITCH        "esp.device.switch"
 #define ESP_RMAKER_DEVICE_LIGHTBULB     "esp.device.lightbulb"
 #define ESP_RMAKER_DEVICE_FAN           "esp.device.fan"
 #define ESP_RMAKER_DEVICE_TEMP_SENSOR   "esp.device.temperature-sensor"
+#define ESP_RMAKER_DEVICE_HUMD_SENSOR   "esp.device.humidity-sensor"
 #define ESP_RMAKER_DEVICE_LIGHT         "esp.device.light"
 #define ESP_RMAKER_DEVICE_OUTLET        "esp.device.outlet"
 #define ESP_RMAKER_DEVICE_PLUG          "esp.device.plug"
