@@ -1,5 +1,8 @@
 # Changes
 
+## 27-Feb-2024: Add support for closing provisioning window after PoP mismatch
+ - For ESP IDF v5.1.3 and later, provisioning will be stopped if there are 5 attempts to establish secure session with wrong PoP. This count can be set to any value between 0 and 20. 0 means that provisioning will not be stopped (which will be same as the earlier behaviour before this change).
+
 ## 21-Nov-2022 (esp_rmaker_mqtt: Add MQTT budgeting to control the number of messages sent)
 
 - Due to some poor, non-optimised coding or bugs, it is possible that the node keeps bombarding the MQTT
