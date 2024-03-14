@@ -143,7 +143,7 @@ void report_data_model()
     esp_rmaker_controller_report_status_using_params(json_data);
 }
 
-esp_err_t change_data_model_attribute(uint64_t node_id, uint16_t endpoint_id, uint32_t cluster_id, uint32_t attribute_id, std::string updated_val)
+esp_err_t change_data_model_attribute(uint64_t node_id, uint16_t endpoint_id, uint32_t cluster_id, uint32_t attribute_id, esp_matter_attr_val_t* updated_val)
 {
     if(get_dev_ptr.find(node_id)!=get_dev_ptr.end())
     {
@@ -169,7 +169,7 @@ esp_err_t change_data_model_attribute(uint64_t node_id, uint16_t endpoint_id, ui
 
                     cl_attribute* attr = cls->get_attribute_ptr[attribute_id];
 
-                    attr->value = updated_val;
+                    attr->esp_value = *updated_val;
 
                     ESP_LOGI(TAG,"\nValue set to updated value.\n");
                 }
@@ -281,12 +281,19 @@ static esp_err_t json_gen(json_gen_str_t *jstr)
                         val.clear();
                         for(const auto& attribute_ptr : cluster_ptr.second->get_attribute_ptr)
                         {
-                            // std::cout<<"\t\t\t\""<<std::hex<<attribute_ptr.second->attribute_id<<"\" : "<<std::hex<<attribute_ptr.second->value<<std::endl;
                             char attr_id[9];
                             sprintf(attr_id, "%x", attribute_ptr.second->attribute_id);
                             std::string attr_id_str = "0x";
                             attr_id_str += attr_id;
-                            json_gen_obj_set_string(jstr,(char*)attr_id_str.c_str() ,(char*)attribute_ptr.second->value.c_str());
+
+                            if(attribute_ptr.second->esp_value.type == ESP_MATTER_VAL_TYPE_BOOLEAN)
+                                json_gen_obj_set_bool(jstr,(char*)attr_id_str.c_str() ,attribute_ptr.second->esp_value.val.b);
+                            else if(attribute_ptr.second->esp_value.type == ESP_MATTER_VAL_TYPE_UINT16)
+                                json_gen_obj_set_int(jstr,(char*)attr_id_str.c_str() ,attribute_ptr.second->esp_value.val.u16);
+                            else
+                                // json_gen_obj_set_null(jstr, (char*)attr_id_str.c_str());
+                                json_gen_obj_set_string(jstr,(char*)attr_id_str.c_str() ,(char*)attribute_ptr.second->esp_value.val.a.b);
+
 
                             attr_id_str.clear();
                             val.clear();
@@ -385,21 +392,22 @@ static void parse_cb_response(cb_data* _data)
         data_model* node_ptr = get_ep_ptr[_data->attr_path.mEndpointId];
 
         int type = _data->tlv_data->GetType();
-        std::string val;
 
-
+        esp_matter_attr_val_t esp_val;
         switch(type)
         {
             // case 0x0:
             // {
-            //     int attribute_value;
+            //     int16_t attribute_value;
             //     if(chip::app::DataModel::Decode(*_data->tlv_data, attribute_value)==CHIP_NO_ERROR)
             //     {
             //         printf("\nattribute decode OK.\n");
-            //         val = std::to_string(attribute_value);
+            //         // val = std::to_string(attribute_value);
+            //         esp_val = esp_matter_int16 (attribute_value);
+
             //     }
             //     else
-            //         printf("\nattribute decode not OK.\n");
+            //         ESP_LOGE(TAG,"\nattribute decode not OK.\n");
             //     break;
             // }
 
@@ -408,7 +416,7 @@ static void parse_cb_response(cb_data* _data)
                 u_int16_t attribute_value;
                 if(chip::app::DataModel::Decode(*_data->tlv_data, attribute_value)==CHIP_NO_ERROR)
                 {
-                    val = std::to_string(attribute_value);
+                    esp_val = esp_matter_uint16 (attribute_value);
                 }
                 else
                     ESP_LOGE(TAG,"\nattribute decode not OK.\n");
@@ -419,15 +427,15 @@ static void parse_cb_response(cb_data* _data)
                 bool attribute_value;
                 if(chip::app::DataModel::Decode(*_data->tlv_data, attribute_value)==CHIP_NO_ERROR)
                 {
-
-                    val = std::to_string(attribute_value);
+                    esp_val = esp_matter_bool(attribute_value);
                 }
                 else
                     ESP_LOGE(TAG,"\nattribute decode not OK.\n");
                 break;
             }
             default:
-                val = "Unhandled type";
+                // esp_val = esp_matter_invalid(NULL);
+                esp_val = esp_matter_char_str("Unhandled",sizeof("Unhandled"));
                 break;
         }
 
@@ -437,7 +445,7 @@ static void parse_cb_response(cb_data* _data)
 
             ep_cluster* curr_cluster = node_ptr->get_cluster_ptr[_data->attr_path.mClusterId];
 
-            cl_attribute* nattribute = new cl_attribute(_data->attr_path.mAttributeId,val);
+            cl_attribute* nattribute = new cl_attribute(_data->attr_path.mAttributeId,&esp_val);
 
             curr_cluster->get_attribute_ptr[_data->attr_path.mAttributeId] = nattribute;
 
