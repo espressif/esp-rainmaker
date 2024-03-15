@@ -9,6 +9,10 @@
 #include "esp_log.h"
 #include "lvgl.h"
 
+#if CONFIG_CUSTOM_COMMISSIONABLE_DATA_PROVIDER
+#include "dynamic_qrcode.h"
+#endif
+
 static const char *TAG = "ui_matter_ctrl";
 
 static bool IsCommission = false;
@@ -288,7 +292,11 @@ void ui_matter_ctrl_start(void (*fn)(void))
     if (!IsCommission) {
         QRcode = lv_qrcode_create(g_page, qrcode_width, lv_color_black(), lv_color_white());
         lv_obj_align(QRcode, LV_ALIGN_TOP_MID, 0, qrcode_align_y);
+#ifdef CONFIG_CUSTOM_COMMISSIONABLE_DATA_PROVIDER
+        const char *qrcode_data = DynamicPasscodeCommissionableDataProvider::GetInstance().GetDynamicQRcodeStr();
+#else
         const char *qrcode_data = "MT:U9VJ0EPJ01ZD6100000";
+#endif
         ESP_LOGI(TAG, "QR Data: %s", qrcode_data);
         lv_qrcode_update(QRcode, qrcode_data, strlen(qrcode_data));
         lv_label_set_text_static(g_hint_label, "Scan the QR code on your phone");
