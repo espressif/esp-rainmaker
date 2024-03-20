@@ -301,7 +301,7 @@ esp_err_t esp_rmaker_report_node_config()
     }
     char publish_topic[MQTT_TOPIC_BUFFER_SIZE];
     esp_rmaker_create_mqtt_topic(publish_topic, MQTT_TOPIC_BUFFER_SIZE, NODE_CONFIG_TOPIC_SUFFIX, NODE_CONFIG_TOPIC_RULE);
-    ESP_LOGD(TAG, "Reporting Node Configuration of length %d bytes.", strlen(publish_payload));
+    ESP_LOGD(TAG, "Reporting Node Configuration of length %lu bytes.", (unsigned long) strlen(publish_payload));
     ESP_LOGD(TAG, "%s", publish_payload);
     esp_err_t ret = esp_rmaker_mqtt_publish(publish_topic, publish_payload, strlen(publish_payload),
                         RMAKER_MQTT_QOS1, NULL);
