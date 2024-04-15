@@ -8,14 +8,20 @@
 */
 
 #include <sdkconfig.h>
-
+#include <esp_log.h>
 #include <iot_button.h>
 #include <esp_rmaker_core.h>
-#include <esp_rmaker_standard_types.h> 
-#include <esp_rmaker_standard_params.h> 
+#include <esp_rmaker_standard_types.h>
+#include <esp_rmaker_standard_params.h>
 
 #include <app_reset.h>
+
+#if CONFIG_IDF_TARGET_ESP32C2
+#include <ledc_driver.h>
+#else
 #include <ws2812_led.h>
+#endif
+
 #include "app_priv.h"
 
 /* This is the button that is used for toggling the power */
@@ -30,6 +36,37 @@ static uint16_t g_saturation = DEFAULT_SATURATION;
 static uint16_t g_value = DEFAULT_BRIGHTNESS;
 static bool g_power = DEFAULT_POWER;
 
+#if CONFIG_IDF_TARGET_ESP32C2
+esp_err_t app_light_set_led(uint32_t hue, uint32_t saturation, uint32_t brightness)
+{
+    /* Whenever this function is called, light power will be ON */
+    if (!g_power) {
+        g_power = true;
+        esp_rmaker_param_update_and_report(
+                esp_rmaker_device_get_param_by_type(light_device, ESP_RMAKER_PARAM_POWER),
+                esp_rmaker_bool(g_power));
+    }
+    ledc_set_hsv(hue, saturation, brightness);
+    return ESP_OK;
+}
+
+esp_err_t app_light_set_power(bool power)
+{
+    g_power = power;
+    if (power) {
+        ledc_set_hsv(g_hue, g_saturation, g_value);
+    } else {
+        ledc_clear();
+    }
+    return ESP_OK;
+}
+
+esp_err_t app_light_init(void)
+{
+    ledc_init();
+    return ESP_OK;
+}
+#else
 esp_err_t app_light_set_led(uint32_t hue, uint32_t saturation, uint32_t brightness)
 {
     /* Whenever this function is called, light power will be ON */
@@ -53,6 +90,21 @@ esp_err_t app_light_set_power(bool power)
     return ESP_OK;
 }
 
+esp_err_t app_light_init(void)
+{
+    esp_err_t err = ws2812_led_init();
+    if (err != ESP_OK) {
+        return err;
+    }
+    if (g_power) {
+        ws2812_led_set_hsv(g_hue, g_saturation, g_value);
+    } else {
+        ws2812_led_clear();
+    }
+    return ESP_OK;
+}
+#endif
+
 esp_err_t app_light_set_brightness(uint16_t brightness)
 {
     g_value = brightness;
@@ -67,20 +119,6 @@ esp_err_t app_light_set_saturation(uint16_t saturation)
 {
     g_saturation = saturation;
     return app_light_set_led(g_hue, g_saturation, g_value);
-}
-
-esp_err_t app_light_init(void)
-{
-    esp_err_t err = ws2812_led_init();
-    if (err != ESP_OK) {
-        return err;
-    }
-    if (g_power) {
-        ws2812_led_set_hsv(g_hue, g_saturation, g_value);
-    } else {
-        ws2812_led_clear();
-    }
-    return ESP_OK;
 }
 
 static void push_btn_cb(void *arg)
