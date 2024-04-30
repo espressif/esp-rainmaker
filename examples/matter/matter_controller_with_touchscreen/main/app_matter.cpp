@@ -8,19 +8,29 @@
 
 #include <app_matter.h>
 #include <app_priv.h>
+#include <app/server/Server.h>
 #include <esp_log.h>
 #include <esp_matter_console.h>
 #include <esp_matter_controller_console.h>
+#include <esp_matter_controller_utils.h>
 #include <esp_matter_rainmaker.h>
 #include <esp_rmaker_core.h>
 #include <esp_rmaker_standard_params.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
+#if CONFIG_ESP_MATTER_CONTROLLER_CUSTOM_CLUSTER_ENABLE
 #include <matter_controller_cluster.h>
 #include <matter_controller_device_mgr.h>
+#endif // CONFIG_ESP_MATTER_CONTROLLER_CUSTOM_CLUSTER_ENABLE
 #include <nvs_flash.h>
 #include <platform/ESP32/route_hook/ESP32RouteHook.h>
 #include <string.h>
+#if CONFIG_OPENTHREAD_BORDER_ROUTER
+#include <esp_matter_thread_br_cluster.h>
+#include <esp_matter_thread_br_console.h>
+#include <esp_matter_thread_br_launcher.h>
+#include <esp_ot_config.h>
+#endif // CONFIG_OPENTHREAD_BORDER_ROUTER
 
 #include "app_matter_ctrl.h"
 #include "ui_matter_ctrl.h"
@@ -40,6 +50,7 @@ static const char *TAG = "app_matter";
 static uint16_t app_endpoint_id;
 extern bool rmaker_init_done;
 extern bool wifi_connected;
+extern bool device_get_flag;
 
 static const char *app_matter_get_rmaker_param_name_from_id(uint32_t cluster_id, uint32_t attribute_id)
 {
@@ -118,15 +129,36 @@ static void app_event_cb(const ChipDeviceEvent *event, intptr_t arg)
             ui_main_status_bar_set_wifi(true);
         }
         break;
+    case chip::DeviceLayer::DeviceEventType::kESPSystemEvent:
+        if (event->Platform.ESPSystemEvent.Base == IP_EVENT &&
+            event->Platform.ESPSystemEvent.Id == IP_EVENT_STA_GOT_IP) {
+#if CONFIG_OPENTHREAD_BORDER_ROUTER
+        esp_openthread_platform_config_t config = {
+            .radio_config = ESP_OPENTHREAD_DEFAULT_RADIO_CONFIG(),
+            .host_config = ESP_OPENTHREAD_DEFAULT_HOST_CONFIG(),
+            .port_config = ESP_OPENTHREAD_DEFAULT_PORT_CONFIG(),
+        };
+#if CONFIG_OPENTHREAD_BR_AUTO_UPDATE_RCP
+        esp_rcp_update_config_t rcp_update_config = ESP_OPENTHREAD_RCP_UPDATE_CONFIG();
+        ESP_ERROR_CHECK(esp_matter::thread_rcp_update_init(&rcp_update_config));
+#endif
+        esp_matter::thread_br_init(&config);
+#endif
+        }
+        break;
 
     case chip::DeviceLayer::DeviceEventType::kFailSafeTimerExpired:
         ESP_LOGE(TAG, "Commissioning failed, fail safe timer expired");
-        ui_matter_config_update_cb(UI_MATTER_EVT_FAILED_COMMISSION);
+        if (!device_get_flag) {
+            ui_matter_config_update_cb(UI_MATTER_EVT_FAILED_COMMISSION);
+        }
         break;
 
     case chip::DeviceLayer::DeviceEventType::kCommissioningSessionStarted:
         ESP_LOGI(TAG, "Commissioning session started");
-        ui_matter_config_update_cb(UI_MATTER_EVT_START_COMMISSION);
+        if (!device_get_flag) {
+            ui_matter_config_update_cb(UI_MATTER_EVT_START_COMMISSION);
+        }
         break;
 
     case chip::DeviceLayer::DeviceEventType::kCommissioningSessionStopped:
@@ -158,7 +190,6 @@ esp_err_t app_matter_init()
     /* Create a Matter node */
     node::config_t node_config;
     node_t *node = node::create(&node_config, app_attribute_update_cb, app_identification_cb);
-    // esp_matter::controller::set_fabric_index(1);
 
     /* The node and endpoint handles can be used to create/add other endpoints and clusters. */
     if (!node) {
@@ -167,6 +198,11 @@ esp_err_t app_matter_init()
     }
     /* Add custom matter controller cluster */
     endpoint_t *root_endpoint = esp_matter::endpoint::get(node, 0);
+
+#if CONFIG_OPENTHREAD_BORDER_ROUTER
+    cluster::thread_br::create(root_endpoint, CLUSTER_FLAG_SERVER);
+#endif
+
     esp_matter::cluster::matter_controller::create(root_endpoint, CLUSTER_FLAG_SERVER);
 
     /* Add custom rainmaker cluster */
@@ -186,7 +222,7 @@ esp_err_t app_matter_endpoint_create()
     descriptor::create(endpoint, &descriptor_config, CLUSTER_FLAG_SERVER);
 
     app_endpoint_id = endpoint::get_id(endpoint);
-    ESP_LOGI(TAG, "Light created with endpoint_id %d", app_endpoint_id);
+    ESP_LOGI(TAG, "Device 0xFC01 created with endpoint_id %d", app_endpoint_id);
 
     return ESP_OK;
 }
@@ -218,6 +254,9 @@ void app_matter_enable_matter_console()
 #if CONFIG_ESP_MATTER_CONTROLLER_ENABLE
     esp_matter::console::controller_register_commands();
 #endif
+#if CONFIG_OPENTHREAD_BORDER_ROUTER && CONFIG_OPENTHREAD_CLI
+    esp_matter::console::thread_br_cli_register_command();
+#endif // CONFIG_OPENTHREAD_BORDER_ROUTER && CONFIG_OPENTHREAD_CLI
 #else
     ESP_LOGI(TAG, "Set CONFIG_ENABLE_CHIP_SHELL to enable Matter Console");
 #endif
