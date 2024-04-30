@@ -220,7 +220,7 @@ static esp_err_t esp_rmaker_scenes_parse_info_and_flags(jparse_ctx_t *jctx, char
             /* +1 for NULL termination */
             *info = (char *)MEM_CALLOC_EXTRAM(1, strlen(_info) + 1);
             if (*info) {
-                strncpy(*info, _info, strlen(_info));
+                memcpy(*info, _info, strlen(_info));
             }
         }
     }
