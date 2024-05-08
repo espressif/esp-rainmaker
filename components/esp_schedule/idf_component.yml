@@ -1,5 +1,5 @@
 ## IDF Component Manager Manifest File
-version: "1.1.1"
+version: "1.2.0"
 description: ESP Schedules, used in RainMaker
 url: https://github.com/espressif/esp-rainmaker/tree/master/components/esp_schedule
 repository: https://github.com/espressif/esp-rainmaker.git
@@ -8,4 +8,3 @@ dependencies:
   espressif/rmaker_common:
     version: "~1.4.2"
     override_path: '../rmaker_common/'
-
