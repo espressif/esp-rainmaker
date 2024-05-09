@@ -132,10 +132,25 @@ build_idf_v5.0:
   image: espressif/idf:release-v5.0
   variables:
     EXAMPLE_TARGETS: "esp32 esp32s2 esp32c3 esp32s3"
+    EXAMPLES: "switch led_light fan temperature_sensor multi_device gpio"
 
 build_idf_v5.1:
   extends: .build_template
   image: espressif/idf:release-v5.1
+  variables:
+    EXAMPLE_TARGETS: "esp32 esp32s2 esp32c3 esp32s3 esp32c6 esp32c2"
+    EXAMPLES: "switch led_light fan temperature_sensor multi_device gpio"
+
+build_idf_v5.2:
+  extends: .build_template
+  image: espressif/idf:release-v5.2
+  variables:
+    EXAMPLE_TARGETS: "esp32 esp32s2 esp32c3 esp32s3 esp32c6 esp32c2"
+    EXAMPLES: "switch led_light fan temperature_sensor multi_device gpio"
+
+build_idf_v5.3:
+  extends: .build_template
+  image: espressif/idf:release-v5.3
   variables:
     EXAMPLE_TARGETS: "esp32 esp32s2 esp32c3 esp32s3 esp32c6 esp32c2"
     EXAMPLES: "switch led_light fan temperature_sensor multi_device gpio"
