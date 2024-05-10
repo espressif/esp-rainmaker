@@ -14,7 +14,6 @@
 #include <sdkconfig.h>
 #include <string.h>
 #include <esp_log.h>
-#include <esp_ota_ops.h>
 #include <json_generator.h>
 #include <esp_rmaker_core.h>
 #include <esp_rmaker_utils.h>
@@ -25,6 +24,8 @@
 
 #if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 0, 0)
 #include <esp_app_desc.h>
+#else
+#include <esp_ota_ops.h>
 #endif
 
 #define NODE_CONFIG_TOPIC_SUFFIX        "config"
