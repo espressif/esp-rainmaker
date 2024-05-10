@@ -39,7 +39,7 @@ set(EXTRA_COMPONENT_DIRS
     "${RMAKER_PATH}/components"
     ${extra_components_dirs_append})
 
-add_compile_options(-fdiagnostics-color=always) 
+add_compile_options(-fdiagnostics-color=always)
 
 idf_build_set_property(__BUILD_COMPONENT_DEPGRAPH_ENABLED 1)
 

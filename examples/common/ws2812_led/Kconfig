@@ -2,7 +2,7 @@ menu "WS2812 RGB LED"
 
     config WS2812_LED_ENABLE
         bool "Enable RGB LED"
-        default n if IDF_TARGET_ESP32
+        default n if IDF_TARGET_ESP32 || !SOC_RMT_SUPPORTED
         default y
         help
             Disable the WS2812 RGB LED.
