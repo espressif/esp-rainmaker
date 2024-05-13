@@ -8,13 +8,7 @@
 
 ### [Claiming device certificates](../README.md#claiming-device-certificates)
 
-### Generating the factory nvs binary
-
-For this example, make sure to configure the passcode as 125 and set the discriminator to 521 to match the QR code on UI. The command is:
-```
-$ cd $ESP_MATTER_PATH/tools/mfg_tool
-$ ./mfg_tool.py -v 0x131B -p 0x2 --passcode 125 --discriminator 521 -cd $RMAKER_PATH/examples/matter/mfg/cd_131B_0002.der --csv $RMAKER_PATH/examples/matter/mfg/keys.csv --mcsv $RMAKER_PATH/examples/matter/mfg/master.csv
-```
+### [Generating the factory nvs binary](../README.md#generating-the-factory-nvs-binary)
 
 ### Building the example
 

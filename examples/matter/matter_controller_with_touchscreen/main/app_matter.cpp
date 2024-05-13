@@ -25,6 +25,11 @@
 #include "app_matter_ctrl.h"
 #include "ui_matter_ctrl.h"
 
+#if CONFIG_CUSTOM_COMMISSIONABLE_DATA_PROVIDER
+#include <esp_matter_providers.h>
+#include "dynamic_qrcode.h"
+#endif
+
 using namespace esp_matter;
 using namespace esp_matter::attribute;
 using namespace esp_matter::cluster;
@@ -194,6 +199,10 @@ esp_err_t app_matter_pre_rainmaker_start()
 
 esp_err_t app_matter_start()
 {
+#if CONFIG_CUSTOM_COMMISSIONABLE_DATA_PROVIDER
+    esp_matter::set_custom_commissionable_data_provider(&DynamicPasscodeCommissionableDataProvider::GetInstance());
+#endif
+
     esp_err_t err = esp_matter::start(app_event_cb);
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "Matter start failed: %d", err);

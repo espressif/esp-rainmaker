@@ -140,3 +140,8 @@ CONFIG_IDF_TARGET="esp32s3"
 
 # Select one of the boards
 CONFIG_BSP_BOARD_ESP32_S3_BOX_3=y
+
+# Enable custom commission data to use dynamic qrcode
+CONFIG_CUSTOM_COMMISSIONABLE_DATA_PROVIDER=y
+
+CONFIG_ESP_MATTER_CONTROLLER_CUSTOM_CLUSTER_ENABLE=y
