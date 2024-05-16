@@ -21,29 +21,23 @@ PROJECT_NAME = "ESP RainMaker Programming Guide"
 ## and used to include in API reference documentation
 
 INPUT = \
-    ## RainMaker Core
-    ../components/esp_rainmaker/include/esp_rmaker_core.h \
-    ../components/esp_rainmaker/include/esp_rmaker_user_mapping.h \
-    ../components/esp_rainmaker/include/esp_rmaker_schedule.h \
-    ../components/esp_rainmaker/include/esp_rmaker_scenes.h \
-    ## RainMaker Standard Types
-    ../components/esp_rainmaker/include/esp_rmaker_standard_types.h \
-    ../components/esp_rainmaker/include/esp_rmaker_standard_params.h \
-    ../components/esp_rainmaker/include/esp_rmaker_standard_devices.h \
-    ../components/esp_rainmaker/include/esp_rmaker_standard_services.h \
-    ## RainMaker OTA
-    ../components/esp_rainmaker/include/esp_rmaker_ota.h \
-    ## RainMaker MQTT
-    ../components/esp_rainmaker/include/esp_rmaker_mqtt.h \
-    ## RainMaker Console
-    ../components/esp_rainmaker/include/esp_rmaker_console.h \
-    ## RainMaker Common
-    ../components/rmaker_common/include/esp_rmaker_common_events.h \
-    ../components/rmaker_common/include/esp_rmaker_factory.h \
-    ../components/rmaker_common/include/esp_rmaker_work_queue.h \
-    ../components/rmaker_common/include/esp_rmaker_utils.h \
-    ../components/rmaker_common/include/esp_rmaker_cmd_resp.h \
-    ../components/rmaker_common/include/esp_rmaker_mqtt_glue.h
+    $(PROJECT_PATH)/components/esp_rainmaker/include/esp_rmaker_core.h \
+    $(PROJECT_PATH)/components/esp_rainmaker/include/esp_rmaker_user_mapping.h \
+    $(PROJECT_PATH)/components/esp_rainmaker/include/esp_rmaker_schedule.h \
+    $(PROJECT_PATH)/components/esp_rainmaker/include/esp_rmaker_scenes.h \
+    $(PROJECT_PATH)/components/esp_rainmaker/include/esp_rmaker_standard_types.h \
+    $(PROJECT_PATH)/components/esp_rainmaker/include/esp_rmaker_standard_params.h \
+    $(PROJECT_PATH)/components/esp_rainmaker/include/esp_rmaker_standard_devices.h \
+    $(PROJECT_PATH)/components/esp_rainmaker/include/esp_rmaker_standard_services.h \
+    $(PROJECT_PATH)/components/esp_rainmaker/include/esp_rmaker_ota.h \
+    $(PROJECT_PATH)/components/esp_rainmaker/include/esp_rmaker_mqtt.h \
+    $(PROJECT_PATH)/components/esp_rainmaker/include/esp_rmaker_console.h \
+    $(PROJECT_PATH)/components/rmaker_common/include/esp_rmaker_common_events.h \
+    $(PROJECT_PATH)/components/rmaker_common/include/esp_rmaker_factory.h \
+    $(PROJECT_PATH)/components/rmaker_common/include/esp_rmaker_work_queue.h \
+    $(PROJECT_PATH)/components/rmaker_common/include/esp_rmaker_utils.h \
+    $(PROJECT_PATH)/components/rmaker_common/include/esp_rmaker_cmd_resp.h \
+    $(PROJECT_PATH)/components/rmaker_common/include/esp_rmaker_mqtt_glue.h
 
 ## Get warnings for functions that have no documentation for their parameters or return value
 ##
@@ -54,7 +48,11 @@ WARN_NO_PARAMDOC = YES
 ENABLE_PREPROCESSING   = YES
 MACRO_EXPANSION        = YES
 EXPAND_ONLY_PREDEF     = YES
-PREDEFINED             = 
+PREDEFINED             = \
+    $(ENV_DOXYGEN_DEFINES)
+
+## Extract all
+EXTRACT_ALL = YES
 
 ## Do not complain about not having dot
 ##
@@ -77,4 +75,3 @@ QUIET = YES
 ## Log warnings in a file for further review
 ##
 WARN_LOGFILE = "doxygen-warning-log.txt"
-
