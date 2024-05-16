@@ -20,6 +20,7 @@
 #include <esp_log.h>
 #include <esp_wifi.h>
 #include <esp_event.h>
+#include <esp_bit_defs.h>
 
 #include <esp_rmaker_factory.h>
 #include <esp_rmaker_work_queue.h>
