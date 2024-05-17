@@ -191,20 +191,25 @@ void ui_matter_config_update_cb(ui_matter_state_t state)
     ui_acquire();
     switch (state) {
     case UI_MATTER_EVT_LOADING:
-        lv_obj_clear_flag(g_hint_label, LV_OBJ_FLAG_HIDDEN);
-        lv_label_set_text(g_hint_label, "Scan the QR code on your phone");
+        if (g_hint_label) {
+            lv_obj_clear_flag(g_hint_label, LV_OBJ_FLAG_HIDDEN);
+            lv_label_set_text(g_hint_label, "Scan the QR code on your phone");
+        }
         break;
     case UI_MATTER_EVT_START_COMMISSION:
-        lv_obj_clear_flag(g_hint_label, LV_OBJ_FLAG_HIDDEN);
-        lv_label_set_text(g_hint_label, "Start Commission ...");
+        if (g_hint_label) {
+            lv_obj_clear_flag(g_hint_label, LV_OBJ_FLAG_HIDDEN);
+            lv_label_set_text(g_hint_label, "Start Commission ...");
+        }
         break;
     case UI_MATTER_EVT_FAILED_COMMISSION:
         if (QRcode) {
             lv_obj_clear_flag(QRcode, LV_OBJ_FLAG_HIDDEN);
         }
-
-        lv_obj_clear_flag(g_hint_label, LV_OBJ_FLAG_HIDDEN);
-        lv_label_set_text(g_hint_label, "Failed commission ...");
+        if (g_hint_label) {
+            lv_obj_clear_flag(g_hint_label, LV_OBJ_FLAG_HIDDEN);
+            lv_label_set_text(g_hint_label, "Failed commission ...");
+        }
         break;
     case UI_MATTER_EVT_COMMISSIONCOMPLETE:
     case UI_MATTER_EVT_REFRESH:

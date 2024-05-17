@@ -12,4 +12,28 @@ This example is expected to be compatible with the Rainmaker iOS app version 3.0
 - Single click the BOOT button will toggle the power of the selected remote device. This will also reflect on the phone app.
 - Double click the BOOT button will change the selected remote device. The new selected device's node-id will be printed in the device console.
 
+## OpenThread Border Router (OTBR) feature
+
+### Hardware Platform
+
+ESP Thread Border Router DevKit Board, see the [docs](https://github.com/espressif/esp-thread-br#hardware-platforms) for more information about the hardware platform.
+
+### Build
+
+The sdkconfig file `sdkconfig.defaults.otbr` is provided to enable the OTBR feature on the controller.
+Build and flash the controller example with the sdkconfig file 'sdkconfig.defaults.otbr'
+
+```
+idf.py -D SDKCONFIG_DEFAULTS="sdkconfig.defaults;sdkconfig.defaults.otbr" set-target esp32s3 build
+idf.py -p <PORT> erase-flash flash monitor
+```
+
+### CLI Command
+Use Thread CLI command in device console
+> Note: Thread Border Router is not initialized until the Controller has been commissioned and obtained an IP address.
+```
+matter esp ot_cli <command>
+```
+
+
 > Please refer to the [README in the parent folder](../README.md) for instructions.

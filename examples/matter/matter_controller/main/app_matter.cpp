@@ -22,6 +22,13 @@
 #include <esp_matter_controller_console.h>
 #include <matter_controller_device_mgr.h>
 
+#if CONFIG_OPENTHREAD_BORDER_ROUTER
+#include <esp_matter_thread_br_cluster.h>
+#include <esp_matter_thread_br_console.h>
+#include <esp_matter_thread_br_launcher.h>
+#include <esp_ot_config.h>
+#endif // CONFIG_OPENTHREAD_BORDER_ROUTER
+
 using namespace esp_matter;
 using namespace esp_matter::attribute;
 using namespace esp_matter::cluster;
@@ -101,6 +108,20 @@ static void app_event_cb(const ChipDeviceEvent *event, intptr_t arg)
     case chip::DeviceLayer::DeviceEventType::PublicEventTypes::kCommissioningComplete:
         ESP_LOGI(TAG, "Commissioning complete");
         break;
+    case chip::DeviceLayer::DeviceEventType::kESPSystemEvent:
+        if (event->Platform.ESPSystemEvent.Base == IP_EVENT &&
+            event->Platform.ESPSystemEvent.Id == IP_EVENT_STA_GOT_IP) {
+#if CONFIG_OPENTHREAD_BORDER_ROUTER
+            esp_openthread_platform_config_t config = {
+                .radio_config = ESP_OPENTHREAD_DEFAULT_RADIO_CONFIG(),
+                .host_config = ESP_OPENTHREAD_DEFAULT_HOST_CONFIG(),
+                .port_config = ESP_OPENTHREAD_DEFAULT_PORT_CONFIG(),
+            };
+            ESP_LOGI(TAG, "Thread border router init");
+            esp_matter::thread_br_init(&config);
+#endif
+        }
+        break;
     case chip::DeviceLayer::DeviceEventType::kInterfaceIpAddressChanged:
         if (event->InterfaceIpAddressChanged.Type == chip::DeviceLayer::InterfaceIpChangeType::kIpV4_Assigned) {
             esp_matter::controller::device_mgr::init(0, on_device_list_update);
@@ -126,6 +147,10 @@ esp_err_t app_matter_init()
     /* Add custom matter controller cluster */
     endpoint_t *root_endpoint = esp_matter::endpoint::get(node, 0);
     esp_matter::cluster::matter_controller::create(root_endpoint, CLUSTER_FLAG_SERVER);
+
+#if CONFIG_OPENTHREAD_BORDER_ROUTER
+    cluster::thread_br::create(root_endpoint, CLUSTER_FLAG_SERVER);
+#endif
 
     /* Add custom rainmaker cluster */
     return rainmaker::init();
@@ -170,6 +195,9 @@ void app_matter_enable_matter_console()
 #if CONFIG_ESP_MATTER_CONTROLLER_ENABLE
     esp_matter::console::controller_register_commands();
 #endif
+#if CONFIG_OPENTHREAD_BORDER_ROUTER && CONFIG_OPENTHREAD_CLI
+    esp_matter::console::thread_br_cli_register_command();
+#endif // CONFIG_OPENTHREAD_BORDER_ROUTER && CONFIG_OPENTHREAD_CLI
 #else
     ESP_LOGI(TAG, "Set CONFIG_ENABLE_CHIP_SHELL to enable Matter Console");
 #endif

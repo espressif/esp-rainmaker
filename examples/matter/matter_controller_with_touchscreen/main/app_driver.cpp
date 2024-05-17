@@ -33,11 +33,11 @@ using esp_matter::controller::device_mgr::endpoint_entry_t;
 using esp_matter::controller::device_mgr::matter_device_t;
 
 static const char *TAG = "app_driver";
-static bool device_get_flag = false;
 static uint16_t device_update_timer = 40;
 static uint64_t device_node_id = 0;
 static matter_device_t *s_device_ptr = NULL;
 TaskHandle_t xRefresh_Ui_Handle = NULL;
+bool device_get_flag = false;
 
 typedef struct endpoint_type {
     uint16_t endpoint_id;

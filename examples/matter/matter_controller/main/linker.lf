@@ -6,24 +6,8 @@ entries:
   else:
     * (default)
 
-[mapping:lvgl__lvgl]
-archive: liblvgl__lvgl.a
-entries:
-  if ESP_ALLOW_BSS_SEG_EXTERNAL_MEMORY = y:
-    * (extram_bss)
-  else:
-    * (default)
-
 [mapping:esp_matter]
 archive: libesp_matter.a
-entries:
-  if ESP_ALLOW_BSS_SEG_EXTERNAL_MEMORY = y:
-    * (extram_bss)
-  else:
-    * (default)
-
-[mapping:stdcpp]
-archive: libstdc++.a
 entries:
   if ESP_ALLOW_BSS_SEG_EXTERNAL_MEMORY = y:
     * (extram_bss)

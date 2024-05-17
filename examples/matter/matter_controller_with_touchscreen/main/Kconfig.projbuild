@@ -1,0 +1,24 @@
+menu "Controller with Thread BR Example"
+    depends on OPENTHREAD_BORDER_ROUTER
+
+    menu "Board Configuration"
+        config PIN_TO_RCP_RESET
+            depends on OPENTHREAD_BR_AUTO_UPDATE_RCP
+            int "Pin to RCP reset"
+            default "42"
+
+        config PIN_TO_RCP_BOOT
+            depends on OPENTHREAD_BR_AUTO_UPDATE_RCP
+            int "Pin to RCP boot"
+            default "40"
+
+        config PIN_TO_RCP_TX
+            int "Pin to RCP TX"
+            default "38"
+
+        config PIN_TO_RCP_RX
+            int "Pin to RCP RX"
+            default "41"
+    endmenu
+
+endmenu
