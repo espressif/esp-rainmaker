@@ -1,0 +1,8 @@
+menu "RMaker REST API"
+    config RMAKER_REST_API_ENABLED
+        bool "Enable RMaker REST API"
+        default y
+        help
+            Enable RainMaker REST API
+
+endmenu
