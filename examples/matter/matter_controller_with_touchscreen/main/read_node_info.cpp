@@ -267,6 +267,7 @@ static esp_err_t json_gen(json_gen_str_t *jstr)
             if(node_ptr.second->get_cluster_ptr.size()>0)
             {
                 json_gen_push_object(jstr,"clusters");
+                json_gen_push_object(jstr,"server");
                 for(const auto &cluster_ptr  : node_ptr.second->get_cluster_ptr)
                 {
 
@@ -274,11 +275,12 @@ static esp_err_t json_gen(json_gen_str_t *jstr)
                     sprintf(cl_id,"%x",cluster_ptr.second->cluster_id);
                     std::string val = "0x";
                     val+= cl_id;
-
+                    json_gen_push_object(jstr,(char*)val.c_str());
+                    val.clear();
                     if(cluster_ptr.second->get_attribute_ptr.size()>0)
                     {
-                        json_gen_push_object(jstr,(char*)val.c_str());
-                        val.clear();
+
+                        json_gen_push_object(jstr,"attributes");
                         for(const auto& attribute_ptr : cluster_ptr.second->get_attribute_ptr)
                         {
                             char attr_id[9];
@@ -298,20 +300,28 @@ static esp_err_t json_gen(json_gen_str_t *jstr)
                             attr_id_str.clear();
                             val.clear();
                         }
-                        json_gen_pop_object(jstr);
+                        json_gen_pop_object(jstr); //close attributes object
+
+
 
                     }
+                    //write logic for event list
+                    json_gen_pop_object(jstr); //close particular cluster object
+
 
                 }
+                json_gen_pop_object(jstr); //close server object
 
-                json_gen_pop_object(jstr);
+                //put logic for client cluster
+
+                json_gen_pop_object(jstr); //close cluster object
             }
 
-            json_gen_pop_object(jstr);
+            json_gen_pop_object(jstr); //close particular endpoint
         }
 
-        json_gen_pop_object(jstr);
-        json_gen_pop_object(jstr);
+        json_gen_pop_object(jstr); //close endpoints object
+        json_gen_pop_object(jstr); //close node object
     }
 
     ESP_LOGI(TAG,"\ndata model JSON generation done\n");
