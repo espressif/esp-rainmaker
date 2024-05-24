@@ -260,7 +260,10 @@ static esp_err_t json_gen(json_gen_str_t *jstr)
 
             char dev_type[5];
             sprintf(dev_type, "%x", node_ptr.second->device_type);
-            json_gen_obj_set_string(jstr, "device_type",dev_type);
+            std::string dev_type_str = "0x";
+            dev_type_str += dev_type;
+            json_gen_obj_set_string(jstr, "device_type",(char*)dev_type_str.c_str());
+            dev_type_str.clear();
 
 
 
