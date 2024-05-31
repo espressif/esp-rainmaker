@@ -18,10 +18,10 @@
 #include <esp_rmaker_standard_params.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
-#if CONFIG_ESP_MATTER_CONTROLLER_CUSTOM_CLUSTER_ENABLE
+#if CONFIG_CONTROLLER_CUSTOM_CLUSTER_ENABLE
 #include <matter_controller_cluster.h>
 #include <matter_controller_device_mgr.h>
-#endif // CONFIG_ESP_MATTER_CONTROLLER_CUSTOM_CLUSTER_ENABLE
+#endif // CONFIG_CONTROLLER_CUSTOM_CLUSTER_ENABLE
 #include <nvs_flash.h>
 #include <platform/ESP32/route_hook/ESP32RouteHook.h>
 #include <string.h>
@@ -203,8 +203,10 @@ esp_err_t app_matter_init()
     cluster::thread_br::create(root_endpoint, CLUSTER_FLAG_SERVER);
 #endif
 
+#if CONFIG_CONTROLLER_CUSTOM_CLUSTER_ENABLE
     esp_matter::cluster::matter_controller::create(root_endpoint, CLUSTER_FLAG_SERVER);
 
+#endif
     /* Add custom rainmaker cluster */
     return rainmaker::init();
 }
