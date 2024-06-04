@@ -611,6 +611,15 @@ esp_err_t esp_rmaker_device_add_model(const esp_rmaker_device_t *device, const c
  */
 char *esp_rmaker_device_get_name(const esp_rmaker_device_t *device);
 
+/** Get Device Private data from handle
+ *
+ * @param[in] device Device handle.
+ *
+ * @return void type of pointer on success.
+ * @return NULL if no private data found.
+ */
+void *esp_rmaker_device_get_priv_data(const esp_rmaker_device_t *device);
+
 /** Get device type from handle
  *
  * @param[in] device Device handle.
