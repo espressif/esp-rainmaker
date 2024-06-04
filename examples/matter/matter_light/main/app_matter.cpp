@@ -22,6 +22,10 @@
 #include <esp_rmaker_core.h>
 #include "app_priv.h"
 
+#if CHIP_DEVICE_CONFIG_ENABLE_THREAD
+#include <platform/ESP32/OpenthreadLauncher.h>
+#endif
+
 using namespace esp_matter;
 using namespace esp_matter::attribute;
 using namespace esp_matter::cluster;
@@ -278,6 +282,15 @@ esp_err_t app_matter_pre_rainmaker_start()
 
 esp_err_t app_matter_start()
 {
+#if CHIP_DEVICE_CONFIG_ENABLE_THREAD
+    /* Set OpenThread platform config */
+    esp_openthread_platform_config_t config = {
+        .radio_config = ESP_OPENTHREAD_DEFAULT_RADIO_CONFIG(),
+        .host_config = ESP_OPENTHREAD_DEFAULT_HOST_CONFIG(),
+        .port_config = ESP_OPENTHREAD_DEFAULT_PORT_CONFIG(),
+    };
+    set_openthread_platform_config(&config);
+#endif
     esp_err_t err = esp_matter::start(app_event_cb);
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "Matter start failed: %d", err);

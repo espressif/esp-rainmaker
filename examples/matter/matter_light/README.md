@@ -12,3 +12,5 @@
 - To test remote control, change the network connection of the mobile.
 
 > Please refer to the [README in the parent folder](../README.md) for instructions.
+
+> Please refer to the [THREAD_INSTRUCTIONS](./THREAD_INSTRUCTIONS.md) for instructions of Thread devices(ESP32-H2 or ESP32-C6).
