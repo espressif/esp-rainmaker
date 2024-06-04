@@ -72,6 +72,10 @@
 
 #endif /* !IDF4.4 */
 
+#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 1, 0)
+#include "esp_mac.h"
+#endif
+
 static const char *TAG = "esp_claim";
 
 #define ESP_RMAKER_RANDOM_NUMBER_LEN    64
@@ -269,16 +273,27 @@ static esp_err_t generate_claim_init_request(esp_rmaker_claim_data_t *claim_data
     if (claim_data->state < RMAKER_CLAIM_STATE_PK_GENERATED) {
         return ESP_ERR_INVALID_STATE;
     }
-    uint8_t eth_mac[6];
-    esp_err_t err = esp_wifi_get_mac(WIFI_IF_STA, eth_mac);
+    uint8_t mac_addr[6];
+#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 1, 0)
+    /* ESP_MAC_BASE was introduced in ESP-IDF v5.1. It is the same as the Wi-Fi Station MAC address
+     * for chips supporting Wi-Fi. We can use base MAC address to generate claim init request for both
+     * Wi-Fi and Thread devices
+     */
+    esp_err_t err = esp_read_mac(mac_addr, ESP_MAC_BASE);
+#else
+    /* Thread was officially supported in ESP-IDF v5.1. Use Wi-Fi Station MAC address to generate claim
+     * init request.
+     */
+    esp_err_t err = esp_wifi_get_mac(WIFI_IF_STA, mac_addr);
+#endif
     if (err != ESP_OK) {
-        ESP_LOGE(TAG, "Could not fetch MAC address. Please initialise Wi-Fi first");
+        ESP_LOGE(TAG, "Could not fetch MAC address.");
         return err;
     }
 
     snprintf(claim_data->payload, sizeof(claim_data->payload),
             "{\"mac_addr\":\"%02X%02X%02X%02X%02X%02X\",\"platform\":\"%s\"}",
-            eth_mac[0], eth_mac[1], eth_mac[2], eth_mac[3], eth_mac[4], eth_mac[5], CONFIG_IDF_TARGET);
+            mac_addr[0], mac_addr[1], mac_addr[2], mac_addr[3], mac_addr[4], mac_addr[5], CONFIG_IDF_TARGET);
     claim_data->payload_len = strlen(claim_data->payload);
     claim_data->payload_offset = 0;
     return ESP_OK;
