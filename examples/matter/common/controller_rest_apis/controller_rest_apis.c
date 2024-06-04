@@ -1013,20 +1013,16 @@ exit:
 
 const char *controller_node_type = "Controller";
 
-static esp_err_t fetch_matter_node_list(const char *endpoint_url,
-                                        const char *access_token,
-                                        const char *rainmaker_group_id,
-                                        matter_device_t **matter_dev_list) {
+static int fetch_matter_node_list_size(const char *endpoint_url, const char *access_token, const char *rainmaker_group_id)
+{
+  int response_buffer_size = 0;
+
   ESP_RETURN_ON_FALSE(endpoint_url, ESP_ERR_INVALID_ARG, TAG,
                       "endpoint_url cannot be NULL");
   ESP_RETURN_ON_FALSE(access_token, ESP_ERR_INVALID_ARG, TAG,
                       "access_token cannot be NULL");
   ESP_RETURN_ON_FALSE(rainmaker_group_id, ESP_ERR_INVALID_ARG, TAG,
                       "rainmaker_group_id cannot be NULL");
-  ESP_RETURN_ON_FALSE(matter_dev_list && *matter_dev_list == NULL,
-                      ESP_ERR_INVALID_ARG, TAG,
-                      "matter_dev_list cannot be NULL and *matter_dev_list "
-                      "should be an empty list");
 
   ESP_LOGD(TAG,"Access Token: %s",access_token);
   esp_err_t ret = ESP_OK;
@@ -1034,7 +1030,6 @@ static esp_err_t fetch_matter_node_list(const char *endpoint_url,
   int http_len, http_status_code;
   char *http_payload = NULL;
   const size_t http_payload_size = 512;
-  matter_device_t *new_device_list = NULL;
 
   snprintf(url, sizeof(url), "%s/%s/%s=%s&%s", endpoint_url, HTTP_API_VERSION,
            "user/node_group?group_id", rainmaker_group_id,
@@ -1071,12 +1066,102 @@ static esp_err_t fetch_matter_node_list(const char *endpoint_url,
   http_len = esp_http_client_fetch_headers(client);
   http_status_code = esp_http_client_get_status_code(client);
   if ((http_len > 0) && (http_status_code == 200)) {
+
+    response_buffer_size = http_len;
+  }
+  else {
+    ESP_LOGE(TAG, "Invalid response for %s", url);
+    ESP_LOGE(TAG, "Status = %d, Data = %s", http_status_code,
+             http_len > 0 ? http_payload : "None");
+    ret = http_status_code == 401 ? ESP_ERR_INVALID_STATE : ESP_FAIL;
+    goto close;
+  }
+
+close:
+  esp_http_client_close(client);
+cleanup:
+  esp_http_client_cleanup(client);
+  if (http_payload) {
+    free(http_payload);
+  }
+  return response_buffer_size;
+}
+
+static esp_err_t fetch_matter_node_list(const char *endpoint_url,
+                                        const char *access_token,
+                                        const char *rainmaker_group_id,
+                                        matter_device_t **matter_dev_list) {
+  ESP_RETURN_ON_FALSE(endpoint_url, ESP_ERR_INVALID_ARG, TAG,
+                      "endpoint_url cannot be NULL");
+  ESP_RETURN_ON_FALSE(access_token, ESP_ERR_INVALID_ARG, TAG,
+                      "access_token cannot be NULL");
+  ESP_RETURN_ON_FALSE(rainmaker_group_id, ESP_ERR_INVALID_ARG, TAG,
+                      "rainmaker_group_id cannot be NULL");
+  ESP_RETURN_ON_FALSE(matter_dev_list && *matter_dev_list == NULL,
+                      ESP_ERR_INVALID_ARG, TAG,
+                      "matter_dev_list cannot be NULL and *matter_dev_list "
+                      "should be an empty list");
+
+  ESP_LOGD(TAG,"Access Token: %s",access_token);
+  esp_err_t ret = ESP_OK;
+  char url[200];
+  int http_len, http_status_code;
+  char *http_payload = NULL;
+  matter_device_t *new_device_list = NULL;
+
+
+  int response_buffer_size = fetch_matter_node_list_size(endpoint_url,access_token,rainmaker_group_id);
+  if(response_buffer_size==0)
+  {
+    ESP_LOGE(TAG,"Error getting Node list response Buffer size.");
+    return ESP_FAIL;
+  }
+
+  response_buffer_size++; //to accomodate null termination
+
+  ESP_LOGI(TAG,"%d Bytes Buffer required for fetching Node list.",response_buffer_size);
+
+  snprintf(url, sizeof(url), "%s/%s/%s=%s&%s", endpoint_url, HTTP_API_VERSION,
+           "user/node_group?group_id", rainmaker_group_id,
+           "node_details=false&sub_groups=false&node_list=true&is_matter=true&matter_node_list=true");
+  esp_http_client_config_t config = {
+      .url = url,
+      .transport_type = HTTP_TRANSPORT_OVER_SSL,
+      .buffer_size = response_buffer_size,
+      .buffer_size_tx = 1536,
+      .skip_cert_common_name_check = false,
+      .crt_bundle_attach = esp_crt_bundle_attach,
+  };
+  ESP_LOGD(TAG,"URL: %s",url);
+  esp_http_client_handle_t client = esp_http_client_init(&config);
+  ESP_RETURN_ON_FALSE(client, ESP_FAIL, TAG,
+                      "Failed to initialise HTTP Client.");
+  ESP_GOTO_ON_ERROR(
+      esp_http_client_set_header(client, "accept", "application/json"), cleanup,
+      TAG, "Failed to set http header accept");
+  ESP_GOTO_ON_ERROR(
+      esp_http_client_set_header(client, "Authorization", access_token),
+      cleanup, TAG, "Failed to set http header Authorization");
+  // HTTP GET Method
+  ESP_GOTO_ON_ERROR(esp_http_client_set_method(client, HTTP_METHOD_GET),
+                    cleanup, TAG, "Failed to set http method");
+  ESP_GOTO_ON_ERROR(esp_http_client_open(client, 0), cleanup, TAG,
+                    "Failed to open http connection");
+
+  http_payload = (char *)MEM_CALLOC_EXTRAM(response_buffer_size, sizeof(char));
+  ESP_GOTO_ON_FALSE(http_payload, ESP_ERR_NO_MEM, cleanup, TAG,
+                    "Failed to allocate memory for http_payload");
+
+  // Read Response
+  http_len = esp_http_client_fetch_headers(client);
+  http_status_code = esp_http_client_get_status_code(client);
+  if ((http_len > 0) && (http_status_code == 200)) {
     http_len = esp_http_client_read_response(client, http_payload,
-                                             http_payload_size - 1);
+                                             response_buffer_size - 1);
     http_payload[http_len] = 0;
   } else {
     http_len = esp_http_client_read_response(client, http_payload,
-                                             http_payload_size - 1);
+                                             response_buffer_size - 1);
     http_payload[http_len] = 0;
     ESP_LOGE(TAG, "Invalid response for %s", url);
     ESP_LOGE(TAG, "Status = %d, Data = %s", http_status_code,
