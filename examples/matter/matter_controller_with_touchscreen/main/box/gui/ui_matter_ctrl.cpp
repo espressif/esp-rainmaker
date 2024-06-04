@@ -115,6 +115,11 @@ static void ui_list_device(void)
     matter_device_list_lock();
     node_endpoint_id_list_t *ptr = device_to_control.dev_list;
     while (ptr) {
+        if(ptr->device_type == CONTROL_UNKNOWN_DEVICE)
+        {
+            ptr=ptr->next;
+            continue;
+        }
         lv_obj_t *g_func_btn = lv_btn_create(g_page);
         ptr->lv_obj = g_func_btn;
         lv_obj_set_size(g_func_btn, control_button_width, control_button_height);
