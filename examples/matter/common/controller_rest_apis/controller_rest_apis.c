@@ -1028,7 +1028,7 @@ static esp_err_t fetch_matter_node_list(const char *endpoint_url,
                       "matter_dev_list cannot be NULL and *matter_dev_list "
                       "should be an empty list");
 
-  ESP_LOGD(TAG,"\nAccess Token: \n%s",access_token);
+  ESP_LOGD(TAG,"Access Token: %s",access_token);
   esp_err_t ret = ESP_OK;
   char url[200];
   int http_len, http_status_code;
@@ -1047,7 +1047,7 @@ static esp_err_t fetch_matter_node_list(const char *endpoint_url,
       .skip_cert_common_name_check = false,
       .crt_bundle_attach = esp_crt_bundle_attach,
   };
-  ESP_LOGD(TAG,"\nURL: %s\n",url);
+  ESP_LOGD(TAG,"URL: %s",url);
   esp_http_client_handle_t client = esp_http_client_init(&config);
   ESP_RETURN_ON_FALSE(client, ESP_FAIL, TAG,
                       "Failed to initialise HTTP Client.");
@@ -1085,7 +1085,7 @@ static esp_err_t fetch_matter_node_list(const char *endpoint_url,
     goto close;
   }
 
-  ESP_LOGD(TAG, "http response payload: %s", http_payload);
+  ESP_LOGD(TAG, "HTTP response payload: %s", http_payload);
 
   jparse_ctx_t jctx;
 
@@ -1109,7 +1109,7 @@ static esp_err_t fetch_matter_node_list(const char *endpoint_url,
         {
             if(json_arr_get_object(&jctx, node_index)==0)
             {
-              char rainmaker_node_id_str[24];
+              char rainmaker_node_id_str[ESP_RAINMAKER_NODE_ID_MAX_LEN];
               int str_len;
               if (json_obj_get_strlen(&jctx, "id", &str_len) == 0)
               {

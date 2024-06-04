@@ -24,6 +24,7 @@ extern "C"
 
 #define ESP_MATTER_DEVICE_MAX_ENDPOINT 8
 #define ESP_MATTER_DEVICE_NAME_MAX_LEN 32
+#define ESP_RAINMAKER_NODE_ID_MAX_LEN 36
 
 typedef struct endpoint_entry {
     uint16_t endpoint_id;
@@ -33,7 +34,7 @@ typedef struct endpoint_entry {
 
 typedef struct matter_device {
     uint64_t node_id;
-    char rainmaker_node_id[24];
+    char rainmaker_node_id[ESP_RAINMAKER_NODE_ID_MAX_LEN];
     bool is_metadata_fetched;
     uint8_t endpoint_count;
     endpoint_entry_t endpoints[ESP_MATTER_DEVICE_MAX_ENDPOINT];
