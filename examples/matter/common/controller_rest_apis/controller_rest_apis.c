@@ -1087,6 +1087,117 @@ cleanup:
   return response_buffer_size;
 }
 
+static esp_err_t parse_node_list(char* http_payload, int buffer_size, matter_device_t **device_list)
+{
+  jparse_ctx_t jctx;
+
+  // Parse the http response
+  if(json_parse_start(&jctx, http_payload, buffer_size ) != 0)
+  {
+    ESP_LOGE(TAG, "Failed to parse the HTTP response json on json_parse_start");
+    return ESP_FAIL;
+  }
+
+  int num_groups;
+  if(json_obj_get_array(&jctx, "groups", &num_groups)==0)
+  {
+    if(json_arr_get_object(&jctx,0)==0)
+    {
+      int num_nodes;
+      if(json_obj_get_array(&jctx, "node_details", &num_nodes)==0)
+      {
+        ESP_LOGD(TAG,"Got %d node details",num_nodes);
+
+        char* self_node_id = esp_rmaker_get_node_id();
+        for(int node_index=0; node_index<num_nodes; node_index++)
+        {
+            if(json_arr_get_object(&jctx, node_index)==0)
+            {
+              char rainmaker_node_id_str[ESP_RAINMAKER_NODE_ID_MAX_LEN];
+              int str_len;
+              if (json_obj_get_strlen(&jctx, "id", &str_len) == 0)
+              {
+                json_obj_get_string(&jctx, "id", rainmaker_node_id_str,str_len + 1);
+
+                rainmaker_node_id_str[str_len] = '\0';
+
+
+                if(strncmp(rainmaker_node_id_str,self_node_id,strlen(self_node_id))!=0)
+                {
+                  char matter_node_id_str[17];
+                  if (json_obj_get_strlen(&jctx, "matter_node_id", &str_len) == 0 &&
+                      json_obj_get_string(&jctx, "matter_node_id", matter_node_id_str,
+                                          str_len + 1) == 0)
+                  {
+                    matter_node_id_str[str_len] = '\0';
+                    matter_device_t *device_entry = NULL;
+                    device_entry = (matter_device_t *)calloc(1, sizeof(matter_device_t));
+                    if (!device_entry)
+                    {
+                      ESP_LOGE(TAG, "Failed to alloc memory for device element");
+                      json_parse_end(&jctx);
+                      return ESP_FAIL;
+                    }
+                    else
+                    {
+                      device_entry->is_metadata_fetched = false;
+                      device_entry->next = *device_list;
+                      *device_list = device_entry;
+                    }
+                    device_entry->node_id = strtoull(matter_node_id_str, NULL, 16);
+                    strcpy(device_entry->rainmaker_node_id,rainmaker_node_id_str);
+
+                  }
+                  else
+                  {
+                    ESP_LOGE(TAG,"Error parsing matter_node_id.");
+                    return ESP_FAIL;
+                  }
+                }
+                else
+                {
+                  ESP_LOGD(TAG,"Skipping self from Node list.");
+                }
+
+              }
+              else
+              {
+                return ESP_FAIL;
+              }
+
+              json_arr_leave_object(&jctx);
+            }
+            else
+            {
+              return ESP_FAIL;
+            }
+        }
+        json_obj_leave_array(&jctx);
+
+      }
+      else
+      {
+        return ESP_FAIL;
+      }
+      json_arr_leave_object(&jctx);
+    }
+    else
+    {
+      ESP_LOGE(TAG,"Error fetching object groups array");
+      return ESP_FAIL;
+    }
+    json_obj_leave_array(&jctx);
+  }
+  else
+  {
+    ESP_LOGE(TAG,"Error parsing groups array");
+    return ESP_FAIL;
+  }
+  json_parse_end(&jctx);
+
+  return ESP_OK;
+}
+
 static esp_err_t fetch_matter_node_list(const char *endpoint_url,
                                         const char *access_token,
                                         const char *rainmaker_group_id,
@@ -1172,96 +1283,12 @@ static esp_err_t fetch_matter_node_list(const char *endpoint_url,
 
   ESP_LOGD(TAG, "HTTP response payload: %s", http_payload);
 
-  jparse_ctx_t jctx;
-
-  // Parse the http response
-  ESP_GOTO_ON_FALSE(
-      json_parse_start(&jctx, http_payload, http_len) == 0, ESP_FAIL, close,
-      TAG, "Failed to parse the HTTPresponse json on json_parse_start");
-
-  int num_groups;
-  if(json_obj_get_array(&jctx, "groups", &num_groups)==0)
-  {
-    if(json_arr_get_object(&jctx,0)==0)
-    {
-      int num_nodes;
-      if(json_obj_get_array(&jctx, "node_details", &num_nodes)==0)
-      {
-        ESP_LOGD(TAG,"Got %d node details",num_nodes);
-
-        char* self_node_id = esp_rmaker_get_node_id();
-        for(int node_index=0; node_index<num_nodes; node_index++)
-        {
-            if(json_arr_get_object(&jctx, node_index)==0)
-            {
-              char rainmaker_node_id_str[ESP_RAINMAKER_NODE_ID_MAX_LEN];
-              int str_len;
-              if (json_obj_get_strlen(&jctx, "id", &str_len) == 0)
-              {
-                json_obj_get_string(&jctx, "id", rainmaker_node_id_str,str_len + 1);
-
-                rainmaker_node_id_str[str_len] = '\0';
-
-
-                if(strncmp(rainmaker_node_id_str,self_node_id,strlen(self_node_id))!=0)
-                {
-                  char matter_node_id_str[17];
-                  if (json_obj_get_strlen(&jctx, "matter_node_id", &str_len) == 0 &&
-                      json_obj_get_string(&jctx, "matter_node_id", matter_node_id_str,
-                                          str_len + 1) == 0)
-                  {
-                    matter_node_id_str[str_len] = '\0';
-                    matter_device_t *device_entry = NULL;
-                    device_entry = (matter_device_t *)calloc(1, sizeof(matter_device_t));
-                    if (!device_entry)
-                    {
-                      ESP_LOGE(TAG, "Failed to alloc memory for device element");
-                      json_parse_end(&jctx);
-                      return NULL;
-                    }
-                    else
-                    {
-                      device_entry->is_metadata_fetched = false;
-                      device_entry->next = new_device_list;
-                      new_device_list = device_entry;
-                    }
-                    device_entry->node_id = strtoull(matter_node_id_str, NULL, 16);
-                    strcpy(device_entry->rainmaker_node_id,rainmaker_node_id_str);
-
-                  }
-                  else
-                  {
-                    ESP_LOGE(TAG,"Error parsing matter_node_id.");
-                  }
-                }
-                else
-                {
-                  ESP_LOGI(TAG,"Skipping self from Node list.");
-                }
-
-              }
-
-              json_arr_leave_object(&jctx);
-            }
-        }
-        json_obj_leave_array(&jctx);
-
-      }
-      json_arr_leave_object(&jctx);
-    }
-    else
-    {
-      ESP_LOGE(TAG,"Error fetching object groups array");
-    }
-    json_obj_leave_array(&jctx);
+  // Read the node list from the http response
+  if (parse_node_list(http_payload, response_buffer_size, &new_device_list) == ESP_OK) {
+    *matter_dev_list = new_device_list;
+  } else {
+    free_matter_device_list(new_device_list);
   }
-  else
-  {
-    ESP_LOGE(TAG,"Error parsing groups array");
-  }
-  json_parse_end(&jctx);
-
-  *matter_dev_list = new_device_list;
 
 close:
   esp_http_client_close(client);
