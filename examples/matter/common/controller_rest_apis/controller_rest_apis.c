@@ -66,12 +66,12 @@ esp_err_t fetch_access_token(const char *endpoint_url,
                       "Failed to initialise HTTP Client");
   ESP_GOTO_ON_ERROR(
       esp_http_client_set_header(client, "accept", "application/json"), cleanup,
-      TAG, "Failed to set http header accept");
+      TAG, "Failed to set HTTP header accept");
   ESP_GOTO_ON_ERROR(
       esp_http_client_set_header(client, "Content-Type", "application/json"),
-      cleanup, TAG, "Failed to set http header Content-Type");
+      cleanup, TAG, "Failed to set HTTP header Content-Type");
   ESP_GOTO_ON_ERROR(esp_http_client_set_method(client, HTTP_METHOD_POST),
-                    cleanup, TAG, "Failed to set http method");
+                    cleanup, TAG, "Failed to set HTTP method");
 
   // Prepare the payload for http write and read
   // The http response will include id_token and access_token, so we allocate 4K
@@ -84,12 +84,12 @@ esp_err_t fetch_access_token(const char *endpoint_url,
   json_gen_obj_set_string(&jstr, "refreshtoken", (char *)refresh_token);
   json_gen_end_object(&jstr);
   json_gen_str_end(&jstr);
-  ESP_LOGD(TAG, "http write payload: %s", http_payload);
+  ESP_LOGD(TAG, "HTTP write payload: %s", http_payload);
 
   // Send POST data
   http_payload_len = strnlen(http_payload, http_payload_size - 1);
   ESP_GOTO_ON_ERROR(esp_http_client_open(client, http_payload_len), cleanup,
-                    TAG, "Failed to open http connection");
+                    TAG, "Failed to open HTTP connection");
   http_len = esp_http_client_write(client, http_payload, http_payload_len);
   ESP_GOTO_ON_FALSE(http_len == http_payload_len, ESP_FAIL, close, TAG,
                     "Failed to write Payload. Returned len = %d", http_len);
@@ -113,16 +113,16 @@ esp_err_t fetch_access_token(const char *endpoint_url,
   }
 
   // Parse the response payload
-  ESP_LOGD(TAG, "http response:%s", http_payload);
+  ESP_LOGD(TAG, "HTTP response:%s", http_payload);
   ESP_GOTO_ON_FALSE(
       json_parse_start(&jctx, http_payload, http_len) == 0, ESP_FAIL, close,
-      TAG, "Failed to parse the http response json on json_parse_start");
+      TAG, "Failed to parse the HTTP response json on json_parse_start");
   if (json_obj_get_strlen(&jctx, "accesstoken", &access_token_len) != 0 ||
       access_token_len >= access_token_buf_len ||
       json_obj_get_string(&jctx, "accesstoken", access_token,
                           access_token_buf_len - 1) != 0) {
     ESP_LOGE(TAG,
-             "Failed to parse the access token from the http response json");
+             "Failed to parse the access token from the HTTP response json");
     ret = ESP_FAIL;
   } else {
     access_token[access_token_len] = 0;
@@ -192,16 +192,16 @@ static esp_err_t fetch_rainmaker_group_id_pagination(
                       "Failed to initialise HTTP Client.");
   ESP_GOTO_ON_ERROR(
       esp_http_client_set_header(client, "accept", "application/json"), cleanup,
-      TAG, "Failed to set http header accept");
+      TAG, "Failed to set HTTP header accept");
   ESP_GOTO_ON_ERROR(
       esp_http_client_set_header(client, "Authorization", access_token),
-      cleanup, TAG, "Failed to set http header Authorization");
+      cleanup, TAG, "Failed to set HTTP header Authorization");
 
   // HTTP GET
   ESP_GOTO_ON_ERROR(esp_http_client_set_method(client, HTTP_METHOD_GET),
-                    cleanup, TAG, "Failed to set http method");
+                    cleanup, TAG, "Failed to set HTTP method");
   ESP_GOTO_ON_ERROR(esp_http_client_open(client, 0), cleanup, TAG,
-                    "Failed to open http connection");
+                    "Failed to open HTTP connection");
 
   // Read response
   http_payload = (char *)MEM_CALLOC_EXTRAM(http_payload_size, sizeof(char));
@@ -225,12 +225,12 @@ static esp_err_t fetch_rainmaker_group_id_pagination(
   }
 
   // Parse the response payload
-  ESP_LOGD(TAG, "http response:%s", http_payload);
+  ESP_LOGD(TAG, "HTTP response:%s", http_payload);
   ESP_GOTO_ON_FALSE(
       json_parse_start(&jctx, http_payload, http_len) == 0, ESP_FAIL, close,
-      TAG, "Failed to parse the http response json on json_parse_start");
+      TAG, "Failed to parse the HTTP response json on json_parse_start");
   if (json_obj_get_array(&jctx, "groups", group_count) != 0) {
-    ESP_LOGE(TAG, "Failed to parse the groups array from the http response");
+    ESP_LOGE(TAG, "Failed to parse the groups array from the HTTP response");
     json_parse_end(&jctx);
     ret = ESP_FAIL;
     goto close;
@@ -339,19 +339,19 @@ esp_err_t fetch_matter_fabric_id(const char *endpoint_url,
                       "Failed to initialise HTTP Client");
   ESP_GOTO_ON_ERROR(
       esp_http_client_set_header(client, "accept", "application/json"), cleanup,
-      TAG, "Failed to set http header accept");
+      TAG, "Failed to set HTTP header accept");
   ESP_GOTO_ON_ERROR(
       esp_http_client_set_header(client, "Content-Type", "application/json"),
-      cleanup, TAG, "Failed to set http header Content-Type");
+      cleanup, TAG, "Failed to set HTTP header Content-Type");
   ESP_GOTO_ON_ERROR(
       esp_http_client_set_header(client, "Authorization", access_token),
-      cleanup, TAG, "Failed to set http header Authorization");
+      cleanup, TAG, "Failed to set HTTP header Authorization");
 
   // HTTP GET
   ESP_GOTO_ON_ERROR(esp_http_client_set_method(client, HTTP_METHOD_GET),
                     cleanup, TAG, "Failed to set http method");
   ESP_GOTO_ON_ERROR(esp_http_client_open(client, 0), cleanup, TAG,
-                    "Failed to open http connection");
+                    "Failed to open HTTP connection");
 
   // Read response
   http_payload = (char *)MEM_CALLOC_EXTRAM(http_payload_size, sizeof(char));
@@ -375,11 +375,11 @@ esp_err_t fetch_matter_fabric_id(const char *endpoint_url,
   }
 
   // Parse the response payload
-  ESP_LOGI(TAG, "http response:%s", http_payload);
+  ESP_LOGI(TAG, "HTTP response:%s", http_payload);
   ret = ESP_FAIL;
   ESP_GOTO_ON_FALSE(
       json_parse_start(&jctx, http_payload, http_len) == 0, ESP_FAIL, close,
-      TAG, "Failed to parse the http response json on json_parse_start");
+      TAG, "Failed to parse the HTTP response json on json_parse_start");
   if (json_obj_get_array(&jctx, "groups", &group_size) == 0 &&
       group_size == 1) {
     if (json_arr_get_object(&jctx, 0) == 0) {
@@ -592,19 +592,19 @@ static esp_err_t fetch_fabric_rcac_pem(const char *endpoint_url,
                       "Failed to initialise HTTP Client");
   ESP_GOTO_ON_ERROR(
       esp_http_client_set_header(client, "accept", "application/json"), cleanup,
-      TAG, "Failed to set http header accept");
+      TAG, "Failed to set HTTP header accept");
   ESP_GOTO_ON_ERROR(
       esp_http_client_set_header(client, "Content-Type", "application/json"),
-      cleanup, TAG, "Failed to set http header Content-Type");
+      cleanup, TAG, "Failed to set HTTP header Content-Type");
   ESP_GOTO_ON_ERROR(
       esp_http_client_set_header(client, "Authorization", access_token),
-      cleanup, TAG, "Failed to set http header Authorization");
+      cleanup, TAG, "Failed to set HTTP header Authorization");
 
   // HTTP GET
   ESP_GOTO_ON_ERROR(esp_http_client_set_method(client, HTTP_METHOD_GET),
                     cleanup, TAG, "Failed to set http method");
   ESP_GOTO_ON_ERROR(esp_http_client_open(client, 0), cleanup, TAG,
-                    "Failed to open http connection");
+                    "Failed to open HTTP connection");
 
   // Read response
   http_payload = (char *)MEM_CALLOC_EXTRAM(http_payload_size, sizeof(char));
@@ -632,10 +632,10 @@ static esp_err_t fetch_fabric_rcac_pem(const char *endpoint_url,
   }
 
   // Parse the response payload
-  ESP_LOGD(TAG, "http response:%s", http_payload);
+  ESP_LOGD(TAG, "HTTP response:%s", http_payload);
   ESP_GOTO_ON_FALSE(
       json_parse_start(&jctx, http_payload, http_len) == 0, ESP_FAIL, close,
-      TAG, "Failed to parse the http response json on json_parse_start");
+      TAG, "Failed to parse the HTTP response json on json_parse_start");
   if (json_obj_get_array(&jctx, "groups", &group_size) == 0 &&
       group_size == 1) {
     if (json_arr_get_object(&jctx, 0) == 0) {
@@ -718,15 +718,15 @@ static esp_err_t fetch_device_noc(const char *endpoint_url,
                       "Failed to initialise HTTP Client.");
   ESP_GOTO_ON_ERROR(
       esp_http_client_set_header(client, "accept", "application/json"), cleanup,
-      TAG, "Failed to set http header accept");
+      TAG, "Failed to set HTTP header accept");
   ESP_GOTO_ON_ERROR(
       esp_http_client_set_header(client, "Authorization", access_token),
-      cleanup, TAG, "Failed to set http header Authorization");
+      cleanup, TAG, "Failed to set HTTP header Authorization");
   ESP_GOTO_ON_ERROR(
       esp_http_client_set_header(client, "Content-Type", "application/json"),
-      cleanup, TAG, "Failed to set http header Content-Type");
+      cleanup, TAG, "Failed to set HTTP header Content-Type");
   ESP_GOTO_ON_ERROR(esp_http_client_set_method(client, HTTP_METHOD_PUT),
-                    cleanup, TAG, "Failed to set http method");
+                    cleanup, TAG, "Failed to set HTTP method");
 
   http_payload = (char *)MEM_CALLOC_EXTRAM(http_payload_size, sizeof(char));
   ESP_GOTO_ON_FALSE(http_payload, ESP_ERR_NO_MEM, cleanup, TAG,
@@ -757,12 +757,12 @@ static esp_err_t fetch_device_noc(const char *endpoint_url,
   }
   json_gen_end_object(&jstr);
   json_gen_str_end(&jstr);
-  ESP_LOGD(TAG, "http write payload: %s", http_payload);
+  ESP_LOGD(TAG, "HTTP write payload: %s", http_payload);
 
   // Send POST data
   http_payload_len = strnlen(http_payload, http_payload_size - 1);
   ESP_GOTO_ON_ERROR(esp_http_client_open(client, http_payload_len), cleanup,
-                    TAG, "Failed to open http connection");
+                    TAG, "Failed to open HTTP connection");
   http_len = esp_http_client_write(client, http_payload, http_payload_len);
   ESP_GOTO_ON_FALSE(http_len == http_payload_len, ESP_FAIL, close, TAG,
                     "Failed to write Payload. Returned len = %d.", http_len);
@@ -789,7 +789,7 @@ static esp_err_t fetch_device_noc(const char *endpoint_url,
   ESP_LOGD(TAG, "http_response %s", http_payload);
   ESP_GOTO_ON_FALSE(
       json_parse_start(&jctx, http_payload, http_len) == 0, ESP_FAIL, close,
-      TAG, "Failed to parse the http response json on json_parse_start");
+      TAG, "Failed to parse the HTTP response json on json_parse_start");
   if (json_obj_get_array(&jctx, "certificates", &cert_count) == 0 &&
       cert_count == 1) {
     if (json_arr_get_object(&jctx, 0) == 0) {
@@ -813,7 +813,7 @@ static esp_err_t fetch_device_noc(const char *endpoint_url,
 
   // De-format the noc_pem
   ESP_GOTO_ON_FALSE(noc_pem_formatted_len > 0, ESP_FAIL, close, TAG,
-                    "Failed to get formatted NOC from http response");
+                    "Failed to get formatted NOC from HTTP response");
   ESP_GOTO_ON_FALSE(
       deformat_cert(noc_pem_formatted, noc_pem, noc_pem_buf_size) > 0, ESP_FAIL,
       close, TAG, "Failed to de-formatted NOC");
@@ -872,19 +872,19 @@ esp_err_t fetch_fabric_ipk(const char *endpoint_url, const char *access_token,
                       "Failed to initialise HTTP Client");
   ESP_GOTO_ON_ERROR(
       esp_http_client_set_header(client, "accept", "application/json"), cleanup,
-      TAG, "Failed to set http header accept");
+      TAG, "Failed to set HTTP header accept");
   ESP_GOTO_ON_ERROR(
       esp_http_client_set_header(client, "Content-Type", "application/json"),
-      cleanup, TAG, "Failed to set http header Content-Type");
+      cleanup, TAG, "Failed to set HTTP header Content-Type");
   ESP_GOTO_ON_ERROR(
       esp_http_client_set_header(client, "Authorization", access_token),
-      cleanup, TAG, "Failed to set http header Authorization");
+      cleanup, TAG, "Failed to set HTTP header Authorization");
 
   // HTTP GET
   ESP_GOTO_ON_ERROR(esp_http_client_set_method(client, HTTP_METHOD_GET),
                     cleanup, TAG, "Failed to set http method");
   ESP_GOTO_ON_ERROR(esp_http_client_open(client, 0), cleanup, TAG,
-                    "Failed to open http connection");
+                    "Failed to open HTTPconnection");
 
   // Read response
   http_payload = (char *)MEM_CALLOC_EXTRAM(http_payload_size, sizeof(char));
@@ -908,10 +908,10 @@ esp_err_t fetch_fabric_ipk(const char *endpoint_url, const char *access_token,
   }
 
   // Parse the response payload
-  ESP_LOGD(TAG, "http response:%s", http_payload);
+  ESP_LOGD(TAG, "HTTP response:%s", http_payload);
   ESP_GOTO_ON_FALSE(
       json_parse_start(&jctx, http_payload, http_len) == 0, ESP_FAIL, close,
-      TAG, "Failed to parse the http response json on json_parse_start");
+      TAG, "Failed to parse the HTTP response json on json_parse_start");
   if (json_obj_get_array(&jctx, "groups", &group_size) == 0 &&
       group_size == 1) {
     if (json_arr_get_object(&jctx, 0) == 0) {
@@ -1048,15 +1048,15 @@ static int fetch_matter_node_list_size(const char *endpoint_url, const char *acc
                       "Failed to initialise HTTP Client.");
   ESP_GOTO_ON_ERROR(
       esp_http_client_set_header(client, "accept", "application/json"), cleanup,
-      TAG, "Failed to set http header accept");
+      TAG, "Failed to set HTTP header accept");
   ESP_GOTO_ON_ERROR(
       esp_http_client_set_header(client, "Authorization", access_token),
-      cleanup, TAG, "Failed to set http header Authorization");
+      cleanup, TAG, "Failed to set HTTP header Authorization");
   // HTTP GET Method
   ESP_GOTO_ON_ERROR(esp_http_client_set_method(client, HTTP_METHOD_GET),
-                    cleanup, TAG, "Failed to set http method");
+                    cleanup, TAG, "Failed to set HTTP method");
   ESP_GOTO_ON_ERROR(esp_http_client_open(client, 0), cleanup, TAG,
-                    "Failed to open http connection");
+                    "Failed to open HTTP connection");
 
   http_payload = (char *)MEM_CALLOC_EXTRAM(http_payload_size, sizeof(char));
   ESP_GOTO_ON_FALSE(http_payload, ESP_ERR_NO_MEM, cleanup, TAG,
@@ -1138,15 +1138,15 @@ static esp_err_t fetch_matter_node_list(const char *endpoint_url,
                       "Failed to initialise HTTP Client.");
   ESP_GOTO_ON_ERROR(
       esp_http_client_set_header(client, "accept", "application/json"), cleanup,
-      TAG, "Failed to set http header accept");
+      TAG, "Failed to set HTTP header accept");
   ESP_GOTO_ON_ERROR(
       esp_http_client_set_header(client, "Authorization", access_token),
-      cleanup, TAG, "Failed to set http header Authorization");
+      cleanup, TAG, "Failed to set HTTP header Authorization");
   // HTTP GET Method
   ESP_GOTO_ON_ERROR(esp_http_client_set_method(client, HTTP_METHOD_GET),
-                    cleanup, TAG, "Failed to set http method");
+                    cleanup, TAG, "Failed to set HTTP method");
   ESP_GOTO_ON_ERROR(esp_http_client_open(client, 0), cleanup, TAG,
-                    "Failed to open http connection");
+                    "Failed to open HTTP connection");
 
   http_payload = (char *)MEM_CALLOC_EXTRAM(response_buffer_size, sizeof(char));
   ESP_GOTO_ON_FALSE(http_payload, ESP_ERR_NO_MEM, cleanup, TAG,
@@ -1177,7 +1177,7 @@ static esp_err_t fetch_matter_node_list(const char *endpoint_url,
   // Parse the http response
   ESP_GOTO_ON_FALSE(
       json_parse_start(&jctx, http_payload, http_len) == 0, ESP_FAIL, close,
-      TAG, "Failed to parse the http response json on json_parse_start");
+      TAG, "Failed to parse the HTTPresponse json on json_parse_start");
 
   int num_groups;
   if(json_obj_get_array(&jctx, "groups", &num_groups)==0)
@@ -1352,15 +1352,15 @@ static esp_err_t fetch_matter_node_metadata(const char *endpoint_url,
                       "Failed to initialise HTTP Client.");
   ESP_GOTO_ON_ERROR(
       esp_http_client_set_header(client, "accept", "application/json"), cleanup,
-      TAG, "Failed to set http header accept");
+      TAG, "Failed to set HTTP header accept");
   ESP_GOTO_ON_ERROR(
       esp_http_client_set_header(client, "Authorization", access_token),
-      cleanup, TAG, "Failed to set http header Authorization");
+      cleanup, TAG, "Failed to set HTTP header Authorization");
   // HTTP GET Method
   ESP_GOTO_ON_ERROR(esp_http_client_set_method(client, HTTP_METHOD_GET),
                     cleanup, TAG, "Failed to set http method");
   ESP_GOTO_ON_ERROR(esp_http_client_open(client, 0), cleanup, TAG,
-                    "Failed to open http connection");
+                    "Failed to open HTTP connection");
   http_payload = (char *)MEM_CALLOC_EXTRAM(http_payload_size, sizeof(char));
   ESP_GOTO_ON_FALSE(http_payload, ESP_ERR_NO_MEM, cleanup, TAG,
                     "Failed to allocate memory for http_payload");
@@ -1382,12 +1382,12 @@ static esp_err_t fetch_matter_node_metadata(const char *endpoint_url,
     ret = http_status_code == 401 ? ESP_ERR_INVALID_STATE : ESP_FAIL;
     goto close;
   }
-  ESP_LOGD(TAG, "http response payload: %s", http_payload);
+  ESP_LOGD(TAG, "HTTP response payload: %s", http_payload);
 
   // Parse the http response
   ESP_GOTO_ON_FALSE(
       json_parse_start(&jctx, http_payload, http_len) == 0, ESP_FAIL, close,
-      TAG, "Failed to parse the http response json on json_parse_start");
+      TAG, "Failed to parse the HTTP response json on json_parse_start");
   if (json_obj_get_array(&jctx, "node_details", &node_count) == 0 &&
       node_count == 1) {
     if (json_arr_get_object(&jctx, 0) == 0) {
