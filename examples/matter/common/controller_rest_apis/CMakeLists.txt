@@ -4,4 +4,4 @@ if (CONFIG_RMAKER_REST_API_ENABLED)
 endif()
 idf_component_register(SRCS ${SRCS_LIST}
                        INCLUDE_DIRS ${INCLUDE_DIRS_LIST}
-                       REQUIRES mbedtls json_parser esp_http_client json_generator rmaker_common)
+                       REQUIRES mbedtls json_parser esp_http_client json_generator rmaker_common esp_rainmaker)
