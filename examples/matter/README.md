@@ -83,11 +83,13 @@ For production devices which may have a different matter vid and pid, please set
 
 For public RainMaker, some test DACs are provided via claiming. For private deployments, test DACs can be generated using mfg_tool
 
+mfg_tool is moved to esp-matter-tools repo: https://github.com/espressif/esp-matter-tools/tree/main/mfg_tool.
+
+It is released on pypi: https://pypi.org/project/esp-matter-mfg-tool and can be installed by running `pip install esp-matter-mfg-tool`
 
 ```
 $ export ESP_SECURE_CERT_PATH=/path/to/esp_secure_cert_mgr
-$ cd $ESP_MATTER_PATH/tools/mfg_tool
-./mfg_tool.py -v <vendor-id> -p <product-id> --pai -k <pai-key> -c <pai-cert> -cd <cert-dclrn> --csv /path/to/keys.csv --mcsv /path/to/master.csv
+$ esp-matter-mfg-tool -v <vendor-id> -p <product-id> --pai -k <pai-key> -c <pai-cert> -cd <cert-dclrn> --csv /path/to/keys.csv --mcsv /path/to/master.csv
 ```
 
 Samples of keys.csv and master.csv can be found in $RMAKER_PATH/examples/matter/mfg/.
@@ -96,14 +98,13 @@ Samples of keys.csv and master.csv can be found in $RMAKER_PATH/examples/matter/
 For testing, you can use the test vid, pid, PAI and CD as shown below
 
 ```
-$ ./mfg_tool.py --dac-in-secure-cert -v 0xFFF2 -p 0x8001 --pai -k $ESP_MATTER_PATH/connectedhomeip/connectedhomeip/credentials/test/attestation/Chip-Test-PAI-FFF2-8001-Key.pem -c $ESP_MATTER_PATH/connectedhomeip/connectedhomeip/credentials/test/attestation/Chip-Test-PAI-FFF2-8001-Cert.pem -cd $ESP_MATTER_PATH/connectedhomeip/connectedhomeip/credentials/test/certification-declaration/Chip-Test-CD-FFF2-8001.der --csv $RMAKER_PATH/examples/matter/mfg/keys.csv --mcsv $RMAKER_PATH/examples/matter/mfg/master.csv
+$ esp-matter-mfg-tool --dac-in-secure-cert -v 0xFFF2 -p 0x8001 --pai -k $ESP_MATTER_PATH/connectedhomeip/connectedhomeip/credentials/test/attestation/Chip-Test-PAI-FFF2-8001-Key.pem -c $ESP_MATTER_PATH/connectedhomeip/connectedhomeip/credentials/test/attestation/Chip-Test-PAI-FFF2-8001-Cert.pem -cd $ESP_MATTER_PATH/connectedhomeip/connectedhomeip/credentials/test/certification-declaration/Chip-Test-CD-FFF2-8001.der --csv $RMAKER_PATH/examples/matter/mfg/keys.csv --mcsv $RMAKER_PATH/examples/matter/mfg/master.csv
 ```
 
 Note the path where the files are generated after running the above command since it will be required later.
 
 Before flashing certificates and factory nvs, connect your esp32 device to your computer. Enter the below command to flash certificates and factory partition
 ```
-$ cd ${ESP_MATTER_PATH}/tools/mfg_tool
 $ esptool.py write_flash 0xd000 /out/<vendor-id>_<product-id>/<node-id>/<node-id>_esp_secure_cert.bin 0x3e0000 ./out/<vendor-id>_<product-id>/<node-id>/<node-id>-partition.bin
 ```
 
