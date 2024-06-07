@@ -1316,25 +1316,28 @@ static esp_err_t get_node_reachable(jparse_ctx_t *jctx, bool *value) {
 
 static esp_err_t get_node_metadata(jparse_ctx_t *jctx, matter_device_t *dev) {
   if (json_obj_get_object(jctx, "metadata") == 0) {
-    int device_type = 0;
-    if (json_obj_get_int(jctx, "deviceType", &device_type) == 0) {
-      dev->endpoints[0].device_type_id = device_type;
-      int ep_count = 0;
-      int ep_id = 1;
-      if (json_obj_get_array(jctx, "endpointsData", &ep_count) == 0) {
-        json_arr_get_int(jctx, 1, &ep_id);
-        dev->endpoints[0].endpoint_id = ep_id;
-        json_obj_leave_array(jctx);
-      }
-      dev->endpoint_count = 1;
+      if (json_obj_get_object(jctx, "Matter") == 0) {
+        int device_type = 0;
+        if (json_obj_get_int(jctx, "deviceType", &device_type) == 0) {
+          dev->endpoints[0].device_type_id = device_type;
+          int ep_count = 0;
+          int ep_id = 1;
+          if (json_obj_get_array(jctx, "endpointsData", &ep_count) == 0) {
+            json_arr_get_int(jctx, 1, &ep_id);
+            dev->endpoints[0].endpoint_id = ep_id;
+            json_obj_leave_array(jctx);
+          }
+          dev->endpoint_count = 1;
+        }
+        int device_name_len = 32;
+        if (json_obj_get_strlen(jctx, "deviceName", &device_name_len) == 0 &&
+            device_name_len < ESP_MATTER_DEVICE_NAME_MAX_LEN) {
+          json_obj_get_string(jctx, "deviceName", dev->endpoints[0].device_name,
+                              ESP_MATTER_DEVICE_NAME_MAX_LEN);
+        }
+        json_obj_get_bool(jctx, "isRainmaker", &(dev->is_rainmaker_device));
+        json_obj_leave_object(jctx);
     }
-    int device_name_len = 32;
-    if (json_obj_get_strlen(jctx, "deviceName", &device_name_len) == 0 &&
-        device_name_len < ESP_MATTER_DEVICE_NAME_MAX_LEN) {
-      json_obj_get_string(jctx, "deviceName", dev->endpoints[0].device_name,
-                          ESP_MATTER_DEVICE_NAME_MAX_LEN);
-    }
-    json_obj_get_bool(jctx, "isRainmaker", &(dev->is_rainmaker_device));
     json_obj_leave_object(jctx);
   }
   return ESP_OK;
