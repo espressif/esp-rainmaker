@@ -84,6 +84,7 @@ matter_device_t *get_device_list_clone() {
     ret = tmp;
     current = current->next;
   }
+  esp_matter::controller::device_mgr::free_device_list(s_matter_device_list);
   return ret;
 }
 
