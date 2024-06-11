@@ -276,6 +276,15 @@ char *esp_rmaker_device_get_name(const esp_rmaker_device_t *device)
     return ((_esp_rmaker_device_t *)device)->name;
 }
 
+void *esp_rmaker_device_get_priv_data(const esp_rmaker_device_t *device)
+{
+    if (!device) {
+        ESP_LOGE(TAG, "Device handle cannot be NULL.");
+        return NULL;
+    }
+    return ((_esp_rmaker_device_t *)device)->priv_data;
+}
+
 char *esp_rmaker_device_get_type(const esp_rmaker_device_t *device)
 {
     if (!device) {

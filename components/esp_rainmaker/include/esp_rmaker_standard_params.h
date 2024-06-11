@@ -51,6 +51,7 @@ extern "C"
 #define ESP_RMAKER_DEF_WIFI_RESET_NAME      "Wi-Fi-Reset"
 #define ESP_RMAKER_DEF_LOCAL_CONTROL_POP    "POP"
 #define ESP_RMAKER_DEF_LOCAL_CONTROL_TYPE   "Type"
+#define ESP_RMAKER_DEF_ADD_ZIGBEE_DEVICE    "Add_zigbee_device"
 
 /**
  * Create standard name param

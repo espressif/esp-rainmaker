@@ -29,6 +29,7 @@ extern "C"
 #define ESP_RMAKER_UI_PUSHBUTTON        "esp.ui.push-btn-big"
 #define ESP_RMAKER_UI_TRIGGER           "esp.ui.trigger"
 #define ESP_RMAKER_UI_HIDDEN            "esp.ui.hidden"
+#define ESP_RMAKER_UI_QR_SCAN           "esp.ui.qr-scan"
 
 /********** STANDARD PARAM TYPES **********/
 
@@ -61,6 +62,7 @@ extern "C"
 #define ESP_RMAKER_PARAM_GARAGE_POSITION     "esp.param.garage-position"
 #define ESP_RMAKER_PARAM_LIGHT_MODE     "esp.param.light-mode"
 #define ESP_RMAKER_PARAM_AC_MODE        "esp.param.ac-mode"
+#define ESP_RMAKER_PARAM_ADD_ZIGBEE_DEVICE     "esp.param.add_zigbee_device"
 
 
 /********** STANDARD DEVICE TYPES **********/
@@ -84,6 +86,7 @@ extern "C"
 #define ESP_RMAKER_DEVICE_TV            "esp.device.tv"
 #define ESP_RMAKER_DEVICE_WASHER        "esp.device.washer"
 #define ESP_RMAKER_DEVICE_OTHER         "esp.device.other"
+#define ESP_RMAKER_DEVICE_ZIGBEE_GATEWAY   "esp.device.zigbee_gateway"
 
 /********** STANDARD SERVICE TYPES **********/
 #define ESP_RMAKER_SERVICE_OTA          "esp.service.ota"

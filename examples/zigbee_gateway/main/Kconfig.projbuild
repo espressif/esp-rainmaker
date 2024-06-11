@@ -1,0 +1,37 @@
+menu "ESP Rainmaker Zigbee Gateway Example"
+    config ZIGBEE_INSTALLCODE_ENABLED
+        bool 'Enable zigbee install code'
+        default False
+        help
+            Select this option to enable the Zigbee Install Code feature, it allows only Zigbee devices with the
+            install code mode enabled to join the network formed by the gateway.
+
+    menu "ESP Zigbee gateway rcp update"
+        depends on !SOC_IEEE802154_SUPPORTED
+        menu "Board Configuration"
+            config PIN_TO_RCP_RESET
+                int "Pin to RCP reset"
+                default "7"
+
+            config PIN_TO_RCP_BOOT
+                int "Pin to RCP boot"
+                default "8"
+
+            config PIN_TO_RCP_TX
+                int "Pin to RCP TX"
+                default "17"
+
+            config PIN_TO_RCP_RX
+                int "Pin to RCP RX"
+                default "18"
+        endmenu
+        
+        config ZIGBEE_GW_AUTO_UPDATE_RCP
+            bool 'Update RCP automatically'
+            default True
+            help
+                If enabled, the Zigbee gateway will store the RCP image in its firmware and
+                compare the stored image version with the running RCP image upon boot. The RCP
+                will be automatically updated upon version mismatch.
+    endmenu
+endmenu
