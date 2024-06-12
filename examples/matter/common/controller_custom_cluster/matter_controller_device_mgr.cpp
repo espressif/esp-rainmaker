@@ -84,7 +84,6 @@ matter_device_t *get_device_list_clone() {
     ret = tmp;
     current = current->next;
   }
-  esp_matter::controller::device_mgr::free_device_list(s_matter_device_list);
   return ret;
 }
 
@@ -154,6 +153,7 @@ static esp_err_t update_device_list_task(void *endpoint_id_ptr) {
   print_matter_device_list(dev_list);
   {
     scoped_device_mgr_lock lock;
+    esp_matter::controller::device_mgr::free_device_list(s_matter_device_list);
     s_matter_device_list = dev_list;
   }
   if (s_device_list_update_cb) {
