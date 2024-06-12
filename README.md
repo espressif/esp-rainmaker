@@ -50,10 +50,6 @@ ESP RainMaker can work with ESP IDF 4.1 and above.
 - [Apple App Store](https://apps.apple.com/app/esp-rainmaker/id1497491540)
 - [Source Code](https://github.com/espressif/esp-rainmaker-ios)
 
-### API Documentation Build Status
-
-[![Documentation Status](https://readthedocs.com/projects/espressif-esp-rainmaker/badge/?version=latest)](https://docs.espressif.com/projects/esp-rainmaker/en/latest/)
-
 ## Discussions
 
 [ESP32 Forum](https://www.esp32.com/viewforum.php?f=41)
