@@ -894,7 +894,7 @@ static esp_err_t __esp_rmaker_schedule_get_params(char *buf, size_t *buf_size)
         schedule = schedule->next;
     }
     if (json_gen_end_array(&jstr) < 0) {
-        ESP_LOGE(TAG, "Buffer size %d not sufficient for reporting Schedule Params.", *buf_size);
+        ESP_LOGE(TAG, "Buffer size %lu not sufficient for reporting Schedule Params.", (unsigned long) *buf_size);
         err = ESP_ERR_NO_MEM;
     }
     *buf_size = json_gen_str_end(&jstr);
@@ -911,7 +911,7 @@ static char *esp_rmaker_schedule_get_params(void)
     }
     char *data = MEM_CALLOC_EXTRAM(1, req_size);
     if (!data) {
-        ESP_LOGE(TAG, "Failed to allocate %d bytes for schedule.", req_size);
+        ESP_LOGE(TAG, "Failed to allocate %lu bytes for schedule.", (unsigned long) req_size);
         return NULL;
     }
     err = __esp_rmaker_schedule_get_params(data, &req_size);
@@ -945,7 +945,7 @@ static esp_err_t write_cb(const esp_rmaker_device_t *device, const esp_rmaker_pa
         return ESP_ERR_INVALID_ARG;
     }
     if (strlen(val.val.s) <= 0) {
-        ESP_LOGI(TAG, "Invalid length for params: %d", strlen(val.val.s));
+        ESP_LOGI(TAG, "Invalid length for params: %lu", (unsigned long) strlen(val.val.s));
         return ESP_ERR_INVALID_ARG;
     }
     esp_rmaker_schedule_parse_json(val.val.s, strlen(val.val.s), ctx->src);

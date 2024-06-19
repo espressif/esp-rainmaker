@@ -182,7 +182,7 @@ esp_err_t esp_rmaker_change_node_id(char *node_id, size_t len)
     if(esp_rmaker_priv_data) {
         char *new_node_id = strndup(node_id, len);
         if (!new_node_id) {
-            ESP_LOGE(TAG, "Failed to allocate %d bytes for new node_id.", len);
+            ESP_LOGE(TAG, "Failed to allocate %lu bytes for new node_id.", (unsigned long) len);
             return ESP_ERR_NO_MEM;
         }
         if (esp_rmaker_priv_data->node_id) {

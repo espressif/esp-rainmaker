@@ -183,7 +183,7 @@ char *esp_rmaker_get_node_params(void)
     req_size += RMAKER_PARAMS_SIZE_MARGIN;
     char *node_params = MEM_CALLOC_EXTRAM(1, req_size);
     if (!node_params) {
-        ESP_LOGE(TAG, "Failed to allocate %d bytes for Node params.", req_size);
+        ESP_LOGE(TAG, "Failed to allocate %lu bytes for Node params.", (unsigned long) req_size);
         return NULL;
     }
     err = esp_rmaker_populate_params(node_params, &req_size, 0, false);
@@ -208,15 +208,15 @@ static char * esp_rmaker_param_get_buf(size_t size)
      * we need to free existing buffer.
      */
     if ((s_param_buf_size != 0) && (s_param_buf_size != size)) {
-        ESP_LOGD(TAG, "Freeing s_node_params_buf of size %d", s_param_buf_size);
+        ESP_LOGD(TAG, "Freeing s_node_params_buf of size %lu", (unsigned long) s_param_buf_size);
         free(s_node_params_buf);
         s_node_params_buf = NULL;
     }
     if (!s_node_params_buf) {
-        ESP_LOGD(TAG, "Allocating s_node_params_buf for size %d.", size);
+        ESP_LOGD(TAG, "Allocating s_node_params_buf for size %lu.", (unsigned long) size);
         s_node_params_buf = MEM_CALLOC_EXTRAM(1, size);
         if (!s_node_params_buf) {
-            ESP_LOGE(TAG, "Failed to allocate %d bytes for Node params.", size);
+            ESP_LOGE(TAG, "Failed to allocate %lu bytes for Node params.", (unsigned long) size);
             s_param_buf_size = 0;
             return NULL;
         }
@@ -236,8 +236,8 @@ static esp_err_t esp_rmaker_allocate_and_populate_params(uint8_t flags, bool res
     esp_err_t err = esp_rmaker_populate_params(node_params_buf, &req_size, flags, reset_flags);
     /* If the max_node_params_size was insufficient, we will re-allocate new buffer */
     if (err == ESP_ERR_NO_MEM) {
-        ESP_LOGW(TAG, "%d bytes not sufficient for Node params. Reallocating %d bytes.",
-                max_node_params_size, req_size + RMAKER_PARAMS_SIZE_MARGIN);
+        ESP_LOGW(TAG, "%lu bytes not sufficient for Node params. Reallocating %lu bytes.",
+                (unsigned long) max_node_params_size, (unsigned long) req_size + RMAKER_PARAMS_SIZE_MARGIN);
         max_node_params_size = req_size + RMAKER_PARAMS_SIZE_MARGIN; /* Keeping some margin since paramater value size can change */
         node_params_buf = esp_rmaker_param_get_buf(max_node_params_size);
         if (!node_params_buf) {
@@ -393,7 +393,7 @@ static esp_err_t esp_rmaker_device_set_params(_esp_rmaker_device_t *device, jpar
 
 esp_err_t esp_rmaker_handle_set_params(char *data, size_t data_len, esp_rmaker_req_src_t src)
 {
-    ESP_LOGI(TAG, "Received params: %.*s", data_len, data);
+    ESP_LOGI(TAG, "Received params: %.*s", (int) data_len, data);
     jparse_ctx_t jctx;
     if (json_parse_start(&jctx, data, data_len) != 0) {
         return ESP_FAIL;
