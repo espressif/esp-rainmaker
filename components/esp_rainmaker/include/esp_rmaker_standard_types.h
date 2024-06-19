@@ -87,6 +87,7 @@ extern "C"
 #define ESP_RMAKER_DEVICE_WASHER        "esp.device.washer"
 #define ESP_RMAKER_DEVICE_OTHER         "esp.device.other"
 #define ESP_RMAKER_DEVICE_ZIGBEE_GATEWAY   "esp.device.zigbee_gateway"
+#define ESP_RMAKER_DEVICE_THREAD_BR        "esp.device.thread-br"
 
 /********** STANDARD SERVICE TYPES **********/
 #define ESP_RMAKER_SERVICE_OTA          "esp.service.ota"
