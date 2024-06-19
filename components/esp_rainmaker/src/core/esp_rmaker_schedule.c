@@ -72,7 +72,7 @@ typedef struct esp_rmaker_schedule {
     /* Info is used to store additional information, it is limited to 128 bytes. */
     char *info;
     /* Index is used in the callback to get back the schedule. */
-    int32_t index;
+    long index;
     /* Flags are used to identify the schedule. Eg. timing, countdown */
     uint32_t flags;
     bool enabled;
@@ -147,17 +147,17 @@ static esp_rmaker_schedule_t *esp_rmaker_schedule_get_schedule_from_id(const cha
     return NULL;
 }
 
-static esp_rmaker_schedule_t *esp_rmaker_schedule_get_schedule_from_index(int32_t index)
+static esp_rmaker_schedule_t *esp_rmaker_schedule_get_schedule_from_index(long index)
 {
     esp_rmaker_schedule_t *schedule = schedule_priv_data->schedule_list;
     while(schedule) {
         if (schedule->index == index) {
-            ESP_LOGD(TAG, "Schedule with index %"PRIi32" found in list for get.", index);
+            ESP_LOGD(TAG, "Schedule with index %ld found in list for get.", index);
             return schedule;
         }
         schedule = schedule->next;
     }
-    ESP_LOGD(TAG, "Schedule with index %"PRIi32" not found in list for get.", index);
+    ESP_LOGD(TAG, "Schedule with index %ld not found in list for get.", index);
     return NULL;
 }
 
@@ -285,10 +285,10 @@ static esp_err_t esp_rmaker_schedule_process_action(esp_rmaker_schedule_action_t
 
 static void esp_rmaker_schedule_trigger_work_cb(void *priv_data)
 {
-    int32_t index = (int32_t)priv_data;
+    long index = (long)priv_data;
     esp_rmaker_schedule_t *schedule = esp_rmaker_schedule_get_schedule_from_index(index);
     if (!schedule) {
-        ESP_LOGE(TAG, "Schedule with index %"PRIi32" not found for trigger work callback", index);
+        ESP_LOGE(TAG, "Schedule with index %ld not found for trigger work callback", index);
         return;
     }
     esp_rmaker_schedule_process_action(&schedule->action);
@@ -307,10 +307,10 @@ static void esp_rmaker_schedule_trigger_common_cb(esp_schedule_handle_t handle, 
 
 static void esp_rmaker_schedule_timestamp_common_cb(esp_schedule_handle_t handle, uint32_t next_timestamp, void *priv_data)
 {
-    int32_t index = (int32_t)priv_data;
+    long index = (long)priv_data;
     esp_rmaker_schedule_t *schedule = esp_rmaker_schedule_get_schedule_from_index(index);
     if (!schedule) {
-        ESP_LOGE(TAG, "Schedule with index %"PRIi32" not found for timestamp callback", index);
+        ESP_LOGE(TAG, "Schedule with index %ld not found for timestamp callback", index);
         return;
     }
     schedule->trigger.next_timestamp = next_timestamp;
