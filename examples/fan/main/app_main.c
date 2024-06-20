@@ -49,7 +49,7 @@ static esp_err_t write_cb(const esp_rmaker_device_t *device, const esp_rmaker_pa
         /* Silently ignoring invalid params */
         return ESP_OK;
     }
-    esp_rmaker_param_update_and_report(param, val);
+    esp_rmaker_param_update(param, val);
     return ESP_OK;
 }
 

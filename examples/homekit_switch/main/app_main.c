@@ -43,7 +43,7 @@ static esp_err_t write_cb(const esp_rmaker_device_t *device, const esp_rmaker_pa
                 val.val.b? "true" : "false", esp_rmaker_device_get_name(device),
                 esp_rmaker_param_get_name(param));
         app_driver_set_state(val.val.b);
-        esp_rmaker_param_update_and_report(param, val);
+        esp_rmaker_param_update(param, val);
         app_homekit_update_state(val.val.b);
     }
     return ESP_OK;

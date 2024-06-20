@@ -83,35 +83,39 @@ esp_err_t led_light_cmd_handler(const void *in_data, size_t in_len, void **out_d
 #endif /* CONFIG_ESP_RMAKER_CMD_RESP_ENABLE */
 
 /* Callback to handle param updates received from the RainMaker cloud */
-static esp_err_t write_cb(const esp_rmaker_device_t *device, const esp_rmaker_param_t *param,
-            const esp_rmaker_param_val_t val, void *priv_data, esp_rmaker_write_ctx_t *ctx)
+static esp_err_t bulk_write_cb(const esp_rmaker_device_t *device, const esp_rmaker_param_write_req_t write_req[],
+        uint8_t count, void *priv_data, esp_rmaker_write_ctx_t *ctx)
 {
     if (ctx) {
         ESP_LOGI(TAG, "Received write request via : %s", esp_rmaker_device_cb_src_to_str(ctx->src));
     }
-    const char *device_name = esp_rmaker_device_get_name(device);
-    const char *param_name = esp_rmaker_param_get_name(param);
-    if (strcmp(param_name, ESP_RMAKER_DEF_POWER_NAME) == 0) {
-        ESP_LOGI(TAG, "Received value = %s for %s - %s",
-                val.val.b? "true" : "false", device_name, param_name);
-        app_light_set_power(val.val.b);
-    } else if (strcmp(param_name, ESP_RMAKER_DEF_BRIGHTNESS_NAME) == 0) {
-        ESP_LOGI(TAG, "Received value = %d for %s - %s",
-                val.val.i, device_name, param_name);
-        app_light_set_brightness(val.val.i);
-    } else if (strcmp(param_name, ESP_RMAKER_DEF_HUE_NAME) == 0) {
-        ESP_LOGI(TAG, "Received value = %d for %s - %s",
-                val.val.i, device_name, param_name);
-        app_light_set_hue(val.val.i);
-    } else if (strcmp(param_name, ESP_RMAKER_DEF_SATURATION_NAME) == 0) {
-        ESP_LOGI(TAG, "Received value = %d for %s - %s",
-                val.val.i, device_name, param_name);
-        app_light_set_saturation(val.val.i);
-    } else {
-        /* Silently ignoring invalid params */
-        return ESP_OK;
+    ESP_LOGI(TAG, "Light received %d params in write", count);
+    for (int i = 0; i < count; i++) {
+        const esp_rmaker_param_t *param = write_req[i].param;
+        esp_rmaker_param_val_t val = write_req[i].val;
+        const char *device_name = esp_rmaker_device_get_name(device);
+        const char *param_name = esp_rmaker_param_get_name(param);
+        if (strcmp(param_name, ESP_RMAKER_DEF_POWER_NAME) == 0) {
+            ESP_LOGI(TAG, "Received value = %s for %s - %s",
+                    val.val.b? "true" : "false", device_name, param_name);
+            app_light_set_power(val.val.b);
+        } else if (strcmp(param_name, ESP_RMAKER_DEF_BRIGHTNESS_NAME) == 0) {
+            ESP_LOGI(TAG, "Received value = %d for %s - %s",
+                    val.val.i, device_name, param_name);
+            app_light_set_brightness(val.val.i);
+        } else if (strcmp(param_name, ESP_RMAKER_DEF_HUE_NAME) == 0) {
+            ESP_LOGI(TAG, "Received value = %d for %s - %s",
+                    val.val.i, device_name, param_name);
+            app_light_set_hue(val.val.i);
+        } else if (strcmp(param_name, ESP_RMAKER_DEF_SATURATION_NAME) == 0) {
+            ESP_LOGI(TAG, "Received value = %d for %s - %s",
+                    val.val.i, device_name, param_name);
+            app_light_set_saturation(val.val.i);
+        } else {
+            ESP_LOGI(TAG, "Updating for %s", param_name);
+        }
+        esp_rmaker_param_update(param, val);
     }
-    esp_rmaker_param_update_and_report(param, val);
     return ESP_OK;
 }
 
@@ -150,7 +154,7 @@ void app_main()
 
     /* Create a device and add the relevant parameters to it */
     light_device = esp_rmaker_lightbulb_device_create("Light", NULL, DEFAULT_POWER);
-    esp_rmaker_device_add_cb(light_device, write_cb, NULL);
+    esp_rmaker_device_add_bulk_cb(light_device, bulk_write_cb, NULL);
 
     esp_rmaker_device_add_param(light_device, esp_rmaker_brightness_param_create(ESP_RMAKER_DEF_BRIGHTNESS_NAME, DEFAULT_BRIGHTNESS));
     esp_rmaker_device_add_param(light_device, esp_rmaker_hue_param_create(ESP_RMAKER_DEF_HUE_NAME, DEFAULT_HUE));
