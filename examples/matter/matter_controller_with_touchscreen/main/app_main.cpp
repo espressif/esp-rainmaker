@@ -41,7 +41,7 @@ static esp_err_t write_cb(const esp_rmaker_device_t *device, const esp_rmaker_pa
     if (strcmp(param_name, ESP_RMAKER_DEF_POWER_NAME) == 0) {
         app_matter_report_power(val.val.b);
     }
-    esp_rmaker_param_update_and_report(param, val);
+    esp_rmaker_param_update(param, val);
     return ESP_OK;
 }
 

@@ -68,8 +68,11 @@ struct esp_rmaker_device {
     char *type;
     char *subtype;
     char *model;
+    uint8_t param_count;
     esp_rmaker_device_write_cb_t write_cb;
     esp_rmaker_device_read_cb_t read_cb;
+    esp_rmaker_device_bulk_write_cb_t bulk_write_cb;
+    esp_rmaker_device_bulk_read_cb_t bulk_read_cb;
     void *priv_data;
     bool is_service;
     esp_rmaker_attr_t *attributes;
