@@ -4,7 +4,7 @@ dependencies:
   espressif/esp-box:
     version: "3.*"
     require: "no"
-    
+
   espressif/esp-box-lite:
     version: "2.*"
     require: "no"
@@ -14,5 +14,5 @@ dependencies:
     require: "no"
 
   espressif/esp32_s3_lcd_ev_board:
-    version: "2.*"
+    version: "==2.1.0"
     require: "no"

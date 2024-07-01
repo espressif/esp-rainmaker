@@ -3,3 +3,4 @@ dependencies:
   idf: ">=5.1"
   espressif/led_strip: "^1.0.0"
   espressif/qrcode: ^0.1.0
+  lvgl/lvgl: "==8.4.0"
