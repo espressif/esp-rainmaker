@@ -526,7 +526,7 @@ static void parse_cb_response(cb_data* _data)
 
             ep_cluster* curr_cluster = node_ptr->get_cluster_ptr[_data->attr_path.mClusterId];
 
-            cl_attribute* nattribute = new cl_attribute(_data->attr_path.mAttributeId,&esp_val);
+            cl_attribute* nattribute = new cl_attribute(_data->attr_path.mAttributeId,esp_val);
 
             curr_cluster->get_attribute_ptr[_data->attr_path.mAttributeId] = nattribute;
 

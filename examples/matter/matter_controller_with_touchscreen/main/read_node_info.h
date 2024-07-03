@@ -23,10 +23,10 @@ typedef struct attributes
 
     esp_matter_attr_val_t esp_value;
 
-    attributes(uint32_t attributeid, esp_matter_attr_val_t* esp_val)
+    attributes(uint32_t attributeid, esp_matter_attr_val_t& esp_val)
     {
         this->attribute_id = attributeid;
-        this->esp_value = *esp_val;
+        this->esp_value = *(&esp_val);
     }
 }cl_attribute;
 
