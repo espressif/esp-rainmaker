@@ -4,7 +4,7 @@
 
 ## Prerequisites
 
-- ESP-IDF [v4.4.4](https://github.com/espressif/esp-idf/tree/v4.4.4) or [v5.0.1](https://github.com/espressif/esp-idf/tree/v5.0.1)
+- ESP-IDF [v5.2.2](https://github.com/espressif/esp-idf/releases/v5.2.2)
 - [ESP-Matter SDK](https://github.com/espressif/esp-matter)
 - [ESP Rainmaker SDK](https://github.com/espressif/esp-rainmaker)
 - [ESP Secure Cert Manager](https://github.com/espressif/esp_secure_cert_mgr)
@@ -39,18 +39,21 @@ This will fetch the device certificates and flash them on your device.
 
 The factory nvs (fctry partition) needs to be generated using the mfg_tool of esp-matter
 
+mfg_tool is moved to esp-matter-tools repo: https://github.com/espressif/esp-matter-tools/tree/main/mfg_tool.
+
+It is released on pypi: https://pypi.org/project/esp-matter-mfg-tool and can be installed by running `pip install esp-matter-mfg-tool`
+
 ```
 $ export ESP_SECURE_CERT_PATH=/path/to/esp_secure_cert_mgr
-$ cd $ESP_MATTER_PATH/tools/mfg_tool
-$ ./mfg_tool.py -v 0x131B -p 0x2 -cd $RMAKER_PATH/examples/matter/mfg/cd_131B_0002.der --csv $RMAKER_PATH/examples/matter/mfg/keys.csv --mcsv $RMAKER_PATH/examples/matter/mfg/master.csv
+$ esp-matter-mfg-tool -v 0x131B -p 0x2 -cd $RMAKER_PATH/examples/matter/mfg/cd_131B_0002.der --csv $RMAKER_PATH/examples/matter/mfg/keys.csv --mcsv $RMAKER_PATH/examples/matter/mfg/master.csv
 ```
 
 This not only generates the factory nvs binary required for matter, but also embeds the RainMaker MQTT Host url into it via the master.csv file. Optionally, you can embed the MQTT host into the firmware itself by using `idf.py menuconfig -> ESP RainMaker Config -> ESP_RMAKER_READ_MQTT_HOST_FROM_CONFIG` and then skipping the --csv and --mcsv options to mfg_tool
 
-The factory binary generated above should be flashed onto the fctry partition (default : `0x3fa000` for ESP32-C6 and `0x3e0000` for other chips. Do check your partition table for exact address).
+The factory binary generated above should be flashed onto the fctry partition (default : `0x3f8000` for ESP32-C6 and `0x3e0000` for other chips. Do check your partition table for exact address).
 
 ```
-$ esptool.py write_flash 0x3e0000 $ESP_MATTER_PATH/tools/mfg_tool/out/131b_2/<node-id>/<node-id>-partition.bin
+$ esptool.py write_flash 0x3e0000 out/131b_2/<node-id>/<node-id>_esp_secure_cert.bin 0x3e0000 out/131b_2/<node-id>/<node-id>-partition.bin
 ```
 
 ## Building the example
@@ -68,7 +71,7 @@ $ idf.py flash monitor
 The QR Code required for commissioning your device can be found at `${ESP_MATTER_PATH}/tools/mfg_tool/out/<vendor-id>_<product-id>/<node-id>/<node-id>-qrcode.png`
 
 
-## Manufacturing Considerations
+## Manufacturing Considerations [This step is only suggested for Privately deployed Production set up and not required for test set up)]
 
 
 ### RainMaker MQTT Host
@@ -103,7 +106,35 @@ $ esp-matter-mfg-tool --dac-in-secure-cert -v 0xFFF2 -p 0x8001 --pai -k $ESP_MAT
 
 Note the path where the files are generated after running the above command since it will be required later.
 
-Before flashing certificates and factory nvs, connect your esp32 device to your computer. Enter the below command to flash certificates and factory partition
+## Configure your app
+Open the project configuration menu using -
+
+```
+idf.py menuconfig
+```
+In the configuration menu, set the following additional configuration to use custom factory partition and different values for Data and Device Info Providers.
+
+1. Enable `ESP32 Factory Data Provider` [Component config → CHIP Device Layer → Commissioning options → Use ESP32 Factory Data Provider]
+
+    Enable config option `CONFIG_ENABLE_ESP32_FACTORY_DATA_PROVIDER`
+    to use ESP32 specific implementation of CommissionableDataProvider and DeviceAttestationCredentialsProvider.
+
+2. Enable `ESP32 Device Instance Info Provider` [Component config → CHIP Device Layer → Commissioning options → Use ESP32 Device Instance Info Provider]
+
+    Enable config option `ENABLE_ESP32_DEVICE_INSTANCE_INFO_PROVIDER`
+    to get device instance info from factory partition.
+
+3. Enable `Attestation - Secure Cert` [ Component config → ESP Matter → DAC Provider options → Attestation - Secure Cert]
+
+    Enable config option `CONFIG_FACTORY_PARTITION_DAC_PROVIDER` to use DAC certificates from the secure_cert partition during Attestation.
+
+4. Set `chip-factory namespace partition label` [Component config → CHIP Device Layer → Matter Manufacturing Options → chip-factory namespace partition label]
+
+    Set config option `CHIP_FACTORY_NAMESPACE_PARTITION_LABEL`
+    to choose the label of the partition to store key-values in the "chip-factory" namespace. The default chosen partition label is `nvs`, change it to `fctry`.
+
+
+Connect your esp32 device to your computer. Enter the below command to flash certificates and factory partition
 ```
 $ esptool.py write_flash 0xd000 /out/<vendor-id>_<product-id>/<node-id>/<node-id>_esp_secure_cert.bin 0x3e0000 ./out/<vendor-id>_<product-id>/<node-id>/<node-id>-partition.bin
 ```
