@@ -1360,7 +1360,7 @@ static esp_err_t fetch_matter_node_metadata(const char *endpoint_url,
   char url[200];
   snprintf(url, sizeof(url), "%s/%s/%s?node_id=%s&%s", endpoint_url,
            HTTP_API_VERSION, "user/nodes", matter_dev->rainmaker_node_id,
-           "node_details=true&is_matter=true");
+           "node_details=true&is_matter=true&params=false");
   int http_len, http_status_code;
   int node_count;
   char id_str[40] = {0};
