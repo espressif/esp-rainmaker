@@ -389,6 +389,7 @@ esp_err_t esp_rmaker_ota_default_cb(esp_rmaker_ota_handle_t ota_handle, esp_rmak
         return ESP_FAIL;
     }
 
+#ifdef CONFIG_ESP_RMAKER_NETWORK_OVER_WIFI
 /* Get the current Wi-Fi power save type. In case OTA fails and we need this
  * to restore power saving.
  */
@@ -403,6 +404,7 @@ esp_err_t esp_rmaker_ota_default_cb(esp_rmaker_ota_handle_t ota_handle, esp_rmak
 #else
     esp_wifi_set_ps(WIFI_PS_NONE);
 #endif /* CONFIG_BT_ENABLED */
+#endif /* CONFIG_ESP_RMAKER_NETWORK_OVER_WIFI */
 
     esp_app_desc_t app_desc;
     err = esp_https_ota_get_img_desc(https_ota_handle, &app_desc);
@@ -455,6 +457,7 @@ esp_err_t esp_rmaker_ota_default_cb(esp_rmaker_ota_handle_t ota_handle, esp_rmak
     }
 
 ota_end:
+#ifdef CONFIG_ESP_RMAKER_NETWORK_OVER_WIFI
 #ifdef CONFIG_BT_ENABLED
     if (esp_bt_controller_get_status() == ESP_BT_CONTROLLER_STATUS_IDLE) {
         esp_wifi_set_ps(ps_type);
@@ -462,6 +465,7 @@ ota_end:
 #else
     esp_wifi_set_ps(ps_type);
 #endif /* CONFIG_BT_ENABLED */
+#endif /* CONFIG_ESP_RMAKER_NETWORK_OVER_WIFI */
     ota_finish_err = esp_https_ota_finish(https_ota_handle);
     if ((err == ESP_OK) && (ota_finish_err == ESP_OK)) {
 #ifdef CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE

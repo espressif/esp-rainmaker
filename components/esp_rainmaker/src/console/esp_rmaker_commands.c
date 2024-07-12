@@ -72,6 +72,7 @@ static void register_get_node_id()
 
 static int wifi_prov_handler(int argc, char** argv)
 {
+#ifdef CONFIG_ESP_RMAKER_NETWORK_OVER_WIFI
     if (argc < 2) {
         printf("%s: Invalid Usage.\n", TAG);
         return ESP_ERR_INVALID_ARG;
@@ -112,6 +113,9 @@ static int wifi_prov_handler(int argc, char** argv)
         return ESP_FAIL;
     }
     return ESP_OK;
+#else
+    return ESP_ERR_NOT_SUPPORTED;
+#endif /* CONFIG_ESP_RMAKER_NETWORK_OVER_WIFI */
 }
 
 static void register_wifi_prov()

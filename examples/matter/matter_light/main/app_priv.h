@@ -11,6 +11,10 @@
 #include <esp_err.h>
 #include <esp_matter.h>
 
+#if CHIP_DEVICE_CONFIG_ENABLE_THREAD
+#include "esp_openthread_types.h"
+#endif
+
 /** Standard max values (used for remapping attributes) */
 #define STANDARD_BRIGHTNESS 100
 #define STANDARD_HUE 360
@@ -86,3 +90,20 @@ esp_err_t app_driver_light_set_brightness(app_driver_handle_t handle, int value)
 esp_err_t app_driver_light_set_hue(app_driver_handle_t handle, int value);
 esp_err_t app_driver_light_set_saturation(app_driver_handle_t handle, int value);
 esp_err_t app_driver_light_set_temperature(app_driver_handle_t handle, int value);
+
+#if CHIP_DEVICE_CONFIG_ENABLE_THREAD
+#define ESP_OPENTHREAD_DEFAULT_RADIO_CONFIG()                                           \
+    {                                                                                   \
+        .radio_mode = RADIO_MODE_NATIVE,                                                \
+    }
+
+#define ESP_OPENTHREAD_DEFAULT_HOST_CONFIG()                                            \
+    {                                                                                   \
+        .host_connection_mode = HOST_CONNECTION_MODE_NONE,                              \
+    }
+
+#define ESP_OPENTHREAD_DEFAULT_PORT_CONFIG()                                            \
+    {                                                                                   \
+        .storage_partition_name = "nvs", .netif_queue_size = 10, .task_queue_size = 10, \
+    }
+#endif
