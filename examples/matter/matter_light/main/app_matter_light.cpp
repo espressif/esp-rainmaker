@@ -17,14 +17,11 @@
 #include <app/clusters/color-control-server/color-control-server.h>
 #include <app/server/Server.h>
 #include <esp_matter_console.h>
-#include <app_matter.h>
+#include <app_matter_light.h>
 #include <esp_rmaker_standard_params.h>
 #include <esp_rmaker_core.h>
 #include "app_priv.h"
-
-#if CHIP_DEVICE_CONFIG_ENABLE_THREAD
-#include <platform/ESP32/OpenthreadLauncher.h>
-#endif
+#include <app_matter.h>
 
 using namespace esp_matter;
 using namespace esp_matter::attribute;
@@ -87,14 +84,14 @@ static esp_rmaker_param_val_t app_matter_get_rmaker_val(esp_matter_attr_val_t *v
     return esp_rmaker_int(0);
 }
 
-static esp_err_t app_identification_cb(identification::callback_type_t type, uint16_t endpoint_id, uint8_t effect_id,
+esp_err_t app_identification_cb(identification::callback_type_t type, uint16_t endpoint_id, uint8_t effect_id,
                                        uint8_t effect_variant, void *priv_data)
 {
     ESP_LOGI(TAG, "Identification callback: type: %d, effect: %d", type, effect_id);
     return ESP_OK;
 }
 
-static esp_err_t app_attribute_update_cb(attribute::callback_type_t type, uint16_t endpoint_id, uint32_t cluster_id,
+esp_err_t app_attribute_update_cb(attribute::callback_type_t type, uint16_t endpoint_id, uint32_t cluster_id,
                                          uint32_t attribute_id, esp_matter_attr_val_t *val, void *priv_data)
 {
     esp_err_t err = ESP_OK;
@@ -150,7 +147,7 @@ static esp_err_t app_attribute_update_cb(attribute::callback_type_t type, uint16
     return err;
 }
 
-static void app_event_cb(const ChipDeviceEvent *event, intptr_t arg)
+void app_event_cb(const ChipDeviceEvent *event, intptr_t arg)
 {
     switch (event->Type) {
     case chip::DeviceLayer::DeviceEventType::kInterfaceIpAddressChanged:
@@ -220,22 +217,6 @@ static void app_event_cb(const ChipDeviceEvent *event, intptr_t arg)
     }
 }
 
-esp_err_t app_matter_init()
-{
-    /* Create a Matter node */
-    node::config_t node_config;
-    node_t *node = node::create(&node_config, app_attribute_update_cb, app_identification_cb);
-
-    /* The node and endpoint handles can be used to create/add other endpoints and clusters. */
-    if (!node) {
-        ESP_LOGE(TAG, "Matter node creation failed");
-        return ESP_FAIL;
-    }
-
-    /* Add custom rainmaker cluster */
-    return rainmaker::init();
-}
-
 esp_err_t app_matter_light_create(app_driver_handle_t driver_handle)
 {
     node_t *node = node::get();
@@ -272,40 +253,6 @@ esp_err_t app_matter_light_create(app_driver_handle_t driver_handle)
     cluster::color_control::feature::hue_saturation::add(cluster, &hue_saturation_config);
 
     return ESP_OK;
-}
-
-esp_err_t app_matter_pre_rainmaker_start()
-{
-    /* Other initializations for custom rainmaker cluster */
-    return rainmaker::start();
-}
-
-esp_err_t app_matter_start()
-{
-#if CHIP_DEVICE_CONFIG_ENABLE_THREAD
-    /* Set OpenThread platform config */
-    esp_openthread_platform_config_t config = {
-        .radio_config = ESP_OPENTHREAD_DEFAULT_RADIO_CONFIG(),
-        .host_config = ESP_OPENTHREAD_DEFAULT_HOST_CONFIG(),
-        .port_config = ESP_OPENTHREAD_DEFAULT_PORT_CONFIG(),
-    };
-    set_openthread_platform_config(&config);
-#endif
-    esp_err_t err = esp_matter::start(app_event_cb);
-    if (err != ESP_OK) {
-        ESP_LOGE(TAG, "Matter start failed: %d", err);
-    }
-    return err;
-}
-
-void app_matter_enable_matter_console()
-{
-#if CONFIG_ENABLE_CHIP_SHELL
-    esp_matter::console::diagnostics_register_commands();
-    esp_matter::console::init();
-#else
-    ESP_LOGI(TAG, "Set CONFIG_ENABLE_CHIP_SHELL to enable Matter Console");
-#endif
 }
 
 esp_err_t app_matter_report_power(bool val)

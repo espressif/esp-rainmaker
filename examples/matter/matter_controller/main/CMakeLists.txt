@@ -1,5 +1,5 @@
 set(ldfragments linker.lf)
-idf_component_register(SRCS         ./app_main.cpp ./app_matter.cpp ./app_driver.cpp
+idf_component_register(SRCS         ./app_main.cpp ./app_matter_controller.cpp ./app_driver.cpp
                       PRIV_INCLUDE_DIRS  "."
                       LDFRAGMENTS "${ldfragments}")
 

@@ -15,7 +15,7 @@
 #include <led_driver.h>
 #include <esp_rmaker_core.h>
 #include <esp_rmaker_standard_params.h>
-#include <app_matter.h>
+#include <app_matter_switch.h>
 #include <app_priv.h>
 
 static const char *TAG = "app_driver";

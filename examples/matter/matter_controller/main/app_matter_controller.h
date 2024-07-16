@@ -11,9 +11,6 @@
 #include <esp_err.h>
 #include <app_priv.h>
 
-esp_err_t app_matter_init();
 esp_err_t app_matter_endpoint_create();
-esp_err_t app_matter_start();
-esp_err_t app_matter_pre_rainmaker_start();
-void app_matter_enable_matter_console();
 esp_err_t app_matter_report_power(bool val);
+esp_err_t app_matter_endpoint_create();

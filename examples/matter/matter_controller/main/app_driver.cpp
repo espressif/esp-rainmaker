@@ -10,7 +10,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include <app_matter.h>
 #include <app_priv.h>
 #include <device.h>
 #include <esp_matter.h>
@@ -19,6 +18,7 @@
 #include <esp_rmaker_core.h>
 #include <esp_rmaker_standard_params.h>
 #include <matter_controller_device_mgr.h>
+#include <app_matter_controller.h>
 
 using namespace esp_matter;
 using namespace chip::app::Clusters;

@@ -50,10 +50,10 @@ $ esp-matter-mfg-tool -v 0x131B -p 0x2 -cd $RMAKER_PATH/examples/matter/mfg/cd_1
 
 This not only generates the factory nvs binary required for matter, but also embeds the RainMaker MQTT Host url into it via the master.csv file. Optionally, you can embed the MQTT host into the firmware itself by using `idf.py menuconfig -> ESP RainMaker Config -> ESP_RMAKER_READ_MQTT_HOST_FROM_CONFIG` and then skipping the --csv and --mcsv options to mfg_tool
 
-The factory binary generated above should be flashed onto the fctry partition (default : `0x3f8000` for ESP32-C6 and `0x3e0000` for other chips. Do check your partition table for exact address).
+The factory binary generated above should be flashed onto the fctry partition (default : `0x3f9000` for ESP32-C6 and `0x3e0000` for other chips. Do check your partition table for exact address).
 
 ```
-$ esptool.py write_flash 0x3e0000 out/131b_2/<node-id>/<node-id>_esp_secure_cert.bin 0x3e0000 out/131b_2/<node-id>/<node-id>-partition.bin
+$ esptool.py write_flash 0x3e0000 out/131b_2/<node-id>/<node-id>-partition.bin
 ```
 
 ## Building the example
@@ -71,8 +71,9 @@ $ idf.py flash monitor
 The QR Code required for commissioning your device can be found at `${ESP_MATTER_PATH}/tools/mfg_tool/out/<vendor-id>_<product-id>/<node-id>/<node-id>-qrcode.png`
 
 
-## Manufacturing Considerations [This step is only suggested for Privately deployed Production set up and not required for test set up)]
+## Manufacturing Considerations
 
+This step is only suggested for Privately deployed Production and not required for test set up.
 
 ### RainMaker MQTT Host
 
@@ -106,7 +107,7 @@ $ esp-matter-mfg-tool --dac-in-secure-cert -v 0xFFF2 -p 0x8001 --pai -k $ESP_MAT
 
 Note the path where the files are generated after running the above command since it will be required later.
 
-## Configure your app
+### Configure your app
 Open the project configuration menu using -
 
 ```

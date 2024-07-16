@@ -11,7 +11,6 @@
 #include <string.h>
 
 #include <app/server/Server.h>
-#include <app_matter.h>
 #include <app_priv.h>
 #include <device.h>
 #include <esp_check.h>
@@ -26,6 +25,7 @@
 
 #include "app_matter_ctrl.h"
 #include "ui_matter_ctrl.h"
+#include <app_matter_controller.h>
 
 using namespace esp_matter;
 using namespace chip::app::Clusters;
