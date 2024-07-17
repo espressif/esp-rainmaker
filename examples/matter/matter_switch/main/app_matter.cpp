@@ -18,6 +18,8 @@
 #include <app_matter.h>
 #include <esp_rmaker_standard_params.h>
 #include <esp_rmaker_core.h>
+#include <esp_matter_client.h>
+#include <lib/core/Optional.h>
 #include <app_priv.h>
 
 using namespace esp_matter;
@@ -31,16 +33,17 @@ uint16_t switch_endpoint_id;
 
 esp_err_t app_matter_send_command_binding(bool power)
 {
-    client::command_handle_t command;
-    command.cluster_id = OnOff::Id;
+    client::request_handle_t req_handle;
+    req_handle.type = esp_matter::client::INVOKE_CMD;
+    req_handle.command_path.mClusterId = OnOff::Id;
     if (power == true) {
-        command.command_id = OnOff::Commands::On::Id;
+        req_handle.command_path.mCommandId = OnOff::Commands::On::Id;
     } else {
-        command.command_id = OnOff::Commands::Off::Id;
+        req_handle.command_path.mCommandId = OnOff::Commands::Off::Id;
     }
 
     lock::chip_stack_lock(portMAX_DELAY);
-    esp_err_t err = client::cluster_update(switch_endpoint_id, &command);
+    esp_err_t err = client::cluster_update(switch_endpoint_id, &req_handle);
     lock::chip_stack_unlock();
     return err;
 }
@@ -87,38 +90,65 @@ esp_err_t app_matter_init()
     return rainmaker::init();
 }
 
-static void app_matter_client_command_callback(client::peer_device_t *peer_device, client::command_handle_t *command_handle,
+static void send_command_success_callback(void *context, const ConcreteCommandPath &command_path,
+                                          const chip::app::StatusIB &status, TLVReader *response_data)
+{
+    ESP_LOGI(TAG, "Send command success");
+}
+
+static void send_command_failure_callback(void *context, CHIP_ERROR error)
+{
+    ESP_LOGI(TAG, "Send command failure: err :%" CHIP_ERROR_FORMAT, error.Format());
+}
+
+static void app_matter_client_command_callback(client::peer_device_t *peer_device, client::request_handle_t *req_handle,
                                         void *priv_data)
 {
-    if (command_handle->cluster_id == OnOff::Id) {
-                /* RainMaker update */
 
+    if (req_handle->type != esp_matter::client::INVOKE_CMD) {
+        return;
+    }
+    char command_data_str[32];
+    if (req_handle->command_path.mClusterId == OnOff::Id) {
+                /* RainMaker update */
+        strcpy(command_data_str, "{}");
         const esp_rmaker_node_t *node = esp_rmaker_get_node();
         esp_rmaker_device_t *device = esp_rmaker_node_get_device_by_name(node, SWITCH_DEVICE_NAME);
         esp_rmaker_param_t *param = esp_rmaker_device_get_param_by_name(device, ESP_RMAKER_DEF_POWER_NAME);
 
-        if (command_handle->command_id == OnOff::Commands::Off::Id) {
-            on_off::command::send_off(peer_device, command_handle->endpoint_id);
+        if (req_handle->command_path.mCommandId == OnOff::Commands::Off::Id) {
             app_driver_switch_set_power((app_driver_handle_t)priv_data, false);
             esp_rmaker_param_update_and_report(param, esp_rmaker_bool(false));
-        } else if (command_handle->command_id == OnOff::Commands::On::Id) {
-            on_off::command::send_on(peer_device, command_handle->endpoint_id);
+        } else if (req_handle->command_path.mCommandId == OnOff::Commands::On::Id) {
             app_driver_switch_set_power((app_driver_handle_t)priv_data, true);
             esp_rmaker_param_update_and_report(param, esp_rmaker_bool(true));
-        } else if (command_handle->command_id == OnOff::Commands::Toggle::Id) {
-            on_off::command::send_toggle(peer_device, command_handle->endpoint_id);
+        } else if (req_handle->command_path.mCommandId == OnOff::Commands::Toggle::Id) {
             esp_rmaker_param_val_t *param_val = esp_rmaker_param_get_val(param);
             app_driver_switch_set_power((app_driver_handle_t)priv_data, !param_val->val.b);
             esp_rmaker_param_update_and_report(param, esp_rmaker_bool(!param_val->val.b));
         }
-    } else if (command_handle->cluster_id == Identify::Id) {
-        if (((char *)command_handle->command_data)[0] != 1) {
-                ESP_LOGE(TAG, "Number of parameters error");
+
+    } else if (req_handle->command_path.mClusterId == Identify::Id) {
+        if (req_handle->command_path.mCommandId == Identify::Commands::Identify::Id) {
+            if (((char *)req_handle->request_data)[0] != 1) {
+                    ESP_LOGE(TAG, "Number of parameters error");
+                    return;
+                }
+                sprintf(command_data_str, "{\"0:U16\": %ld}",
+                        strtoul((const char *)(req_handle->request_data) + 1, NULL, 16));
+        }else {
+                ESP_LOGE(TAG, "Unsupported command");
                 return;
             }
-        identify::command::send_identify(peer_device, command_handle->endpoint_id,
-                                            strtoul((const char *)(command_handle->command_data) + 1, NULL, 16));
-    }
+        }else {
+            ESP_LOGE(TAG, "Unsupported cluster");
+            return;
+        }
+
+    client::interaction::invoke::send_request(NULL, peer_device, req_handle->command_path, command_data_str,
+                                              send_command_success_callback, send_command_failure_callback,
+                                              chip::NullOptional);
+
 }
 
 esp_err_t app_matter_switch_create(app_driver_handle_t driver_handle)
@@ -151,7 +181,7 @@ esp_err_t app_matter_pre_rainmaker_start()
 
 esp_err_t app_matter_start()
 {
-    client::set_command_callback(app_matter_client_command_callback, NULL, NULL);
+    client::set_request_callback(app_matter_client_command_callback, NULL, NULL);
     esp_err_t err = esp_matter::start(app_event_cb);
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "Matter start failed: %d", err);
