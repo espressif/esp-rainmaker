@@ -9,4 +9,3 @@ ota_0,    app,  ota_0,   0x20000,   0x1E8000,
 reserved, 0x06,     ,    0x208000,  0x8000,
 ota_1,    app,  ota_1,   0x210000,  0x1E8000,
 fctry,    data, nvs,     0x3F8000,  0x6000
-
