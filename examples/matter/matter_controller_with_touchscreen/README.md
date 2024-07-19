@@ -21,7 +21,7 @@ $ idf.py flash monitor
 > Please check the board selection (default ESP32-S3-BOX-3) in one of the ways:
 > - Use `idf.py menuconfig`->`HMI Board Config`->`Selece BSP board` to select board.
 > - Add only one board config in '[sdkconfig.defaults](matter_controller_with_touchscreen/sdkconfig.defaults)'. e.g. 'CONFIG_BSP_BOARD_ESP32_S3_LCD_EV_BOARD=y' to select ESP32-S3-LCD-EV-BOARD as board. 'CONFIG_BSP_BOARD_ESP32_S3_BOX_3=y' to select ESP32-S3-BOX-3 as board.
->> - Please use ESP-IDF [v5.2](https://github.com/espressif/esp-idf/tree/v5.2).
+>> - Please use ESP-IDF [v5.2.2](https://github.com/espressif/esp-idf/releases/v5.2.2).
 >> - If the board is ESP32-S3-LCD-EV-BOARD, set-target command should be `idf.py -D SDKCONFIG_DEFAULTS="sdkconfig.defaults;sdkconfig.defaults.lcdboard" set-target esp32s3`, remember to select board at the same time.
 
 ### Building the example (with OpenThread Border Router)
