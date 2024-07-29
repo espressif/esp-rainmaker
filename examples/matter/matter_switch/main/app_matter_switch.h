@@ -11,9 +11,7 @@
 #include <esp_err.h>
 #include <app_priv.h>
 
-esp_err_t app_matter_init();
 esp_err_t app_matter_switch_create(app_driver_handle_t driver_handle);
-esp_err_t app_matter_start();
-esp_err_t app_matter_pre_rainmaker_start();
 esp_err_t app_matter_send_command_binding(bool power);
-void app_matter_enable_matter_console();
+void app_matter_client_command_callback(esp_matter::client::peer_device_t *peer_device, esp_matter::client::request_handle_t *req_handle,
+                                        void *priv_data);

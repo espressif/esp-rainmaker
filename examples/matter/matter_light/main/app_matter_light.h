@@ -8,12 +8,12 @@
 
 #pragma once
 
-#include <app_priv.h>
 #include <esp_err.h>
+#include <app_priv.h>
 
-esp_err_t app_matter_init();
-esp_err_t app_matter_endpoint_create();
-esp_err_t app_matter_start();
-esp_err_t app_matter_pre_rainmaker_start();
-void app_matter_enable_matter_console();
+esp_err_t app_matter_light_create(app_driver_handle_t driver_handle);
 esp_err_t app_matter_report_power(bool val);
+esp_err_t app_matter_report_hue(int val);
+esp_err_t app_matter_report_saturation(int val);
+esp_err_t app_matter_report_temperature(int val);
+esp_err_t app_matter_report_brightness(int val);

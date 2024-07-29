@@ -1,4 +1,5 @@
-idf_component_register(SRCS         ./app_main.cpp ./app_matter.cpp ./app_driver.cpp
+set(PRIV_REQUIRES_LIST device app_reset app_insights app_matter)
+idf_component_register(SRCS         ./app_main.cpp ./app_matter_light.cpp ./app_driver.cpp
                       PRIV_INCLUDE_DIRS  "."
                       PRIV_REQUIRES      ${PRIV_REQUIRES_LIST})
 

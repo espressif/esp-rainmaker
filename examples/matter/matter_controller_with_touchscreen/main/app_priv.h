@@ -48,3 +48,12 @@ esp_err_t app_driver_attribute_update(app_driver_handle_t driver_handle, uint16_
 void on_device_list_update();
 
 esp_err_t update_device_refresh_ui_init();
+
+
+esp_err_t app_attribute_update_cb(esp_matter::attribute::callback_type_t type, uint16_t endpoint_id, uint32_t cluster_id,
+                                         uint32_t attribute_id, esp_matter_attr_val_t *val, void *priv_data);
+
+esp_err_t app_identification_cb(esp_matter::identification::callback_type_t type, uint16_t endpoint_id, uint8_t effect_id,
+                                       uint8_t effect_variant, void *priv_data);
+
+void app_event_cb(const ChipDeviceEvent *event, intptr_t arg);

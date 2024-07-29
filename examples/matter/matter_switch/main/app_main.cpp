@@ -9,8 +9,6 @@
 #include <esp_err.h>
 #include <esp_log.h>
 #include <nvs_flash.h>
-#include <app_priv.h>
-#include <app_matter.h>
 #include <app_reset.h>
 
 #include <esp_rmaker_core.h>
@@ -20,10 +18,15 @@
 #include <esp_rmaker_schedule.h>
 #include <esp_rmaker_scenes.h>
 #include <app_insights.h>
+#include <app_matter.h>
+#include <app_matter_switch.h>
+#include <app_priv.h>
 
 static const char *TAG = "app_main";
 
 static app_driver_handle_t switch_handle;
+
+bool rmaker_init_done = false; // used with extern in `app_matter.c`
 
 /* Callback to handle commands received from the RainMaker cloud */
 static esp_err_t write_cb(const esp_rmaker_device_t *device, const esp_rmaker_param_t *param,
@@ -56,12 +59,17 @@ extern "C" void app_main()
     app_driver_handle_t button_handle = app_driver_button_init(switch_handle);
     app_reset_button_register(button_handle);
 
-    /* Initialize matter */
-    app_matter_init();
+    /* Initialize Matter */
+    app_matter_init(app_attribute_update_cb,app_identification_cb);
+    app_matter_rmaker_init();
+
+    /* Create Data Model for esp-matter */
     app_matter_switch_create(switch_handle);
 
     /* Matter start */
-    app_matter_start();
+    esp_matter::client::set_request_callback(app_matter_client_command_callback, NULL, NULL);
+    app_matter_start(app_event_cb);
+    app_matter_send_command_binding(DEFAULT_POWER);
 
     /* Initialize the ESP RainMaker Agent.
      * Create Lightbulb device and its parameters.
@@ -104,10 +112,11 @@ extern "C" void app_main()
     app_insights_enable();
 
     /* Pre start */
-    ESP_ERROR_CHECK(app_matter_pre_rainmaker_start());
+    ESP_ERROR_CHECK(app_matter_rmaker_start());
 
     /* Start the ESP RainMaker Agent */
     esp_rmaker_start();
+    rmaker_init_done = true;
 
     /* Enable Matter diagnostics console*/
     app_matter_enable_matter_console();

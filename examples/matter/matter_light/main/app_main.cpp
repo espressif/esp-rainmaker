@@ -20,10 +20,13 @@
 #include <esp_rmaker_console.h>
 
 #include "app_priv.h"
-#include "app_matter.h"
+#include <app_matter.h>
+#include "app_matter_light.h"
+#if CHIP_DEVICE_CONFIG_ENABLE_THREAD
+#include <platform/ESP32/OpenthreadLauncher.h>
+#endif
 
 static const char *TAG = "app_main";
-
 
 static app_driver_handle_t light_handle;
 
@@ -72,21 +75,34 @@ extern "C" void app_main()
     light_handle = app_driver_light_init();
     app_driver_handle_t button_handle = app_driver_button_init(light_handle);
     app_reset_button_register(button_handle);
-    esp_rmaker_console_init();
 
-    /* Initialize matter */
-    app_matter_init();
+    /* Initialize Matter */
+    app_matter_init(app_attribute_update_cb,app_identification_cb);
+    app_matter_rmaker_init();
+
+    /* Create Data Model for esp-matter */
     app_matter_light_create(light_handle);
 
-    /* Matter start */
-    app_matter_start();
+#if CHIP_DEVICE_CONFIG_ENABLE_THREAD
+    /* Set OpenThread platform config */
+    esp_openthread_platform_config_t config = {
+        .radio_config = ESP_OPENTHREAD_DEFAULT_RADIO_CONFIG(),
+        .host_config = ESP_OPENTHREAD_DEFAULT_HOST_CONFIG(),
+        .port_config = ESP_OPENTHREAD_DEFAULT_PORT_CONFIG(),
+    };
+    set_openthread_platform_config(&config);
+#endif
 
     /* Starting driver with default values */
     app_driver_light_set_defaults();
 
+    /* Matter start */
+    app_matter_start(app_event_cb);
+
+    /* Create Data Model for esp-matter */
     /* Initialize the ESP RainMaker Agent.
      * Create Lightbulb device and its parameters.
-     * */
+    */
     esp_rmaker_config_t rainmaker_cfg = {
         .enable_time_sync = false,
     };
@@ -127,9 +143,10 @@ extern "C" void app_main()
     app_insights_enable();
 
     /* Pre start */
-    ESP_ERROR_CHECK(app_matter_pre_rainmaker_start());
-
+    ESP_ERROR_CHECK(app_matter_rmaker_start());
     /* Start the ESP RainMaker Agent */
     esp_rmaker_start();
     rmaker_init_done = true;
+
+    app_matter_enable_matter_console();
 }

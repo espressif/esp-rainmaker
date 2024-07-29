@@ -15,12 +15,14 @@
 #include <esp_matter_rainmaker.h>
 #include <platform/ESP32/route_hook/ESP32RouteHook.h>
 #include <esp_matter_console.h>
-#include <app_matter.h>
+#include <app_matter_switch.h>
 #include <esp_rmaker_standard_params.h>
 #include <esp_rmaker_core.h>
 #include <esp_matter_client.h>
 #include <lib/core/Optional.h>
+#include <app_matter.h>
 #include <app_priv.h>
+
 
 using namespace esp_matter;
 using namespace esp_matter::attribute;
@@ -48,20 +50,20 @@ esp_err_t app_matter_send_command_binding(bool power)
     return err;
 }
 
-static esp_err_t app_identification_cb(identification::callback_type_t type, uint16_t endpoint_id, uint8_t effect_id,
+esp_err_t app_identification_cb(identification::callback_type_t type, uint16_t endpoint_id, uint8_t effect_id,
                                        uint8_t effect_variant, void *priv_data)
 {
     ESP_LOGI(TAG, "Identification callback: type: %d, effect: %d", type, effect_id);
     return ESP_OK;
 }
 
-static esp_err_t app_attribute_update_cb(attribute::callback_type_t type, uint16_t endpoint_id, uint32_t cluster_id,
+esp_err_t app_attribute_update_cb(attribute::callback_type_t type, uint16_t endpoint_id, uint32_t cluster_id,
                                          uint32_t attribute_id, esp_matter_attr_val_t *val, void *priv_data)
 {
     return ESP_OK;
 }
 
-static void app_event_cb(const ChipDeviceEvent *event, intptr_t arg)
+void app_event_cb(const ChipDeviceEvent *event, intptr_t arg)
 {
     switch (event->Type) {
     case chip::DeviceLayer::DeviceEventType::PublicEventTypes::kCommissioningComplete:
@@ -74,22 +76,6 @@ static void app_event_cb(const ChipDeviceEvent *event, intptr_t arg)
 }
 
 
-esp_err_t app_matter_init()
-{
-    /* Create a Matter node */
-    node::config_t node_config;
-    node_t *node = node::create(&node_config, app_attribute_update_cb, app_identification_cb);
-
-    /* The node and endpoint handles can be used to create/add other endpoints and clusters. */
-    if (!node) {
-        ESP_LOGE(TAG, "Matter node creation failed");
-        return ESP_FAIL;
-    }
-
-    /* Add custom rainmaker cluster */
-    return rainmaker::init();
-}
-
 static void send_command_success_callback(void *context, const ConcreteCommandPath &command_path,
                                           const chip::app::StatusIB &status, TLVReader *response_data)
 {
@@ -101,7 +87,7 @@ static void send_command_failure_callback(void *context, CHIP_ERROR error)
     ESP_LOGI(TAG, "Send command failure: err :%" CHIP_ERROR_FORMAT, error.Format());
 }
 
-static void app_matter_client_command_callback(client::peer_device_t *peer_device, client::request_handle_t *req_handle,
+void app_matter_client_command_callback(client::peer_device_t *peer_device, client::request_handle_t *req_handle,
                                         void *priv_data)
 {
 
@@ -171,31 +157,4 @@ esp_err_t app_matter_switch_create(app_driver_handle_t driver_handle)
     switch_endpoint_id = endpoint::get_id(endpoint);
     ESP_LOGI(TAG, "Switch created with endpoint_id %d", switch_endpoint_id);
     return ESP_OK;
-}
-
-esp_err_t app_matter_pre_rainmaker_start()
-{
-    /* Other initializations for custom rainmaker cluster */
-    return rainmaker::start();
-}
-
-esp_err_t app_matter_start()
-{
-    client::set_request_callback(app_matter_client_command_callback, NULL, NULL);
-    esp_err_t err = esp_matter::start(app_event_cb);
-    if (err != ESP_OK) {
-        ESP_LOGE(TAG, "Matter start failed: %d", err);
-    }
-    app_matter_send_command_binding(DEFAULT_POWER);
-    return err;
-}
-
-void app_matter_enable_matter_console()
-{
-#if CONFIG_ENABLE_CHIP_SHELL
-    esp_matter::console::diagnostics_register_commands();
-    esp_matter::console::init();
-#else
-    ESP_LOGI(TAG, "Set CONFIG_ENABLE_CHIP_SHELL to enable Matter Console");
-#endif
 }

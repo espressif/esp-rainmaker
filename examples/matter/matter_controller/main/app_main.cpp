@@ -19,11 +19,21 @@
 #include <esp_rmaker_scenes.h>
 #include <app_insights.h>
 #include <app_reset.h>
-
+#if CONFIG_OPENTHREAD_BORDER_ROUTER
+#include <esp_matter_thread_br_cluster.h>
+#include <esp_matter_thread_br_console.h>
+#include <esp_matter_thread_br_launcher.h>
+#include <esp_ot_config.h>
+#endif // CONFIG_OPENTHREAD_BORDER_ROUTER
 #include <app_priv.h>
 #include <app_matter.h>
+#include <app_matter_controller.h>
+#include <esp_matter_controller_console.h>
+#include <matter_controller_cluster.h>
 
 static const char *TAG = "app_main";
+
+using namespace esp_matter;
 
 bool rmaker_init_done = false;
 
@@ -57,14 +67,30 @@ extern "C" void app_main()
     app_driver_handle_t button_handle = app_driver_button_init(NULL);
     app_reset_button_register(button_handle);
 
-    /* Initialize matter */
+    /* Initialize Matter */
+    app_matter_init(app_attribute_update_cb, app_identification_cb);
+
     // The data model for Matter Controller is the same as normal Matter end-devices. We should create root_node
     // endpoint for the controller to support network commissioning and other basic features of Matter.
-    app_matter_init();
+    /* Add custom matter controller cluster */
+    node_t *matter_node = node::get();
+    if (!matter_node) {
+        ESP_LOGE(TAG, "Matter node creation failed");
+        abort();
+    }
+    endpoint_t *root_endpoint = esp_matter::endpoint::get(matter_node, 0);
+    esp_matter::cluster::matter_controller::create(root_endpoint, CLUSTER_FLAG_SERVER);
+
+#if CONFIG_OPENTHREAD_BORDER_ROUTER
+    cluster::thread_br::create(root_endpoint, CLUSTER_FLAG_SERVER);
+#endif
+
+    app_matter_rmaker_init();
+
     app_matter_endpoint_create();
 
     /* Matter start */
-    app_matter_start();
+    app_matter_start(app_event_cb);
 
     /* Initialize the ESP RainMaker Agent.
      */
@@ -109,12 +135,19 @@ extern "C" void app_main()
     app_insights_enable();
 
     /* Pre start */
-    ESP_ERROR_CHECK(app_matter_pre_rainmaker_start());
+    ESP_ERROR_CHECK(app_matter_rmaker_start());
 
     /* Start the ESP RainMaker Agent */
     esp_rmaker_start();
     rmaker_init_done = true;
 
-    /* Enable Matter diagnostics console*/
+    /* Enable Matter console*/
     app_matter_enable_matter_console();
+#if CONFIG_ESP_MATTER_CONTROLLER_ENABLE
+    esp_matter::console::controller_register_commands();
+#endif
+#if CONFIG_OPENTHREAD_BORDER_ROUTER && CONFIG_OPENTHREAD_CLI
+    esp_matter::console::thread_br_cli_register_command();
+#endif // CONFIG_OPENTHREAD_BORDER_ROUTER && CONFIG_OPENTHREAD_CLI
+
 }

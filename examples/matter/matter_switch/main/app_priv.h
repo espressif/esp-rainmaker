@@ -11,7 +11,6 @@
 #include <esp_err.h>
 #include <esp_matter.h>
 
-
 /** Default attribute values used by Rainmaker during initialization */
 #define SWITCH_DEVICE_NAME "Matter Switch"
 #define DEFAULT_POWER true
@@ -47,3 +46,12 @@ app_driver_handle_t app_driver_button_init(void *user_data);
  * @return error in case of failure.
  */
 esp_err_t app_driver_switch_set_power(app_driver_handle_t handle, bool power);
+
+
+esp_err_t app_attribute_update_cb(esp_matter::attribute::callback_type_t type, uint16_t endpoint_id, uint32_t cluster_id,
+                                         uint32_t attribute_id, esp_matter_attr_val_t *val, void *priv_data);
+
+esp_err_t app_identification_cb(esp_matter::identification::callback_type_t type, uint16_t endpoint_id, uint8_t effect_id,
+                                       uint8_t effect_variant, void *priv_data);
+
+void app_event_cb(const ChipDeviceEvent *event, intptr_t arg);
