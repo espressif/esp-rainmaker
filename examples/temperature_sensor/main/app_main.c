@@ -17,7 +17,7 @@
 #include <esp_rmaker_standard_params.h>
 #include <esp_rmaker_standard_devices.h>
 
-#include <app_wifi.h>
+#include <app_network.h>
 #include <app_insights.h>
 
 #include "app_priv.h"
@@ -43,10 +43,10 @@ void app_main()
 
     /* Initialize Wi-Fi. Note that, this should be called before esp_rmaker_node_init()
      */
-    app_wifi_init();
+    app_network_init();
     
     /* Initialize the ESP RainMaker Agent.
-     * Note that this should be called after app_wifi_init() but before app_wifi_start()
+     * Note that this should be called after app_network_init() but before app_network_start()
      * */
     esp_rmaker_config_t rainmaker_cfg = {
         .enable_time_sync = false,
@@ -76,7 +76,7 @@ void app_main()
      * else, it will start Wi-Fi provisioning. The function will return
      * after a connection has been successfully established
      */
-    err = app_wifi_start(POP_TYPE_RANDOM);
+    err = app_network_start(POP_TYPE_RANDOM);
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "Could not start Wifi. Aborting!!!");
         vTaskDelay(5000/portTICK_PERIOD_MS);
