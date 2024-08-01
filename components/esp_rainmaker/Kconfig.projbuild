@@ -176,6 +176,8 @@ menu "ESP RainMaker Config"
     config ESP_RMAKER_LOCAL_CTRL_FEATURE_ENABLE
         bool "ESP RainMaker Local Control Feature"
         default n
+        #TODO: Enable Local Control for Thread devices
+        depends on ESP_RMAKER_NETWORK_OVER_WIFI
         select ESP_HTTPS_SERVER_ENABLE
         help
             Enabling this allows to discover and control the node over local Wi-Fi network.
@@ -189,6 +191,7 @@ menu "ESP RainMaker Config"
     config ESP_RMAKER_LOCAL_CTRL_AUTO_ENABLE
         bool "Auto ESP RainMaker Local Control"
         default n
+        depends on ESP_RMAKER_NETWORK_OVER_WIFI
         select ESP_RMAKER_LOCAL_CTRL_FEATURE_ENABLE
         help
             Automatically enabled local control when RainMaker starts.

@@ -135,6 +135,7 @@ build_idf_v5.0:
   variables:
     EXAMPLE_TARGETS: "esp32 esp32s2 esp32c3 esp32s3"
     EXAMPLES: "switch led_light fan temperature_sensor multi_device gpio"
+    COMPONENT_MGR_142: "1"
 
 build_idf_v5.1:
   extends: .build_template

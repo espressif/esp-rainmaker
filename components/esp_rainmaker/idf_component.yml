@@ -1,5 +1,5 @@
 ## IDF Component Manager Manifest File
-version: "1.3.0"
+version: "1.4.0"
 description: ESP RainMaker firmware agent
 url: https://github.com/espressif/esp-rainmaker/tree/master/components/esp_rainmaker
 repository: https://github.com/espressif/esp-rainmaker.git
@@ -27,3 +27,7 @@ dependencies:
   espressif/esp_schedule:
     version: "~1.2.0"
     override_path: '../esp_schedule/'
+  espressif/network_provisioning:
+    version: "~1.0.0"
+    rules:
+      - if: "idf_version >= 5.1"

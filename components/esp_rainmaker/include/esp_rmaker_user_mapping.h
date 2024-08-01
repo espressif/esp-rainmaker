@@ -44,8 +44,8 @@ esp_rmaker_user_mapping_state_t esp_rmaker_user_node_mapping_get_state(void);
  * Create User Mapping Endpoint
  *
  * This will create a custom provisioning endpoint for user-node mapping.
- * This should be called after wifi_prov_mgr_init() but before
- * wifi_prov_mgr_start_provisioning()
+ * This should be called after network_prov_mgr_init()/wifi_prov_mgr_init() but before
+ * network_prov_mgr_start_provisioning()/wifi_prov_mgr_start_provisioning()
  *
  * @return ESP_OK on success
  * @return error on failure
@@ -57,7 +57,7 @@ esp_err_t esp_rmaker_user_mapping_endpoint_create(void);
  *
  * This will register the callback for the custom provisioning endpoint
  * for user-node mapping which was created with esp_rmaker_user_mapping_endpoint_create().
- * This should be called immediately after wifi_prov_mgr_start_provisioning().
+ * This should be called immediately after network_prov_mgr_start_provisioning()/wifi_prov_mgr_start_provisioning().
  *
  * @return ESP_OK on success
  * @return error on failure
