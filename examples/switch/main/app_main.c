@@ -26,7 +26,7 @@
 
 #include <esp_rmaker_common_events.h>
 
-#include <app_wifi.h>
+#include <app_network.h>
 #include <app_insights.h>
 
 #include "app_priv.h"
@@ -100,15 +100,15 @@ static void event_handler(void* arg, esp_event_base_t event_base,
             default:
                 ESP_LOGW(TAG, "Unhandled RainMaker Common Event: %"PRIi32, event_id);
         }
-    } else if (event_base == APP_WIFI_EVENT) {
+    } else if (event_base == APP_NETWORK_EVENT) {
         switch (event_id) {
-            case APP_WIFI_EVENT_QR_DISPLAY:
+            case APP_NETWORK_EVENT_QR_DISPLAY:
                 ESP_LOGI(TAG, "Provisioning QR : %s", (char *)event_data);
                 break;
-            case APP_WIFI_EVENT_PROV_TIMEOUT:
+            case APP_NETWORK_EVENT_PROV_TIMEOUT:
                 ESP_LOGI(TAG, "Provisioning Timed Out. Please reboot.");
                 break;
-            case APP_WIFI_EVENT_PROV_RESTART:
+            case APP_NETWORK_EVENT_PROV_RESTART:
                 ESP_LOGI(TAG, "Provisioning has restarted due to failures.");
                 break;
             default:
@@ -166,16 +166,16 @@ void app_main()
 
     /* Initialize Wi-Fi. Note that, this should be called before esp_rmaker_node_init()
      */
-    app_wifi_init();
+    app_network_init();
 
     /* Register an event handler to catch RainMaker events */
     ESP_ERROR_CHECK(esp_event_handler_register(RMAKER_EVENT, ESP_EVENT_ANY_ID, &event_handler, NULL));
     ESP_ERROR_CHECK(esp_event_handler_register(RMAKER_COMMON_EVENT, ESP_EVENT_ANY_ID, &event_handler, NULL));
-    ESP_ERROR_CHECK(esp_event_handler_register(APP_WIFI_EVENT, ESP_EVENT_ANY_ID, &event_handler, NULL));
+    ESP_ERROR_CHECK(esp_event_handler_register(APP_NETWORK_EVENT, ESP_EVENT_ANY_ID, &event_handler, NULL));
     ESP_ERROR_CHECK(esp_event_handler_register(RMAKER_OTA_EVENT, ESP_EVENT_ANY_ID, &event_handler, NULL));
 
     /* Initialize the ESP RainMaker Agent.
-     * Note that this should be called after app_wifi_init() but before app_wifi_start()
+     * Note that this should be called after app_network_init() but before app_nenetworkk_start()
      * */
     esp_rmaker_config_t rainmaker_cfg = {
         .enable_time_sync = false,
@@ -240,13 +240,13 @@ void app_main()
     /* Start the ESP RainMaker Agent */
     esp_rmaker_start();
 
-    err = app_wifi_set_custom_mfg_data(MGF_DATA_DEVICE_TYPE_SWITCH, MFG_DATA_DEVICE_SUBTYPE_SWITCH);
+    err = app_network_set_custom_mfg_data(MGF_DATA_DEVICE_TYPE_SWITCH, MFG_DATA_DEVICE_SUBTYPE_SWITCH);
     /* Start the Wi-Fi.
      * If the node is provisioned, it will start connection attempts,
      * else, it will start Wi-Fi provisioning. The function will return
      * after a connection has been successfully established
      */
-    err = app_wifi_start(POP_TYPE_RANDOM);
+    err = app_network_start(POP_TYPE_RANDOM);
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "Could not start Wifi. Aborting!!!");
         vTaskDelay(5000/portTICK_PERIOD_MS);

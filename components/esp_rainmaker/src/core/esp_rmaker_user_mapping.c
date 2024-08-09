@@ -18,7 +18,11 @@
 #include <nvs.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/semphr.h>
+#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 1, 0)
+#include <network_provisioning/manager.h>
+#else
 #include <wifi_provisioning/manager.h>
+#endif
 #include <json_generator.h>
 #include <esp_rmaker_work_queue.h>
 #include <esp_rmaker_core.h>
@@ -71,6 +75,24 @@ static void esp_rmaker_user_mapping_cleanup_data(void)
 static void esp_rmaker_user_mapping_event_handler(void* arg, esp_event_base_t event_base,
                           int32_t event_id, void* event_data)
 {
+#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 1, 0)
+    if (event_base == NETWORK_PROV_EVENT) {
+        switch (event_id) {
+            case NETWORK_PROV_INIT: {
+                if (esp_rmaker_user_mapping_endpoint_create() != ESP_OK) {
+                    ESP_LOGE(TAG, "Failed to create user mapping end point.");
+                }
+                break;
+            }
+            case NETWORK_PROV_START:
+                if (esp_rmaker_user_mapping_endpoint_register() != ESP_OK) {
+                    ESP_LOGE(TAG, "Failed to register user mapping end point.");
+                }
+                break;
+            default:
+                break;
+        }
+#else
     if (event_base == WIFI_PROV_EVENT) {
         switch (event_id) {
             case WIFI_PROV_INIT: {
@@ -87,6 +109,7 @@ static void esp_rmaker_user_mapping_event_handler(void* arg, esp_event_base_t ev
             default:
                 break;
         }
+#endif
     } else if ((event_base == RMAKER_COMMON_EVENT) && (event_id == RMAKER_MQTT_EVENT_PUBLISHED)) {
         /* Checking for the PUBACK for the user node association message to be sure that the message
          * has indeed reached the RainMaker cloud.
@@ -302,30 +325,51 @@ int esp_rmaker_user_mapping_handler(uint32_t session_id, const uint8_t *inbuf, s
 }
 esp_err_t esp_rmaker_user_mapping_endpoint_create(void)
 {
+#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 1, 0)
+    esp_err_t err = network_prov_mgr_endpoint_create(USER_MAPPING_ENDPOINT);
+#else
     esp_err_t err = wifi_prov_mgr_endpoint_create(USER_MAPPING_ENDPOINT);
+#endif
     return err;
 }
 
 esp_err_t esp_rmaker_user_mapping_endpoint_register(void)
 {
+#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 1, 0)
+    return network_prov_mgr_endpoint_register(USER_MAPPING_ENDPOINT, esp_rmaker_user_mapping_handler, NULL);
+#else
     return wifi_prov_mgr_endpoint_register(USER_MAPPING_ENDPOINT, esp_rmaker_user_mapping_handler, NULL);
+#endif
 }
 
 esp_err_t esp_rmaker_user_mapping_prov_init(void)
 {
     int ret = ESP_OK;
-    ret = esp_event_handler_register(WIFI_PROV_EVENT, WIFI_PROV_INIT, &esp_rmaker_user_mapping_event_handler, NULL);
+#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 1, 0)
+    ret = esp_event_handler_register(NETWORK_PROV_EVENT, NETWORK_PROV_INIT, &esp_rmaker_user_mapping_event_handler, NULL);
+#else
+    ret = esp_event_handler_register(WIFI_PROV_EVENT, WIFI_PROV_INIT,&esp_rmaker_user_mapping_event_handler, NULL);
+#endif
     if (ret != ESP_OK) {
         return ret;
     }
-    ret = esp_event_handler_register(WIFI_PROV_EVENT, WIFI_PROV_START, &esp_rmaker_user_mapping_event_handler, NULL);
+#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 1, 0)
+    ret = esp_event_handler_register(NETWORK_PROV_EVENT, NETWORK_PROV_START, &esp_rmaker_user_mapping_event_handler, NULL);
+#else
+    ret = esp_event_handler_register(WIFI_PROV_EVENT, WIFI_PROV_START,&esp_rmaker_user_mapping_event_handler, NULL);
+#endif
     return ret;
 }
 
 esp_err_t esp_rmaker_user_mapping_prov_deinit(void)
 {
+#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 1, 0)
+    esp_event_handler_unregister(NETWORK_PROV_EVENT, NETWORK_PROV_INIT, &esp_rmaker_user_mapping_event_handler);
+    esp_event_handler_unregister(NETWORK_PROV_EVENT, NETWORK_PROV_START, &esp_rmaker_user_mapping_event_handler);
+#else
     esp_event_handler_unregister(WIFI_PROV_EVENT, WIFI_PROV_INIT, &esp_rmaker_user_mapping_event_handler);
     esp_event_handler_unregister(WIFI_PROV_EVENT, WIFI_PROV_START, &esp_rmaker_user_mapping_event_handler);
+#endif
     return ESP_OK;
 }
 

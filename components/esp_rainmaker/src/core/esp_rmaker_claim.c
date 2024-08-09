@@ -40,7 +40,11 @@
 #include <esp_rmaker_factory.h>
 #include <esp_rmaker_utils.h>
 
+#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 1, 0)
+#include <network_provisioning/manager.h>
+#else
 #include <wifi_provisioning/manager.h>
+#endif
 #include <esp_event.h>
 #include <esp_tls.h>
 #include <esp_rmaker_core.h>
@@ -813,6 +817,27 @@ esp_err_t esp_rmaker_claiming_handler(uint32_t session_id, const uint8_t *inbuf,
 static void event_handler(void* arg, esp_event_base_t event_base,
                           int32_t event_id, void* event_data)
 {
+#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 1, 0)
+    if (event_base == NETWORK_PROV_EVENT) {
+        switch (event_id) {
+            case NETWORK_PROV_INIT: {
+                static const char *capabilities[] = {"claim"};
+                network_prov_mgr_set_app_info("rmaker", "1.0", capabilities, 1);
+                if (network_prov_mgr_endpoint_create(CLAIM_ENDPOINT) != ESP_OK) {
+                    ESP_LOGE(TAG, "Failed to create claim end point.");
+                }
+                break;
+            }
+            case NETWORK_PROV_START:
+                if (network_prov_mgr_endpoint_register(CLAIM_ENDPOINT, esp_rmaker_claiming_handler, arg) != ESP_OK) {
+                    ESP_LOGE(TAG, "Failed to register claim end point.");
+                }
+                break;
+            default:
+                break;
+        }
+    }
+#else
     if (event_base == WIFI_PROV_EVENT) {
         switch (event_id) {
             case WIFI_PROV_INIT: {
@@ -832,6 +857,7 @@ static void event_handler(void* arg, esp_event_base_t event_base,
                 break;
         }
     }
+#endif
 }
 #endif /* CONFIG_ESP_RMAKER_ASSISTED_CLAIM */
 esp_err_t __esp_rmaker_claim_init(esp_rmaker_claim_data_t *claim_data)
@@ -975,8 +1001,13 @@ esp_err_t esp_rmaker_assisted_claim_perform(esp_rmaker_claim_data_t *claim_data)
     if (claim_data->state == RMAKER_CLAIM_STATE_VERIFY_DONE) {
         err = ESP_OK;
     }
+#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 1, 0)
+    esp_event_handler_unregister(NETWORK_PROV_EVENT, NETWORK_PROV_INIT, &event_handler);
+    esp_event_handler_unregister(NETWORK_PROV_EVENT, NETWORK_PROV_START, &event_handler);
+#else
     esp_event_handler_unregister(WIFI_PROV_EVENT, WIFI_PROV_INIT, &event_handler);
     esp_event_handler_unregister(WIFI_PROV_EVENT, WIFI_PROV_START, &event_handler);
+#endif
     esp_rmaker_claim_data_free(claim_data);
     vEventGroupDelete(claim_event_group);
     return err;
@@ -986,8 +1017,13 @@ esp_rmaker_claim_data_t *esp_rmaker_assisted_claim_init(void)
     ESP_LOGI(TAG, "Initialising Assisted Claiming. This may take time.");
     esp_rmaker_claim_data_t *claim_data = esp_rmaker_claim_init();
     if (claim_data) {
+#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 1, 0)
+        esp_event_handler_register(NETWORK_PROV_EVENT, NETWORK_PROV_INIT, &event_handler, claim_data);
+        esp_event_handler_register(NETWORK_PROV_EVENT, NETWORK_PROV_START, &event_handler, claim_data);
+#else
         esp_event_handler_register(WIFI_PROV_EVENT, WIFI_PROV_INIT, &event_handler, claim_data);
         esp_event_handler_register(WIFI_PROV_EVENT, WIFI_PROV_START, &event_handler, claim_data);
+#endif
     }
     return claim_data;
 }

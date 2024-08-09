@@ -18,7 +18,11 @@
 #include <esp_log.h>
 #include <esp_wifi.h>
 #include <esp_console.h>
+#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 1, 0)
+#include <network_provisioning/manager.h>
+#else
 #include <wifi_provisioning/manager.h>
+#endif
 
 #include <esp_rmaker_core.h>
 #include <esp_rmaker_user_mapping.h>
@@ -84,11 +88,19 @@ static int wifi_prov_handler(int argc, char** argv)
         memcpy(wifi_config.sta.password, argv[2], strlen(argv[2]));
     }
 
-    /* If device is still provisioning, use  wifi_prov_mgr_configure_sta */
+    /* If device is still provisioning, use  network_prov_mgr_configure_wifi_sta/wifi_prov_mgr_configure_sta */
     bool provisioned = false;
+#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 1, 0)
+    network_prov_mgr_is_wifi_provisioned(&provisioned);
+#else
     wifi_prov_mgr_is_provisioned(&provisioned);
+#endif
     if (!provisioned) { // provisioning in progress
+#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 1, 0)
+        network_prov_mgr_configure_wifi_sta(&wifi_config);
+#else
         wifi_prov_mgr_configure_sta(&wifi_config);
+#endif
         return ESP_OK;
     }
 

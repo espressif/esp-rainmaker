@@ -16,13 +16,16 @@ set(core_srcs "src/core/esp_rmaker_core.c"
         "src/core/esp_rmaker_secure_boot_digest.c"
         )
 
-set(priv_req protobuf-c json_parser json_generator wifi_provisioning
+set(priv_req protobuf-c json_parser json_generator
              nvs_flash esp_http_client app_update esp-tls mbedtls esp_https_ota
              console esp_local_ctrl esp_https_server mdns esp_schedule efuse driver rmaker_common)
 
-# NAT64 and DNS64 features were introduced for openthread component in IDF v5.1
 if ("${IDF_VERSION_MAJOR}.${IDF_VERSION_MINOR}" VERSION_GREATER_EQUAL "5.1")
-    list(APPEND priv_req openthread)
+    # NAT64 and DNS64 features were introduced for openthread component in IDF v5.1
+    list(APPEND priv_req openthread network_provisioning)
+else()
+    # wifi_provisioning could be replaced by network_provisioning for IDF v5.1+
+    list(APPEND priv_req wifi_provisioning)
 endif()
 
 if(CONFIG_ESP_RMAKER_ASSISTED_CLAIM)

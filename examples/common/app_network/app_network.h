@@ -27,19 +27,19 @@ extern "C" {
 #define MFG_DATA_DEVICE_EXTRA_CODE          0x00
 
 /** ESP RainMaker Event Base */
-ESP_EVENT_DECLARE_BASE(APP_WIFI_EVENT);
+ESP_EVENT_DECLARE_BASE(APP_NETWORK_EVENT);
 
-/** App Wi-Fir Events */
+/** App Network Events */
 typedef enum {
     /** QR code available for display. Associated data is the NULL terminated QR payload. */
-    APP_WIFI_EVENT_QR_DISPLAY = 1,
+    APP_NETWORK_EVENT_QR_DISPLAY = 1,
     /** Provisioning timed out */
-    APP_WIFI_EVENT_PROV_TIMEOUT,
+    APP_NETWORK_EVENT_PROV_TIMEOUT,
     /** Provisioning has restarted due to failures (Invalid SSID/Passphrase) */
-    APP_WIFI_EVENT_PROV_RESTART,
+    APP_NETWORK_EVENT_PROV_RESTART,
     /** Provisioning closed due to invalid credentials */
-    APP_WIFI_EVENT_PROV_CRED_MISMATCH,
-} app_wifi_event_t;
+    APP_NETWORK_EVENT_PROV_CRED_MISMATCH,
+} app_network_event_t;
 
 /** Types of Proof of Possession */
 typedef enum {
@@ -48,32 +48,32 @@ typedef enum {
     /** Use random stream generated and stored in fctry partition during claiming process as PoP */
     POP_TYPE_RANDOM,
     /** Do not use any PoP.
-     * Use this option with caution. Consider using `CONFIG_APP_WIFI_PROV_TIMEOUT_PERIOD` with this.
+     * Use this option with caution. Consider using `CONFIG_APP_NETWORK_PROV_TIMEOUT_PERIOD` with this.
      */
     POP_TYPE_NONE,
     /** Use a custom PoP.
-     * Set a custom PoP using app_wifi_set_custom_pop() first.
+     * Set a custom PoP using app_network_set_custom_pop() first.
      */
     POP_TYPE_CUSTOM
-} app_wifi_pop_type_t;
+} app_network_pop_type_t;
 
-/** Initialize Wi-Fi
+/** Initialize Wi-Fi/Thread
  *
- * This initializes Wi-Fi and the Wi-Fi provisioning manager
+ * This initializes Wi-Fi/Thread stack and the network provisioning manager
  */
-void app_wifi_init();
+void app_network_init();
 
-/** Start Wi-Fi
+/** Start Wi-Fi/Thread
  *
- * This will start provisioning if the node is not provisioned and will connect to Wi-Fi
- * if node is provisioned. Function will return successfully only after Wi-Fi is connect
+ * This will start provisioning if the node is not provisioned and will connect to any network
+ * if node is provisioned. Function will return successfully only after network is connected
  *
  * @param[in] pop_type The type for Proof of Possession (PoP) pin
- * 
- * @return ESP_OK on success (Wi-Fi connected).
+ *
+ * @return ESP_OK on success (Network connected).
  * @return error in case of failure.
  */
-esp_err_t app_wifi_start(app_wifi_pop_type_t pop_type);
+esp_err_t app_network_start(app_network_pop_type_t pop_type);
 
 /** Set custom manufacturing data
  *
@@ -87,19 +87,33 @@ esp_err_t app_wifi_start(app_wifi_pop_type_t pop_type);
  * @return ESP_OK on success.
  * @return error in case of failure.
  */
-esp_err_t app_wifi_set_custom_mfg_data(uint16_t device_type, uint8_t device_subtype);
+esp_err_t app_network_set_custom_mfg_data(uint16_t device_type, uint8_t device_subtype);
 
 /** Set custom PoP
  *
  * This can be used to set a custom Proof of Possession (PoP) pin for provisioning.
- * Applicable only if POP_TYPE_CUSTOM is used for app_wifi_start().
+ * Applicable only if POP_TYPE_CUSTOM is used for app_network_start().
  *
  * @param[in] pop A NULL terminated PoP string (typically 8 characters alphanumeric)
  *
  * @return ESP_OK on success.
  * @return error in case of failure.
  */
-esp_err_t app_wifi_set_custom_pop(const char *pop);
+esp_err_t app_network_set_custom_pop(const char *pop);
+
+#if CONFIG_APP_WIFI_PROV_COMPAT
+#define APP_WIFI_EVENT APP_NETWORK_EVENT
+typedef app_network_event_t app_wifi_event_t;
+#define APP_WIFI_EVENT_QR_DISPLAY APP_NETWORK_EVENT_QR_DISPLAY
+#define APP_WIFI_EVENT_PROV_TIMEOUT APP_NETWORK_EVENT_PROV_TIMEOUT
+#define APP_WIFI_EVENT_PROV_RESTART APP_NETWORK_EVENT_PROV_RESTART
+#define APP_WIFI_EVENT_PROV_CRED_MISMATCH APP_NETWORK_EVENT_PROV_CRED_MISMATCH
+typedef app_network_pop_type_t app_wifi_pop_type_t;
+#define app_wifi_init() app_network_init()
+#define app_wifi_start(pop_type) app_network_start(pop_type)
+#define app_wifi_set_custom_mfg_data(device_type, device_subtype) app_network_set_custom_mfg_data(device_type, device_subtype)
+#define app_wifi_set_custom_pop(pop) app_network_set_custom_pop(pop)
+#endif /* !CONFIG_APP_WIFI_PROV_COMPAT */
 
 #ifdef __cplusplus
 }

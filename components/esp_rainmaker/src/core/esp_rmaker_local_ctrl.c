@@ -18,12 +18,18 @@
 #include <nvs.h>
 #include <esp_event.h>
 #include <esp_local_ctrl.h>
+#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 1, 0)
+#include <network_provisioning/manager.h>
+#else
 #include <wifi_provisioning/manager.h>
+#endif
 #include <esp_rmaker_internal.h>
 #include <esp_rmaker_standard_services.h>
 #include <esp_https_server.h>
 #include <esp_rmaker_work_queue.h>
+#ifdef CONFIG_ESP_RMAKER_NETWORK_OVER_WIFI
 #include <mdns.h>
+#endif
 #include <esp_rmaker_utils.h>
 
 #include <esp_idf_version.h>
@@ -67,7 +73,7 @@ enum property_flags {
 static bool g_local_ctrl_is_started = false;
 
 static char *g_serv_name;
-static bool wait_for_wifi_prov;
+static bool wait_for_provisioning;
 /********* Handler functions for responding to control requests / commands *********/
 
 static esp_err_t get_property_values(size_t props_count,
@@ -279,8 +285,11 @@ static esp_err_t __esp_rmaker_start_local_ctrl_service(const char *serv_name)
     https_conf.httpd.ctrl_port = ESP_RMAKER_LOCAL_CTRL_HTTP_CTRL_PORT;
     https_conf.httpd.stack_size = CONFIG_ESP_RMAKER_LOCAL_CTRL_STACK_SIZE;
 
+#ifdef CONFIG_ESP_RMAKER_NETWORK_OVER_WIFI
     mdns_init();
     mdns_hostname_set(serv_name);
+#endif
+
 
     esp_local_ctrl_config_t config = {
         .transport = ESP_LOCAL_CTRL_TRANSPORT_HTTPD,
@@ -334,8 +343,14 @@ static esp_err_t __esp_rmaker_start_local_ctrl_service(const char *serv_name)
     /* Start esp_local_ctrl service */
     ESP_ERROR_CHECK(esp_local_ctrl_start(&config));
 
+#ifdef CONFIG_ESP_RMAKER_NETWORK_OVER_WIFI
+    /* The instance name of mdns service set by esp_local_ctrl_start is 'Local Control Service'.
+     * We should ensure that each end-device should have an unique instance name.
+     */
+    mdns_service_instance_name_set("_esp_local_ctrl", "_tcp", serv_name);
     /* Add node_id in mdns */
     mdns_service_txt_item_set("_esp_local_ctrl", "_tcp", "node_id", esp_rmaker_get_node_id());
+#endif
 
     if (pop) {
         free(pop);
@@ -377,22 +392,39 @@ static void esp_rmaker_local_ctrl_prov_event_handler(void* arg, esp_event_base_t
                           int32_t event_id, void* event_data)
 {
     ESP_LOGI(TAG, "Event %"PRIu32, event_id);
+#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 1, 0)
+    if (event_base == NETWORK_PROV_EVENT) {
+#else
     if (event_base == WIFI_PROV_EVENT) {
+#endif
         switch (event_id) {
+#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 1, 0)
+            case NETWORK_PROV_START:
+#else
             case WIFI_PROV_START:
-                wait_for_wifi_prov = true;
+#endif
+                wait_for_provisioning = true;
                 break;
+#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 1, 0)
+            case NETWORK_PROV_DEINIT:
+#else
             case WIFI_PROV_DEINIT:
-                if (wait_for_wifi_prov == true) {
-                    wait_for_wifi_prov = false;
+#endif
+                if (wait_for_provisioning == true) {
+                    wait_for_provisioning = false;
                     if (g_serv_name) {
                         __esp_rmaker_start_local_ctrl_service(g_serv_name);
                         free(g_serv_name);
                         g_serv_name = NULL;
                     }
                 }
+#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 1, 0)
+                esp_event_handler_unregister(NETWORK_PROV_EVENT, NETWORK_PROV_START, &esp_rmaker_local_ctrl_prov_event_handler);
+                esp_event_handler_unregister(NETWORK_PROV_EVENT, NETWORK_PROV_DEINIT, &esp_rmaker_local_ctrl_prov_event_handler);
+#else
                 esp_event_handler_unregister(WIFI_PROV_EVENT, WIFI_PROV_START, &esp_rmaker_local_ctrl_prov_event_handler);
                 esp_event_handler_unregister(WIFI_PROV_EVENT, WIFI_PROV_DEINIT, &esp_rmaker_local_ctrl_prov_event_handler);
+#endif
                 break;
             default:
                 break;
@@ -410,14 +442,19 @@ esp_err_t esp_rmaker_init_local_ctrl_service(void)
     /* ESP Local Control uses protocomm_httpd, which is also used by SoftAP Provisioning.
      * If local control is started before provisioning ends, it fails because only one protocomm_httpd
      * instance is allowed at a time.
-     * So, we check for the WIFI_PROV_START event, and if received, wait for the WIFI_PROV_DEINIT event
-     * before starting local control.
+     * So, we check for the NETWORK_PROV_START event, and if received, wait for the NETWORK_PROV_DEINIT
+     * event before starting local control.
      * This would not be required in case of BLE Provisioning, but this code has no easy way of knowing
      * what provisioning transport is being used and hence this logic will come into picture for both,
      * SoftAP and BLE provisioning.
      */
+#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 1, 0)
+    esp_event_handler_register(NETWORK_PROV_EVENT, NETWORK_PROV_START, &esp_rmaker_local_ctrl_prov_event_handler, NULL);
+    esp_event_handler_register(NETWORK_PROV_EVENT, NETWORK_PROV_DEINIT, &esp_rmaker_local_ctrl_prov_event_handler, NULL);
+#else
     esp_event_handler_register(WIFI_PROV_EVENT, WIFI_PROV_START, &esp_rmaker_local_ctrl_prov_event_handler, NULL);
     esp_event_handler_register(WIFI_PROV_EVENT, WIFI_PROV_DEINIT, &esp_rmaker_local_ctrl_prov_event_handler, NULL);
+#endif
     return ESP_OK;
 }
 
@@ -427,7 +464,7 @@ esp_err_t esp_rmaker_start_local_ctrl_service(const char *serv_name)
         esp_rmaker_local_ctrl_service_enable();
     }
 
-    if (!wait_for_wifi_prov) {
+    if (!wait_for_provisioning) {
         return __esp_rmaker_start_local_ctrl_service(serv_name);
     }
 
@@ -460,12 +497,19 @@ esp_err_t esp_rmaker_local_ctrl_disable(void)
         free(g_serv_name);
         g_serv_name = NULL;
     }
+#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 1, 0)
+    esp_event_handler_unregister(NETWORK_PROV_EVENT, NETWORK_PROV_START, &esp_rmaker_local_ctrl_prov_event_handler);
+    esp_event_handler_unregister(NETWORK_PROV_EVENT, NETWORK_PROV_DEINIT, &esp_rmaker_local_ctrl_prov_event_handler);
+#else
     esp_event_handler_unregister(WIFI_PROV_EVENT, WIFI_PROV_START, &esp_rmaker_local_ctrl_prov_event_handler);
     esp_event_handler_unregister(WIFI_PROV_EVENT, WIFI_PROV_DEINIT, &esp_rmaker_local_ctrl_prov_event_handler);
+#endif
     if (!g_local_ctrl_is_started) {
         return ESP_OK;
     }
+#ifdef CONFIG_ESP_RMAKER_NETWORK_OVER_WIFI
     mdns_free();
+#endif
     esp_err_t err = esp_local_ctrl_stop();
     if (err != ESP_OK) {
         return err;
