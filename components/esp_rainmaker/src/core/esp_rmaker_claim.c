@@ -40,11 +40,6 @@
 #include <esp_rmaker_factory.h>
 #include <esp_rmaker_utils.h>
 
-#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 1, 0)
-#include <network_provisioning/manager.h>
-#else
-#include <wifi_provisioning/manager.h>
-#endif
 #include <esp_event.h>
 #include <esp_tls.h>
 #include <esp_rmaker_core.h>
@@ -59,6 +54,12 @@
 #include "esp_rmaker_internal.h"
 #include "esp_rmaker_client_data.h"
 #include "esp_rmaker_claim.h"
+
+#if RMAKER_USING_NETWORK_PROV
+#include <network_provisioning/manager.h>
+#else
+#include <wifi_provisioning/manager.h>
+#endif
 
 #if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(4, 4, 0)
 // Features supported in 4.4+
@@ -827,7 +828,7 @@ esp_err_t esp_rmaker_claiming_handler(uint32_t session_id, const uint8_t *inbuf,
 static void event_handler(void* arg, esp_event_base_t event_base,
                           int32_t event_id, void* event_data)
 {
-#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 1, 0)
+#if RMAKER_USING_NETWORK_PROV
     if (event_base == NETWORK_PROV_EVENT) {
         switch (event_id) {
             case NETWORK_PROV_INIT: {
@@ -867,7 +868,7 @@ static void event_handler(void* arg, esp_event_base_t event_base,
                 break;
         }
     }
-#endif
+#endif /* RMAKER_USING_NETWORK_PROV */
 }
 #endif /* CONFIG_ESP_RMAKER_ASSISTED_CLAIM */
 esp_err_t __esp_rmaker_claim_init(esp_rmaker_claim_data_t *claim_data)
@@ -1011,7 +1012,7 @@ esp_err_t esp_rmaker_assisted_claim_perform(esp_rmaker_claim_data_t *claim_data)
     if (claim_data->state == RMAKER_CLAIM_STATE_VERIFY_DONE) {
         err = ESP_OK;
     }
-#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 1, 0)
+#if RMAKER_USING_NETWORK_PROV
     esp_event_handler_unregister(NETWORK_PROV_EVENT, NETWORK_PROV_INIT, &event_handler);
     esp_event_handler_unregister(NETWORK_PROV_EVENT, NETWORK_PROV_START, &event_handler);
 #else
@@ -1027,7 +1028,7 @@ esp_rmaker_claim_data_t *esp_rmaker_assisted_claim_init(void)
     ESP_LOGI(TAG, "Initialising Assisted Claiming. This may take time.");
     esp_rmaker_claim_data_t *claim_data = esp_rmaker_claim_init();
     if (claim_data) {
-#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 1, 0)
+#if RMAKER_USING_NETWORK_PROV
         esp_event_handler_register(NETWORK_PROV_EVENT, NETWORK_PROV_INIT, &event_handler, claim_data);
         esp_event_handler_register(NETWORK_PROV_EVENT, NETWORK_PROV_START, &event_handler, claim_data);
 #else

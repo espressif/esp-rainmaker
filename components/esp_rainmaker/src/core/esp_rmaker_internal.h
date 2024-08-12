@@ -17,10 +17,17 @@
 #include <freertos/queue.h>
 #include <json_generator.h>
 #include <esp_rmaker_core.h>
+#include <esp_idf_version.h>
 
 #define RMAKER_PARAM_FLAG_VALUE_CHANGE   (1 << 0)
 #define RMAKER_PARAM_FLAG_VALUE_NOTIFY   (1 << 1)
 #define ESP_RMAKER_NVS_PART_NAME            "nvs"
+
+#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 1, 0) && defined(CONFIG_ESP_RMAKER_USING_NETWORK_PROV)
+#define RMAKER_USING_NETWORK_PROV 1
+#else
+#define RMAKER_USING_NETWORK_PROV 0
+#endif
 
 typedef enum {
     ESP_RMAKER_STATE_DEINIT = 0,

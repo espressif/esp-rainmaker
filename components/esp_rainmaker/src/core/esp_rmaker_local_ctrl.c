@@ -18,11 +18,6 @@
 #include <nvs.h>
 #include <esp_event.h>
 #include <esp_local_ctrl.h>
-#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 1, 0)
-#include <network_provisioning/manager.h>
-#else
-#include <wifi_provisioning/manager.h>
-#endif
 #include <esp_rmaker_internal.h>
 #include <esp_rmaker_standard_services.h>
 #include <esp_https_server.h>
@@ -33,6 +28,13 @@
 #include <esp_rmaker_utils.h>
 
 #include <esp_idf_version.h>
+
+#if RMAKER_USING_NETWORK_PROV
+#include <network_provisioning/manager.h>
+#else
+#include <wifi_provisioning/manager.h>
+#endif
+
 #if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(4, 2, 0)
 // Features supported in 4.2
 
@@ -392,20 +394,20 @@ static void esp_rmaker_local_ctrl_prov_event_handler(void* arg, esp_event_base_t
                           int32_t event_id, void* event_data)
 {
     ESP_LOGI(TAG, "Event %"PRIu32, event_id);
-#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 1, 0)
+#if RMAKER_USING_NETWORK_PROV
     if (event_base == NETWORK_PROV_EVENT) {
 #else
     if (event_base == WIFI_PROV_EVENT) {
 #endif
         switch (event_id) {
-#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 1, 0)
+#if RMAKER_USING_NETWORK_PROV
             case NETWORK_PROV_START:
 #else
             case WIFI_PROV_START:
 #endif
                 wait_for_provisioning = true;
                 break;
-#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 1, 0)
+#if RMAKER_USING_NETWORK_PROV
             case NETWORK_PROV_DEINIT:
 #else
             case WIFI_PROV_DEINIT:
@@ -418,7 +420,7 @@ static void esp_rmaker_local_ctrl_prov_event_handler(void* arg, esp_event_base_t
                         g_serv_name = NULL;
                     }
                 }
-#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 1, 0)
+#if RMAKER_USING_NETWORK_PROV
                 esp_event_handler_unregister(NETWORK_PROV_EVENT, NETWORK_PROV_START, &esp_rmaker_local_ctrl_prov_event_handler);
                 esp_event_handler_unregister(NETWORK_PROV_EVENT, NETWORK_PROV_DEINIT, &esp_rmaker_local_ctrl_prov_event_handler);
 #else
@@ -448,7 +450,7 @@ esp_err_t esp_rmaker_init_local_ctrl_service(void)
      * what provisioning transport is being used and hence this logic will come into picture for both,
      * SoftAP and BLE provisioning.
      */
-#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 1, 0)
+#if RMAKER_USING_NETWORK_PROV
     esp_event_handler_register(NETWORK_PROV_EVENT, NETWORK_PROV_START, &esp_rmaker_local_ctrl_prov_event_handler, NULL);
     esp_event_handler_register(NETWORK_PROV_EVENT, NETWORK_PROV_DEINIT, &esp_rmaker_local_ctrl_prov_event_handler, NULL);
 #else
@@ -497,7 +499,7 @@ esp_err_t esp_rmaker_local_ctrl_disable(void)
         free(g_serv_name);
         g_serv_name = NULL;
     }
-#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 1, 0)
+#if RMAKER_USING_NETWORK_PROV
     esp_event_handler_unregister(NETWORK_PROV_EVENT, NETWORK_PROV_START, &esp_rmaker_local_ctrl_prov_event_handler);
     esp_event_handler_unregister(NETWORK_PROV_EVENT, NETWORK_PROV_DEINIT, &esp_rmaker_local_ctrl_prov_event_handler);
 #else

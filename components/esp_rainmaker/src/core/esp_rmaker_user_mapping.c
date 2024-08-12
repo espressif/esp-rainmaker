@@ -18,11 +18,6 @@
 #include <nvs.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/semphr.h>
-#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 1, 0)
-#include <network_provisioning/manager.h>
-#else
-#include <wifi_provisioning/manager.h>
-#endif
 #include <json_generator.h>
 #include <esp_rmaker_work_queue.h>
 #include <esp_rmaker_core.h>
@@ -33,6 +28,11 @@
 #include "esp_rmaker_user_mapping.pb-c.h"
 #include "esp_rmaker_internal.h"
 #include "esp_rmaker_mqtt_topics.h"
+#if RMAKER_USING_NETWORK_PROV
+#include <network_provisioning/manager.h>
+#else
+#include <wifi_provisioning/manager.h>
+#endif
 
 static const char *TAG = "esp_rmaker_user_mapping";
 
@@ -75,7 +75,7 @@ static void esp_rmaker_user_mapping_cleanup_data(void)
 static void esp_rmaker_user_mapping_event_handler(void* arg, esp_event_base_t event_base,
                           int32_t event_id, void* event_data)
 {
-#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 1, 0)
+#if RMAKER_USING_NETWORK_PROV
     if (event_base == NETWORK_PROV_EVENT) {
         switch (event_id) {
             case NETWORK_PROV_INIT: {
@@ -325,7 +325,7 @@ int esp_rmaker_user_mapping_handler(uint32_t session_id, const uint8_t *inbuf, s
 }
 esp_err_t esp_rmaker_user_mapping_endpoint_create(void)
 {
-#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 1, 0)
+#if RMAKER_USING_NETWORK_PROV
     esp_err_t err = network_prov_mgr_endpoint_create(USER_MAPPING_ENDPOINT);
 #else
     esp_err_t err = wifi_prov_mgr_endpoint_create(USER_MAPPING_ENDPOINT);
@@ -335,7 +335,7 @@ esp_err_t esp_rmaker_user_mapping_endpoint_create(void)
 
 esp_err_t esp_rmaker_user_mapping_endpoint_register(void)
 {
-#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 1, 0)
+#if RMAKER_USING_NETWORK_PROV
     return network_prov_mgr_endpoint_register(USER_MAPPING_ENDPOINT, esp_rmaker_user_mapping_handler, NULL);
 #else
     return wifi_prov_mgr_endpoint_register(USER_MAPPING_ENDPOINT, esp_rmaker_user_mapping_handler, NULL);
@@ -345,7 +345,7 @@ esp_err_t esp_rmaker_user_mapping_endpoint_register(void)
 esp_err_t esp_rmaker_user_mapping_prov_init(void)
 {
     int ret = ESP_OK;
-#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 1, 0)
+#if RMAKER_USING_NETWORK_PROV
     ret = esp_event_handler_register(NETWORK_PROV_EVENT, NETWORK_PROV_INIT, &esp_rmaker_user_mapping_event_handler, NULL);
 #else
     ret = esp_event_handler_register(WIFI_PROV_EVENT, WIFI_PROV_INIT,&esp_rmaker_user_mapping_event_handler, NULL);
@@ -353,7 +353,7 @@ esp_err_t esp_rmaker_user_mapping_prov_init(void)
     if (ret != ESP_OK) {
         return ret;
     }
-#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 1, 0)
+#if RMAKER_USING_NETWORK_PROV
     ret = esp_event_handler_register(NETWORK_PROV_EVENT, NETWORK_PROV_START, &esp_rmaker_user_mapping_event_handler, NULL);
 #else
     ret = esp_event_handler_register(WIFI_PROV_EVENT, WIFI_PROV_START,&esp_rmaker_user_mapping_event_handler, NULL);
@@ -363,7 +363,7 @@ esp_err_t esp_rmaker_user_mapping_prov_init(void)
 
 esp_err_t esp_rmaker_user_mapping_prov_deinit(void)
 {
-#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 1, 0)
+#if RMAKER_USING_NETWORK_PROV
     esp_event_handler_unregister(NETWORK_PROV_EVENT, NETWORK_PROV_INIT, &esp_rmaker_user_mapping_event_handler);
     esp_event_handler_unregister(NETWORK_PROV_EVENT, NETWORK_PROV_START, &esp_rmaker_user_mapping_event_handler);
 #else

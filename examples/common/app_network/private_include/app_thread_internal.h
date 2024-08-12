@@ -9,9 +9,20 @@
 #include <esp_err.h>
 #include <esp_event.h>
 #include <esp_openthread_types.h>
+#include <esp_idf_version.h>
 
 #ifdef __cplusplus
 extern "C" {
+#endif
+
+#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 1, 0) && defined(CONFIG_ESP_RMAKER_USING_NETWORK_PROV)
+#define RMAKER_USING_NETWORK_PROV 1
+#else
+#define RMAKER_USING_NETWORK_PROV 0
+#endif
+
+#if !RMAKER_USING_NETWORK_PROV
+#error "Please use IDF v5.1+ and enable ESP_RMAKER_USING_NETWORK_PROV for Thread devices"
 #endif
 
 #if SOC_IEEE802154_SUPPORTED
