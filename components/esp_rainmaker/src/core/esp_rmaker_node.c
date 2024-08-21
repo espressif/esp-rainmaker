@@ -13,18 +13,18 @@
 // limitations under the License.
 #include <sdkconfig.h>
 #include <string.h>
-#include <esp_wifi.h>
+#include "esp_idf_version.h"
 #include <esp_log.h>
+#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 0, 0)
+#include <esp_app_desc.h>
+#else
 #include <esp_ota_ops.h>
+#endif
 #include <esp_rmaker_utils.h>
 #include <esp_rmaker_core.h>
 #include <esp_rmaker_secure_boot_digest.h>
 
 #include "esp_rmaker_internal.h"
-
-#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 0, 0)
-#include <esp_app_desc.h>
-#endif
 
 static const char *TAG = "esp_rmaker_node";
 
