@@ -1,5 +1,13 @@
 # Changes
 
+## 7-Aug-2024: Enabled ESP-Insights command response feature
+ - With ESP-Insights updated to the newer component, the command response feature from rainmaker can be used.
+ - To use the same, in addition to enabling esp-insights, please set below option from menuconfig:
+ ```bash
+CONFIG_ESP_INSIGHTS_CMD_RESP_ENABLED=y
+ ```
+ - More info on this can be found [here](https://github.com/espressif/esp-insights/blob/main/FEATURES.md#command-response).
+
 ## 18-Jul-2024: Use network_provsioning for ESP-IDF v5.1 or later to support RainMaker over Thread
 - The network_provisioning component can be used for provisioning both Wi-Fi or Thread devices. It also stays backward capabitable with wifi_provisioning component.
 

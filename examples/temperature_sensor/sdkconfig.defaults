@@ -31,3 +31,7 @@ CONFIG_ESP_RMAKER_LOCAL_CTRL_SECURITY_1=y
 
 # Application Rollback
 CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE=y
+
+# If ESP-Insights is enabled, we need MQTT transport selected
+# Takes out manual efforts to enable this option
+CONFIG_ESP_INSIGHTS_TRANSPORT_MQTT=y

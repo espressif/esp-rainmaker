@@ -22,8 +22,6 @@
 #define APP_INSIGHTS_LOG_TYPE               ESP_DIAG_LOG_TYPE_ERROR
 #endif /* CONFIG_APP_INSIGHTS_ENABLE_LOG_TYPE_ALL */
 
-esp_err_t esp_insights_enable(esp_insights_config_t *config);
-
 #define INSIGHTS_TOPIC_SUFFIX       "diagnostics/from-node"
 #define INSIGHTS_TOPIC_RULE         "insights_message_delivery"
 
@@ -80,6 +78,9 @@ static void rmaker_common_event_handler(void* arg, esp_event_base_t event_base,
 esp_err_t app_insights_enable(void)
 {
 #ifdef CONFIG_ESP_INSIGHTS_ENABLED
+#ifndef CONFIG_ESP_INSIGHTS_TRANSPORT_MQTT
+    ESP_LOGE(TAG, "Please select the CONFIG_ESP_INSIGHTS_TRANSPORT_MQTT option from menuconfig");
+#endif
     /* Initialize the event loop, if not done already. */
     esp_err_t err = esp_event_loop_create_default();
     /* If the default event loop is already initialized, we get ESP_ERR_INVALID_STATE */
@@ -108,7 +109,12 @@ esp_err_t app_insights_enable(void)
         .node_id  = node_id,
         .alloc_ext_ram = true,
     };
+
     esp_insights_enable(&config);
+
+    if (esp_insights_cmd_resp_enable()!= ESP_OK) {
+        ESP_LOGE(TAG, "Failed to enabled insights command response");
+    }
 #else
     ESP_LOGI(TAG, "Enable CONFIG_ESP_INSIGHTS_ENABLED to get Insights.");
 #endif /* ! CONFIG_ESP_INSIGHTS_ENABLED */

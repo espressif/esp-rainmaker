@@ -39,3 +39,7 @@ CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE=y
 
 # Change default log level to reduce binary size
 CONFIG_LOG_DEFAULT_LEVEL_WARN=y
+
+# If ESP-Insights is enabled, we need MQTT transport selected
+# Takes out manual efforts to enable this option
+CONFIG_ESP_INSIGHTS_TRANSPORT_MQTT=y

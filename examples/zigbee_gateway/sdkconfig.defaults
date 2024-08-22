@@ -99,3 +99,7 @@ CONFIG_PIN_TO_RCP_RX=18
 #
 CONFIG_IEEE802154_RECEIVE_DONE_HANDLER=y
 # end of IEEE802154
+
+# If ESP-Insights is enabled, we need MQTT transport selected
+# Takes out manual efforts to enable this option
+CONFIG_ESP_INSIGHTS_TRANSPORT_MQTT=y
