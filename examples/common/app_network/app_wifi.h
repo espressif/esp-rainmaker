@@ -9,6 +9,10 @@
 #include <sdkconfig.h>
 #include <app_network.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #if CONFIG_APP_WIFI_PROV_COMPAT
 #define APP_WIFI_EVENT APP_NETWORK_EVENT
 typedef app_network_event_t app_wifi_event_t;
