@@ -44,7 +44,6 @@ typedef struct {
     esp_rmaker_ota_report_fn_t report_fn;
 } esp_rmaker_ota_t;
 
-char *esp_rmaker_ota_status_to_string(ota_status_t status);
 void esp_rmaker_ota_common_cb(void *priv);
 void esp_rmaker_ota_finish_using_params(esp_rmaker_ota_t *ota);
 void esp_rmaker_ota_finish_using_topics(esp_rmaker_ota_t *ota);

@@ -623,7 +623,7 @@ static esp_err_t esp_ota_check_for_mqtt(esp_rmaker_ota_t *ota)
     return esp_event_handler_register(RMAKER_COMMON_EVENT, RMAKER_MQTT_EVENT_CONNECTED, &event_handler, ota);
 }
 
-static esp_err_t esp_rmaker_erase_rollback_flag(void)
+esp_err_t esp_rmaker_ota_erase_rollback_flag(void)
 {
     nvs_handle handle;
     esp_err_t err = nvs_open_from_partition(ESP_RMAKER_NVS_PART_NAME, RMAKER_OTA_NVS_NAMESPACE, NVS_READWRITE, &handle);
@@ -635,20 +635,26 @@ static esp_err_t esp_rmaker_erase_rollback_flag(void)
     return ESP_OK;
 }
 
-static void esp_rmaker_ota_manage_rollback(esp_rmaker_ota_t *ota)
-{
-    /* If rollback is enabled, and the ota update flag is found, it means that the OTA validation is pending
-    */
+bool esp_rmaker_ota_is_ota_validation_pending(void) {
     nvs_handle handle;
     esp_err_t err = nvs_open_from_partition(ESP_RMAKER_NVS_PART_NAME, RMAKER_OTA_NVS_NAMESPACE, NVS_READWRITE, &handle);
     if (err == ESP_OK) {
         uint8_t ota_update = 0;
         size_t len = sizeof(ota_update);
+
+        /* If rollback is enabled, and the ota update flag is found, it means that the OTA validation is pending */
         if ((err = nvs_get_blob(handle, RMAKER_OTA_UPDATE_FLAG_NVS_NAME, &ota_update, &len)) == ESP_OK) {
-            ota->validation_in_progress = true;
+            return true;
         }
         nvs_close(handle);
     }
+    
+    return false;
+}
+
+static void esp_rmaker_ota_manage_rollback(esp_rmaker_ota_t *ota)
+{
+    ota->validation_in_progress = esp_rmaker_ota_is_ota_validation_pending();
     const esp_partition_t *running = esp_ota_get_running_partition();
     esp_ota_img_states_t ota_state;
     if (esp_ota_get_state_partition(running, &ota_state) == ESP_OK) {
@@ -685,7 +691,7 @@ static void esp_rmaker_ota_manage_rollback(esp_rmaker_ota_t *ota)
             */
             if (ota->validation_in_progress) {
                 ota->rolled_back = true;
-                esp_rmaker_erase_rollback_flag();
+                esp_rmaker_ota_erase_rollback_flag();
                 if (ota->type == OTA_USING_PARAMS) {
                     /* Calling this only for OTA_USING_PARAMS, because for OTA_USING_TOPICS,
                      * the work queue function will manage the status reporting later.

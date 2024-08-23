@@ -55,6 +55,13 @@ typedef enum {
     OTA_STATUS_REJECTED,
 } ota_status_t;
 
+/** Returns string representation of ota_status_t for reporting
+ * 
+ * @param status ota_status_t variant
+ * @return string representation for provided status, "invalid" if not valid status
+ */
+char *esp_rmaker_ota_status_to_string(ota_status_t status);
+
 /** OTA Workflow type */
 typedef enum {
     /** OTA will be performed using services and parameters. */
@@ -237,6 +244,21 @@ esp_err_t esp_rmaker_ota_report_status(esp_rmaker_ota_handle_t ota_handle, ota_s
  * @return ESP_FAIL if the OTA failed.
  * */
 esp_err_t esp_rmaker_ota_default_cb(esp_rmaker_ota_handle_t handle, esp_rmaker_ota_data_t *ota_data);
+
+/** Clear Rollback flag
+ * The default OTA callback stores a value in NVS as a flag to denote if an OTA was recently installed.
+ * This flag is then read to decide if firmware has been rolled back.
+ * This function can be called to erase that flag.
+ */
+esp_err_t esp_rmaker_ota_erase_rollback_flag(void);
+
+/** Returns whether OTA validation is pending.
+ * Returns true if firmware validation is pending after an OTA.
+ * This can be reset using esp_rmaker_ota_erase_rollback_flag()
+ * 
+ * @return true if validation is pending, false otherwises
+ */
+bool esp_rmaker_ota_is_ota_validation_pending(void);
 
 /** Fetch OTA Info
  *
