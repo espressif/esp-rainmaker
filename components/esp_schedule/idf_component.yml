@@ -7,4 +7,3 @@ issues: https://github.com/espressif/esp-rainmaker/issues
 dependencies:
   espressif/rmaker_common:
     version: "~1.4.2"
-    override_path: '../rmaker_common/'

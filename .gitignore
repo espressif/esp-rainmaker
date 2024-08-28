@@ -83,3 +83,11 @@ docs/docusaurus/website/node_modules
 # IDF package manager
 **/managed_components/
 *.lock
+
+# Patch files
+*.patch
+
+# Failed patch files
+*.rej
+*.orig
+
