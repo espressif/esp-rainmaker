@@ -763,6 +763,9 @@ static esp_err_t __esp_rmaker_param_report_time_series(json_gen_str_t *jptr, con
     }
     snprintf(param_name, sizeof(param_name), "%s.%s", device->name, _param->name);
     json_gen_obj_set_string(jptr, "name", param_name);
+    if (_param->type) {
+        json_gen_obj_set_string(jptr, "type", _param->type);
+    }
     esp_rmaker_report_data_type( _param->val.type, "dt", jptr);
     json_gen_push_array(jptr, "records");
     __esp_rmaker_param_report_time_series_records(jptr, _param);
@@ -842,6 +845,9 @@ static esp_err_t esp_rmaker_param_report_simple_time_series(const esp_rmaker_par
     char param_name[MAX_TS_DATA_PARAM_NAME];
     snprintf(param_name, sizeof(param_name), "%s.%s", _device->name, _param->name);
     json_gen_obj_set_string(&jstr, "name", param_name);
+    if (_param->type) {
+        json_gen_obj_set_string(&jstr, "type", _param->type);
+    }
     esp_rmaker_report_data_type(_param->val.type, "dt", &jstr);
     time_t current_timestamp = 0;
     time(&current_timestamp);
