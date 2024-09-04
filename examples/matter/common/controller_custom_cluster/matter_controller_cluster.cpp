@@ -701,7 +701,7 @@ MatterControllerAttrAccess g_attr_access;
 
 void controller_cluster_plugin_server_init_callback()
 {
-    registerAttributeAccessOverride(&g_attr_access);
+    chip::app::AttributeAccessInterfaceRegistry::Instance().Register(&g_attr_access);
 }
 
 cluster_t *create(endpoint_t *endpoint, uint8_t flags)
