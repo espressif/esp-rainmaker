@@ -160,7 +160,7 @@ build_idf_v5.3:
 
 build_matter:
   stage: build
-  image: espressif/esp-matter:latest_idf_v5.2.1
+  image: espressif/esp-matter:latest_idf_v5.2.1@sha256:57344841c684d5b9d61b165b4c69160f6050f684314ab9085b170bcd9a5638f1
   tags:
     - build
   variables:

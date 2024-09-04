@@ -5,7 +5,7 @@
 ## Prerequisites
 
 - ESP-IDF [v5.2.2](https://github.com/espressif/esp-idf/releases/v5.2.2)
-- [ESP-Matter SDK](https://github.com/espressif/esp-matter)
+- [ESP-Matter SDK](https://github.com/espressif/esp-matter). Latest known working commit is [7b17d1](https://github.com/espressif/esp-matter/tree/7b17d1683163557d206536f17f5b016104e53029).
 - [ESP Rainmaker SDK](https://github.com/espressif/esp-rainmaker)
 - [ESP Secure Cert Manager](https://github.com/espressif/esp_secure_cert_mgr)
 Please go through the installation process (if required) for all of the above prerequisites.
