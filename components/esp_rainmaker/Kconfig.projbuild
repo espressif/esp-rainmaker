@@ -388,4 +388,12 @@ menu "ESP RainMaker Config"
 
     endmenu
 
+    config ESP_RMAKER_USING_NETWORK_PROV
+        bool "Using Network Provisioning"
+        default y
+        help
+            RainMaker will use network_provisioning component to provision a device to a Wi-Fi/Thread network if enabling this option.
+            If the option is not enabled, it will use wifi_provisioning instead. This option only works when IDF verson is later than
+            v5.1.
+
 endmenu

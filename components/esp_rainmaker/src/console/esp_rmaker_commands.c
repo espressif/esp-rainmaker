@@ -18,18 +18,18 @@
 #include <esp_log.h>
 #include <esp_wifi.h>
 #include <esp_console.h>
-#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 1, 0)
-#include <network_provisioning/manager.h>
-#else
-#include <wifi_provisioning/manager.h>
-#endif
-
 #include <esp_rmaker_core.h>
 #include <esp_rmaker_user_mapping.h>
 #include <esp_rmaker_utils.h>
 #include <esp_rmaker_cmd_resp.h>
 
+#include <esp_rmaker_internal.h>
 #include <esp_rmaker_console_internal.h>
+#if RMAKER_USING_NETWORK_PROV
+#include <network_provisioning/manager.h>
+#else
+#include <wifi_provisioning/manager.h>
+#endif
 
 static const char *TAG = "esp_rmaker_commands";
 
@@ -90,13 +90,13 @@ static int wifi_prov_handler(int argc, char** argv)
 
     /* If device is still provisioning, use  network_prov_mgr_configure_wifi_sta/wifi_prov_mgr_configure_sta */
     bool provisioned = false;
-#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 1, 0)
+#if RMAKER_USING_NETWORK_PROV
     network_prov_mgr_is_wifi_provisioned(&provisioned);
 #else
     wifi_prov_mgr_is_provisioned(&provisioned);
 #endif
     if (!provisioned) { // provisioning in progress
-#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 1, 0)
+#if RMAKER_USING_NETWORK_PROV
         network_prov_mgr_configure_wifi_sta(&wifi_config);
 #else
         wifi_prov_mgr_configure_sta(&wifi_config);

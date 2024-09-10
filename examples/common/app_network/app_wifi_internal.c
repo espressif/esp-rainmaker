@@ -14,6 +14,8 @@
 #include <esp_log.h>
 #include <esp_idf_version.h>
 #include <esp_rmaker_utils.h>
+#include <app_network.h>
+#include <app_wifi_internal.h>
 #if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(4, 1, 0)
 // Features supported in 4.1+
 #define ESP_NETIF_SUPPORTED
@@ -25,7 +27,7 @@
 #include <tcpip_adapter.h>
 #endif
 
-#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 1, 0)
+#if RMAKER_USING_NETWORK_PROV
 #include <network_provisioning/manager.h>
 #ifdef CONFIG_APP_NETWORK_PROV_TRANSPORT_BLE
 #include <network_provisioning/scheme_ble.h>
@@ -61,20 +63,20 @@ static void event_handler(void* arg, esp_event_base_t event_base,
     static int retries = 0;
 #endif
 
-#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 1, 0)
+#if RMAKER_USING_NETWORK_PROV
     if (event_base == NETWORK_PROV_EVENT) {
 #else
     if (event_base == WIFI_PROV_EVENT) {
 #endif
         switch (event_id) {
-#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 1, 0)
+#if RMAKER_USING_NETWORK_PROV
             case NETWORK_PROV_START:
 #else
             case WIFI_PROV_START:
 #endif
                 ESP_LOGI(TAG, "Provisioning started");
                 break;
-#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 1, 0)
+#if RMAKER_USING_NETWORK_PROV
             case NETWORK_PROV_WIFI_CRED_RECV: {
 #else
             case WIFI_PROV_CRED_RECV: {
@@ -86,7 +88,7 @@ static void event_handler(void* arg, esp_event_base_t event_base,
                          (const char *) wifi_sta_cfg->password);
                 break;
             }
-#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 1, 0)
+#if RMAKER_USING_NETWORK_PROV
             case NETWORK_PROV_WIFI_CRED_FAIL: {
                 network_prov_wifi_sta_fail_reason_t *reason = (network_prov_wifi_sta_fail_reason_t *)event_data;
 #else
@@ -95,7 +97,7 @@ static void event_handler(void* arg, esp_event_base_t event_base,
 #endif
                 ESP_LOGE(TAG, "Provisioning failed!\n\tReason : %s"
                          "\n\tPlease reset to factory and retry provisioning",
-#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 1, 0)
+#if RMAKER_USING_NETWORK_PROV
                          (*reason == NETWORK_PROV_WIFI_STA_AUTH_ERROR) ?
 #else
                          (*reason == WIFI_PROV_STA_AUTH_ERROR) ?
@@ -106,11 +108,11 @@ static void event_handler(void* arg, esp_event_base_t event_base,
                 if (retries >= CONFIG_APP_NETWORK_PROV_MAX_RETRY_CNT) {
 #if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(4, 3, 1)
                     ESP_LOGI(TAG, "Failed to connect with provisioned AP, reseting provisioned credentials");
-#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 1, 0)
+#if RMAKER_USING_NETWORK_PROV
                     network_prov_mgr_reset_wifi_sm_state_on_failure();
 #else
                     wifi_prov_mgr_reset_sm_state_on_failure();
-#endif // ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 1, 0)
+#endif // RMAKER_USING_NETWORK_PROV
                     esp_event_post(APP_NETWORK_EVENT, APP_NETWORK_EVENT_PROV_RESTART, NULL, 0, portMAX_DELAY);
 #else
                     ESP_LOGW(TAG, "Failed to connect with provisioned AP, please reset to provisioning manually");
@@ -120,7 +122,7 @@ static void event_handler(void* arg, esp_event_base_t event_base,
 #endif // CONFIG_APP_NETWORK_RESET_PROV_ON_FAILURE
                 break;
             }
-#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 1, 0)
+#if RMAKER_USING_NETWORK_PROV
             case NETWORK_PROV_WIFI_CRED_SUCCESS:
 #else
             case WIFI_PROV_CRED_SUCCESS:
@@ -158,7 +160,7 @@ esp_err_t wifi_init(void)
     tcpip_adapter_init();
 #endif
     /* Register our event handler for Wi-Fi, IP and Provisioning related events */
-#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 1, 0)
+#if RMAKER_USING_NETWORK_PROV
     ESP_ERROR_CHECK(esp_event_handler_register(NETWORK_PROV_EVENT, ESP_EVENT_ANY_ID, &event_handler, NULL));
 #else
     ESP_ERROR_CHECK(esp_event_handler_register(WIFI_PROV_EVENT, ESP_EVENT_ANY_ID, &event_handler, NULL));
@@ -181,7 +183,7 @@ esp_err_t wifi_start(const char *pop, const char *service_name, const char *serv
                      size_t mfg_data_len, bool *provisioned)
 {
 #ifdef CONFIG_ESP_RMAKER_NETWORK_OVER_WIFI
-#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 1, 0)
+#if RMAKER_USING_NETWORK_PROV
     /* Configuration for the provisioning manager */
     network_prov_mgr_config_t config = {
         /* What is the Provisioning Scheme that we want ?
@@ -210,7 +212,7 @@ esp_err_t wifi_start(const char *pop, const char *service_name, const char *serv
     /* Initialize provisioning manager with the
      * configuration parameters set above */
     ESP_ERROR_CHECK(network_prov_mgr_init(config));
-#else // ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 1, 0)
+#else // RMAKER_USING_NETWORK_PROV
     /* Configuration for the provisioning manager */
     wifi_prov_mgr_config_t config = {
         /* What is the Provisioning Scheme that we want ?
@@ -239,9 +241,9 @@ esp_err_t wifi_start(const char *pop, const char *service_name, const char *serv
     /* Initialize provisioning manager with the
      * configuration parameters set above */
     ESP_ERROR_CHECK(wifi_prov_mgr_init(config));
-#endif // ESP_IDF_VERSION < ESP_IDF_VERSION_VAL(5, 1, 0)
+#endif // RMAKER_USING_NETWORK_PROV
     /* Let's find out if the device is provisioned */
-#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 1, 0)
+#if RMAKER_USING_NETWORK_PROV
     network_prov_mgr_is_wifi_provisioned(provisioned);
 #else
     wifi_prov_mgr_is_provisioned(provisioned);
@@ -260,7 +262,7 @@ esp_err_t wifi_start(const char *pop, const char *service_name, const char *serv
          *          using X25519 key exchange and proof of possession (pop) and AES-CTR
          *          for encryption/decryption of messages.
          */
-#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 1, 0)
+#if RMAKER_USING_NETWORK_PROV
         network_prov_security_t security = NETWORK_PROV_SECURITY_1;
 #else
         wifi_prov_security_t security = WIFI_PROV_SECURITY_1;
@@ -282,7 +284,7 @@ esp_err_t wifi_start(const char *pop, const char *service_name, const char *serv
             0xb4, 0xdf, 0x5a, 0x1c, 0x3f, 0x6b, 0xf4, 0xbf,
             0xea, 0x4a, 0x82, 0x03, 0x04, 0x90, 0x1a, 0x02,
         };
-#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 1, 0)
+#if RMAKER_USING_NETWORK_PROV
         esp_err_t err = network_prov_scheme_ble_set_service_uuid(custom_service_uuid);
 #else
         esp_err_t err = wifi_prov_scheme_ble_set_service_uuid(custom_service_uuid);
@@ -293,7 +295,7 @@ esp_err_t wifi_start(const char *pop, const char *service_name, const char *serv
         }
 #if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(4, 2, 0)
         if (mfg_data) {
-#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 1, 0)
+#if RMAKER_USING_NETWORK_PROV
             err = network_prov_scheme_ble_set_mfg_data(mfg_data, mfg_data_len);
 #else
             err = wifi_prov_scheme_ble_set_mfg_data(mfg_data, mfg_data_len);
@@ -307,7 +309,7 @@ esp_err_t wifi_start(const char *pop, const char *service_name, const char *serv
 #endif /* CONFIG_APP_NETWORK_PROV_TRANSPORT_BLE */
 
         /* Start provisioning service */
-#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 1, 0)
+#if RMAKER_USING_NETWORK_PROV
         ESP_ERROR_CHECK(network_prov_mgr_start_provisioning(security, pop, service_name, service_key));
 #else
         ESP_ERROR_CHECK(wifi_prov_mgr_start_provisioning(security, pop, service_name, service_key));
@@ -316,7 +318,7 @@ esp_err_t wifi_start(const char *pop, const char *service_name, const char *serv
         ESP_LOGI(TAG, "Already provisioned, starting Wi-Fi STA");
         /* We don't need the manager as device is already provisioned,
          * so let's release it's resources */
-#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 1, 0)
+#if RMAKER_USING_NETWORK_PROV
         network_prov_mgr_deinit();
 #else
         wifi_prov_mgr_deinit();

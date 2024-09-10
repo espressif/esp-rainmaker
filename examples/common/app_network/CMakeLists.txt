@@ -1,9 +1,7 @@
-set(priv_req qrcode nvs_flash esp_event rmaker_common vfs)
+set(priv_req qrcode nvs_flash esp_event rmaker_common vfs wifi_provisioning)
 
 if ("${IDF_VERSION_MAJOR}.${IDF_VERSION_MINOR}" VERSION_GREATER_EQUAL "5.1")
     list(APPEND priv_req network_provisioning openthread)
-else()
-    list(APPEND priv_req wifi_provisioning)
 endif()
 
 idf_component_register(SRCS "app_wifi_internal.c" "app_network.c" "app_thread_internal.c"
