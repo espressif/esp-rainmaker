@@ -1,5 +1,12 @@
 # Changes
 
+## 27-Sep-2024: Modified esp-rainmaker examples to use partitions_4mb_optimised.csv
+ - RainMaker examples now use `partitions_4mb_optimised.csv` by default instead of `partitions.csv` and it is recommended to use the same in any new RainMaker projects.
+ - The fctry partition address is different for this partition table. So, if the host claiming is used, please pass the new address using:
+ ```bash
+esp-rainmaker-cli claim $ESPPORT --address 0x3fa000
+ ```
+
 ## 7-Aug-2024: Enabled ESP-Insights command response feature
  - With ESP-Insights updated to the newer component, the command response feature from rainmaker can be used.
  - To use the same, in addition to enabling esp-insights, please set below option from menuconfig:
