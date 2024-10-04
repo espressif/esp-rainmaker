@@ -122,10 +122,16 @@ esp_err_t esp_rmaker_ota_report_status(esp_rmaker_ota_handle_t ota_handle, ota_s
     }
     esp_rmaker_ota_t *ota = (esp_rmaker_ota_t *)ota_handle;
     esp_err_t err = ESP_FAIL;
-    if (ota->type == OTA_USING_PARAMS) {
-        err = esp_rmaker_ota_report_status_using_params(ota_handle, status, additional_info);
-    } else if (ota->type == OTA_USING_TOPICS) {
-        err = esp_rmaker_ota_report_status_using_topics(ota_handle, status, additional_info);
+    
+    if (ota->report_fn) {
+        char *job_id = NULL;
+        if (ota->transient_priv) {
+            job_id = ota->transient_priv;
+        }
+        err = ota->report_fn(job_id, status, additional_info);
+
+    } else {
+        ESP_LOGE(TAG, "Report fn not found");
     }
     if (err == ESP_OK) {
         esp_rmaker_ota_t *ota = (esp_rmaker_ota_t *)ota_handle;
@@ -337,6 +343,24 @@ esp_err_t esp_rmaker_ota_default_cb(esp_rmaker_ota_handle_t ota_handle, esp_rmak
     if (!ota_data->url) {
         return ESP_FAIL;
     }
+
+    esp_rmaker_ota_handle_t handle_internal = NULL;
+
+    if (!ota_handle) {
+        /* Since ota_handle is not present, this default callback might be being called directly externally 
+         * We'll set the bare minimum fields required by the esp_rmaker_report_status. 
+         */
+        handle_internal =  MEM_CALLOC_EXTRAM(1, sizeof(esp_rmaker_ota_t));
+        if(handle_internal == NULL){
+            ESP_LOGE(TAG, "Failed to allocate memory for OTA handle.");
+            return ESP_ERR_NO_MEM;
+        }
+        esp_rmaker_ota_t *ota = (esp_rmaker_ota_t *) handle_internal;
+        ota->report_fn = ota_data->report_fn;
+        ota->transient_priv = (void *) ota_data->ota_job_id;
+        ota_handle = handle_internal;
+     }
+
     /* Handle OTA metadata, if any */
     if (ota_data->metadata) {
         if (esp_rmaker_ota_handle_metadata(ota_handle, ota_data) != OTA_OK) {
@@ -386,7 +410,9 @@ esp_err_t esp_rmaker_ota_default_cb(esp_rmaker_ota_handle_t ota_handle, esp_rmak
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "ESP HTTPS OTA Begin failed");
         esp_rmaker_ota_report_status(ota_handle, OTA_STATUS_FAILED, "ESP HTTPS OTA Begin failed");
-        return ESP_FAIL;
+
+        err = ESP_FAIL;
+        goto end;
     }
 
 #ifdef CONFIG_ESP_RMAKER_NETWORK_OVER_WIFI
@@ -488,7 +514,7 @@ ota_end:
         ESP_LOGI(TAG, "OTA upgrade successful. Auto reboot is disabled. Requesting a Reboot via Event handler.");
         esp_rmaker_ota_post_event(RMAKER_OTA_EVENT_REQ_FOR_REBOOT, NULL, 0);
 #endif
-        return ESP_OK;
+        err = ESP_OK;
     } else {
         if (ota_finish_err == ESP_ERR_OTA_VALIDATE_FAILED) {
             ESP_LOGE(TAG, "Image validation failed, image is corrupted");
@@ -500,7 +526,12 @@ ota_end:
             ESP_LOGE(TAG, "ESP_HTTPS_OTA upgrade failed %d", ota_finish_err);
         }
     }
-    return ESP_FAIL;
+
+end:
+    if (handle_internal) {
+        free(handle_internal);
+    }
+    return err;
 }
 
 static void event_handler(void* arg, esp_event_base_t event_base,

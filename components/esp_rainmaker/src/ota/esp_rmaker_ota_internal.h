@@ -41,6 +41,7 @@ typedef struct {
     ota_status_t last_reported_status;
     void *transient_priv;
     char *metadata;
+    esp_rmaker_ota_report_fn_t report_fn;
 } esp_rmaker_ota_t;
 
 char *esp_rmaker_ota_status_to_string(ota_status_t status);
@@ -48,8 +49,8 @@ void esp_rmaker_ota_common_cb(void *priv);
 void esp_rmaker_ota_finish_using_params(esp_rmaker_ota_t *ota);
 void esp_rmaker_ota_finish_using_topics(esp_rmaker_ota_t *ota);
 esp_err_t esp_rmaker_ota_enable_using_params(esp_rmaker_ota_t *ota);
-esp_err_t esp_rmaker_ota_report_status_using_params(esp_rmaker_ota_handle_t ota_handle,
+esp_err_t esp_rmaker_ota_report_status_using_params(char *ota_job_id,
             ota_status_t status, char *additional_info);
 esp_err_t esp_rmaker_ota_enable_using_topics(esp_rmaker_ota_t *ota);
-esp_err_t esp_rmaker_ota_report_status_using_topics(esp_rmaker_ota_handle_t ota_handle,
+esp_err_t esp_rmaker_ota_report_status_using_topics(char *ota_job_id,
         ota_status_t status, char *additional_info);

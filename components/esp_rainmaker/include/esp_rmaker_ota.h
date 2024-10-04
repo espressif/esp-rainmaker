@@ -65,6 +65,19 @@ typedef enum {
 
 /** The OTA Handle to be used by the OTA callback */
 typedef void *esp_rmaker_ota_handle_t;
+/** Function Prototype for Reporting Intermediate OTA States
+ * 
+ * This function is called to notify RainMaker dashbord of OTA Progress
+ * 
+ * @param ota_job_id Job Id to report.
+ * @param status OTA status to report.
+ * @param additional_info Descriptionn to report.
+ * 
+ * @return ESP_OK on success
+ * @return error on faliure
+ */
+typedef esp_err_t (*esp_rmaker_ota_report_fn_t)(char *ota_job_id, ota_status_t status, char* additional_info); 
+
 
 /** OTA Data */
 typedef struct {
@@ -83,6 +96,8 @@ typedef struct {
     char *priv;
     /** OTA Metadata. Applicable only for OTA using Topics. Will be received (if applicable) from the backend, along with the OTA URL */
     char *metadata;
+    /** The Function to be called for reporting OTA status. This can be used if needed to override transport of OTA*/
+    esp_rmaker_ota_report_fn_t report_fn;
 } esp_rmaker_ota_data_t;
 
 /** Function prototype for OTA Callback
