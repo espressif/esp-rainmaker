@@ -32,8 +32,8 @@ extern "C" {
                 .rx_flow_ctrl_thresh = 0,                                      \
                 .source_clk = UART_SCLK_DEFAULT,                               \
             },                                                                 \
-        .rx_pin = GPIO_NUM_17,                                                 \
-        .tx_pin = GPIO_NUM_18,                                                 \
+        .rx_pin = CONFIG_PIN_TO_RCP_TX,                                        \
+        .tx_pin = CONFIG_PIN_TO_RCP_RX,                                        \
     },                                                                         \
   }
 
@@ -52,8 +52,9 @@ extern "C" {
 #ifdef CONFIG_AUTO_UPDATE_RCP
 #define ESP_OPENTHREAD_RCP_UPDATE_CONFIG()                                                                           \
     {                                                                                                                \
-        .rcp_type = RCP_TYPE_ESP32H2_UART, .uart_rx_pin = GPIO_NUM_17, .uart_tx_pin = GPIO_NUM_18, .uart_port = 1,   \
-        .uart_baudrate = 115200, .reset_pin = GPIO_NUM_7, .boot_pin = GPIO_NUM_8, .update_baudrate = 460800,         \
+        .rcp_type = RCP_TYPE_ESP32H2_UART, .uart_rx_pin = CONFIG_PIN_TO_RCP_TX, .uart_tx_pin = CONFIG_PIN_TO_RCP_RX, \
+        .uart_port = 1, .uart_baudrate = 115200, .reset_pin = CONFIG_PIN_TO_RCP_RESET,                               \
+        .boot_pin = CONFIG_PIN_TO_RCP_BOOT, .update_baudrate = 460800,                                               \
         .firmware_dir = "/" CONFIG_RCP_PARTITION_NAME "/ot_rcp", .target_chip = ESP32H2_CHIP,                        \
     }
 #endif
