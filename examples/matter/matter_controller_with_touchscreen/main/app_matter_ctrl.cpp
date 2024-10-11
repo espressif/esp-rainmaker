@@ -10,7 +10,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include <DataModelLogger.h>
+#include <commands/clusters/DataModelLogger.h>
 #include <app_matter.h>
 #include <device.h>
 #include <esp_check.h>
