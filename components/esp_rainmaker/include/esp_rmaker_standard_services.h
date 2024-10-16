@@ -37,9 +37,9 @@ extern "C"
  */
 esp_rmaker_device_t *esp_rmaker_ota_service_create(const char *serv_name, void *priv_data);
 
-/** Create a standard OTA service
+/** Create a standard Time service
  *
- * This creates an OTA service with the mandatory parameters. The default parameter names will be used.
+ * This creates a Time service with the mandatory parameters. The default parameter names will be used.
  * Refer \ref esp_rmaker_standard_params.h for default names.
  *
  * @param[in] serv_name The unique service name

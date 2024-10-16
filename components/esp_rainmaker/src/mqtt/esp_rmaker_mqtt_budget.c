@@ -147,7 +147,7 @@ esp_err_t esp_rmaker_mqtt_budgeting_init(void)
      * to be invoked since it is called from MQTT init. Else, MQTT itself is going to fail.
      */
     ESP_LOGW(TAG, "MQTT Budgeting is not enabled.");
-    return ESP_FAIL;
+    return ESP_OK;
 }
 
 esp_err_t esp_rmaker_mqtt_budgeting_deinit(void)
