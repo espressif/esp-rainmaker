@@ -78,6 +78,10 @@ before_script:
   - fi
   - for TARGET in $EXAMPLE_TARGETS; do
   - echo Building for $TARGET
+  - if [[ "$EXAMPLE" == "homekit_switch" && "$TARGET" == "esp32h2" ]]; then
+  -   echo "Skipping homekit_switch build for esp32h2"
+  -   continue
+  - fi
   - idf.py set-target $TARGET
   - idf.py build
   - mkdir -p $CI_PROJECT_DIR/esp-rainmaker-bins-${CI_JOB_ID}/$EXAMPLE/$TARGET/
@@ -140,7 +144,6 @@ build_idf_v5.0:
   image: espressif/idf:release-v5.0
   variables:
     EXAMPLE_TARGETS: "esp32 esp32s2 esp32c3 esp32s3"
-    EXAMPLES: "switch led_light fan temperature_sensor multi_device gpio"
     COMPONENT_MGR_142: "1"
 
 build_idf_v5.1:
@@ -148,21 +151,18 @@ build_idf_v5.1:
   image: espressif/idf:release-v5.1
   variables:
     EXAMPLE_TARGETS: "esp32 esp32s2 esp32c3 esp32s3 esp32c6 esp32c2 esp32h2"
-    EXAMPLES: "switch led_light fan temperature_sensor multi_device gpio"
 
 build_idf_v5.2:
   extends: .build_template
   image: espressif/idf:release-v5.2
   variables:
     EXAMPLE_TARGETS: "esp32 esp32s2 esp32c3 esp32s3 esp32c6 esp32c2 esp32h2"
-    EXAMPLES: "switch led_light fan temperature_sensor multi_device gpio"
 
 build_idf_v5.3:
   extends: .build_template
   image: espressif/idf:release-v5.3
   variables:
     EXAMPLE_TARGETS: "esp32 esp32s2 esp32c3 esp32s3 esp32c6 esp32c2 esp32h2"
-    EXAMPLES: "switch led_light fan temperature_sensor multi_device gpio"
 
 build_thread_br:
   extends: .build_template
