@@ -94,16 +94,24 @@ static void esp_rmaker_cmd_callback(const char *topic, void *payload, size_t pay
     }
 }
 
+/* Keeping the variable outside the function as there would subsequently also be a function
+ * to disable command response.
+ */
+static bool cmd_resp_topic_subscribed = false;
 static esp_err_t esp_rmaker_cmd_resp_check_pending(void)
 {
     ESP_LOGI(TAG, "Checking for pending commands.");
     char subscribe_topic[100];
     snprintf(subscribe_topic, sizeof(subscribe_topic), "node/%s/%s",
-                esp_rmaker_get_node_id(), TO_NODE_TOPIC_SUFFIX);
-    esp_err_t err = esp_rmaker_mqtt_subscribe(subscribe_topic, esp_rmaker_cmd_callback, RMAKER_MQTT_QOS1, NULL);
-    if (err != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to subscribe to %s. Error %d", subscribe_topic, err);
-        return ESP_FAIL;
+            esp_rmaker_get_node_id(), TO_NODE_TOPIC_SUFFIX);
+    if (!cmd_resp_topic_subscribed) {
+        /* Subscribing just once because any subsequent reconnect will automatically subscribe to the topic */
+        esp_err_t err = esp_rmaker_mqtt_subscribe(subscribe_topic, esp_rmaker_cmd_callback, RMAKER_MQTT_QOS1, NULL);
+        if (err != ESP_OK) {
+            ESP_LOGE(TAG, "Failed to subscribe to %s. Error %d", subscribe_topic, err);
+            return ESP_FAIL;
+        }
+        cmd_resp_topic_subscribed = true;
     }
     void *output = NULL;
     size_t output_len = 0;
