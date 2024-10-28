@@ -1,0 +1,24 @@
+CONFIG_ESPTOOLPY_FLASHSIZE_4MB=y
+
+#
+# Use partition table which makes use of flash to the fullest
+# Can be used for other platforms as well. But please keep in mind that fctry partition address is
+# different than default, and the new address needs to be specified to `rainmaker.py claim`
+#
+CONFIG_PARTITION_TABLE_CUSTOM=y
+CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions_4mb_optimised.csv"
+
+# mbedtls
+CONFIG_MBEDTLS_DYNAMIC_BUFFER=y
+CONFIG_MBEDTLS_DYNAMIC_FREE_PEER_CERT=y
+CONFIG_MBEDTLS_DYNAMIC_FREE_CONFIG_DATA=y
+CONFIG_MBEDTLS_CERTIFICATE_BUNDLE_DEFAULT_CMN=y
+
+# Temporary Fix for Timer Overflows
+CONFIG_FREERTOS_TIMER_TASK_STACK_DEPTH=3120
+
+# For additional security on reset to factory
+CONFIG_ESP_RMAKER_USER_ID_CHECK=y
+
+# Application Rollback
+CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE=y
