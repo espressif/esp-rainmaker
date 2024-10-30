@@ -221,9 +221,9 @@ esp_rmaker_param_t *esp_rmaker_base_url_param_create(const char *param_name)
     return param;
 }
 
-esp_rmaker_param_t *esp_rmaker_group_id_param_create(const char *param_name)
+esp_rmaker_param_t *esp_rmaker_group_id_param_create(const char *param_name, const char *val)
 {
     esp_rmaker_param_t *param = esp_rmaker_param_create(param_name, ESP_RMAKER_PARAM_GROUP_ID,
-            esp_rmaker_str(""), PROP_FLAG_READ | PROP_FLAG_WRITE | PROP_FLAG_PERSIST);
+            esp_rmaker_str(val), PROP_FLAG_READ | PROP_FLAG_WRITE);
     return param;
 }

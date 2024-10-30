@@ -67,8 +67,6 @@ extern "C"
 #define ESP_RMAKER_PARAM_BASE_URL       "esp.param.base-url"
 #define ESP_RMAKER_PARAM_GROUP_ID       "esp.param.group-id"
 
-
-
 /********** STANDARD DEVICE TYPES **********/
 
 #define ESP_RMAKER_DEVICE_SWITCH        "esp.device.switch"
@@ -101,6 +99,7 @@ extern "C"
 #define ESP_RMAKER_SERVICE_SYSTEM       "esp.service.system"
 #define ESP_RMAKER_SERVICE_LOCAL_CONTROL    "esp.service.local_control"
 #define ESP_RMAKER_SERVICE_USER_AUTH        "esp.service.rmaker-user-auth"
+#define ESP_RMAKER_SERVICE_GROUPS       "esp.service.groups"
 
 #ifdef __cplusplus
 }

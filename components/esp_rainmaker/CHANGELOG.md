@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.8.6
+
+### New Feature
+
+- Added Groups service to enable direct MQTT communication between nodes and clients (phone apps/controllers).
+    - Setting group_id via the Groups service routes local param updates to group-specific topics
+      (`node/<node_id>/params/local/<group_id>`) for lower latency.
+    - Also added `esp_rmaker_publish_direct()` API to publish messages on `node/<node_id>/direct/params/local/<group_id>`
+      for direct client-to-node communication, bypassing cloud processing for reduced cost and latency.
+    - Clients can also publish param updates directly to `node/<node_id>/params/remote/<group_id>` instead of
+      using the set params API.
+
 ## 1.8.5
 
 ### Changes
