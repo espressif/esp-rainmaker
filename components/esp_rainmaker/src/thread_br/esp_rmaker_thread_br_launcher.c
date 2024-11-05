@@ -139,7 +139,13 @@ static void thread_br_event_handler(void* arg, esp_event_base_t event_base, int3
         }
     } else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_CONNECTED) {
         esp_openthread_lock_acquire(portMAX_DELAY);
-        ESP_ERROR_CHECK(esp_openthread_border_router_init());
+        // Create link local address for Wi-Fi Station interface
+        esp_netif_create_ip6_linklocal(esp_netif_get_handle_from_ifkey("WIFI_STA_DEF"));
+        static bool border_router_initialized = false;
+        if (!border_router_initialized) {
+            ESP_ERROR_CHECK(esp_openthread_border_router_init());
+            border_router_initialized = true;
+        }
         esp_openthread_lock_release();
     }
 }
