@@ -294,9 +294,32 @@ static esp_err_t esp_rmaker_deinit_priv_data(esp_rmaker_priv_data_t *rmaker_priv
     free(rmaker_priv_data);
     return ESP_OK;
 }
+static void esp_rmaker_end()
+{
+    ESP_LOGW(TAG, "rmaker end was called..");
+    esp_err_t err = ESP_FAIL;
+#ifdef CONFIG_ESP_RMAKER_LOCAL_CTRL_ENABLE
+    err = esp_rmaker_local_ctrl_disable();
+    if (err != ESP_OK) {
+       ESP_LOGW(TAG, "Failed to disable local control service...");
+    }
+#endif /* CONFIG_ESP_RMAKER_LOCAL_CTRL_ENABLE */
+    if (esp_rmaker_priv_data->mqtt_connected) {
+        err = esp_rmaker_mqtt_disconnect();
+    }
+    esp_rmaker_mqtt_deinit();
+    esp_rmaker_priv_data->state = ESP_RMAKER_STATE_INIT_DONE;
+    if (err == ESP_OK) {
+        ESP_LOGI(TAG, "esp_rmaker_end returned successfully");
+    }
+    else {
+        ESP_LOGE(TAG, "mqtt_disconnect failed!");
+    }
+}
 
 esp_err_t esp_rmaker_node_deinit(const esp_rmaker_node_t *node)
 {
+    esp_rmaker_end();
     if (!esp_rmaker_priv_data) {
         ESP_LOGE(TAG, "ESP RainMaker already de-initialized.");
         return ESP_ERR_INVALID_ARG;
@@ -420,7 +443,18 @@ static void esp_rmaker_task(void *data)
     /* Check if already connected to Wi-Fi */
     if (esp_wifi_sta_get_ap_info(&ap_info) != ESP_OK) {
         /* Wait for Wi-Fi connection */
-        xEventGroupWaitBits(rmaker_core_event_group, WIFI_CONNECTED_EVENT, false, true, portMAX_DELAY);
+        do {
+            EventBits_t evt_bits = xEventGroupWaitBits(
+                rmaker_core_event_group, WIFI_CONNECTED_EVENT, false, true, pdMS_TO_TICKS(2*1000));
+                if (evt_bits) {
+                    break; /* We got connected */
+                }
+                if (esp_rmaker_priv_data->state == ESP_RMAKER_STATE_STOP_REQUESTED) {
+                    ESP_LOGI(TAG, "Rainmaker stop was requested. Aborting!");
+                    esp_event_handler_unregister(IP_EVENT, IP_EVENT_STA_GOT_IP, &esp_rmaker_event_handler);
+                    goto rmaker_end;
+                }
+        } while (true);
     }
     esp_event_handler_unregister(IP_EVENT, IP_EVENT_STA_GOT_IP, &esp_rmaker_event_handler);
 #elif defined(CONFIG_ESP_RMAKER_NETWORK_OVER_THREAD) /* CONFIG_ESP_RMAKER_NETWORK_OVER_WIFI */
@@ -494,7 +528,18 @@ static void esp_rmaker_task(void *data)
         goto rmaker_end;
     }
     ESP_LOGI(TAG, "Waiting for MQTT connection");
-    xEventGroupWaitBits(rmaker_core_event_group, MQTT_CONNECTED_EVENT, false, true, portMAX_DELAY);
+    do {
+		EventBits_t evt_bits = xEventGroupWaitBits(
+		    rmaker_core_event_group, MQTT_CONNECTED_EVENT, false, true, pdMS_TO_TICKS(2 * 1000));
+		if (evt_bits) {
+			break; /* We got connected */
+		}
+		if (esp_rmaker_priv_data->state == ESP_RMAKER_STATE_STOP_REQUESTED) {
+			ESP_LOGI(TAG, "Rainmaker stop was requested. Aborting!");
+			esp_event_handler_unregister(RMAKER_COMMON_EVENT, RMAKER_MQTT_EVENT_CONNECTED, &esp_rmaker_event_handler);
+			goto rmaker_end;
+	    }
+	} while (true);
     esp_event_handler_unregister(RMAKER_COMMON_EVENT, RMAKER_MQTT_EVENT_CONNECTED, &esp_rmaker_event_handler);
     esp_rmaker_priv_data->state = ESP_RMAKER_STATE_STARTED;
     err = esp_rmaker_report_node_config();
@@ -533,19 +578,13 @@ static void esp_rmaker_task(void *data)
         ESP_LOGI(TAG, "Waiting for User Node Association.");
     }
     err = ESP_OK;
-
-rmaker_end:
     if (rmaker_core_event_group) {
         vEventGroupDelete(rmaker_core_event_group);
     }
     rmaker_core_event_group = NULL;
-    if (err == ESP_OK) {
-        return;
-    }
-    if (esp_rmaker_priv_data->mqtt_connected) {
-        esp_rmaker_mqtt_disconnect();
-    }
-    esp_rmaker_priv_data->state = ESP_RMAKER_STATE_INIT_DONE;
+    return;
+rmaker_end:
+    esp_rmaker_end();
 }
 
 
@@ -709,6 +748,18 @@ esp_err_t esp_rmaker_start(void)
 esp_err_t esp_rmaker_stop()
 {
     ESP_RMAKER_CHECK_HANDLE(ESP_ERR_INVALID_STATE);
+    /* Since, rmaker_work_queue might be getting used out of rainmaker, we do not stop it.
+     * Just, remove the reset handler...
+     */
+    ESP_ERROR_CHECK_WITHOUT_ABORT(esp_event_handler_unregister(RMAKER_COMMON_EVENT, ESP_EVENT_ANY_ID, &reset_event_handler));
+
+    if (esp_rmaker_priv_data->state == ESP_RMAKER_STATE_STARTED) {
+        esp_rmaker_end();
+        ESP_LOGI(TAG, "RainMaker stopped");
+        return ESP_OK;
+    }
+    /* rmaker_task is still executing. rely on that task for stop. */
+    ESP_LOGI(TAG, "Rainmaker stop was requested, from state %d", esp_rmaker_priv_data->state);
     esp_rmaker_priv_data->state = ESP_RMAKER_STATE_STOP_REQUESTED;
     return ESP_OK;
 }
