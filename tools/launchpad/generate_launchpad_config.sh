@@ -97,7 +97,7 @@ EOF
 
         echo "ios_app_url = \"https://apps.apple.com/app/esp-rainmaker/id1497491540\"" >> $OUT_FILE
         echo "android_app_url = \"https://play.google.com/store/apps/details?id=com.espressif.rainmaker\"" >> $OUT_FILE
-        echo "readme.text = \"https://raw.githubusercontent.com/$REPO_OWNER/$REPO_NAME/master/tools/launchpad/app_link_guide.md\"" >> $OUT_FILE
+        echo "readme.text = \"https://raw.githubusercontent.com/$REPO_OWNER/$REPO_NAME/master/examples/${app#*_}/README.md\"" >> $OUT_FILE
         echo "" >> $OUT_FILE
 
         unset CHIPSETS IMAGES

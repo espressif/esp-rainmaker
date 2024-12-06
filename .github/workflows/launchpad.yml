@@ -95,6 +95,7 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        id: checkout
         with:
           submodules: 'recursive'
 
@@ -111,7 +112,16 @@ jobs:
 
           cd images
           $ESP_RMAKER_PATH/tools/launchpad/generate_launchpad_config.sh ${{ github.repository_owner }} `basename ${{ github.repository }}`
-          echo "ESP-RainMaker applications" >> build_cfg.md
+
+          echo "#### Build Config" >> build_cfg.md
+          echo "" >> build_cfg.md
+          echo "" >> build_cfg.md
+          echo "- ESP-IDF: [`git -C $IDF_PATH rev-parse HEAD`](https://github.com/espressif/esp-idf/tree/`git -C $IDF_PATH rev-parse HEAD`)" >> build_cfg.md
+          echo "- ESP-RainMaker: [${{steps.checkout.outputs.commit}}](https://github.com/espressif/esp-rainmaker/tree/${{steps.checkout.outputs.commit}})" >> build_cfg.md
+          echo "" >> build_cfg.md
+          echo "" >> build_cfg.md
+
+          cat $ESP_RMAKER_PATH/tools/launchpad/app_link_guide.md >> build_cfg.md
 
           tree -H '.' -L 1 --noreport -T 'ESP RainMaker Launchpad Artifacts' -shi --charset utf-8 -I "index.html" -o index.html
 
