@@ -127,6 +127,8 @@ esp_err_t esp_rmaker_reset_user_node_mapping(void);
 #endif
 esp_err_t esp_rmaker_init_local_ctrl_service(void);
 esp_err_t esp_rmaker_start_local_ctrl_service(const char *serv_name);
+esp_err_t esp_rmaker_set_network_id(const char *network_id);
+char *esp_rmaker_get_network_id(void);
 static inline esp_err_t esp_rmaker_post_event(esp_rmaker_event_t event_id, void* data, size_t data_size)
 {
     return esp_event_post(RMAKER_EVENT, event_id, data, data_size, portMAX_DELAY);

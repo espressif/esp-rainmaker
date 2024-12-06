@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.7.4
+
+### New Feature
+
+- Add `network-id` attribute to Thread rainmaker nodes.
+
+This attribute represents the partition ID of the Thread network, which is used to determine whether Thread nodes belong to the same network.
+
 ## 1.7.3
 
 ### New Feature
