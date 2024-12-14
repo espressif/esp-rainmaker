@@ -41,19 +41,19 @@ static uint64_t ota_autofetch_period = (OTA_AUTOFETCH_PERIOD * 60 * 60 * 1000000
 
 static const char *TAG = "esp_rmaker_ota_using_topics";
 
-esp_err_t esp_rmaker_ota_report_status_using_topics(esp_rmaker_ota_handle_t ota_handle, ota_status_t status, char *additional_info)
+esp_err_t esp_rmaker_ota_report_status_using_topics(char *ota_job_id, ota_status_t status, char *additional_info)
 {
-    if (!ota_handle) {
-        return ESP_FAIL;
+    if (!ota_job_id) {
+        ESP_LOGE(TAG, "Reporting failed. OTA Job ID not found");
+        return ESP_ERR_INVALID_ARG;
     }
-    esp_rmaker_ota_t *ota = (esp_rmaker_ota_t *)ota_handle;
 
     char publish_payload[200];
     json_gen_str_t jstr;
     json_gen_str_start(&jstr, publish_payload, sizeof(publish_payload), NULL, NULL);
     json_gen_start_object(&jstr);
-    if (ota->transient_priv) {
-        json_gen_obj_set_string(&jstr, "ota_job_id", (char *)ota->transient_priv);
+    if (ota_job_id) {
+        json_gen_obj_set_string(&jstr, "ota_job_id", ota_job_id);
     } else {
         /* This will get executed only when the OTA status is being reported after a reboot, either to
          * indicate successful verification of new firmware, or to indicate that firmware was rolled back
@@ -321,6 +321,7 @@ static void esp_rmaker_ota_work_fn(void *priv_data)
 /* Enable the ESP RainMaker specific OTA */
 esp_err_t esp_rmaker_ota_enable_using_topics(esp_rmaker_ota_t *ota)
 {
+    ota->report_fn = esp_rmaker_ota_report_status_using_topics;
     esp_err_t err = esp_rmaker_work_queue_add_task(esp_rmaker_ota_work_fn, ota);
     if (err == ESP_OK) {
         ESP_LOGI(TAG, "OTA enabled with Topics");

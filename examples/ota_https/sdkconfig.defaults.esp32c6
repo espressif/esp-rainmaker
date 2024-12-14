@@ -1,0 +1,10 @@
+#
+# Use partition table which makes use of flash to the fullest
+# Can be used for other platforms as well. But please keep in mind that fctry partition address is
+# different than default, and the new address needs to be specified to `rainmaker.py claim`
+#
+CONFIG_PARTITION_TABLE_CUSTOM=y
+CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions_4mb_optimised.csv"
+
+# To accomodate security features
+CONFIG_PARTITION_TABLE_OFFSET=0xc000
