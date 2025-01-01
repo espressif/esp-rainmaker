@@ -1,0 +1,128 @@
+# Copyright 2024 Espressif Systems (Shanghai) PTE LTD
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# This workflow build examples, store the artifacts and deploy them to github pages.
+# Generates the launchpad configuration file that can be used with the url.
+
+name: Build Examples
+
+on:
+  # Runs on pushes targeting the default branch
+  push:
+    branches: ["master"]
+
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+
+# Sets permissions of the GITHUB_TOKEN to allow deployment to GitHub Pages
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Allow one concurrent deployment
+concurrency:
+  group: "pages"
+  cancel-in-progress: true
+
+jobs:
+  Build:
+    # Disable the job in forks
+    if: ${{ github.repository_owner == 'espressif' }}
+
+    runs-on: ubuntu-latest
+    container:
+      image: espressif/idf:v5.3.1
+    strategy:
+      matrix:
+        example: [fan, led_light, multi_device, switch, temperature_sensor]
+        target: [esp32, esp32c3, esp32c6, esp32s3]
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: 'recursive'
+
+      - run: mkdir -p images
+
+      - name: build application
+        run: |
+          . $IDF_PATH/export.sh
+          export ESP_RMAKER_PATH=$PWD
+          cd examples/${{ matrix.example }}
+
+          # Lets use the assisted claim by default for launchpad examples
+          echo "CONFIG_ESP_RMAKER_ASSISTED_CLAIM=y" >> sdkconfig.defaults
+
+          idf.py set-target ${{ matrix.target }} build
+
+          cd build
+          TARGET_CHIP=`cat project_description.json | python3 -c 'import sys,json; print(json.load(sys.stdin)["target"])'`
+          APP_BIN=`cat project_description.json | python3 -c 'import sys,json; print(json.load(sys.stdin)["app_bin"])'`
+
+          OUT_BIN=$ESP_RMAKER_PATH/images/"$TARGET_CHIP"_RainMaker_"$APP_BIN"
+          esptool.py --chip $TARGET_CHIP merge_bin -o $OUT_BIN @flash_args
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-images-${{ matrix.target }}-${{ matrix.example }}
+          path: images
+
+  deploy:
+    # Disable the job in forks
+    if: ${{ github.repository_owner == 'espressif' }}
+
+    needs: Build
+
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    container:
+      image: espressif/esp-matter:latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: 'recursive'
+
+      - name: Download builds
+        uses: actions/download-artifact@v4
+        with:
+          pattern: build-images-*
+          path: images/
+          merge-multiple: true
+
+      - name: generate launchpad config
+        run: |
+          export ESP_RMAKER_PATH=$PWD
+
+          cd images
+          $ESP_RMAKER_PATH/tools/launchpad/generate_launchpad_config.sh ${{ github.repository_owner }} `basename ${{ github.repository }}`
+          echo "ESP-RainMaker applications" >> build_cfg.md
+
+          tree -H '.' -L 1 --noreport -T 'ESP RainMaker Launchpad Artifacts' -shi --charset utf-8 -I "index.html" -o index.html
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v4
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: images/
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

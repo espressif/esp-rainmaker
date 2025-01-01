@@ -54,7 +54,7 @@
 #endif
 
 #ifdef CONFIG_ESP_RMAKER_NETWORK_OVER_WIFI
-static const char* TAG = "app_thread";
+static const char* TAG = "app_wifi";
 /* Event handler for catching system events */
 static void event_handler(void* arg, esp_event_base_t event_base,
                           int32_t event_id, void* event_data)

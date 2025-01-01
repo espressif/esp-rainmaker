@@ -55,3 +55,9 @@ ESP RainMaker can work with ESP IDF 4.1 and above.
 [ESP32 Forum](https://www.esp32.com/viewforum.php?f=41)
 
 [![Gitter Chat](https://badges.gitter.im/esp-rainmaker/community.svg)](https://gitter.im/esp-rainmaker/community?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge)
+
+---
+
+<a href="https://espressif.github.io/esp-launchpad/?flashConfigURL=https://espressif.github.io/esp-rainmaker/launchpad.toml">
+    <img alt="Try it with ESP Launchpad" src="https://espressif.github.io/esp-launchpad/assets/try_with_launchpad.png" width="250" height="70">
+</a>
