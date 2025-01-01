@@ -22,7 +22,6 @@ static const char *TAG = "app_main";
 
 #define WIFI_SSID CONFIG_EXAMPLE_WIFI_SSID
 #define WIFI_PASSWORD CONFIG_EXAMPLE_WIFI_PASSWORD
-#define WIFI_RESET_BUTTON_TIMEOUT 3
 
 static EventGroupHandle_t g_wifi_event_group;
 #define WIFI_CONNECTED_BIT BIT0
