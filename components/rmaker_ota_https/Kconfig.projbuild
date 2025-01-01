@@ -17,10 +17,10 @@ menu "ESP RainMaker HTTPS OTA Config"
         int "Rollback Period"
         default 90
         help
-            The time period(in seconds) for checking if OTA is valid.
+            The time period for checking if OTA is valid.
             If OTA is not marked valid in this timeframe, firmware is rolled back.
 
     config OTA_HTTPS_APPLY_STACK_SIZE
-        int "Stack size(in kilobytes) of the task reponsible for calling the OTA callback"
+        int "Stack size(in bytes) of the task reponsible for calling the OTA callback"
         default 3072
 endmenu
