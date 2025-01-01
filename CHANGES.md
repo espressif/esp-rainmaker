@@ -1,5 +1,9 @@
 # Changes
 
+## 1-Jan-2025: Modified esp-rainmaker OTA for accepting a report OTA callback.
+- It is now possible to use the default OTA callback provided in esp_rmaker_ota.c along with a custom report function.
+- See esp_rmaker_ota_https for refernce implementation.
+
 ## 27-Sep-2024: Modified esp-rainmaker examples to use partitions_4mb_optimised.csv
  - RainMaker examples now use `partitions_4mb_optimised.csv` by default instead of `partitions.csv` and it is recommended to use the same in any new RainMaker projects.
  - The fctry partition address is different for this partition table. So, if the host claiming is used, please pass the new address using:
