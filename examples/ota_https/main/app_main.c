@@ -30,11 +30,14 @@ static EventGroupHandle_t g_wifi_event_group;
 static void event_handler(void *arg, esp_event_base_t event_base,
                           int32_t event_id, void *event_data)
 {
-    if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_DISCONNECTED) {
+    if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_DISCONNECTED)
+    {
         ESP_LOGW(TAG, "WiFi disconnected. Trying to connect.");
         esp_wifi_connect();
-    } else if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP) {
-        ip_event_got_ip_t* event = (ip_event_got_ip_t*) event_data;
+    }
+    else if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP)
+    {
+        ip_event_got_ip_t *event = (ip_event_got_ip_t *)event_data;
         ESP_LOGI(TAG, "WiFi connected, got ip:" IPSTR, IP2STR(&event->ip_info.ip));
         xEventGroupSetBits(g_wifi_event_group, WIFI_CONNECTED_BIT);
     }
@@ -46,9 +49,12 @@ esp_err_t wifi_init_connect(void)
 
     esp_err_t err;
     err = esp_event_loop_create_default();
-    if (err == ESP_ERR_INVALID_STATE){
+    if (err == ESP_ERR_INVALID_STATE)
+    {
         ESP_LOGW(TAG, "Event loop creation failed. Continuing since it might be created elsewhere");
-    } else if (err != ESP_OK) {
+    }
+    else if (err != ESP_OK)
+    {
         ESP_LOGE(TAG, "ESP Event Loop creation failed.");
         return ESP_FAIL;
     };
@@ -72,20 +78,19 @@ esp_err_t wifi_init_connect(void)
     wifi_config_t wifi_config = {
         .sta = {
             .ssid = WIFI_SSID,
-            .password = WIFI_PASSWORD
-        },
+            .password = WIFI_PASSWORD},
     };
     ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
     ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &wifi_config));
     ESP_ERROR_CHECK(esp_wifi_start());
     ESP_ERROR_CHECK(esp_wifi_connect());
 
-    xEventGroupWaitBits(g_wifi_event_group, 
-            WIFI_CONNECTED_BIT,
-            pdFALSE,
-            pdFALSE,
-            portMAX_DELAY);
-            
+    xEventGroupWaitBits(g_wifi_event_group,
+                        WIFI_CONNECTED_BIT,
+                        pdFALSE,
+                        pdFALSE,
+                        portMAX_DELAY);
+
     return ESP_OK;
 }
 
@@ -95,7 +100,8 @@ void app_main()
     ESP_ERROR_CHECK(err);
 
     err = nvs_flash_init();
-    if (err == ESP_ERR_NVS_NO_FREE_PAGES || err == ESP_ERR_NVS_NEW_VERSION_FOUND) {
+    if (err == ESP_ERR_NVS_NO_FREE_PAGES || err == ESP_ERR_NVS_NEW_VERSION_FOUND)
+    {
         ESP_ERROR_CHECK(nvs_flash_erase());
         err = nvs_flash_init();
     }
@@ -103,7 +109,8 @@ void app_main()
 
     /* Initialize factory parition for HTTPS OTA */
     err = esp_rmaker_factory_init();
-    if (err != ESP_OK) {
+    if (err != ESP_OK)
+    {
         ESP_LOGE(TAG, "Failed to initialize rmaker factory partition.");
     }
     ESP_ERROR_CHECK(err);
