@@ -117,7 +117,7 @@ void app_main()
 
     ESP_ERROR_CHECK(wifi_init_connect());
 
-    // Needs to be done after WiFi is connected.
+    /* Needs to be done after WiFi is connected. */
     esp_rmaker_ota_https_enable(NULL);
     esp_rmaker_ota_https_fetch();
 }
