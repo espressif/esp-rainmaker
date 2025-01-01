@@ -18,7 +18,7 @@
 #include <app_reset.h>
 #include <app_insights.h>
 
-static const char *TAG = "app_mmain";
+static const char *TAG = "app_main";
 
 #define WIFI_SSID CONFIG_EXAMPLE_WIFI_SSID
 #define WIFI_PASSWORD CONFIG_EXAMPLE_WIFI_PASSWORD
