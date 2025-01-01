@@ -15,8 +15,6 @@
 #include <esp_log.h>
 #include <esp_rmaker_factory.h>
 #include <esp_rmaker_ota_https.h>
-#include <app_reset.h>
-#include <app_insights.h>
 
 static const char *TAG = "app_main";
 
