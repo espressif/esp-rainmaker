@@ -72,6 +72,7 @@ typedef enum {
 
 /** The OTA Handle to be used by the OTA callback */
 typedef void *esp_rmaker_ota_handle_t;
+
 /** Function Prototype for Reporting Intermediate OTA States
  * 
  * This function is called to notify RainMaker dashbord of OTA Progress
