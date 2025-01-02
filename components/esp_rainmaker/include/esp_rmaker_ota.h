@@ -55,6 +55,13 @@ typedef enum {
     OTA_STATUS_REJECTED,
 } ota_status_t;
 
+/** Returns string representation of ota_status_t for reporting
+ * 
+ * @param status ota_status_t variant
+ * @return string representation for provided status, "invalid" if not valid status
+ */
+char *esp_rmaker_ota_status_to_string(ota_status_t status);
+
 /** OTA Workflow type */
 typedef enum {
     /** OTA will be performed using services and parameters. */
@@ -65,6 +72,20 @@ typedef enum {
 
 /** The OTA Handle to be used by the OTA callback */
 typedef void *esp_rmaker_ota_handle_t;
+
+/** Function Prototype for Reporting Intermediate OTA States
+ * 
+ * This function is called to notify RainMaker dashbord of OTA Progress
+ * 
+ * @param ota_job_id Job Id to report.
+ * @param status OTA status to report.
+ * @param additional_info Descriptionn to report.
+ * 
+ * @return ESP_OK on success
+ * @return error on faliure
+ */
+typedef esp_err_t (*esp_rmaker_ota_report_fn_t)(char *ota_job_id, ota_status_t status, char* additional_info); 
+
 
 /** OTA Data */
 typedef struct {
@@ -83,6 +104,8 @@ typedef struct {
     char *priv;
     /** OTA Metadata. Applicable only for OTA using Topics. Will be received (if applicable) from the backend, along with the OTA URL */
     char *metadata;
+    /** The Function to be called for reporting OTA status. This can be used if needed to override transport of OTA*/
+    esp_rmaker_ota_report_fn_t report_fn;
 } esp_rmaker_ota_data_t;
 
 /** Function prototype for OTA Callback
@@ -222,6 +245,21 @@ esp_err_t esp_rmaker_ota_report_status(esp_rmaker_ota_handle_t ota_handle, ota_s
  * @return ESP_FAIL if the OTA failed.
  * */
 esp_err_t esp_rmaker_ota_default_cb(esp_rmaker_ota_handle_t handle, esp_rmaker_ota_data_t *ota_data);
+
+/** Clear Rollback flag
+ * The default OTA callback stores a value in NVS as a flag to denote if an OTA was recently installed.
+ * This flag is then read to decide if firmware has been rolled back.
+ * This function can be called to erase that flag.
+ */
+esp_err_t esp_rmaker_ota_erase_rollback_flag(void);
+
+/** Returns whether OTA validation is pending.
+ * Returns true if firmware validation is pending after an OTA.
+ * This can be reset using esp_rmaker_ota_erase_rollback_flag()
+ * 
+ * @return true if validation is pending, false otherwises
+ */
+bool esp_rmaker_ota_is_ota_validation_pending(void);
 
 /** Fetch OTA Info
  *
