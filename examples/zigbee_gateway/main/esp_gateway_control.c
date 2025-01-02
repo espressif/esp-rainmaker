@@ -15,13 +15,15 @@
 static const char *TAG = "esp_gateway_control";
 extern uint8_t gateway_ep;
 
-esp_err_t esp_gateway_control_permit_join(void)
+esp_err_t esp_gateway_control_permit_join(uint8_t permit_duration)
 {
     esp_zb_zdo_permit_joining_req_param_t cmd_req;
     cmd_req.dst_nwk_addr = 0x0000;
-    cmd_req.permit_duration = ESP_ZIGBEE_GATWAY_OPEN_NETWORK_DEFAULT_TIME; // 180 seconds
+    cmd_req.permit_duration = permit_duration;
     cmd_req.tc_significance = 1;
+    esp_zb_lock_acquire(portMAX_DELAY);
     esp_zb_zdo_permit_joining_req(&cmd_req, NULL, NULL);
+    esp_zb_lock_release();
     return ESP_OK;
 }
 
@@ -30,7 +32,7 @@ esp_err_t esp_gateway_control_secur_ic_add(esp_zigbee_ic_mac_address_t *IC_MacAd
     return esp_zb_secur_ic_add(IC_MacAddress->addr, ic_type, IC_MacAddress->ic);
 }
 
-esp_err_t esp_gateway_control_light_on_off(bool on_off, light_bulb_device_params_t *device)
+esp_err_t esp_gateway_control_light_on_off(bool on_off, device_params_t *device)
 {
     esp_zb_zcl_on_off_cmd_t cmd_req;
     uint8_t cmd_id = (on_off) ? (ESP_ZB_ZCL_CMD_ON_OFF_ON_ID) : (ESP_ZB_ZCL_CMD_ON_OFF_OFF_ID);
@@ -40,6 +42,8 @@ esp_err_t esp_gateway_control_light_on_off(bool on_off, light_bulb_device_params
     cmd_req.address_mode = ESP_ZB_APS_ADDR_MODE_16_ENDP_PRESENT;
     cmd_req.on_off_cmd_id = cmd_id;
     ESP_LOGI(TAG, "send 'on_off' command: %s", on_off ? "true" : "false");
+    esp_zb_lock_acquire(portMAX_DELAY);
     esp_zb_zcl_on_off_cmd_req(&cmd_req);
+    esp_zb_lock_release();
     return ESP_OK;
 }

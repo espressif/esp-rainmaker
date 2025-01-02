@@ -14,6 +14,6 @@
 
 #define ESP_ZIGBEE_GATWAY_OPEN_NETWORK_DEFAULT_TIME 180 /* zigbee open network timeout 180 seconds*/
 
-esp_err_t esp_gateway_control_permit_join(void);
+esp_err_t esp_gateway_control_permit_join(uint8_t permit_duration);
 esp_err_t esp_gateway_control_secur_ic_add(esp_zigbee_ic_mac_address_t *IC_MacAddress, esp_zb_secur_ic_type_t ic_type);
-esp_err_t esp_gateway_control_light_on_off(bool on_off, light_bulb_device_params_t *device);
+esp_err_t esp_gateway_control_light_on_off(bool on_off, device_params_t *device);
