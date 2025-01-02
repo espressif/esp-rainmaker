@@ -46,12 +46,10 @@ esp_err_t wifi_init_connect(void)
 
     esp_err_t err;
     err = esp_event_loop_create_default();
-    if (err == ESP_ERR_INVALID_STATE)
-    {
+    if (err == ESP_ERR_INVALID_STATE) {
         ESP_LOGW(TAG, "Event loop creation failed. Continuing since it might be created elsewhere");
-    }
-    else if (err != ESP_OK)
-    {
+    } 
+    else if (err != ESP_OK) {
         ESP_LOGE(TAG, "ESP Event Loop creation failed.");
         return ESP_FAIL;
     };
@@ -97,8 +95,7 @@ void app_main()
     ESP_ERROR_CHECK(err);
 
     err = nvs_flash_init();
-    if (err == ESP_ERR_NVS_NO_FREE_PAGES || err == ESP_ERR_NVS_NEW_VERSION_FOUND)
-    {
+    if (err == ESP_ERR_NVS_NO_FREE_PAGES || err == ESP_ERR_NVS_NEW_VERSION_FOUND) {
         ESP_ERROR_CHECK(nvs_flash_erase());
         err = nvs_flash_init();
     }
@@ -106,8 +103,7 @@ void app_main()
 
     /* Initialize factory parition for HTTPS OTA */
     err = esp_rmaker_factory_init();
-    if (err != ESP_OK)
-    {
+    if (err != ESP_OK) {
         ESP_LOGE(TAG, "Failed to initialize rmaker factory partition.");
     }
     ESP_ERROR_CHECK(err);
