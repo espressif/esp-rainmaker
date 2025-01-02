@@ -27,6 +27,7 @@
 #include "esp_rmaker_internal.h"
 
 static const char *TAG = "esp_rmaker_node";
+static bool node_created;
 
 static void esp_rmaker_node_info_free(esp_rmaker_node_info_t *info)
 {
@@ -84,6 +85,7 @@ esp_err_t esp_rmaker_node_delete(const esp_rmaker_node_t *node)
             _esp_rmaker_device_t *next_device = device->next;
             device->parent = NULL;
             esp_rmaker_device_delete((esp_rmaker_device_t *)device);
+            free(device);
             device = next_device;
         }
         /* Node ID is created in the context of esp_rmaker_init and just assigned
@@ -95,6 +97,8 @@ esp_err_t esp_rmaker_node_delete(const esp_rmaker_node_t *node)
         if (_node->info) {
             esp_rmaker_node_info_free(_node->info);
         }
+        free(_node);
+        node_created = false;
         return ESP_OK;
     }
     return ESP_ERR_INVALID_ARG;
@@ -102,7 +106,6 @@ esp_err_t esp_rmaker_node_delete(const esp_rmaker_node_t *node)
 
 esp_rmaker_node_t *esp_rmaker_node_create(const char *name, const char *type)
 {
-    static bool node_created;
     if (node_created) {
         ESP_LOGE(TAG, "Node has already been created. Cannot create another");
         return NULL;
