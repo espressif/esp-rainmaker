@@ -19,17 +19,15 @@
 #include <esp_rmaker_scenes.h>
 #include <app_insights.h>
 #include <app_reset.h>
-#if CONFIG_OPENTHREAD_BORDER_ROUTER
-#include <esp_matter_thread_br_cluster.h>
-#include <esp_matter_thread_br_console.h>
-#include <esp_matter_thread_br_launcher.h>
-#include <esp_ot_config.h>
-#endif // CONFIG_OPENTHREAD_BORDER_ROUTER
 #include <app_priv.h>
 #include <app_matter.h>
 #include <app_matter_controller.h>
 #include <esp_matter_controller_console.h>
 #include <matter_controller_cluster.h>
+#if CHIP_DEVICE_CONFIG_ENABLE_THREAD
+#include <esp_ot_config.h>
+#include <platform/ESP32/OpenthreadLauncher.h>
+#endif
 
 static const char *TAG = "app_main";
 
@@ -81,14 +79,19 @@ extern "C" void app_main()
     endpoint_t *root_endpoint = esp_matter::endpoint::get(matter_node, 0);
     esp_matter::cluster::matter_controller::create(root_endpoint, CLUSTER_FLAG_SERVER);
 
-#if CONFIG_OPENTHREAD_BORDER_ROUTER
-    cluster::thread_br::create(root_endpoint, CLUSTER_FLAG_SERVER);
-#endif
-
     app_matter_rmaker_init();
 
     app_matter_endpoint_create();
 
+#if CHIP_DEVICE_CONFIG_ENABLE_THREAD
+    /* Set OpenThread platform config */
+    esp_openthread_platform_config_t config = {
+        .radio_config = ESP_OPENTHREAD_DEFAULT_RADIO_CONFIG(),
+        .host_config = ESP_OPENTHREAD_DEFAULT_HOST_CONFIG(),
+        .port_config = ESP_OPENTHREAD_DEFAULT_PORT_CONFIG(),
+    };
+    set_openthread_platform_config(&config);
+#endif // CHIP_DEVICE_CONFIG_ENABLE_THREAD
     /* Matter start */
     app_matter_start(app_event_cb);
 
@@ -147,7 +150,7 @@ extern "C" void app_main()
     esp_matter::console::controller_register_commands();
 #endif
 #if CONFIG_OPENTHREAD_BORDER_ROUTER && CONFIG_OPENTHREAD_CLI
-    esp_matter::console::thread_br_cli_register_command();
+    esp_matter::console::otcli_register_commands();
 #endif // CONFIG_OPENTHREAD_BORDER_ROUTER && CONFIG_OPENTHREAD_CLI
 
 }

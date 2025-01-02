@@ -13,7 +13,7 @@
 #include <esp_matter_controller_cluster_command.h>
 #include <esp_matter_controller_read_command.h>
 #include <esp_matter_controller_subscribe_command.h>
-#include <DataModelLogger.h>
+#include <commands/clusters/DataModelLogger.h>
 #include <esp_matter_core.h>
 
 #include "app_matter_ctrl.h"

@@ -23,11 +23,12 @@
 #include <esp_matter_controller_console.h>
 #include <matter_controller_device_mgr.h>
 
-#if CONFIG_OPENTHREAD_BORDER_ROUTER
-#include <esp_matter_thread_br_cluster.h>
-#include <esp_matter_thread_br_console.h>
-#include <esp_matter_thread_br_launcher.h>
-#include <esp_ot_config.h>
+#ifdef CONFIG_OPENTHREAD_BORDER_ROUTER
+#include <esp_openthread_lock.h>
+#include <esp_openthread_border_router.h>
+#include <platform/OpenThread/GenericThreadBorderRouterDelegate.h>
+#include <platform/KvsPersistentStorageDelegate.h>
+using chip::app::Clusters::ThreadBorderRouterManagement::GenericOpenThreadBorderRouterDelegate;
 #endif // CONFIG_OPENTHREAD_BORDER_ROUTER
 
 using namespace esp_matter;
@@ -112,14 +113,15 @@ void app_event_cb(const ChipDeviceEvent *event, intptr_t arg)
     case chip::DeviceLayer::DeviceEventType::kESPSystemEvent:
         if (event->Platform.ESPSystemEvent.Base == IP_EVENT &&
             event->Platform.ESPSystemEvent.Id == IP_EVENT_STA_GOT_IP) {
-#if CONFIG_OPENTHREAD_BORDER_ROUTER
-            esp_openthread_platform_config_t config = {
-                .radio_config = ESP_OPENTHREAD_DEFAULT_RADIO_CONFIG(),
-                .host_config = ESP_OPENTHREAD_DEFAULT_HOST_CONFIG(),
-                .port_config = ESP_OPENTHREAD_DEFAULT_PORT_CONFIG(),
-            };
-            ESP_LOGI(TAG, "Thread border router init");
-            esp_matter::thread_br_init(&config);
+#ifdef CONFIG_OPENTHREAD_BORDER_ROUTER
+            static bool sThreadBRInitialized = false;
+            if (!sThreadBRInitialized) {
+                esp_openthread_set_backbone_netif(esp_netif_get_handle_from_ifkey("WIFI_STA_DEF"));
+                esp_openthread_lock_acquire(portMAX_DELAY);
+                esp_openthread_border_router_init();
+                esp_openthread_lock_release();
+                sThreadBRInitialized = true;
+            }
 #endif
         }
         break;
@@ -141,11 +143,32 @@ esp_err_t app_matter_endpoint_create()
         ESP_LOGE(TAG, "Matter node not found");
         return ESP_FAIL;
     }
+#if defined(CONFIG_ENABLE_MATTER_OVER_THREAD) && defined(CONFIG_OPENTHREAD_BORDER_ROUTER)
+    static chip::KvsPersistentStorageDelegate tbr_storage_delegate;
+    chip::DeviceLayer::PersistedStorage::KeyValueStoreManager & kvsManager = chip::DeviceLayer::PersistedStorage::KeyValueStoreMgr();
+    tbr_storage_delegate.Init(&kvsManager);
+    GenericOpenThreadBorderRouterDelegate *delegate = chip::Platform::New<GenericOpenThreadBorderRouterDelegate>(&tbr_storage_delegate);
+    char threadBRName[] = "Espressif-ThreadBR";
+    delegate->SetThreadBorderRouterName(chip::CharSpan(threadBRName));
+    if (!delegate) {
+        ESP_LOGE(TAG, "Failed to create thread_border_router delegate");
+        return ESP_ERR_NO_MEM;
+    }
+    thread_border_router::config_t tbr_config;
+    tbr_config.thread_border_router_management.delegate = delegate;
+    endpoint_t *tbr_endpoint = thread_border_router::create(node, &tbr_config, ENDPOINT_FLAG_NONE, NULL);
+    if (!node || !tbr_endpoint) {
+        ESP_LOGE(TAG, "Failed to create data model");
+        return ESP_ERR_NO_MEM;
+    }
+    app_endpoint_id = endpoint::get_id(tbr_endpoint);
+#else
     endpoint_t *endpoint = esp_matter::endpoint::create(node, ENDPOINT_FLAG_NONE, NULL);
     esp_matter::endpoint::add_device_type(endpoint, 0xFC01, 1);
     descriptor::config_t descriptor_config;
     descriptor::create(endpoint, &descriptor_config, CLUSTER_FLAG_SERVER);
     app_endpoint_id = endpoint::get_id(endpoint);
+#endif // CONFIG_ENABLE_MATTER_OVER_THREAD && CONFIG_OPENTHREAD_BORDER_ROUTER
 
     return ESP_OK;
 }
