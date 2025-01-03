@@ -533,6 +533,12 @@ esp_err_t esp_rmaker_param_delete(const esp_rmaker_param_t *param)
         if (_param->ui_type) {
             free(_param->ui_type);
         }
+        if ((_param->val.type == RMAKER_VAL_TYPE_STRING) || (_param->val.type == RMAKER_VAL_TYPE_OBJECT) ||
+                (_param->val.type == RMAKER_VAL_TYPE_ARRAY)) {
+            if (_param->val.val.s) {
+                free(_param->val.val.s);
+            }
+        }
         free(_param);
         return ESP_OK;
     }

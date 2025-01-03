@@ -55,6 +55,7 @@ esp_err_t esp_rmaker_device_delete(const esp_rmaker_device_t *device)
         if (_device->type) {
             free(_device->type);
         }
+        free(_device);
         return ESP_OK;
     }
     return ESP_ERR_INVALID_ARG;
