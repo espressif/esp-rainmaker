@@ -45,9 +45,7 @@
 #ifdef CONFIG_ESP_RMAKER_NETWORK_OVER_WIFI
 #include <esp_wifi.h>
 #endif
-#ifdef CONFIG_BT_ENABLED
-#include <esp_bt.h>
-#endif
+
 #include "esp_rmaker_ota_internal.h"
 
 #ifndef MIN
@@ -987,13 +985,13 @@ static esp_err_t esp_rmaker_ota_use_mqtt(esp_rmaker_ota_handle_t ota_handle, esp
     esp_wifi_get_ps(&ps_type);
 /* Disable Wi-Fi power save to speed up OTA, iff BT is controller is idle/disabled.
  * Co-ex requirement, device panics otherwise.*/
-#if CONFIG_BT_ENABLED
+#if defined(RMAKER_OTA_BT_ENABLED_CHECK)
     if (esp_bt_controller_get_status() == ESP_BT_CONTROLLER_STATUS_IDLE) {
         esp_wifi_set_ps(WIFI_PS_NONE);
     }
 #else
     esp_wifi_set_ps(WIFI_PS_NONE);
-#endif /* CONFIG_BT_ENABLED */
+#endif /* RMAKER_OTA_BT_ENABLED_CHECK */
 #endif /* CONFIG_ESP_RMAKER_NETWORK_OVER_WIFI */
 
         esp_app_desc_t app_desc;
@@ -1063,13 +1061,13 @@ static esp_err_t esp_rmaker_ota_use_mqtt(esp_rmaker_ota_handle_t ota_handle, esp
 
 ota_end:
 #ifdef CONFIG_ESP_RMAKER_NETWORK_OVER_WIFI
-#ifdef CONFIG_BT_ENABLED
+#if defined(RMAKER_OTA_BT_ENABLED_CHECK)
     if (esp_bt_controller_get_status() == ESP_BT_CONTROLLER_STATUS_IDLE) {
         esp_wifi_set_ps(ps_type);
     }
 #else
     esp_wifi_set_ps(ps_type);
-#endif /* CONFIG_BT_ENABLED */
+#endif /* RMAKER_OTA_BT_ENABLED_CHECK */
 #endif /* CONFIG_ESP_RMAKER_NETWORK_OVER_WIFI */
 
     if (err == ESP_OK) {

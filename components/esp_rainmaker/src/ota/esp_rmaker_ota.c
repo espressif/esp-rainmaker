@@ -23,9 +23,6 @@
 #ifdef CONFIG_ESP_RMAKER_OTA_USE_MQTT
 #include "esp_rmaker_mqtt_ota.h"
 #endif
-#if CONFIG_BT_ENABLED
-#include <esp_bt.h>
-#endif /* CONFIG_BT_ENABLED */
 #include <errno.h>
 
 #include <esp_rmaker_utils.h>
