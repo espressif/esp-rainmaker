@@ -22,7 +22,7 @@ extern "C" {
  * @return ESP_OK on success.
  * @return error in case of failure.
  */
-esp_err_t wifi_init();
+esp_err_t app_wifi_internal_init();
 
 /** Start Wi-Fi
  *
@@ -42,8 +42,9 @@ esp_err_t wifi_init();
  * @return ESP_OK on success (Wi-Fi connected).
  * @return error in case of failure.
  */
-esp_err_t wifi_start(const char *pop, const char *service_name, const char *service_key, uint8_t *mfg_data,
-                     size_t mfg_data_len, bool *provisioned);
+esp_err_t app_wifi_internal_start(const char *pop, const char *service_name,
+                                  const char *service_key, uint8_t *mfg_data,
+                                  size_t mfg_data_len, bool *provisioned);
 
 #ifdef __cplusplus
 }
