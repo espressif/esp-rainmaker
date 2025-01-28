@@ -1,0 +1,26 @@
+menu "ESP RainMaker HTTPS OTA Config"
+    config OTA_HTTPS_AUTOFETCH_ENABLED
+        bool "Enable Autofetch"
+        default y
+        help
+            Enable periodic checking of OTA.
+
+    config OTA_HTTPS_AUTOFETCH_PERIOD
+        int "Autofetch Period"
+        depends on OTA_HTTPS_AUTOFETCH_ENABLED
+        default 2
+        help
+            The time period(in hours) for checking OTA.
+            If disabled, OTA is only checked once, when HTTPS OTA is enabled.
+
+    config OTA_HTTPS_ROLLBACK_PERIOD
+        int "Rollback Period"
+        default 90
+        help
+            The time period for checking if OTA is valid.
+            If OTA is not marked valid in this timeframe, firmware is rolled back.
+
+    config OTA_HTTPS_APPLY_STACK_SIZE
+        int "Stack size(in bytes) of the task reponsible for calling the OTA callback"
+        default 3072
+endmenu

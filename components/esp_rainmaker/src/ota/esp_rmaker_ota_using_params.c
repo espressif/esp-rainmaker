@@ -82,7 +82,7 @@ static esp_err_t esp_rmaker_ota_service_cb(const esp_rmaker_device_t *device, co
     return ESP_FAIL;
 }
 
-esp_err_t esp_rmaker_ota_report_status_using_params(esp_rmaker_ota_handle_t ota_handle, ota_status_t status, char *additional_info)
+esp_err_t esp_rmaker_ota_report_status_using_params(char *ota_job_id, ota_status_t status, char *additional_info)
 {
     const esp_rmaker_device_t *device = esp_rmaker_node_get_device_by_name(esp_rmaker_get_node(), ESP_RMAKER_OTA_SERV_NAME);
     if (!device) {
@@ -100,6 +100,7 @@ esp_err_t esp_rmaker_ota_report_status_using_params(esp_rmaker_ota_handle_t ota_
 /* Enable the ESP RainMaker specific OTA */
 esp_err_t esp_rmaker_ota_enable_using_params(esp_rmaker_ota_t *ota)
 {
+    ota->report_fn = esp_rmaker_ota_report_status_using_params;
     esp_rmaker_device_t *service = esp_rmaker_ota_service_create(ESP_RMAKER_OTA_SERV_NAME, ota);
     if (!service) {
         ESP_LOGE(TAG, "Failed to create OTA Service");
