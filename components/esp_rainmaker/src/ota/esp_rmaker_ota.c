@@ -525,6 +525,18 @@ static void event_handler(void* arg, esp_event_base_t event_base,
     }
 }
 
+static esp_err_t esp_rmaker_erase_rollback_flag(void)
+{
+    nvs_handle handle;
+    esp_err_t err = nvs_open_from_partition(ESP_RMAKER_NVS_PART_NAME, RMAKER_OTA_NVS_NAMESPACE, NVS_READWRITE, &handle);
+    if (err == ESP_OK) {
+        nvs_erase_key(handle, RMAKER_OTA_UPDATE_FLAG_NVS_NAME);
+        nvs_commit(handle);
+        nvs_close(handle);
+    }
+    return ESP_OK;
+}
+
 esp_err_t esp_rmaker_ota_mark_valid(void)
 {
     const esp_partition_t *running = esp_ota_get_running_partition();
@@ -542,6 +554,7 @@ esp_err_t esp_rmaker_ota_mark_valid(void)
         return ESP_ERR_INVALID_ARG;
     }
     esp_ota_mark_app_valid_cancel_rollback();
+    esp_rmaker_erase_rollback_flag();
     ota->ota_in_progress = false;
     if (ota->rollback_timer) {
         xTimerStop(ota->rollback_timer, portMAX_DELAY);
@@ -590,18 +603,6 @@ static esp_err_t esp_ota_check_for_mqtt(esp_rmaker_ota_t *ota)
     }
 
     return esp_event_handler_register(RMAKER_COMMON_EVENT, RMAKER_MQTT_EVENT_CONNECTED, &event_handler, ota);
-}
-
-static esp_err_t esp_rmaker_erase_rollback_flag(void)
-{
-    nvs_handle handle;
-    esp_err_t err = nvs_open_from_partition(ESP_RMAKER_NVS_PART_NAME, RMAKER_OTA_NVS_NAMESPACE, NVS_READWRITE, &handle);
-    if (err == ESP_OK) {
-        nvs_erase_key(handle, RMAKER_OTA_UPDATE_FLAG_NVS_NAME);
-        nvs_commit(handle);
-        nvs_close(handle);
-    }
-    return ESP_OK;
 }
 
 static void esp_rmaker_ota_manage_rollback(esp_rmaker_ota_t *ota)
