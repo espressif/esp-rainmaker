@@ -35,6 +35,12 @@ if ("${IDF_VERSION_MAJOR}.${IDF_VERSION_MINOR}" VERSION_GREATER_EQUAL "5.1")
     list(APPEND priv_req openthread network_provisioning)
 endif()
 
+if(CONFIG_ESP_RMAKER_ENABLE_CHALLENGE_RESPONSE)
+    list(APPEND core_srcs
+        "src/core/esp_rmaker_chal_resp.c"
+        "src/core/esp_rmaker_chal_resp.pb-c.c")
+endif()
+
 if(CONFIG_ESP_RMAKER_ASSISTED_CLAIM)
     list(APPEND core_srcs
         "src/core/esp_rmaker_claim.c"

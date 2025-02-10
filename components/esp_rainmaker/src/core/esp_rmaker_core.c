@@ -34,6 +34,9 @@
 #include "esp_rmaker_mqtt.h"
 #include "esp_rmaker_claim.h"
 #include "esp_rmaker_client_data.h"
+#ifdef CONFIG_ESP_RMAKER_ENABLE_CHALLENGE_RESPONSE
+#include <esp_rmaker_chal_resp.h>
+#endif /* CONFIG_ESP_RMAKER_ENABLE_CHALLENGE_RESPONSE */
 
 #ifdef CONFIG_OPENTHREAD_ENABLED
 #include <esp_openthread.h>
@@ -91,7 +94,7 @@ static esp_rmaker_priv_data_t *esp_rmaker_priv_data;
 
 bool esp_rmaker_is_mqtt_connected()
 {
-    if (esp_rmaker_priv_data) {        
+    if (esp_rmaker_priv_data) {
         return esp_rmaker_priv_data->mqtt_connected;
     }
     return false;
@@ -113,7 +116,9 @@ static void reset_event_handler(void* arg, esp_event_base_t event_base,
                 esp_rmaker_mqtt_disconnect();
                 break;
             case RMAKER_EVENT_FACTORY_RESET:
+#ifdef CONFIG_ESP_RMAKER_FACTORY_RESET_REPORTING
                 esp_rmaker_reset_user_node_mapping();
+#endif
                 break;
             default:
                 break;
@@ -139,33 +144,33 @@ static void esp_rmaker_mqtt_event_handler(void* arg, esp_event_base_t event_base
 #include "mbedtls/oid.h"
 
 static char* esp_rmaker_populate_node_id_from_cert()
-{ 
+{
     void *addr = NULL;
     size_t len = 0;
     addr = esp_rmaker_get_client_cert();
     if (addr) {
         len = esp_rmaker_get_client_cert_len();
-    } else { 
-        ESP_LOGE(TAG, "Failed to get device certificate."); 
-        return NULL; 
+    } else {
+        ESP_LOGE(TAG, "Failed to get device certificate.");
+        return NULL;
     }
     mbedtls_x509_crt crt;
     mbedtls_x509_crt_init(&crt);
     char *node_id = NULL;
-    int ret = mbedtls_x509_crt_parse(&crt, addr, len); 
+    int ret = mbedtls_x509_crt_parse(&crt, addr, len);
     if (ret != 0) {
-        ESP_LOGE(TAG, "Parsing of device certificate failed, returned %02X", ret); 
+        ESP_LOGE(TAG, "Parsing of device certificate failed, returned %02X", ret);
     } else {
         mbedtls_asn1_named_data *cn_data;
-        cn_data = mbedtls_asn1_find_named_data(&crt.subject, MBEDTLS_OID_AT_CN, 
+        cn_data = mbedtls_asn1_find_named_data(&crt.subject, MBEDTLS_OID_AT_CN,
                                                 MBEDTLS_OID_SIZE(MBEDTLS_OID_AT_CN));
         if (cn_data) {
             node_id = MEM_CALLOC_EXTRAM(1, cn_data->val.len + 1);
             memcpy(node_id, (const char *)cn_data->val.p, cn_data->val.len);
         }
     }
-    mbedtls_x509_crt_free(&crt); 
-    return node_id; 
+    mbedtls_x509_crt_free(&crt);
+    return node_id;
 }
 #endif
 
@@ -280,7 +285,7 @@ static esp_err_t esp_rmaker_deinit_priv_data(esp_rmaker_priv_data_t *rmaker_priv
         return ESP_ERR_INVALID_ARG;
     }
     esp_rmaker_work_queue_deinit();
-#ifndef CONFIG_ESP_RMAKER_DISABLE_USER_MAPPING_PROV
+#if !defined(CONFIG_ESP_RMAKER_DISABLE_USER_MAPPING_PROV) && !defined(CONFIG_ESP_RMAKER_ENABLE_CHALLENGE_RESPONSE)
     esp_rmaker_user_mapping_prov_deinit();
 #endif
 #ifdef ESP_RMAKER_CLAIM_ENABLED
@@ -521,10 +526,16 @@ static void esp_rmaker_task(void *data)
          * status.
          */
         if (esp_rmaker_user_node_mapping_get_state() != ESP_RMAKER_USER_MAPPING_STARTED) {
+#ifdef CONFIG_ESP_RMAKER_FACTORY_RESET_REPORTING
             esp_rmaker_reset_user_node_mapping();
             /* Wait for user reset to finish. */
             err = esp_event_handler_register(RMAKER_EVENT, RMAKER_EVENT_USER_NODE_MAPPING_RESET,
                     &esp_rmaker_event_handler, NULL);
+#else
+            /* If factory reset reporting is disabled, just wait for user node mapping */
+            err = esp_event_handler_register(RMAKER_EVENT, RMAKER_EVENT_USER_NODE_MAPPING_DONE,
+                    &esp_rmaker_event_handler, NULL);
+#endif
         } else {
             /* Wait for User Node mapping to finish. */
             err = esp_event_handler_register(RMAKER_EVENT, RMAKER_EVENT_USER_NODE_MAPPING_DONE,
@@ -613,14 +624,14 @@ static esp_err_t esp_rmaker_init(const esp_rmaker_config_t *config, bool use_cla
         ESP_LOGE(TAG, "ESP RainMaker Queue Creation Failed");
         return ESP_ERR_NO_MEM;
     }
-#ifndef CONFIG_ESP_RMAKER_DISABLE_USER_MAPPING_PROV
+#if !defined(CONFIG_ESP_RMAKER_DISABLE_USER_MAPPING_PROV) && !defined(CONFIG_ESP_RMAKER_ENABLE_CHALLENGE_RESPONSE)
     if (esp_rmaker_user_mapping_prov_init()) {
         esp_rmaker_deinit_priv_data(esp_rmaker_priv_data);
         esp_rmaker_priv_data = NULL;
         ESP_LOGE(TAG, "Could not initialise User-Node mapping.");
         return ESP_FAIL;
     }
-#endif /* !CONFIG_ESP_RMAKER_DISABLE_USER_MAPPING_PROV */
+#endif /* !CONFIG_ESP_RMAKER_DISABLE_USER_MAPPING_PROV && !CONFIG_ESP_RMAKER_ENABLE_CHALLENGE_RESPONSE */
     if (esp_rmaker_mqtt_conn_params_init(esp_rmaker_priv_data, use_claiming) != ESP_OK) {
         esp_rmaker_deinit_priv_data(esp_rmaker_priv_data);
         esp_rmaker_priv_data = NULL;
@@ -643,6 +654,28 @@ static esp_err_t esp_rmaker_init(const esp_rmaker_config_t *config, bool use_cla
 #ifdef CONFIG_ESP_RMAKER_LOCAL_CTRL_ENABLE
     esp_rmaker_init_local_ctrl_service();
 #endif
+
+#ifdef CONFIG_ESP_RMAKER_ENABLE_CHALLENGE_RESPONSE
+    /* Check if claiming is needed - challenge response is incompatible with claiming */
+#ifdef ESP_RMAKER_CLAIM_ENABLED
+    if (esp_rmaker_priv_data->need_claim) {
+        esp_rmaker_deinit_priv_data(esp_rmaker_priv_data);
+        esp_rmaker_priv_data = NULL;
+        ESP_LOGE(TAG, "Challenge Response is incompatible with claiming. Please disable claiming or disable challenge response.");
+        ESP_LOGE(TAG, "Claiming is needed because device certificates are not found or device is not claimed yet.");
+        return ESP_FAIL;
+    }
+#endif /* ESP_RMAKER_CLAIM_ENABLED */
+
+    /* Initialize challenge response */
+    if (esp_rmaker_chal_resp_init() != ESP_OK) {
+        esp_rmaker_deinit_priv_data(esp_rmaker_priv_data);
+        esp_rmaker_priv_data = NULL;
+        ESP_LOGE(TAG, "Failed to initialize Challenge Response");
+        return ESP_FAIL;
+    }
+#endif /* CONFIG_ESP_RMAKER_ENABLE_CHALLENGE_RESPONSE */
+
     esp_rmaker_priv_data->enable_time_sync = config->enable_time_sync;
     esp_rmaker_post_event(RMAKER_EVENT_INIT_DONE, NULL, 0);
     esp_rmaker_priv_data->state = ESP_RMAKER_STATE_INIT_DONE;
@@ -713,6 +746,10 @@ esp_err_t esp_rmaker_start(void)
 esp_err_t esp_rmaker_stop()
 {
     ESP_RMAKER_CHECK_HANDLE(ESP_ERR_INVALID_STATE);
+#ifdef CONFIG_ESP_RMAKER_ENABLE_CHALLENGE_RESPONSE
+    /* Deinitialize challenge response */
+    esp_rmaker_chal_resp_deinit();
+#endif /* CONFIG_ESP_RMAKER_ENABLE_CHALLENGE_RESPONSE */
     esp_rmaker_priv_data->state = ESP_RMAKER_STATE_STOP_REQUESTED;
     return ESP_OK;
 }

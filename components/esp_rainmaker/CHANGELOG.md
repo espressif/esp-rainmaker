@@ -1,5 +1,20 @@
 # Changelog
 
+## 1.6.5
+
+### New Feature
+
+- Add support for challenge response based user node mapping during provisioning.
+  This is more secure and reliable because
+    - The mapping happens even before Wi-Fi credentials are sent, which ensures that the
+      node is added to the user's account before it is connected to the network.
+    - The node does not necessarily need to be connected to the network to be mapped.
+
+Note that the node needs to be claimed before this can be used, as it requires the MQTT credentials
+to be available. This is not a concern for private deployments since the node credentials are pre-flashed.
+This feature requires the support to be available in phone apps too.
+This was added in ESP RainMaker iOS app v3.4.0 and Android app v3.7.0
+
 ## 1.6.4
 
 ## New feature
@@ -13,17 +28,13 @@ impact would be low enough when compared against the advantages. This can be ena
 `CONFIG_ESP_RMAKER_OTA_USE_MQTT` to `y` in the menuconfig.
 (`idf.py menuconfig ->  ESP RainMaker Config -> ESP RainMaker OTA Config -> OTA Update Protocol Type -> MQTT`)
 
-## Bugfix
-
-- Fix a bug where the OTA fetch was not working when `CONFIG_ESP_RMAKER_OTA_AUTOFETCH` was enabled.
-
 
 ## 1.6.3
 
 ## Bugfix
 
 - Duplicate otafetch after rebooting into new firmware after an OTA was causing a crash.
-This was seen when both, CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE and CONFIG_ESP_RMAKER_OTA_AUTOFETCH
+This was seen when both, `CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE` and `CONFIG_ESP_RMAKER_OTA_AUTOFETCH`
 are enabled.
 
 ## 1.6.2
