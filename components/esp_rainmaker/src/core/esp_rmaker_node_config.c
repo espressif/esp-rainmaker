@@ -57,13 +57,13 @@ static esp_err_t esp_rmaker_report_info(json_gen_str_t *jptr)
     json_gen_push_object(jptr, "secure_boot_digest");
     for (int i = 0; i < SECURE_BOOT_NUM_BLOCKS; i++) {
         char key_name[3];
-        snprintf(&key_name, sizeof(key_name), "k%d", i);
+        snprintf(key_name, sizeof(key_name), "k%d", i);
         key_name[2] = '\0';
         if (info->secure_boot_digest[i] == NULL) {
-            json_gen_obj_set_null(jptr, &key_name);
+            json_gen_obj_set_null(jptr, key_name);
             continue;
         }
-        json_gen_obj_set_string(jptr, &key_name, info->secure_boot_digest[i]);
+        json_gen_obj_set_string(jptr, key_name, info->secure_boot_digest[i]);
     }
     json_gen_pop_object(jptr);
 #endif
