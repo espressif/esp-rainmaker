@@ -1,0 +1,24 @@
+## IDF Component Manager Manifest File
+dependencies:
+  espressif/esp_insights: "^1.2.2"
+  espressif/esp_rainmaker: "^1.5.1"
+  m5stack/m5gfx: "0.1.16"
+  m5stack/m5unified: "0.1.16"
+  lvgl/lvgl: "9.2.0"
+  espressif/arduino-esp32: "3.0.7"
+  
+  ## Required IDF version
+  idf:
+    version: ">=4.1.0"
+
+  ## Additional dependencies
+  app_reset:
+    path: examples/common/app_reset
+    git: https://github.com/espressif/esp-rainmaker.git
+    version: 72845bc
+
+  gpio_button:
+    path: examples/common/gpio_button
+    git: https://github.com/espressif/esp-rainmaker.git
+    version: 72845bc
+
