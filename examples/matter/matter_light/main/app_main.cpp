@@ -144,9 +144,11 @@ extern "C" void app_main()
 
     /* Pre start */
     ESP_ERROR_CHECK(app_matter_rmaker_start());
-    /* Start the ESP RainMaker Agent */
-    esp_rmaker_start();
+
     rmaker_init_done = true;
 
     app_matter_enable_matter_console();
+
+    // RainMaker start is deferred after Matter commissioning is complete
+    // and BLE memory is reclaimed, so that MQTT connect doesnt fail.
 }
