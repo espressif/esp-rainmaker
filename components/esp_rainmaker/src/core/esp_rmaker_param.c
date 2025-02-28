@@ -392,10 +392,10 @@ static esp_err_t esp_rmaker_device_set_params(_esp_rmaker_device_t *device, jpar
 set_params_free:
     /* Free all values which are allocated on heap */
     for (int i = 0; i < num_param; i++) {
-        if ((write_req[num_param].val.type == RMAKER_VAL_TYPE_STRING) || (write_req[num_param].val.type == RMAKER_VAL_TYPE_OBJECT ||
-                    (write_req[num_param].val.type == RMAKER_VAL_TYPE_ARRAY))) {
-            if (write_req[num_param].val.val.s) {
-                free(write_req[num_param].val.val.s);
+        if ((write_req[i].val.type == RMAKER_VAL_TYPE_STRING) || (write_req[i].val.type == RMAKER_VAL_TYPE_OBJECT ||
+                    (write_req[i].val.type == RMAKER_VAL_TYPE_ARRAY))) {
+            if (write_req[i].val.val.s) {
+                free(write_req[i].val.val.s);
             }
         }
     }
