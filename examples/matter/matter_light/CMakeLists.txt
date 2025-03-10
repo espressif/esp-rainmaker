@@ -48,6 +48,7 @@ set(EXTRA_COMPONENT_DIRS
     "${RMAKER_PATH}/examples/matter/common"
     ${extra_components_dirs_append})
 
+set(PROJECT_VER "1.0")
 project(matter_light)
 
 idf_build_set_property(CXX_COMPILE_OPTIONS "-std=gnu++17;-Os;-DCHIP_HAVE_CONFIG_H" APPEND)

@@ -5,3 +5,5 @@ dependencies:
     version: ">=5.0.0"
   espressif/esp_rainmaker:
     version: ">=1.0"
+  espressif/qrcode:
+    version: "^0.1.0~2"

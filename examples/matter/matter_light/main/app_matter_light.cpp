@@ -22,6 +22,9 @@
 #include <esp_rmaker_core.h>
 #include "app_priv.h"
 #include <app_matter.h>
+#ifndef CONFIG_EXAMPLE_USE_RAINMAKER_FABRIC
+#include <matter_commissioning_window_management.h>
+#endif
 
 using namespace esp_matter;
 using namespace esp_matter::attribute;
@@ -172,10 +175,19 @@ void app_event_cb(const ChipDeviceEvent *event, intptr_t arg)
 
     case chip::DeviceLayer::DeviceEventType::kCommissioningWindowOpened:
         ESP_LOGI(TAG, "Commissioning window opened");
+#ifndef CONFIG_EXAMPLE_USE_RAINMAKER_FABRIC
+#ifdef CONFIG_CUSTOM_COMMISSIONABLE_DATA_PROVIDER
+        matter_commissioning_window_parameters_update();
+#endif
+        matter_commissioning_window_status_update(true);
+#endif
         break;
 
     case chip::DeviceLayer::DeviceEventType::kCommissioningWindowClosed:
         ESP_LOGI(TAG, "Commissioning window closed");
+#ifndef CONFIG_EXAMPLE_USE_RAINMAKER_FABRIC
+        matter_commissioning_window_status_update(false);
+#endif
         break;
 
     case chip::DeviceLayer::DeviceEventType::kFabricRemoved:
