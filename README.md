@@ -58,6 +58,6 @@ ESP RainMaker can work with ESP IDF 4.1 and above.
 
 ---
 
-<a href="https://espressif.github.io/esp-launchpad/?flashConfigURL=https://espressif.github.io/esp-rainmaker/launchpad.toml">
+<a href="https://espressif.github.io/esp-launchpad/?solution=rainmaker">
     <img alt="Try it with ESP Launchpad" src="https://espressif.github.io/esp-launchpad/assets/try_with_launchpad.png" width="250" height="70">
 </a>
