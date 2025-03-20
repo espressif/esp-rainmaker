@@ -81,20 +81,6 @@ CONFIG_ZB_ZCZR=y
 # end of Component config
 
 #
-# ESP Zigbee gateway rcp update
-#
-CONFIG_ZIGBEE_GW_AUTO_UPDATE_RCP=n
-#
-# Board Configuration
-#
-CONFIG_PIN_TO_RCP_RESET=7
-CONFIG_PIN_TO_RCP_BOOT=8
-CONFIG_PIN_TO_RCP_TX=17
-CONFIG_PIN_TO_RCP_RX=18
-
-# end of ESP Zigbee gateway rcp update
-
-#
 # IEEE802154
 #
 CONFIG_IEEE802154_RECEIVE_DONE_HANDLER=y

@@ -19,15 +19,16 @@ typedef struct esp_zigbee_ic_mac_address_s{
 } esp_zigbee_ic_mac_address_t;
 
 /* define a single remote device struct for managing */
-typedef struct light_bulb_device_params_s {
+typedef struct device_params_s {
     esp_zb_ieee_addr_t ieee_addr;
     uint8_t  endpoint;
     uint16_t short_addr;
-} light_bulb_device_params_t;
+} device_params_t;
 
 typedef struct esp_rainmaker_gateway_end_device_list_s{
    esp_rmaker_device_t *device;
    esp_zb_ha_standard_devices_t device_type;
-   light_bulb_device_params_t zigbee_info;
+   device_params_t zigbee_info;
+   bool attribute_value;
    struct esp_rainmaker_gateway_end_device_list_s *next;
-} esp_rainmaker_gateway_end_device_list_t;
+} esp_rainmaker_gateway_joining_device_list_t;

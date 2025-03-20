@@ -17,11 +17,42 @@ The Wi-Fi based ESP Zigbee Gateway consists of two SoCs:
 * An ESP32 series Wi-Fi SoC (ESP32, ESP32-C, ESP32-S, etc) loaded with ESP Zigbbe Gateway and Zigbee Stack.
 * An ESP32-H 802.15.4 SoC loaded with OpenThread RCP.
 
-Note: For more information, please refer to the [ESP Zigbee gateway board](https://github.com/espressif/esp-zigbee-sdk/tree/main/examples/esp_zigbee_gateway#hardware-platforms).
+The following boards are available for this example:
+- [ESP Zigbee gateway board](https://github.com/espressif/esp-zigbee-sdk/tree/main/examples/esp_zigbee_gateway#hardware-platforms)
+- [M5Stack CoreS3](https://shop.m5stack.com/products/m5stack-cores3-esp32s3-lotdevelopment-kit) + [Module Gateway H2](https://shop.m5stack.com/products/esp32-h2-thread-zigbee-gateway-module)
 
 ## Build and Flash firmware
 
+### Build the RCP firmware
+
+The Zigbee Gateway supports flashing the RCP image from the host SoC.
+
+First build the [ot_rcp](https://github.com/espressif/esp-idf/tree/master/examples/openthread/ot_rcp),`OPENTHREAD_NCP_VENDOR_HOOK` of ot_rcp should be selected via menuconfig.
+
+### Build and Flash Zigbee Gateway Firmware
+
 Follow the ESP RainMaker Documentation [Get Started](https://rainmaker.espressif.com/docs/get-started.html) section to build and flash this firmware. Just note the path of this example.
+
+Build command depends on the board used:
+- For ESP Zigbee gateway board:
+```
+idf.py set-target esp32s3 build
+```
+- For M5Stack CoreS3 + Module Gateway H2:
+```
+idf.py -D SDKCONFIG_DEFAULTS="sdkconfig.defaults;sdkconfig.defaults.m5stack" set-target esp32s3 build
+```
+
+> Note: If failed to flash M5Stack-CoreS3 board, please long press the the bottom RST button.
+
+## Add device
+
+### Supported devices mapping to RainMaker:
+
+- ESP_ZB_HA_ON_OFF_LIGHT_DEVICE_ID (0x0100)
+- ESP_ZB_HA_IAS_ZONE_ID (0x0402, Zone type: Door/Window handle)
+
+After adding device and refreshing RainMaker App, you can see the device in App.
 
 ### Add Zigbee device via pre-shared link key
 
@@ -74,6 +105,8 @@ I (100537) esp_app_rainmaker: Received write request via : Cloud
 I (100547) esp_app_rainmaker: Received device name = Zigbee_Gateway,parameter name = Add_zigbee_device
 I (100557) esp_app_rainmaker: Zigbee network close after 180 seconds
 ```
+
+> Note: For M5Stack-CoreS3 board, you can also toggle the "Add zigbee device" button on the screen to to open the Zigbee network and add devices.
 
 ### Add Zigbee device via install code mode
 
@@ -136,3 +169,4 @@ I (100577) esp_rmaker_param: Reporting params: {"Zigbee_Gateway":{"Add_zigbee_de
 
 Press and hold the BOOT button for more than 3 seconds to reset the board to factory defaults. You will have to provision the board again to use it.
 
+> Note: For M5Stack-CoreS3, use the button on the touch screen to reset.
