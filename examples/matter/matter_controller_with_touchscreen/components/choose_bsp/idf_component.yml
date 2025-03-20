@@ -16,3 +16,7 @@ dependencies:
   espressif/esp32_s3_lcd_ev_board:
     version: "==2.1.0"
     require: "no"
+
+  espressif/m5stack_core_s3:
+    version: "1.1.1"
+    require: "no"

@@ -15,5 +15,32 @@ menu "HMI Board Config"
         config BSP_BOARD_ESP32_S3_LCD_EV_BOARD
             bool "BSP board ESP32-S3-LCD-EV-Board"
 
+        config BSP_BOARD_M5STACK_CORES3
+            bool "BSP board M5Stack CoreS3"
     endchoice
+
+    menu "Board Configuration"
+        depends on OPENTHREAD_BORDER_ROUTER
+        config PIN_TO_RCP_RESET
+            int
+            default "7" if BSP_BOARD_M5STACK_CORES3
+            default "42"
+
+        config PIN_TO_RCP_BOOT
+            int
+            default "18" if BSP_BOARD_M5STACK_CORES3
+            default "40"
+
+        config PIN_TO_RCP_TX
+            int
+            default "4" if BSP_BOARD_ESP32_S3_LCD_EV_BOARD
+            default "10" if BSP_BOARD_M5STACK_CORES3
+            default "38"
+
+        config PIN_TO_RCP_RX
+            int
+            default "0" if BSP_BOARD_ESP32_S3_LCD_EV_BOARD
+            default "17" if BSP_BOARD_M5STACK_CORES3
+            default "41"
+    endmenu
 endmenu

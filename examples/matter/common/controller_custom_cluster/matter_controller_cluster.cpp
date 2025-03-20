@@ -354,7 +354,7 @@ esp_err_t parse_string_from_tlv(TLVReader &tlv_data, ScopedMemoryBufferWithSize<
         }
     }
     tlv_data.ExitContainer(outer);
-    ESP_RETURN_ON_FALSE(str_span.data() && str_span.size() > 0, ESP_FAIL, TAG, "Failed to decode the tlv_data");
+    ESP_RETURN_ON_FALSE(str_span.data() && str_span.size() > 0 && str_span.size() < str.AllocatedSize(), ESP_FAIL, TAG, "Failed to decode the tlv_data");
     strncpy(str.Get(), str_span.data(), str_span.size());
     str[str_span.size()] = 0;
     return ESP_OK;
@@ -464,7 +464,7 @@ static esp_err_t install_user_noc(uint16_t endpoint_id, uint8_t fabric_index)
     // Alloc memory for ScopedMemoryBuffers
     rainmaker_group_id.Calloc(ESP_MATTER_RAINMAKER_MAX_GROUP_ID_LEN);
     ESP_RETURN_ON_FALSE(rainmaker_group_id.Get(), ESP_ERR_NO_MEM, TAG, "Failed to alloc memory for rainmaker_group_id");
-    endpoint_url.Calloc(ESP_MATTER_RAINMAKER_MAX_ENDPOINT_URL_LEN);
+    endpoint_url.Calloc(ESP_MATTER_RAINMAKER_MAX_ENDPOINT_URL_LEN + 1);
     ESP_RETURN_ON_FALSE(endpoint_url.Get(), ESP_ERR_NO_MEM, TAG, "Failed to alloc memory for endpoint_url");
     ESP_RETURN_ON_ERROR(attribute::endpoint_url::get(endpoint_id, endpoint_url.Get()), TAG,
                         "Failed to get endpoint_url");
@@ -662,7 +662,7 @@ CHIP_ERROR MatterControllerAttrAccess::Read(const ConcreteReadAttributePath &aPa
     }
     case attribute::endpoint_url::Id: {
         ScopedMemoryBufferWithSize<char> endpoint_url;
-        endpoint_url.Alloc(ESP_MATTER_RAINMAKER_MAX_ENDPOINT_URL_LEN);
+        endpoint_url.Alloc(ESP_MATTER_RAINMAKER_MAX_ENDPOINT_URL_LEN + 1);
         if (!endpoint_url.Get()) {
             return CHIP_ERROR_NO_MEMORY;
         }
@@ -763,7 +763,7 @@ esp_err_t controller_authorize(uint16_t endpoint_id)
     // Alloc memory for ScopedMemoryBuffers
     refresh_token.Calloc(ESP_MATTER_RAINMAKER_MAX_REFRESH_TOKEN_LEN);
     ESP_RETURN_ON_FALSE(refresh_token.Get(), ESP_ERR_NO_MEM, TAG, "Failed to alloc memory for refresh_token");
-    endpoint_url.Calloc(ESP_MATTER_RAINMAKER_MAX_ENDPOINT_URL_LEN);
+    endpoint_url.Calloc(ESP_MATTER_RAINMAKER_MAX_ENDPOINT_URL_LEN + 1);
     ESP_RETURN_ON_FALSE(endpoint_url.Get(), ESP_ERR_NO_MEM, TAG, "Failed to alloc memory for endpoint_url");
 
     ESP_RETURN_ON_ERROR(cluster::matter_controller::attribute::endpoint_url::get(endpoint_id, endpoint_url.Get()), TAG,

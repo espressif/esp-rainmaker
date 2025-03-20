@@ -129,7 +129,7 @@ static esp_err_t update_device_list_task(void *endpoint_id_ptr) {
   uint16_t endpoint_id = *(uint16_t *)endpoint_id_ptr;
   free(endpoint_id_ptr);
 
-  endpoint_url.Calloc(ESP_MATTER_RAINMAKER_MAX_ENDPOINT_URL_LEN);
+  endpoint_url.Calloc(ESP_MATTER_RAINMAKER_MAX_ENDPOINT_URL_LEN + 1);
   ESP_RETURN_ON_FALSE(endpoint_url.Get(), ESP_ERR_NO_MEM, TAG,
                       "Failed to alloc memory for endpoint_url");
   rainmaker_group_id.Calloc(ESP_MATTER_RAINMAKER_MAX_GROUP_ID_LEN);

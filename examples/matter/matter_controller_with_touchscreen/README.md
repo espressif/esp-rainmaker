@@ -1,7 +1,11 @@
 # Matter + Rainmaker Controller With Touchscreen Example
 
-- This example demonstrates a Matter + RainMaker Controller which running on [ESP32-S3-BOX](https://github.com/espressif/esp-box) or [ESP32-S3-LCD-EV-BOARD](https://github.com/espressif/esp-dev-kits/tree/master/esp32-s3-lcd-ev-board). Matter is used for commissioning (also known as Wi-Fi provisioning) and local control, whereas RainMaker is used for remote control.
-- Thread Border Router support by integrating an ESP32-H2.
+- This example demonstrates a Matter + RainMaker Controller (Matter is used for commissioning, also known as Wi-Fi provisioning, and local control, whereas RainMaker is used for remote control), which can run on following boards:
+  - [ESP32-S3-BOX/BOX-3](https://github.com/espressif/esp-box)
+  - [ESP32-S3-LCD-EV-BOARD](https://github.com/espressif/esp-dev-kits).
+  - [M5Stack-CoreS3](https://docs.m5stack.com/en/core/CoreS3)
+- Thread Border Router support by integrating an ESP32-H2. [Module Gateway H2](https://shop.m5stack.com/products/esp32-h2-thread-zigbee-gateway-module) can be used for M5Stack-CoreS3.
+
 
 ## Usage
 
@@ -18,31 +22,30 @@ $ idf.py set-target esp32s3
 $ idf.py build
 $ idf.py flash monitor
 ```
-> Please check the board selection (default ESP32-S3-BOX-3) in one of the ways:
-> - Use `idf.py menuconfig`->`HMI Board Config`->`Selece BSP board` to select board.
-> - Add only one board config in '[sdkconfig.defaults](matter_controller_with_touchscreen/sdkconfig.defaults)'. e.g. 'CONFIG_BSP_BOARD_ESP32_S3_LCD_EV_BOARD=y' to select ESP32-S3-LCD-EV-BOARD as board. 'CONFIG_BSP_BOARD_ESP32_S3_BOX_3=y' to select ESP32-S3-BOX-3 as board.
->> - Please use ESP-IDF [v5.2.2](https://github.com/espressif/esp-idf/releases/v5.2.2).
->> - If the board is ESP32-S3-LCD-EV-BOARD, set-target command should be `idf.py -D SDKCONFIG_DEFAULTS="sdkconfig.defaults;sdkconfig.defaults.lcdboard" set-target esp32s3`, remember to select board at the same time.
+
+- The `set-target` command above depends on the selected board:
+  - For ESP32-S3-BOX series, set-target command should be `idf.py set-target esp32s3`.
+  - For ESP32-S3-LCD-EV-BOARD, set-target command should be `idf.py -D SDKCONFIG_DEFAULTS="sdkconfig.defaults;sdkconfig.defaults.lcdboard" set-target esp32s3`.
+  - For M5Stack CoreS3, set-target command should be `idf.py -D SDKCONFIG_DEFAULTS="sdkconfig.defaults;sdkconfig.defaults.m5stack" set-target esp32s3`.
+
+- Please check the board selection (default ESP32-S3-BOX-3) in one of the ways:
+  - Use `idf.py menuconfig`->`HMI Board Config`->`Selece BSP board` to select board.
+  - Add only one board config in [sdkconfig.defaults](./sdkconfig.defaults). e.g. 'CONFIG_BSP_BOARD_ESP32_S3_LCD_EV_BOARD=y' to select ESP32-S3-LCD-EV-BOARD as board. 'CONFIG_BSP_BOARD_ESP32_S3_BOX_3=y' to select ESP32-S3-BOX-3 as board. 'CONFIG_BSP_BOARD_M5STACK_CORES3=y' to select M5Stack-CoreS3 as board.
 
 ### Building the example (with OpenThread Border Router)
 
-Build ot_rcp example in `${IDF_PATH}/examples/openthread/ot_rcp`.
+Prepare a ESP32-H2 board (flashed ot_rcp example) to connect ESP32-S3-BOX / ESP32-S3-BOX-3 / S3-LCD-EV-BOARD / M5Stack-CoreS3 via UART.
 
-Prepare a ESP32-H2 board (flashed ot_rcp example) to connect ESP32-S3-BOX / ESP32-S3-BOX-3 / S3-LCD-EV-BOARD via UART.
+| ESP32-H2 | BOX / BOX-3 | S3-LCD-EV-BOARD | M5Stack-CoreS3 |
+|----------|-------------|-----------------|----------------|
+|    GND   |     GND     |       GND       |      GND       |
+|    3V3   |     3V3     |       3V3       |      3V3       |
+|    RX    |    GPIO41   |      GPIO0      |     GPIO17     |
+|    TX    |    GPIO38   |      GPIO4      |     GPIO10     |
 
-| BOX / BOX-3 | ESP32-H2 |
-|------------ |----------|
-| GND | GND |
-| 3V3 | 3V3 |
-| GPIO41 | RX |
-| GPIO38 | TX |
+The example with the OTBR feature supports flashing the RCP image from the host SoC.
 
-| S3-LCD-EV-BOARD | ESP32-H2 |
-|-----------------|----------|
-| GND | GND |
-| 3V3 | 3V3 |
-| GPIO0 | RX |
-| GPIO4 | TX |
+First build the [ot_rcp](https://github.com/espressif/esp-idf/tree/master/examples/openthread/ot_rcp).
 
 Build the example with the sdkconfig file 'sdkconfig.defaults.otbr' to enable the OTBR feature on the controller.
 
@@ -51,7 +54,15 @@ $ idf.py -D SDKCONFIG_DEFAULTS="sdkconfig.defaults;sdkconfig.defaults.otbr" set-
 $ idf.py build
 $ idf.py flash monitor
 ```
-> If the board is ESP32-S3-LCD-EV-BOARD, set-target command should be `idf.py -D SDKCONFIG_DEFAULTS="sdkconfig.defaults;sdkconfig.defaults.lcdboard;sdkconfig.defaults.otbr" set-target esp32s3`, remember to check the board selection (default ESP32-S3-BOX-3) at the same time.
+
+- The `set-target` command above depends on the selected board:
+  - For ESP32-S3-BOX series, set-target command should be `idf.py -D SDKCONFIG_DEFAULTS="sdkconfig.defaults;sdkconfig.defaults.otbr" set-target esp32s3`.
+  - For ESP32-S3-LCD-EV-BOARD, set-target command should be `idf.py -D SDKCONFIG_DEFAULTS="sdkconfig.defaults;sdkconfig.defaults.lcdboard;sdkconfig.defaults.otbr" set-target esp32s3`.
+  - For M5Stack CoreS3, set-target command should be `idf.py -D SDKCONFIG_DEFAULTS="sdkconfig.defaults;sdkconfig.defaults.m5stack;sdkconfig.defaults.otbr" set-target esp32s3`.
+
+- Please check the board selection (same as with no OTBR feature)
+
+If you are using IDF v5.3.1 or later, there might be an error of `#error CONFIG_LWIP_IPV6_NUM_ADDRESSES should be set to 12` when building this example. Please change the IPv6 addresses number for LwIP network interface in menuconfig and rebuild the example again.
 
 > Note: Thread Border Router is not initialized until the Controller has been commissioned and obtained an IP address.
 
@@ -60,7 +71,7 @@ $ idf.py flash monitor
 To commission the Controller with touchscreen, scan the QR Code shown on the screen using ESP RainMaker app.
 - After commissioning successfully, the Controller could control the other devices (supporting On/Off cluster server) in the same fabric locally by clicking the icon on the screen.
 - Besides the [Matter + Rainmaker light](../matter_light/), a Matter-only light at '$ESP_MATTER_PATH/examples/light' can also be commissioned by using a similar method. The QR code for Matter-only light is on the [website](https://docs.espressif.com/projects/esp-matter/en/latest/esp32/developing.html#commissioning-and-control).
-- Long click the BOOT button will reset factory, then the device can be commissioned again.
+- Long click the BOOT button or touch the Reset button in "About Us" page will do factory reset, then the device can be commissioned again.
 
 > Please refer to the [README in the parent folder](../README.md) for instructions.
 

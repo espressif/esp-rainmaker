@@ -18,11 +18,17 @@ static const char * boards_info = {
     "S3_BOX"
 #elif CONFIG_BSP_BOARD_ESP32_S3_BOX_Lite
     "S3_BOX_LITE"
-#else
+#elif CONFIG_BSP_BOARD_ESP32_S3_LCD_EV_BOARD
     "S3_LCD_EV_BOARD"
+#elif CONFIG_BSP_BOARD_M5STACK_CORES3
+    "M5STACK_CORES3"
+#else
+    "Unknown board"
 #endif
 };
 
+#define LV_SYMBOL_EXTRA_SYNC "\xef\x80\xA1"
+static bool perform_factory_reset = false;
 static void (*g_about_us_end_cb)(void) = NULL;
 
 static void ui_about_us_page_return_click_cb(lv_event_t *e)
@@ -36,6 +42,49 @@ static void ui_about_us_page_return_click_cb(lv_event_t *e)
     // bsp_btn_rm_all_callback(BSP_BUTTON_MAIN);
     if (g_about_us_end_cb) {
         g_about_us_end_cb();
+    }
+}
+
+static void timer_cb(struct _lv_timer_t *)
+{
+    matter_factory_reset();
+}
+
+static void msgbox_event_cb(lv_event_t *e)
+{
+    lv_event_code_t code = lv_event_get_code(e);
+    lv_obj_t *msgbox = lv_event_get_current_target(e);
+
+    if (code == LV_EVENT_VALUE_CHANGED) {
+        const char *txt = lv_msgbox_get_active_btn_text(msgbox);
+        if (strcmp(txt, "Ok") == 0) {
+            if (!perform_factory_reset) {
+                lv_obj_t *text = lv_msgbox_get_text(msgbox);
+                lv_label_set_text_fmt(text, "Do factory reset");
+                lv_obj_set_style_text_color(text, lv_color_make(255, 0, 0), LV_STATE_DEFAULT);
+                ESP_LOGI("BOX", "Factory reset triggered. Release the button to start factory reset.");
+                perform_factory_reset = true;
+                lv_timer_create(timer_cb, 2000, NULL);
+            }
+        } else {
+            lv_msgbox_close(msgbox);
+        }
+    }
+}
+
+static void btn_event_cb(lv_event_t *e)
+{
+    lv_event_code_t code = lv_event_get_code(e);
+    if (code == LV_EVENT_CLICKED) {
+        static const char *btns[] = {"Ok", "Cancel", ""};
+        lv_obj_t *mbox = lv_msgbox_create(NULL, "Setting", "Are you sure to reset Controller", btns, true);
+        lv_obj_add_event_cb(mbox, msgbox_event_cb, LV_EVENT_ALL, NULL);
+        lv_group_focus_obj(lv_msgbox_get_btns(mbox));
+        lv_obj_add_state(lv_msgbox_get_btns(mbox), LV_STATE_FOCUS_KEY);
+        lv_obj_align(mbox, LV_ALIGN_CENTER, 0, 0);
+        lv_obj_t *bg = lv_obj_get_parent(mbox);
+        lv_obj_set_style_bg_opa(bg, LV_OPA_70, 0);
+        lv_obj_set_style_bg_color(bg, lv_palette_main(LV_PALETTE_GREY), 0);
     }
 }
 
@@ -94,4 +143,17 @@ void ui_about_us_start(void (*fn)(void))
     lv_label_set_recolor(lab, true);
     lv_label_set_text(lab, msg);
     lv_obj_align(lab, LV_ALIGN_BOTTOM_LEFT, 0, -10);
+
+    lv_obj_t *reset_button = lv_btn_create(page);
+    lv_obj_set_style_bg_color(reset_button, lv_color_white(), LV_STATE_DEFAULT);
+    lv_obj_set_style_bg_color(reset_button, lv_palette_lighten(LV_PALETTE_RED, 1), LV_STATE_PRESSED);
+    lv_obj_set_style_border_width(reset_button, 1, LV_PART_MAIN);
+    lv_obj_set_style_border_color(reset_button, lv_palette_main(LV_PALETTE_GREY), LV_PART_MAIN);
+    lv_obj_align(reset_button, LV_ALIGN_TOP_RIGHT, 0, 0);
+    lv_obj_set_size(reset_button, UI_SCALING(40), UI_SCALING(40));
+    lv_obj_t *reset_label = lv_label_create(page);
+    lv_label_set_text_static(reset_label, LV_SYMBOL_EXTRA_SYNC);
+    lv_obj_align_to(reset_label, reset_button, LV_ALIGN_CENTER, 0, 0);
+    lv_obj_add_event_cb(reset_button, btn_event_cb, LV_EVENT_CLICKED, NULL);
+
 }

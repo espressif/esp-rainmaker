@@ -28,6 +28,8 @@ idf.py -D SDKCONFIG_DEFAULTS="sdkconfig.defaults;sdkconfig.defaults.otbr" set-ta
 idf.py -p <PORT> erase-flash flash monitor
 ```
 
+If you are using IDF v5.3.1 or later, there might be an error of `#error CONFIG_LWIP_IPV6_NUM_ADDRESSES should be set to 12` when building this example. Please change the IPv6 addresses number for LwIP network interface in menuconfig and rebuild the example again.
+
 ### CLI Command
 Use Thread CLI command in device console
 > Note: Thread Border Router is not initialized until the Controller has been commissioned and obtained an IP address.
