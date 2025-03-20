@@ -20,8 +20,22 @@ void box_main(void)
     ESP_LOGI(TAG, "Compile time: %s %s", __DATE__, __TIME__);
     printf_choose_bsp();
     bsp_i2c_init();
-    bsp_display_start();
-    // bsp_board_init();
+#if CONFIG_BSP_BOARD_ESP32_S3_LCD_EV_BOARD
+    bsp_display_cfg_t cfg;
+#else
+    bsp_display_cfg_t cfg = {
+        .lvgl_port_cfg = ESP_LVGL_PORT_INIT_CONFIG(),
+        .buffer_size = BSP_LCD_H_RES * 10,
+        .double_buffer = 0,
+        .flags = {
+            .buff_dma = true,
+            .buff_spiram = false,
+        }
+    };
+    cfg.lvgl_port_cfg.task_affinity = 1;
+#endif
+    bsp_display_start_with_config(&cfg);
+
     ESP_LOGI(TAG, "Display LVGL demo");
     bsp_display_backlight_on();
     ESP_ERROR_CHECK(ui_main_start());

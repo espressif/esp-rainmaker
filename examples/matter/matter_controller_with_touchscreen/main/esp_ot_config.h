@@ -84,7 +84,7 @@
     }
 #endif // CONFIG_OPENTHREAD_BORDER_ROUTER
 
-#if CONFIG_OPENTHREAD_BR_AUTO_UPDATE_RCP
+#if CONFIG_AUTO_UPDATE_RCP
 #define ESP_OPENTHREAD_RCP_UPDATE_CONFIG()                                                                           \
     {                                                                                                                \
         .rcp_type = RCP_TYPE_ESP32H2_UART, .uart_rx_pin = CONFIG_PIN_TO_RCP_TX, .uart_tx_pin = CONFIG_PIN_TO_RCP_RX, \

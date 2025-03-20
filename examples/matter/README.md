@@ -5,7 +5,7 @@
 ## Prerequisites
 
 - ESP-IDF [v5.2.2](https://github.com/espressif/esp-idf/releases/v5.2.2)
-- [ESP-Matter SDK](https://github.com/espressif/esp-matter). Latest known working commit is [7b17d1](https://github.com/espressif/esp-matter/tree/7b17d1683163557d206536f17f5b016104e53029).
+- [ESP-Matter SDK](https://github.com/espressif/esp-matter). Latest known working commit is [8a7c81f2](https://github.com/espressif/esp-matter/tree/8a7c81f28b8d787247d42b0992ae264555bec936).
 - [ESP Rainmaker SDK](https://github.com/espressif/esp-rainmaker)
 - [ESP Secure Cert Manager](https://github.com/espressif/esp_secure_cert_mgr)
 Please go through the installation process (if required) for all of the above prerequisites.
@@ -24,13 +24,12 @@ $ export RMAKER_PATH=/path/to/esp-rainmaker
 ### Claiming device certificates
 
 Self Claiming or Assisted Claiming can't be used with the RainMaker + Matter examples because the certificate needs to be present even before Matter commissioning stars.
-So, we will use [host driven claiming](https://rainmaker.espressif.com/docs/claiming#host-driven-claiming) via the RainMaker CLI.
+So, we will use [host driven claiming](https://rainmaker.espressif.com/docs/claiming#host-driven-claiming) via the [RainMaker CLI](https://rainmaker.espressif.com/docs/cli-setup).
 
 Make sure your device is connected to the host machine, login into the CLI and execute this:
 
 ```
-$ cd $RMAKER_PATH/cli
-$ ./rainmaker.py claim --matter <port>
+$ esp-rainmaker-cli claim --matter <port>
 ```
 
 This will fetch the device certificates and flash them on your device.
