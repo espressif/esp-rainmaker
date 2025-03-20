@@ -27,6 +27,10 @@
 #include <app_insights.h>
 #include <app_thread_config.h>
 
+#if CONFIG_M5STACK_THREAD_BR_BOARD
+#include "m5display.h"
+#endif
+
 static const char *TAG = "app_main";
 
 esp_rmaker_device_t *thread_br_device;
@@ -57,6 +61,10 @@ void app_main()
     ESP_ERROR_CHECK( err );
 #ifdef CONFIG_AUTO_UPDATE_RCP
     ESP_ERROR_CHECK(init_spiffs());
+#endif
+
+#if CONFIG_M5STACK_THREAD_BR_BOARD
+    app_m5stack_display_start();
 #endif
 
     /* Initialize Wi-Fi. Note that, this should be called before esp_rmaker_node_init()
@@ -113,6 +121,10 @@ void app_main()
 
     /* Start the ESP RainMaker Agent */
     esp_rmaker_start();
+
+#if CONFIG_M5STACK_THREAD_BR_BOARD
+    app_register_m5stack_display_event_handler();
+#endif
 
     /* Start the Wi-Fi.
      * If the node is provisioned, it will start connection attempts,
