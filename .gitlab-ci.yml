@@ -139,60 +139,6 @@ build_idf_v4.4:
     EXAMPLE_TARGETS: "esp32 esp32s2 esp32c3 esp32s3"
     COMPONENT_MGR_142: "1"
 
-build_idf_v5.0:
-  extends: .build_template
-  image: espressif/idf:release-v5.0
-  variables:
-    EXAMPLE_TARGETS: "esp32 esp32s2 esp32c3 esp32s3"
-    COMPONENT_MGR_142: "1"
-
-build_idf_v5.1:
-  extends: .build_template
-  image: espressif/idf:release-v5.1
-  variables:
-    EXAMPLE_TARGETS: "esp32 esp32s2 esp32c3 esp32s3 esp32c6 esp32c2 esp32h2"
-
-build_idf_v5.2:
-  extends: .build_template
-  image: espressif/idf:release-v5.2
-  variables:
-    EXAMPLE_TARGETS: "esp32 esp32s2 esp32c3 esp32s3 esp32c6 esp32c2 esp32h2"
-
-build_idf_v5.3:
-  extends: .build_template
-  image: espressif/idf:release-v5.3
-  variables:
-    EXAMPLE_TARGETS: "esp32 esp32s2 esp32c3 esp32s3 esp32c6 esp32c2 esp32h2"
-
-build_thread_br:
-  extends: .build_template
-  image: espressif/idf:release-v5.3
-  variables:
-    PEDANTIC_FLAGS: "-Werror -Werror=deprecated-declarations -Wno-error=cpp -Werror=unused-variable -Werror=unused-function"
-    EXAMPLE_TARGETS: "esp32s3"
-    EXAMPLES: "thread_br"
-
-build_matter:
-  stage: build
-  image: espressif/esp-matter:latest_idf_v5.2.3@sha256:fd5feacb5fabec2fe4f7a537b463b29ee7b2871f07a736e0736a8f6fb5aacf04
-  tags:
-    - build
-  variables:
-    PEDANTIC_FLAGS: ""
-    EXAMPLE_TARGETS: "esp32 esp32c3 esp32s3 esp32c6 esp32c2"
-    EXAMPLES: "matter/matter_light matter/matter_switch"
-    CONTROLLER_EXAMPLE_TARGET: "esp32s3"
-  script:
-    - *build_matter_examples
-    - *build_matter_controller_example
-
-build_zigbee_gateway:
-  extends: .build_template
-  image: espressif/idf:release-v5.3
-  variables:
-    EXAMPLE_TARGETS: "esp32s3"
-    EXAMPLES: "zigbee_gateway"
-
 build_docs:
   stage: build
   image: $ESP_DOCS_ENV_IMAGE

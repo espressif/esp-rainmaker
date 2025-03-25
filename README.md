@@ -1,6 +1,8 @@
 # ESP RainMaker
 
-> Note: For major changes, please refer [this file](CHANGES.md).
+> ⚠️ **Deprecation Warning**
+>
+> This branch is only for esp-idf v4.x compatibility. It will not get any major updates as esp-idf v4.x releases have reached end of life. For esp-idf v5.0 onwards, please use the master branch.
 
 ## Introduction
 

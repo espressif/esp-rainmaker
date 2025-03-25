@@ -1,5 +1,12 @@
 # Changes
 
+## 25-Mar-2025: idf_v4.x_compat: Forking a branch specific for ESP IDF v4.x support
+
+The master branch of esp-rainmaker wont support esp-idf v4.x any more as these releases have reached
+their end of life. This branch will not get any new features, but only bug fixes.
+
+It is recommended to move to the latest esp-idf releases for any new projects
+
 ## 27-Sep-2024: Modified esp-rainmaker examples to use partitions_4mb_optimised.csv
  - RainMaker examples now use `partitions_4mb_optimised.csv` by default instead of `partitions.csv` and it is recommended to use the same in any new RainMaker projects.
  - The fctry partition address is different for this partition table. So, if the host claiming is used, please pass the new address using:
