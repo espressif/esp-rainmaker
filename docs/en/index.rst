@@ -5,10 +5,8 @@ ESP RainMaker is an end-to-end solution offered by Espressif to enable remote co
 This is the C API (for firmware) and Python API (for host tools) documentation for ESP RainMaker. All other documentation can be found at `http://rainmaker.espressif.com <http://rainmaker.espressif.com>`_
 
 .. _C API Reference: c-api-reference/index.html
-.. _Python API Reference: python-api-reference/index.html
 
 .. toctree::
    :hidden:
 
    c-api-reference/index
-   python-api-reference/index

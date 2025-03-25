@@ -31,8 +31,9 @@
 #include <wifi_provisioning/scheme_softap.h>
 #include <hap_platform_httpd.h>
 #endif /* CONFIG_APP_WIFI_PROV_TRANSPORT_BLE */
-
+#ifdef CONFIG_APP_WIFI_PROV_SHOW_QR
 #include <qrcode.h>
+#endif
 #include <nvs.h>
 #include <nvs_flash.h>
 #include <esp_timer.h>
@@ -67,6 +68,16 @@ static uint64_t prov_timeout_period = (APP_WIFI_PROV_TIMEOUT_PERIOD * 60 * 10000
 #define APP_PROV_STOP_ON_CREDS_MISMATCH
 #elif (CONFIG_APP_WIFI_PROV_MAX_RETRY_CNT > 0)
 #warning "Provisioning window stop on max credentials failures, needs IDF version >= 5.1.3"
+#endif
+
+#ifdef CONFIG_APP_WIFI_PROV_SHOW_QR
+static esp_err_t qrcode_display(const char *text)
+{
+#define MAX_QRCODE_VERSION 5
+    esp_qrcode_config_t cfg = ESP_QRCODE_CONFIG_DEFAULT();
+    cfg.max_qrcode_version = MAX_QRCODE_VERSION;
+    return esp_qrcode_generate(&cfg, text);
+}
 #endif
 
 static void app_wifi_print_qr(const char *name, const char *pop, const char *transport)

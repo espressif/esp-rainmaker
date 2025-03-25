@@ -4,6 +4,9 @@ dependencies:
   espressif/esp-zigbee-lib: "~1.6.0"
   espressif/esp_rcp_update: "~1.2.0"
   espressif/esp-serial-flasher: "~0.0.4"
+  espressif/esp_rainmaker:
+    version: ">=1.0"
+    override_path: '../../../components/esp_rainmaker/'
   ## Required IDF version
   idf:
     version: ">=5.0.0"

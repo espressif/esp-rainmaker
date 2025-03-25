@@ -1,5 +1,7 @@
 # ESP RainMaker
 
+> This branch will not support esp-idf v4.x releases anymore as they have reached their end of life. Please check out `idf_4_x_compat` branch if your project requires it.
+
 > Note: For major changes, please refer [this file](CHANGES.md).
 
 ## Introduction
