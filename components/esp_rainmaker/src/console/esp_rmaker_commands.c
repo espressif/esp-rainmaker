@@ -18,6 +18,7 @@
 #include <esp_log.h>
 #include <esp_wifi.h>
 #include <esp_console.h>
+#include <string.h>
 #include <esp_rmaker_core.h>
 #include <esp_rmaker_user_mapping.h>
 #include <esp_rmaker_utils.h>
@@ -165,10 +166,41 @@ static void register_cmd_resp_command()
     esp_console_cmd_register(&cmd_resp_cmd);
 }
 
+static int sign_data_command(int argc, char *argv[])
+{
+    if (argc != 2) {
+        printf("Usage: sign-data <data>\n");
+        return -1;
+    }
+    char *data = (char *)argv[1];
+    size_t outlen = 0;
+    char *response = NULL;
+    esp_err_t err = esp_rmaker_node_auth_sign_msg((const void *)data, strlen(data), (void **)&response, &outlen);
+    if(err != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to sign message");
+        return -1;
+    }
+    ESP_LOGI(TAG, "hex signature(len %d): %s", outlen, response);
+    free(response);
+    return 0;
+}
+
+static void register_sign_data_command()
+{
+    const esp_console_cmd_t cmd = {
+        .command = "sign-data",
+        .help = "sends some data and expects a rsa signed response",
+        .func = &sign_data_command,
+    };
+    ESP_LOGI(TAG, "Registering command: %s", cmd.command);
+    esp_console_cmd_register(&cmd);
+}
+
 void register_commands()
 {
     register_user_node_mapping();
     register_get_node_id();
     register_wifi_prov();
     register_cmd_resp_command();
+    register_sign_data_command();
 }

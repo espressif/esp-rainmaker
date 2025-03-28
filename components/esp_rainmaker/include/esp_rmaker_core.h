@@ -853,7 +853,7 @@ esp_err_t esp_rmaker_param_add_array_max_count(const esp_rmaker_param_t *param, 
  * and the last one can be updated using esp_rmaker_param_update_and_report().
  * This will report all parameters which were updated prior to this call.
  *
- * @note This does not report to time series even if PROP_FLAG_TIME_SERIES is set. 
+ * @note This does not report to time series even if PROP_FLAG_TIME_SERIES is set.
  *
  * Sample:
  *
@@ -1041,6 +1041,7 @@ esp_err_t esp_rmaker_test_cmd_resp(const void *cmd, size_t cmd_len, void *priv_d
 * @return Apt error on failure.
 */
 esp_err_t esp_rmaker_node_auth_sign_msg(const void *challenge, size_t inlen, void **response, size_t *outlen);
+
 /*
  * @brief Enable Local Control Service.
  *
