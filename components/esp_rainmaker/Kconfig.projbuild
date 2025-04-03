@@ -341,6 +341,24 @@ menu "ESP RainMaker Config"
                 OTA Jobs can include additional metadata for time to indicate a range of valid date and the time within
                 those dates. Eg. Perform OTA between 1 Dec 2022 and 10 Dec 2022 that too only between 2:00am and 5:00am.
                 If you want to ignore this, disable this option.
+
+        config ESP_RMAKER_OTA_PROGRESS_SUPPORT
+            bool "Enable OTA Progress Support"
+            default n
+            help
+                When the device do OTA, it will report upgrade progress to cloud. If the APP need show the progress bar,
+                please enable it and APP can get the progress value in additional_info by API ota_status.
+ 
+        config ESP_RMAKER_OTA_PROGRESS_INTERVAL
+            int "OTA Progress Interval (%)"
+            default 10
+            range 5 50
+            depends on ESP_RMAKER_OTA_PROGRESS_SUPPORT
+            help
+                If you set the reported upgrade progress interval to 10, it will report 10% of the progress every time 10%
+                of the firmware is downloaded, range from 10%, 20%, 30% until 90%. For example, when downloaded 10% firmware size,
+                the ota_status is OTA_STATUS_IN_PROGRESS and the additional_info is `Downloaded 10% Firmware Image`.
+                The additional_info `Downloading Firmware Image` is 0% progress and `Firmware Image download complete` is 100% progress.
     endmenu
 
     menu "ESP RainMaker Scheduling"
