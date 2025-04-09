@@ -1,5 +1,6 @@
 stages:
   - build
+  - test
   - deploy
 
 variables:
@@ -22,6 +23,67 @@ before_script:
     - echo -e "Host gitlab.espressif.cn\n\tStrictHostKeyChecking no\n" >> ~/.ssh/config
     # Create esp-rainmaker-bins-${CI_JOB_ID}/ dir (to copy binaries into for artifacts)
     - mkdir -p $CI_PROJECT_DIR/esp-rainmaker-bins-${CI_JOB_ID}
+
+.setup_hardware: &setup_hardware
+  - curl -o resource-pool-cli.py pn-tools.espressif.cn:5011/download-cli
+  - python3 -m pip install paramiko scp esptool
+  - |
+    echo "Command: python3 resource-pool-cli.py grab --user-id ${CI_JOB_ID} --resource-type ${TARGET} --wait-time 60 --timeout 3600"
+    if RESOURCE_OUTPUT=$(python3 resource-pool-cli.py grab --user-id ${CI_JOB_ID} --resource-type ${TARGET} --wait-time 60 --timeout 3600); then
+      echo "RESOURCE_OUTPUT: $RESOURCE_OUTPUT"
+      DEVICE_IP=$(echo "$RESOURCE_OUTPUT" | grep -E "^\s*ip:" | grep -oP 'ip: \K[^\s]+')
+      RFC_PORT=$(echo "$RESOURCE_OUTPUT" | grep -E "^\s*rfc_port:" | grep -oP 'rfc_port: \K[^\s]+')
+      export RESOURCE_ID=$(echo "$RESOURCE_OUTPUT" | grep -E "^\s*resource_id:" | grep -oP 'resource_id: \K[^\s]+')
+      export DEVICE_PORT="rfc2217://${DEVICE_IP}:${RFC_PORT}"
+      export RESOURCE_CONFIG_FILE=$(echo "$RESOURCE_OUTPUT" | grep -oP 'Resource data saved to: \K[^\s]+')
+      echo "Device: $DEVICE_PORT | Config: $RESOURCE_CONFIG_FILE | Resource ID: $RESOURCE_ID"
+      echo "$RESOURCE_ID" > ${CI_PROJECT_DIR}/.resource_id
+      echo "${CI_JOB_ID}" > ${CI_PROJECT_DIR}/.job_id
+    else
+      echo "ERROR: Failed to grab ${TARGET} resource for job ${CI_JOB_ID}"
+      echo "Resource allocation failed"
+      exit 1
+    fi
+
+.release_hardware: &release_hardware
+  - |
+    if [ -f ${CI_PROJECT_DIR}/.resource_id ] && [ -f ${CI_PROJECT_DIR}/.job_id ]; then
+      RESOURCE_ID=$(cat ${CI_PROJECT_DIR}/.resource_id)
+      JOB_ID=$(cat ${CI_PROJECT_DIR}/.job_id)
+      echo "Releasing resource: $RESOURCE_ID for job: $JOB_ID"
+      python3 ${CI_PROJECT_DIR}/resource-pool-cli.py release --resource-id ${RESOURCE_ID} --user-id ${JOB_ID} || true
+      rm -f ${CI_PROJECT_DIR}/.resource_id ${CI_PROJECT_DIR}/.job_id
+    else
+      echo "No resource to release (resource ID file not found)"
+    fi
+
+.flash_firmware: &flash_firmware
+  - python3 ${CI_PROJECT_DIR}/resource-pool-cli.py erase-flash ${RESOURCE_CONFIG_FILE}
+  - |
+    if [ "$TARGET" == "esp32" ]; then
+      BOOTLOADER_ADDR="0x1000"
+    else
+      BOOTLOADER_ADDR="0x0"
+    fi
+    python3 ${CI_PROJECT_DIR}/resource-pool-cli.py flash build/bootloader/bootloader.bin ${BOOTLOADER_ADDR} ${RESOURCE_CONFIG_FILE}
+  - python3 ${CI_PROJECT_DIR}/resource-pool-cli.py flash build/partition_table/partition-table.bin 0x8000 ${RESOURCE_CONFIG_FILE}
+  - python3 ${CI_PROJECT_DIR}/resource-pool-cli.py flash build/ota_data_initial.bin 0x16000 ${RESOURCE_CONFIG_FILE}
+  - python3 ${CI_PROJECT_DIR}/resource-pool-cli.py flash build/esp_rainmaker_test.bin 0x20000 ${RESOURCE_CONFIG_FILE}
+
+.generate_rainmaker_claim_data: &generate_rainmaker_claim_data
+  - python3 -m pip install esp-rainmaker-cli
+  - esp-rainmaker-cli profile switch global
+  # login/claim are non-fatal (tests can self-claim), but make a failure LOUD so a
+  # credentials regression is visible instead of silently degrading CI to the fallback.
+  - "esp-rainmaker-cli login --user_name \"${UT_USERNAME}\" --password \"${UT_PASSWORD}\" || echo \"WARNING [unit-test]: RainMaker login FAILED (check UT_USERNAME/UT_PASSWORD) — falling back to self-claim; investigate if this persists\""
+  - "esp-rainmaker-cli claim --mac \"${MAC_ADDR}\" --outdir \"${CI_PROJECT_DIR}/.rainmaker_claim\" || echo \"WARNING [unit-test]: RainMaker claim FAILED — continuing without claim data\""
+  - export CLAIM_DATA_PATH=$(find "${CI_PROJECT_DIR}/.rainmaker_claim" -type d -name "${MAC_ADDR}" 2>/dev/null | head -n 1)
+  - "if [ -n \"${CLAIM_DATA_PATH}\" ] && [ -f \"${CLAIM_DATA_PATH}/node.info\" ]; then export NODE_ID=$(cat \"${CLAIM_DATA_PATH}/node.info\"); echo \"Claim data ready: $NODE_ID\"; else echo \"No claim data; tests will run without claiming.\"; fi"
+
+.build_test_app: &build_test_app
+  - cd $CI_PROJECT_DIR/components/esp_rainmaker/test_app
+  - idf.py set-target $TARGET
+  - idf.py build
 
 .build_matter_examples: &build_matter_examples
   # start building examples
@@ -249,6 +311,41 @@ build_rainmaker_controller:
   variables:
     EXAMPLE_TARGETS: "esp32s3"
     EXAMPLES: "rainmaker_controller"
+
+.unit_test_with_claiming_template:
+  image: espressif/idf:release-v5.5
+  stage: test
+  tags: ["idf_unit_test_runner"]
+  needs: []
+  before_script:
+    - *generate_rainmaker_claim_data
+    - *setup_hardware
+  script:
+    - *build_test_app
+    - *flash_firmware
+    - |
+      if [ -n "${CLAIM_DATA_PATH}" ] && [ -f "${CLAIM_DATA_PATH}/${MAC_ADDR}.bin" ]; then
+        echo "Flashing RainMaker claimed data..."
+        python3 ${CI_PROJECT_DIR}/resource-pool-cli.py flash "${CLAIM_DATA_PATH}/${MAC_ADDR}.bin" 0x3fa000 ${RESOURCE_CONFIG_FILE}
+      else
+        echo "Skipping claim data flash (no claim data)."
+      fi
+    - python3 ${CI_PROJECT_DIR}/resource-pool-cli.py rfc2217-server ${RESOURCE_CONFIG_FILE}
+    - python3 $CI_PROJECT_DIR/components/esp_rainmaker/test_app/run_test.py $DEVICE_PORT -l "Enter next test" --log-file result.txt
+    - "if grep -qE ':FAIL($|[: ])' result.txt; then echo \"❌ Found FAIL entries in result.txt\"; exit 1; else echo \"✅ No FAIL entries found\"; fi"
+  after_script:
+    - *release_hardware
+    - if command -v esp-rainmaker-cli >/dev/null 2>&1; then esp-rainmaker-cli logout; fi
+  artifacts:
+    when: always
+    paths:
+      - components/esp_rainmaker/test_app/result.txt
+
+unit_test_esp32c3:
+  extends: .unit_test_with_claiming_template
+  variables:
+    TARGET: "esp32c3"
+    MAC_ADDR: "ABCDABCDABCD"
 
 build_docs:
   stage: build

@@ -1,0 +1,13 @@
+## Component dependencies
+dependencies:
+  ## Required IDF version
+  idf:
+    version: ">=5.1.0"
+
+  ## Local component overrides
+  espressif/esp_rainmaker:
+    override_path: "../../../esp_rainmaker"
+
+  espressif/rmaker_common: "*"
+
+  espressif/esp_schedule: "*"
