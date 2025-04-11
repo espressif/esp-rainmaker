@@ -25,6 +25,12 @@
 #ifdef CONFIG_ESP_RMAKER_NETWORK_OVER_WIFI
 #include <mdns.h>
 #endif
+#ifdef CONFIG_ESP_RMAKER_NETWORK_OVER_THREAD
+#include <esp_openthread.h>
+#include <esp_openthread_lock.h>
+#include <openthread/srp_client.h>
+#include <openthread/srp_client_buffers.h>
+#endif /* CONFIG_ESP_RMAKER_NETWORK_OVER_THREAD */
 #include <esp_rmaker_utils.h>
 
 #include <esp_idf_version.h>
@@ -272,6 +278,112 @@ static esp_err_t esp_rmaker_local_ctrl_service_disable(void)
     return ESP_OK;
 }
 
+#ifdef CONFIG_ESP_RMAKER_NETWORK_OVER_THREAD
+#define SRP_MAX_HOST_NAME_LEN 32
+static char srp_host_name[SRP_MAX_HOST_NAME_LEN + 1];
+
+static esp_err_t srp_client_set_host(const char *host_name)
+{
+    if (!host_name || strlen(host_name) > 15) {
+        return ESP_ERR_INVALID_ARG;
+    }
+    // Avoid adding the same host name multiple times
+    if (strcmp(srp_host_name, host_name) != 0) {
+        strncpy(srp_host_name, host_name, SRP_MAX_HOST_NAME_LEN);
+        srp_host_name[strnlen(host_name, SRP_MAX_HOST_NAME_LEN)] = 0;
+        esp_openthread_lock_acquire(portMAX_DELAY);
+        otInstance *instance = esp_openthread_get_instance();
+        if (otSrpClientSetHostName(instance, srp_host_name) != OT_ERROR_NONE) {
+            esp_openthread_lock_release();
+            return ESP_FAIL;
+        }
+        if (otSrpClientEnableAutoHostAddress(instance) != OT_ERROR_NONE) {
+            esp_openthread_lock_release();
+            return ESP_FAIL;
+        }
+        esp_openthread_lock_release();
+    }
+    return ESP_OK;
+}
+
+static esp_err_t srp_client_add_local_ctrl_service(const char *serv_name)
+{
+    static uint8_t rainmaker_node_id_txt_value[30];
+    char *rmaker_node_id = esp_rmaker_get_node_id();
+    if (rmaker_node_id == NULL || strlen(rmaker_node_id) > sizeof(rainmaker_node_id_txt_value)) {
+        return ESP_ERR_INVALID_ARG;
+    }
+    memcpy(rainmaker_node_id_txt_value, rmaker_node_id, strlen(rmaker_node_id));
+    const static uint8_t text_values[3][23] = {
+        {'/', 'e', 's', 'p', '_', 'l', 'o', 'c', 'a', 'l', '_', 'c', 't', 'r', 'l', '/', 'v', 'e', 'r', 's', 'i', 'o', 'n'},
+        {'/', 'e', 's', 'p', '_', 'l', 'o', 'c', 'a', 'l', '_', 'c', 't', 'r', 'l', '/', 's', 'e', 's', 's', 'i', 'o', 'n'},
+        {'/', 'e', 's', 'p', '_', 'l', 'o', 'c', 'a', 'l', '_', 'c', 't', 'r', 'l', '/', 'c', 'o', 'n', 't', 'r', 'o', 'l'}};
+    static otDnsTxtEntry txt_entries[4] = {
+        {
+            .mKey = "version_endpoint",
+            .mValue = text_values[0],
+            .mValueLength = 23,
+        },
+        {
+            .mKey = "session_endpoint",
+            .mValue = text_values[1],
+            .mValueLength = 23,
+        },
+        {
+            .mKey = "control_endpoint",
+            .mValue = text_values[2],
+            .mValueLength = 23,
+        },
+        {
+            .mKey = "node_id",
+            .mValue = rainmaker_node_id_txt_value,
+            .mValueLength = sizeof(rainmaker_node_id_txt_value),
+        }
+    };
+    txt_entries[3].mValueLength = (uint16_t)strlen(rmaker_node_id);
+    static char s_serv_name[30];
+    strncpy(s_serv_name, serv_name, strnlen(serv_name, sizeof(s_serv_name) - 1));
+    s_serv_name[strnlen(serv_name, sizeof(s_serv_name) - 1)] = 0;
+    static otSrpClientService srp_client_service = {
+        .mName = "_esp_local_ctrl._tcp",
+        .mInstanceName = (const char*)s_serv_name,
+        .mTxtEntries = txt_entries,
+        .mPort = CONFIG_ESP_RMAKER_LOCAL_CTRL_HTTP_PORT,
+        .mNumTxtEntries = 4,
+        .mNext = NULL,
+        .mLease = 0,
+        .mKeyLease = 0,
+    };
+    esp_openthread_lock_acquire(portMAX_DELAY);
+    otInstance *instance = esp_openthread_get_instance();
+    // Try to remove the service registered before adding a new service. If the previous service is not removed,
+    // Adding service will fail with a duplicated instance error. This could happen when the device reboots, which
+    // might result in the wrong resolved IP addresss on the phone app side.
+    (void)otSrpClientRemoveService(instance, &srp_client_service);
+    if (otSrpClientAddService(instance, &srp_client_service) != OT_ERROR_NONE) {
+        esp_openthread_lock_release();
+        return ESP_FAIL;
+    }
+    otSrpClientEnableAutoStartMode(instance, NULL, NULL);
+    esp_openthread_lock_release();
+    return ESP_OK;
+}
+
+static esp_err_t srp_client_clean_up()
+{
+    esp_err_t ret = ESP_OK;
+    esp_openthread_lock_acquire(portMAX_DELAY);
+    otInstance *instance = esp_openthread_get_instance();
+    if (otSrpClientRemoveHostAndServices(instance, false, true) != OT_ERROR_NONE) {
+        ret = ESP_FAIL;
+    }
+    memset(srp_host_name, 0, sizeof(srp_host_name));
+    esp_openthread_lock_release();
+    return ret;
+}
+
+#endif /* CONFIG_ESP_RMAKER_NETWORK_OVER_THREAD */
+
 static esp_err_t __esp_rmaker_start_local_ctrl_service(const char *serv_name)
 {
     if (!serv_name) {
@@ -292,6 +404,9 @@ static esp_err_t __esp_rmaker_start_local_ctrl_service(const char *serv_name)
     mdns_hostname_set(serv_name);
 #endif
 
+#ifdef CONFIG_ESP_RMAKER_NETWORK_OVER_THREAD
+    srp_client_set_host(serv_name);
+#endif
 
     esp_local_ctrl_config_t config = {
         .transport = ESP_LOCAL_CTRL_TRANSPORT_HTTPD,
@@ -352,6 +467,9 @@ static esp_err_t __esp_rmaker_start_local_ctrl_service(const char *serv_name)
     mdns_service_instance_name_set("_esp_local_ctrl", "_tcp", serv_name);
     /* Add node_id in mdns */
     mdns_service_txt_item_set("_esp_local_ctrl", "_tcp", "node_id", esp_rmaker_get_node_id());
+#endif
+#ifdef CONFIG_ESP_RMAKER_NETWORK_OVER_THREAD
+    srp_client_add_local_ctrl_service(serv_name);
 #endif
 
     if (pop) {
@@ -511,6 +629,9 @@ esp_err_t esp_rmaker_local_ctrl_disable(void)
     }
 #ifdef CONFIG_ESP_RMAKER_NETWORK_OVER_WIFI
     mdns_free();
+#endif
+#ifdef CONFIG_ESP_RMAKER_NETWORK_OVER_THREAD
+    srp_client_clean_up();
 #endif
     esp_err_t err = esp_local_ctrl_stop();
     if (err != ESP_OK) {
