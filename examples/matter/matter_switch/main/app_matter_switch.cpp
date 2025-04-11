@@ -70,6 +70,13 @@ void app_event_cb(const ChipDeviceEvent *event, intptr_t arg)
         ESP_LOGI(TAG, "Commissioning complete");
         break;
 
+    case chip::DeviceLayer::DeviceEventType::PublicEventTypes::kBLEDeinitialized:
+        ESP_LOGI(TAG, "BLE deinitialized and memory reclaimed");
+        // Starting RainMaker after Matter commissioning is complete
+        // and BLE memory is reclaimed, so that MQTT connect doesn't fail.
+        esp_rmaker_start();
+        break;
+
     default:
         break;
     }

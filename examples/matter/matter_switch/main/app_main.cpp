@@ -26,8 +26,6 @@ static const char *TAG = "app_main";
 
 static app_driver_handle_t switch_handle;
 
-bool rmaker_init_done = false; // used with extern in `app_matter.c`
-
 /* Callback to handle commands received from the RainMaker cloud */
 static esp_err_t write_cb(const esp_rmaker_device_t *device, const esp_rmaker_param_t *param,
                           const esp_rmaker_param_val_t val, void *priv_data, esp_rmaker_write_ctx_t *ctx)
@@ -86,7 +84,6 @@ extern "C" void app_main()
     esp_rmaker_device_t *switch_device = esp_rmaker_switch_device_create(SWITCH_DEVICE_NAME, NULL, DEFAULT_POWER);
     esp_rmaker_device_add_cb(switch_device, write_cb, NULL);
 
-
     esp_rmaker_node_add_device(node, switch_device);
 
     /* Enable OTA */
@@ -114,10 +111,9 @@ extern "C" void app_main()
     /* Pre start */
     ESP_ERROR_CHECK(app_matter_rmaker_start());
 
-    /* Start the ESP RainMaker Agent */
-    esp_rmaker_start();
-    rmaker_init_done = true;
-
     /* Enable Matter diagnostics console*/
     app_matter_enable_matter_console();
+
+    // RainMaker start is deferred after Matter commissioning is complete
+    // and BLE memory is reclaimed, so that MQTT connect doesnt fail.
 }
