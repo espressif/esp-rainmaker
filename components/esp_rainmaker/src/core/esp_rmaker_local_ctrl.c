@@ -284,7 +284,7 @@ static char srp_host_name[SRP_MAX_HOST_NAME_LEN + 1];
 
 static esp_err_t srp_client_set_host(const char *host_name)
 {
-    if (!host_name || strlen(host_name) > 15) {
+    if (!host_name || strlen(host_name) > SRP_MAX_HOST_NAME_LEN) {
         return ESP_ERR_INVALID_ARG;
     }
     // Avoid adding the same host name multiple times
@@ -308,7 +308,8 @@ static esp_err_t srp_client_set_host(const char *host_name)
 
 static esp_err_t srp_client_add_local_ctrl_service(const char *serv_name)
 {
-    static uint8_t rainmaker_node_id_txt_value[30];
+    // We use rainmaker_node_id as the SRP host name
+    static uint8_t rainmaker_node_id_txt_value[SRP_MAX_HOST_NAME_LEN + 1];
     char *rmaker_node_id = esp_rmaker_get_node_id();
     if (rmaker_node_id == NULL || strlen(rmaker_node_id) > sizeof(rainmaker_node_id_txt_value)) {
         return ESP_ERR_INVALID_ARG;
@@ -341,7 +342,7 @@ static esp_err_t srp_client_add_local_ctrl_service(const char *serv_name)
         }
     };
     txt_entries[3].mValueLength = (uint16_t)strlen(rmaker_node_id);
-    static char s_serv_name[30];
+    static char s_serv_name[SRP_MAX_HOST_NAME_LEN + 1];
     strncpy(s_serv_name, serv_name, strnlen(serv_name, sizeof(s_serv_name) - 1));
     s_serv_name[strnlen(serv_name, sizeof(s_serv_name) - 1)] = 0;
     static otSrpClientService srp_client_service = {
@@ -351,7 +352,7 @@ static esp_err_t srp_client_add_local_ctrl_service(const char *serv_name)
         .mPort = CONFIG_ESP_RMAKER_LOCAL_CTRL_HTTP_PORT,
         .mNumTxtEntries = 4,
         .mNext = NULL,
-        .mLease = 0,
+        .mLease = CONFIG_ESP_RMAKER_LOCAL_CTRL_LEASE_INTERVAL_SECONDS,
         .mKeyLease = 0,
     };
     esp_openthread_lock_acquire(portMAX_DELAY);
