@@ -12,7 +12,7 @@ dependencies:
   espressif/esp_secure_cert_mgr:
     version: "^2.2.1"
   espressif/rmaker_common:
-    version: "~1.7.0"
+    version: ">=1.7.1"
   espressif/json_parser:
     version: "~1.0.3"
   espressif/json_generator:

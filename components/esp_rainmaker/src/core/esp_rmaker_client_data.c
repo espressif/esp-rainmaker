@@ -17,6 +17,7 @@
 #include <string.h>
 
 #include <esp_log.h>
+#include <esp_idf_version.h>
 
 #include <esp_rmaker_factory.h>
 #include <esp_rmaker_core.h>
@@ -162,16 +163,47 @@ esp_rmaker_mqtt_conn_params_t *esp_rmaker_get_mqtt_conn_params()
         return NULL;
     }
 
-#if defined(CONFIG_ESP_RMAKER_USE_ESP_SECURE_CERT_MGR) && defined(CONFIG_ESP_SECURE_CERT_DS_PERIPHERAL)
-    mqtt_conn_params->ds_data = esp_secure_cert_get_ds_ctx();
-    if (mqtt_conn_params->ds_data == NULL) /* Get client key only if ds_data is NULL */
-#endif /* (defined(CONFIG_ESP_RMAKER_USE_ESP_SECURE_CERT_MGR) && defined(CONFIG_ESP_SECURE_CERT_DS_PERIPHERAL)) */
-    {
-        if ((mqtt_conn_params->client_key = esp_rmaker_get_client_key()) == NULL) {
+#if defined(CONFIG_ESP_RMAKER_USE_ESP_SECURE_CERT_MGR)
+    /* Determine the key type and use ecdsa peripheral if it is supported */
+    esp_secure_cert_key_type_t key_type = ESP_SECURE_CERT_DEFAULT_FORMAT_KEY;
+    esp_err_t esp_ret = esp_secure_cert_get_priv_key_type(&key_type);
+    if (esp_ret != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to obtain the priv key type");
+        goto init_err;
+    }
+    if (key_type == ESP_SECURE_CERT_ECDSA_PERIPHERAL_KEY) {
+#if SOC_ECDSA_SUPPORTED
+        ESP_LOGI(TAG, "Setting up the ECDSA key from eFuse");
+        uint8_t efuse_block_id;
+        esp_ret = esp_secure_cert_get_priv_key_efuse_id(&efuse_block_id);
+        if (esp_ret != ESP_OK) {
+            ESP_LOGE(TAG, "Failed to get ECDSA key from eFuse");
             goto init_err;
         }
-        mqtt_conn_params->client_key_len = esp_rmaker_get_client_key_len();
+#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 5, 0)
+        mqtt_conn_params->use_ecdsa_peripheral = true;
+        mqtt_conn_params->ecdsa_key_efuse_blk = efuse_block_id;
+#endif /* ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 5, 0) */
+#endif
+    } else {
+#if defined(CONFIG_ESP_SECURE_CERT_DS_PERIPHERAL)
+        mqtt_conn_params->ds_data = esp_secure_cert_get_ds_ctx();
+        if (mqtt_conn_params->ds_data == NULL) /* Get client key only if ds_data is NULL */
+#endif
+        {
+            if ((mqtt_conn_params->client_key = esp_rmaker_get_client_key()) == NULL) {
+                goto init_err;
+            }
+            mqtt_conn_params->client_key_len = esp_rmaker_get_client_key_len();
+        }
     }
+#else /* !CONFIG_ESP_RMAKER_USE_ESP_SECURE_CERT_MGR */
+    if ((mqtt_conn_params->client_key = esp_rmaker_get_client_key()) == NULL) {
+        goto init_err;
+    }
+    mqtt_conn_params->client_key_len = esp_rmaker_get_client_key_len();
+#endif
+
     if ((mqtt_conn_params->client_cert = esp_rmaker_get_client_cert()) == NULL) {
         goto init_err;
     }
