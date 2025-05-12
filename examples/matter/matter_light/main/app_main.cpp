@@ -23,6 +23,7 @@
 #include <app_matter.h>
 #include "app_matter_light.h"
 #if CHIP_DEVICE_CONFIG_ENABLE_THREAD
+#include <platform/ThreadStackManager.h>
 #include <platform/ESP32/OpenthreadLauncher.h>
 #endif
 #ifndef CONFIG_EXAMPLE_USE_RAINMAKER_FABRIC
@@ -33,8 +34,8 @@
 #if CONFIG_DYNAMIC_PASSCODE_COMMISSIONABLE_DATA_PROVIDER
 #include <esp_matter_providers.h>
 #include <dynamic_commissionable_data_provider.h>
-#include <app/server/OnboardingCodesUtil.h>
 #include <setup_payload/QRCodeSetupPayloadGenerator.h>
+#include <setup_payload/OnboardingCodesUtil.h>
 dynamic_commissionable_data_provider g_dynamic_passcode_provider;
 #endif
 #endif
@@ -107,13 +108,16 @@ extern "C" void app_main()
     app_matter_light_create(light_handle);
 
 #if CHIP_DEVICE_CONFIG_ENABLE_THREAD
-    /* Set OpenThread platform config */
-    esp_openthread_platform_config_t config = {
+   esp_openthread_platform_config_t ot_config = {
         .radio_config = ESP_OPENTHREAD_DEFAULT_RADIO_CONFIG(),
         .host_config = ESP_OPENTHREAD_DEFAULT_HOST_CONFIG(),
         .port_config = ESP_OPENTHREAD_DEFAULT_PORT_CONFIG(),
     };
-    set_openthread_platform_config(&config);
+    set_openthread_platform_config(&ot_config);
+    // This will not really initiaize Thread stack as the thread stack has been initialzed in app_network.
+    // We call this function to pass the OpenThread instance to GenericThreadStackManagerImpl_OpenThread
+    // so that it can be used for SRP service registration and network commissioning driver.
+    chip::DeviceLayer::ThreadStackMgr().InitThreadStack();
 #endif
 
     /* Starting driver with default values */
@@ -198,9 +202,11 @@ extern "C" void app_main()
 #ifdef CONFIG_ESP_RMAKER_NETWORK_OVER_WIFI
     // If Wi-Fi is provisioned and RainMaker user node mapping is done, deinitialize the BLE.
     network_prov_mgr_is_wifi_provisioned(&is_network_provisioned);
+#else
+    network_prov_mgr_is_thread_provisioned(&is_network_provisioned);
 #endif
     if (is_network_provisioned && esp_rmaker_user_node_mapping_get_state() == ESP_RMAKER_USER_MAPPING_DONE) {
-        chip::DeviceLayer::Internal::BLEMgr().Shutdown();
+        chip::DeviceLayer::PlatformMgr().ScheduleWork([](intptr_t) { chip::DeviceLayer::Internal::BLEMgr().Shutdown(); });
     }
 #endif
     

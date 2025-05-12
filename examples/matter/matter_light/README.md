@@ -78,6 +78,8 @@ Implements Matter-standard dynamic passcode generation. QR codes/pairing codes a
 
 ### 4. Compilation Instructions  
 
+*Note: Currently, use no fabric feature, need update the [ESP-Matter SDK](https://github.com/espressif/esp-matter). Latest known working commit is [057ac6a3](https://github.com/espressif/esp-matter/tree/057ac6a3e06f29a8a6f0e942228d01064e6942d3).
+
 **Fabric Example**:  
 ```bash
 idf.py build

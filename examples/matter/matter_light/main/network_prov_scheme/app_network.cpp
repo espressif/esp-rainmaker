@@ -26,7 +26,6 @@
 #include <nvs.h>
 #include <nvs_flash.h>
 #include <platform/CHIPDeviceLayer.h>
-#include <platform/ESP32_custom/PlatformManagerImpl.h>
 #include <platform/PlatformManager.h>
 #include <qrcode.h>
 
@@ -84,6 +83,10 @@ esp_err_t app_network_set_custom_mfg_data(uint16_t device_type, uint8_t device_s
 {
     int8_t mfg_data[] = {(int8_t)MFG_DATA_HEADER, MGF_DATA_APP_ID, MFG_DATA_VERSION, MFG_DATA_CUSTOMER_ID};
     size_t mfg_data_len = sizeof(mfg_data) + 4; // 4 bytes of device type, subtype, and extra-code
+    if (custom_mfg_data) {
+        free(custom_mfg_data);
+        custom_mfg_data_len = 0;
+    }
     custom_mfg_data = (uint8_t *)MEM_ALLOC_EXTRAM(mfg_data_len);
     if (custom_mfg_data == NULL) {
         ESP_LOGE(TAG, "Failed to allocate memory to custom mfg data");

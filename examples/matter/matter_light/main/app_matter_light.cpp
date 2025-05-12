@@ -16,6 +16,8 @@
 #include <platform/ESP32/route_hook/ESP32RouteHook.h>
 #include <app/clusters/color-control-server/color-control-server.h>
 #include <app/server/Server.h>
+#include <esp_matter.h>
+#include <esp_matter_attribute_utils.h>
 #include <esp_matter_console.h>
 #include <app_matter_light.h>
 #include <esp_rmaker_standard_params.h>
@@ -24,6 +26,7 @@
 #include <app_matter.h>
 #ifndef CONFIG_EXAMPLE_USE_RAINMAKER_FABRIC
 #include <matter_commissioning_window_management.h>
+#include <protocomm_matter_ble.h>
 #endif
 
 using namespace esp_matter;
@@ -152,6 +155,9 @@ esp_err_t app_attribute_update_cb(attribute::callback_type_t type, uint16_t endp
 
 void app_event_cb(const ChipDeviceEvent *event, intptr_t arg)
 {
+    if (!event) {
+        return;
+    }
     switch (event->Type) {
     case chip::DeviceLayer::DeviceEventType::kInterfaceIpAddressChanged:
         ESP_LOGI(TAG, "Interface IP Address changed");
@@ -231,7 +237,12 @@ void app_event_cb(const ChipDeviceEvent *event, intptr_t arg)
         // and BLE memory is reclaimed, so that MQTT connect doesn't fail.
         esp_rmaker_start();
         break;
-
+#ifndef CONFIG_EXAMPLE_USE_RAINMAKER_FABRIC
+    case chip::DeviceLayer::DeviceEventType::kCHIPoBLEAdvertisingChange:
+        if (event->CHIPoBLEAdvertisingChange.Result == chip::DeviceLayer::kActivity_Started) {
+            start_secondary_ble_adv();
+        }
+#endif
     default:
         break;
     }
@@ -259,6 +270,7 @@ esp_err_t app_matter_light_create(app_driver_handle_t driver_handle)
     /* These node and endpoint handles can be used to create/add other endpoints and clusters. */
     if (!node || !endpoint) {
         ESP_LOGE(TAG, "Matter node creation failed");
+        return ESP_FAIL;
     }
 
     light_endpoint_id = endpoint::get_id(endpoint);

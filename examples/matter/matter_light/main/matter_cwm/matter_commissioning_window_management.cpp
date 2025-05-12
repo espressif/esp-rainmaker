@@ -14,11 +14,11 @@
 #include <esp_check.h>
 #include <esp_rmaker_core.h>
 
-#include <app/server/OnboardingCodesUtil.h>
 #include <app/server/Server.h>
 #include <setup_payload/SetupPayload.h>
 #include <setup_payload/QRCodeSetupPayloadGenerator.h>
 #include <setup_payload/ManualSetupPayloadGenerator.h>
+#include <setup_payload/OnboardingCodesUtil.h>
 
 constexpr char *TAG = "MatterCWM";
 static esp_rmaker_device_t *s_matter_cwm_service;
