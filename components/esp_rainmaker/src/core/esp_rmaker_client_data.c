@@ -17,7 +17,6 @@
 #include <string.h>
 
 #include <esp_log.h>
-#include <esp_idf_version.h>
 
 #include <esp_rmaker_factory.h>
 #include <esp_rmaker_core.h>
@@ -69,7 +68,7 @@ char * esp_rmaker_get_client_cert()
          * returning that, and the caller is expected to free the returned buffer using free().
          */
 
-        const char *client_cert_buf = MEM_CALLOC_EXTRAM(1, client_cert_len);
+        char *client_cert_buf = MEM_CALLOC_EXTRAM(1, client_cert_len);
         if (client_cert_buf) {
             memcpy(client_cert_buf, client_cert_addr, client_cert_len);
         }
@@ -116,7 +115,7 @@ char * esp_rmaker_get_client_key()
          * returning that, and the caller is expected to free the returned buffer using free().
          */
 
-        const char *client_key_buf = MEM_CALLOC_EXTRAM(1, client_key_len);
+        char *client_key_buf = MEM_CALLOC_EXTRAM(1, client_key_len);
         if (client_key_buf) {
             memcpy(client_key_buf, client_key_addr, client_key_len);
         }
@@ -160,6 +159,7 @@ esp_rmaker_mqtt_conn_params_t *esp_rmaker_get_mqtt_conn_params()
 {
     esp_rmaker_mqtt_conn_params_t *mqtt_conn_params = MEM_CALLOC_EXTRAM(1, sizeof(esp_rmaker_mqtt_conn_params_t));
     if (mqtt_conn_params == NULL) {
+        ESP_LOGE(TAG, "Failed to allocate memory for mqtt_conn_params");
         return NULL;
     }
 
@@ -180,10 +180,11 @@ esp_rmaker_mqtt_conn_params_t *esp_rmaker_get_mqtt_conn_params()
             ESP_LOGE(TAG, "Failed to get ECDSA key from eFuse");
             goto init_err;
         }
-#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 5, 0)
         mqtt_conn_params->use_ecdsa_peripheral = true;
         mqtt_conn_params->ecdsa_key_efuse_blk = efuse_block_id;
-#endif /* ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 5, 0) */
+#else
+        ESP_LOGE(TAG, "ECDSA peripheral is not supported on this SoC");
+        goto init_err;
 #endif
     } else {
 #if defined(CONFIG_ESP_SECURE_CERT_DS_PERIPHERAL)
@@ -205,10 +206,12 @@ esp_rmaker_mqtt_conn_params_t *esp_rmaker_get_mqtt_conn_params()
 #endif
 
     if ((mqtt_conn_params->client_cert = esp_rmaker_get_client_cert()) == NULL) {
+        ESP_LOGE(TAG, "Failed to get client cert");
         goto init_err;
     }
-        mqtt_conn_params->client_cert_len = esp_rmaker_get_client_cert_len();
+    mqtt_conn_params->client_cert_len = esp_rmaker_get_client_cert_len();
     if ((mqtt_conn_params->mqtt_host = esp_rmaker_get_mqtt_host()) == NULL) {
+        ESP_LOGE(TAG, "Failed to get mqtt host");
         goto init_err;
     }
     mqtt_conn_params->server_cert = (char *)mqtt_server_root_ca_pem_start;

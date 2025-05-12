@@ -3,6 +3,7 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  */
+
 #include <string.h>
 #include <esp_log.h>
 #include "mbedtls/platform.h"
@@ -10,6 +11,8 @@
 #include "mbedtls/sha256.h"
 #include "mbedtls/ecdsa.h"
 #include "sha/sha_parallel_engine.h"
+#include "ecdsa/ecdsa_alt.h"
+#include "soc/soc_caps.h"
 
 #include "esp_secure_cert_read.h"
 #include "esp_rmaker_utils.h"
@@ -40,83 +43,138 @@ static void bytes_to_hex(uint8_t *src, uint8_t *dst, int in_len)
 
 esp_err_t esp_rmaker_node_auth_sign_msg(const void *challenge, size_t inlen, void **response, size_t *outlen)
 {
+    esp_err_t err = ESP_OK;
+    int ret = 0;
+    char *priv_key = NULL;
+    size_t priv_key_len = 0;
+    uint8_t *signature = NULL;
+    char *char_signature = NULL;
+    size_t slen = 0;
+    mbedtls_pk_context pk_ctx;
+#if TEST_SIGNATURE_VERIFICATION
+    char *cert = NULL;
+    mbedtls_x509_crt crt;
+    bool crt_initialized = false;
+#endif
+
     if (!challenge || (inlen == 0)) {
         ESP_LOGE(TAG, "function arguments challenge and inlen cannot be NULL.");
         return ESP_ERR_INVALID_ARG;
     }
 
-    /* Get private key */
-    char *priv_key = NULL;
-    size_t priv_key_len = 0;
+    /* Calculate SHA of challenge - common for both paths */
+    uint8_t hash[32] = {0};
+    esp_sha(SHA2_256, (const unsigned char *)challenge, inlen, hash);
+
+    /* Sign the hash using ECDSA or RSA */
+    mbedtls_pk_init(&pk_ctx);
+
 #if CONFIG_ESP_RMAKER_USE_ESP_SECURE_CERT_MGR
     esp_secure_cert_key_type_t key_type;
-    esp_err_t err = esp_secure_cert_get_priv_key_type(&key_type);
+    err = esp_secure_cert_get_priv_key_type(&key_type);
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "Failed to get the type of private key from secure cert partition, err:%d", err);
-        return err;
+        goto cleanup;
     }
     if (key_type == ESP_SECURE_CERT_INVALID_KEY) {
         ESP_LOGE(TAG, "Private key type in secure cert partition is invalid");
-        return ESP_FAIL;
+        err = ESP_FAIL;
+        goto cleanup;
     }
+
     /* This flow is for devices supporting ECDSA peripheral */
     if (key_type == ESP_SECURE_CERT_ECDSA_PERIPHERAL_KEY) {
-#if CONFIG_USE_ESP32_ECDSA_PERIPHERAL
-        /* TODO: code for signing the challenge on devices that have a DS peripheral. */
-        return ESP_FAIL;
-#else  /* !CONFIG_USE_ESP32_ECDSA_PERIPHERAL */
-        return ESP_ERR_INVALID_STATE;
-#endif /* CONFIG_USE_ESP32_ECDSA_PERIPHERAL */
+#if SOC_ECDSA_SUPPORTED
+        /* Setup ECDSA peripheral */
+        uint8_t efuse_block_id;
+        err = esp_secure_cert_get_priv_key_efuse_id(&efuse_block_id);
+        if (err != ESP_OK) {
+            ESP_LOGE(TAG, "Failed to obtain efuse key id, err:%d", err);
+            goto cleanup;
+        }
+
+        ESP_LOGD(TAG, "Using key from eFuse block %d for ECDSA key", efuse_block_id);
+        esp_ecdsa_pk_conf_t pk_conf = {
+            .grp_id = MBEDTLS_ECP_DP_SECP256R1,
+            .efuse_block = efuse_block_id,
+        };
+
+        ret = esp_ecdsa_set_pk_context(&pk_ctx, &pk_conf);
+        if (ret != 0) {
+            ESP_LOGE(TAG, "Failed to set ECDSA context, ret:%d", ret);
+            err = ESP_FAIL;
+            goto cleanup;
+        }
+#else /* !SOC_ECDSA_SUPPORTED */
+        ESP_LOGE(TAG, "ECDSA peripheral support is not available on this SoC");
+        err = ESP_ERR_NOT_SUPPORTED;
+        goto cleanup;
+#endif /* SOC_ECDSA_SUPPORTED */
     } else
 #endif /* CONFIG_ESP_RMAKER_USE_ESP_SECURE_CERT_MGR */
     {
         /* This flow is for devices which do not support ECDSA peripheral */
-#if !CONFIG_USE_ESP32_ECDSA_PERIPHERAL
         priv_key = esp_rmaker_get_client_key();
         priv_key_len = esp_rmaker_get_client_key_len();
-#else /* CONFIG_USE_ESP32_ECDSA_PERIPHERAL */
-        return ESP_ERR_INVALID_STATE;
-#endif /* !CONFIG_USE_ESP32_ECDSA_PERIPHERAL */
-    }
-    if (!priv_key) {
-        ESP_LOGE(TAG, "Error getting private key");
-        return ESP_FAIL;
-    }
-    /* Calculate SHA of challenge */
-    uint8_t hash[32];
-    esp_sha(SHA2_256,(const unsigned char *)challenge, inlen, hash);
 
-    /* Sign the hash using RSA or ECDSA */
-    mbedtls_pk_context pk_ctx;
-    mbedtls_pk_init(&pk_ctx);
-    int ret = mbedtls_pk_parse_key(&pk_ctx, (uint8_t *)priv_key, priv_key_len, NULL, 0, NULL, 0);
-    uint8_t *signature = NULL;
+        if (!priv_key) {
+            ESP_LOGE(TAG, "Error getting private key");
+            err = ESP_FAIL;
+            goto cleanup;
+        }
+
+#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 0, 0)
+        ret = mbedtls_pk_parse_key(&pk_ctx, (uint8_t *)priv_key, priv_key_len, NULL, 0, NULL, 0);
+#else /* !(ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 0, 0)) */
+        ret = mbedtls_pk_parse_key(&pk_ctx, (uint8_t *)priv_key, priv_key_len, NULL, 0);
+#endif /* ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 0, 0) */
+
+        if (ret != 0) {
+            ESP_LOGE(TAG, "Error parsing private key, err:%d", ret);
+            err = ESP_FAIL;
+            goto cleanup;
+        }
+    }
+
+    /* Allocate signature buffer based on key type */
     if (mbedtls_pk_get_type(&pk_ctx) == MBEDTLS_PK_RSA) {
         ESP_LOGI(TAG, "RSA key found");
-        signature = (uint8_t *)MEM_CALLOC_EXTRAM(1, 256); // TODO: replace magic number 256
-    } else if (mbedtls_pk_get_type(&pk_ctx) == MBEDTLS_PK_ECKEY) {
+        mbedtls_rsa_context *rsa_ctx = mbedtls_pk_rsa(pk_ctx);
+        size_t key_size = mbedtls_rsa_get_len(rsa_ctx);
+        signature = (uint8_t *)MEM_CALLOC_EXTRAM(1, key_size);
+        if (!signature) {
+            ESP_LOGE(TAG, "Failed to allocate memory for RSA signature.");
+            err = ESP_ERR_NO_MEM;
+            goto cleanup;
+        }
+    } else if (mbedtls_pk_get_type(&pk_ctx) == MBEDTLS_PK_ECKEY ||
+               mbedtls_pk_get_type(&pk_ctx) == MBEDTLS_PK_ECDSA) {
+        /* MBEDTLS_PK_ECKEY: software EC key (PEM/DER parsed)
+         * MBEDTLS_PK_ECDSA: hardware ECDSA peripheral (esp_ecdsa_set_pk_context) */
         ESP_LOGI(TAG, "ECDSA key found");
         signature = (uint8_t *)MEM_CALLOC_EXTRAM(1, MBEDTLS_ECDSA_MAX_LEN);
+        if (!signature) {
+            ESP_LOGE(TAG, "Failed to allocate memory for ECDSA signature.");
+            err = ESP_ERR_NO_MEM;
+            goto cleanup;
+        }
     } else {
-        ESP_LOGE(TAG, "found different key: %d", mbedtls_pk_get_type(&pk_ctx));
+        ESP_LOGE(TAG, "Found unexpected key type: %d", mbedtls_pk_get_type(&pk_ctx));
+        err = ESP_FAIL;
+        goto cleanup;
     }
-    if (!signature) {
-        ESP_LOGE(TAG, "Failed to allocate memory to signature.");
-        mbedtls_pk_free(&pk_ctx);
-        return ESP_ERR_NO_MEM;
-    }
-    size_t slen = 0;
-    if (mbedtls_pk_get_type(&pk_ctx) == MBEDTLS_PK_ECKEY) {
-        ret = mbedtls_ecdsa_write_signature(mbedtls_pk_ec(pk_ctx), MBEDTLS_MD_SHA256, hash, sizeof(hash), signature, MBEDTLS_ECDSA_MAX_LEN, &slen, myrand, NULL);
+
+    /* Sign using the appropriate method */
+    if (mbedtls_pk_get_type(&pk_ctx) == MBEDTLS_PK_ECKEY ||
+        mbedtls_pk_get_type(&pk_ctx) == MBEDTLS_PK_ECDSA) {
+        ret = mbedtls_pk_sign(&pk_ctx, MBEDTLS_MD_SHA256, hash, sizeof(hash), signature, MBEDTLS_ECDSA_MAX_LEN, &slen, myrand, NULL);
         if (ret != 0) {
-            ESP_LOGE(TAG, "Error in writing signature. err = %d", ret);
-            free(signature);
-            mbedtls_pk_free(&pk_ctx);
-            return ESP_FAIL;
+            ESP_LOGE(TAG, "Error in writing ECDSA signature. err = %d", ret);
+            err = ESP_FAIL;
+            goto cleanup;
         }
     } else if (mbedtls_pk_get_type(&pk_ctx) == MBEDTLS_PK_RSA) {
         mbedtls_rsa_context *rsa_ctx = mbedtls_pk_rsa(pk_ctx);
-        // rsa_ctx->MBEDTLS_PRIVATE(len) = 256;
         mbedtls_rsa_set_padding(rsa_ctx, MBEDTLS_RSA_PKCS_V21, MBEDTLS_MD_SHA256);
         ret = mbedtls_rsa_rsassa_pss_sign(rsa_ctx,
                                           myrand,
@@ -126,24 +184,36 @@ esp_err_t esp_rmaker_node_auth_sign_msg(const void *challenge, size_t inlen, voi
                                           hash,
                                           signature);
         if (ret != 0) {
-            ESP_LOGE(TAG, "Error in writing signature. err = %d", ret);
-            free(signature);
-            mbedtls_pk_free(&pk_ctx);
-            return ESP_FAIL;
+            ESP_LOGE(TAG, "Error in writing RSA signature. err = %d", ret);
+            err = ESP_FAIL;
+            goto cleanup;
         }
         slen = mbedtls_rsa_get_len(rsa_ctx);
-        ESP_LOGI(TAG, "signature length %d", slen);
+        ESP_LOGI(TAG, "Signature length %d", slen);
     }
 
 #if TEST_SIGNATURE_VERIFICATION
-    char *cert = esp_rmaker_get_client_cert();
-    mbedtls_x509_crt crt;
-    mbedtls_x509_crt_init(&crt);
-    mbedtls_x509_crt_parse(&crt, (const unsigned char *)cert, strlen(cert) + 1);
-    mbedtls_pk_context *pk = &crt.pk;
+    cert = esp_rmaker_get_client_cert();
+    if (cert == NULL) {
+        ESP_LOGE(TAG, "Failed to get client certificate for verification");
+        err = ESP_FAIL;
+        goto cleanup;
+    }
 
-    if (mbedtls_pk_get_type(&pk_ctx) == MBEDTLS_PK_ECKEY) {
-        ret = mbedtls_pk_verify(pk, MBEDTLS_MD_SHA256, hash, sizeof(hash), signature, sizeof(signature));
+    mbedtls_x509_crt_init(&crt);
+    crt_initialized = true;
+    size_t cert_len = esp_rmaker_get_client_cert_len();
+    ret = mbedtls_x509_crt_parse(&crt, (const unsigned char *)cert, cert_len + 1);
+    if (ret != 0) {
+        ESP_LOGE(TAG, "Failed to parse certificate: %d", ret);
+        err = ESP_FAIL;
+        goto cleanup;
+    }
+
+    mbedtls_pk_context *pk = &crt.pk;
+    if (mbedtls_pk_get_type(&pk_ctx) == MBEDTLS_PK_ECKEY ||
+        mbedtls_pk_get_type(&pk_ctx) == MBEDTLS_PK_ECDSA) {
+        ret = mbedtls_pk_verify(pk, MBEDTLS_MD_SHA256, hash, sizeof(hash), signature, slen);
     } else if (mbedtls_pk_get_type(&pk_ctx) == MBEDTLS_PK_RSA) {
         mbedtls_pk_rsassa_pss_options opt = {
             .mgf1_hash_id = MBEDTLS_MD_SHA256,
@@ -152,29 +222,44 @@ esp_err_t esp_rmaker_node_auth_sign_msg(const void *challenge, size_t inlen, voi
         ret = mbedtls_pk_verify_ext(MBEDTLS_PK_RSASSA_PSS, (const void *)&opt, pk, MBEDTLS_MD_SHA256, hash, sizeof(hash), signature, slen);
     }
 
-    mbedtls_x509_crt_free(&crt);
-    free(cert);
     if (ret == 0) {
         ESP_LOGI(TAG, "Signature is valid");
     } else {
         ESP_LOGE(TAG, "Signature verification failed %d", ret);
     }
-#endif
+#endif /* TEST_SIGNATURE_VERIFICATION */
 
     /* Convert hex stream to bytes */
 #define BYTE_ENCODED_SIGNATURE_LEN ((2 * slen) + 1) /* +1 for null character */
-    char *char_signature = (char *)MEM_ALLOC_EXTRAM(BYTE_ENCODED_SIGNATURE_LEN);
+    char_signature = (char *)MEM_ALLOC_EXTRAM(BYTE_ENCODED_SIGNATURE_LEN);
     if (!char_signature) {
         ESP_LOGE(TAG, "Error in allocating memory for challenge response.");
-        free(signature);
-        mbedtls_pk_free(&pk_ctx);
-        return ESP_ERR_NO_MEM;
+        err = ESP_ERR_NO_MEM;
+        goto cleanup;
     }
     bytes_to_hex(signature, (uint8_t *)char_signature, slen);
-    mbedtls_pk_free(&pk_ctx);
-    free(signature);
+
     /* Set output variables */
     *(char **)response = char_signature;
     *outlen = 2 * slen; /* hex encoding takes 2 bytes per input byte */
-    return ESP_OK;
+    char_signature = NULL; /* Avoid freeing the output buffer in cleanup */
+
+cleanup:
+    if (signature) {
+        free(signature);
+    }
+    if (char_signature) {
+        free(char_signature);
+    }
+    mbedtls_pk_free(&pk_ctx);
+#if TEST_SIGNATURE_VERIFICATION
+    if (cert) {
+        free(cert);
+    }
+    if (crt_initialized) {
+        mbedtls_x509_crt_free(&crt);
+    }
+#endif
+
+    return err;
 }
