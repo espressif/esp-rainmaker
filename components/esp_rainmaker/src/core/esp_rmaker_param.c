@@ -14,6 +14,7 @@
 #include <sdkconfig.h>
 #include <time.h>
 #include <string.h>
+#include <stdint.h>
 #include <esp_log.h>
 #include <esp_err.h>
 #include <nvs.h>
@@ -581,6 +582,7 @@ esp_rmaker_param_t *esp_rmaker_param_create(const char *param_name, const char *
     }
     param->val.type = val.type;
     param->prop_flags = properties;
+    param->ttl_days = 0; /* Initialize TTL days to 0 */
     if ((val.type == RMAKER_VAL_TYPE_STRING) || (val.type == RMAKER_VAL_TYPE_OBJECT) ||
                 (val.type == RMAKER_VAL_TYPE_ARRAY)) {
         if (val.val.s) {
@@ -631,6 +633,26 @@ esp_err_t esp_rmaker_param_add_bounds(const esp_rmaker_param_t *param,
         free(_param->bounds);
     }
     _param->bounds = bounds;
+    return ESP_OK;
+}
+
+esp_err_t esp_rmaker_param_add_simple_time_series_ttl(const esp_rmaker_param_t *param, uint16_t ttl_days)
+{
+    if (!param) {
+        ESP_LOGE(TAG, "Param handle cannot be NULL.");
+        return ESP_ERR_INVALID_ARG;
+    }
+    _esp_rmaker_param_t *_param = (_esp_rmaker_param_t *)param;
+    if (!(_param->prop_flags & PROP_FLAG_SIMPLE_TIME_SERIES)) {
+        ESP_LOGE(TAG, "TTL can only be set for parameters with PROP_FLAG_SIMPLE_TIME_SERIES flag.");
+        return ESP_ERR_INVALID_ARG;
+    }
+    if (ttl_days == 0) {
+        ESP_LOGE(TAG, "TTL days must be a positive value.");
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    _param->ttl_days = ttl_days;
     return ESP_OK;
 }
 
@@ -859,6 +881,12 @@ static esp_err_t esp_rmaker_param_report_simple_time_series(const esp_rmaker_par
     time(&current_timestamp);
     json_gen_obj_set_int(&jstr, "t", (int)current_timestamp);
     esp_rmaker_report_value(&_param->val, "v", &jstr);
+
+    /* Add TTL in days if set */
+    if (_param->ttl_days > 0) {
+        json_gen_obj_set_int(&jstr, "d", _param->ttl_days);
+    }
+
     json_gen_end_object(&jstr);
     json_gen_str_end(&jstr);
 

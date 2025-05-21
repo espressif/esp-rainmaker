@@ -59,6 +59,7 @@ struct esp_rmaker_param {
     esp_rmaker_param_valid_str_list_t *valid_str_list;
     struct esp_rmaker_device *parent;
     struct esp_rmaker_param * next;
+    uint16_t ttl_days;  /* TTL in days for simple time series data */
 };
 typedef struct esp_rmaker_param _esp_rmaker_param_t;
 

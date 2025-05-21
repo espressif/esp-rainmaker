@@ -810,6 +810,21 @@ esp_err_t esp_rmaker_param_add_bounds(const esp_rmaker_param_t *param,
     esp_rmaker_param_val_t min, esp_rmaker_param_val_t max, esp_rmaker_param_val_t step);
 
 /**
+ * Add Time-To-Live for a simple time series parameter
+ *
+ * This adds a TTL value (in days) for a simple time series parameter,
+ * which will be sent as "d" field in the JSON payload.
+ * This is applicable only for parameters with PROP_FLAG_SIMPLE_TIME_SERIES flag.
+ *
+ * @param[in] param Parameter Handle
+ * @param[in] ttl_days Time-to-live value in days
+ *
+ * @return ESP_OK on success
+ * @return error in case of failure
+ */
+esp_err_t esp_rmaker_param_add_simple_time_series_ttl(const esp_rmaker_param_t *param, uint16_t ttl_days);
+
+/**
  * Add a list of valid strings for a string parameter
  *
  * This can be used to add a list of valid strings for a given string parameter.
