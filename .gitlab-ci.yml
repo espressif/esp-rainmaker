@@ -82,6 +82,7 @@ before_script:
   -   echo "Skipping homekit_switch build for esp32h2"
   -   continue
   - fi
+  - rm -rf managed_components dependencies.lock build sdkconfig sdkconfig.old
   - idf.py set-target $TARGET
   - idf.py build
   - mkdir -p $CI_PROJECT_DIR/esp-rainmaker-bins-${CI_JOB_ID}/$EXAMPLE/$TARGET/
@@ -147,7 +148,7 @@ build_thread_br:
 
 build_matter:
   stage: build
-  image: espressif/esp-matter:latest_idf_v5.2.3@sha256:fd5feacb5fabec2fe4f7a537b463b29ee7b2871f07a736e0736a8f6fb5aacf04
+  image: espressif/esp-matter:latest_idf_v5.4.1@sha256:988acc285766319b64e8ed69ca0a0ea80fab9de90640a597e7b2f9f0c453d80c
   tags:
     - build
   variables:
