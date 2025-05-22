@@ -844,7 +844,13 @@ static esp_err_t esp_rmaker_param_report_time_series(const esp_rmaker_param_t *p
     return ESP_OK;
 }
 
-static esp_err_t esp_rmaker_param_report_simple_time_series(const esp_rmaker_param_t *param)
+/* Add this helper function before both simple time series functions */
+static esp_err_t esp_rmaker_simple_ts_data_report_internal(
+    const esp_rmaker_param_t *param,
+    const esp_rmaker_param_val_t *val,  /* Optional (NULL to use param's current value) */
+    int timestamp,                      /* 0 to use current time */
+    uint16_t ttl_days,                  /* 0 to omit TTL field */
+    bool update_param)                  /* Whether to update param value with val */
 {
     if (!param) {
         ESP_LOGE(TAG, "Param handle cannot be NULL.");
@@ -856,48 +862,85 @@ static esp_err_t esp_rmaker_param_report_simple_time_series(const esp_rmaker_par
         ESP_LOGE(TAG, "Param \"%s\" has not been added to any device.", _param->name);
         return ESP_FAIL;
     }
-    if (esp_rmaker_time_check() != true) {
+    /* Update param value if requested */
+    if (update_param && val) {
+        esp_err_t err = esp_rmaker_param_update(param, *val);
+        if (err != ESP_OK) {
+            ESP_LOGE(TAG, "Failed to update parameter value locally.");
+            return err;
+        }
+    }
+    /* Check that time is available if needed */
+    if (timestamp == 0 && esp_rmaker_time_check() != true) {
         ESP_LOGE(TAG, "Current time not yet available. Cannot report time series data.");
         return ESP_ERR_INVALID_STATE;
     }
-    /* node_params_buf will be NULL during the first publish */
-    char * node_params_buf = esp_rmaker_param_get_buf(max_node_params_size);
+    /* Determine value to use */
+    const esp_rmaker_param_val_t *report_val = val ? val : &_param->val;
+    /* Get buffer for the JSON payload */
+    char *node_params_buf = esp_rmaker_param_get_buf(max_node_params_size);
     if (!node_params_buf) {
         return ESP_ERR_NO_MEM;
     }
-
+    /* Generate JSON payload */
     json_gen_str_t jstr;
     int buf_len = max_node_params_size;
     json_gen_str_start(&jstr, node_params_buf, buf_len, NULL, NULL);
     json_gen_start_object(&jstr);
+    /* Add parameter name */
     char param_name[MAX_TS_DATA_PARAM_NAME];
     snprintf(param_name, sizeof(param_name), "%s.%s", _device->name, _param->name);
     json_gen_obj_set_string(&jstr, "name", param_name);
+    /* Add type if available */
     if (_param->type) {
         json_gen_obj_set_string(&jstr, "type", _param->type);
     }
-    esp_rmaker_report_data_type(_param->val.type, "dt", &jstr);
-    time_t current_timestamp = 0;
-    time(&current_timestamp);
-    json_gen_obj_set_int(&jstr, "t", (int)current_timestamp);
-    esp_rmaker_report_value(&_param->val, "v", &jstr);
-
-    /* Add TTL in days if set */
-    if (_param->ttl_days > 0) {
-        json_gen_obj_set_int(&jstr, "d", _param->ttl_days);
+    /* Add data type */
+    esp_rmaker_report_data_type(report_val->type, "dt", &jstr);
+    /* Add timestamp */
+    if (timestamp == 0) {
+        time_t current_time;
+        time(&current_time);
+        timestamp = (int)current_time;
     }
-
+    json_gen_obj_set_int(&jstr, "t", timestamp);
+    /* Add value */
+    esp_rmaker_report_value(report_val, "v", &jstr);
+    /* Add TTL in days if provided or set in param */
+    uint16_t ttl = ttl_days > 0 ? ttl_days : _param->ttl_days;
+    if (ttl > 0) {
+        json_gen_obj_set_int(&jstr, "d", ttl);
+    }
     json_gen_end_object(&jstr);
     json_gen_str_end(&jstr);
-
-    esp_rmaker_create_mqtt_topic(publish_topic, sizeof(publish_topic), SIMPLE_TS_DATA_TOPIC_SUFFIX, SIMPLE_TS_DATA_TOPIC_RULE);
+    /* Create MQTT topic and publish the data */
+    esp_rmaker_create_mqtt_topic(publish_topic, sizeof(publish_topic),
+                                SIMPLE_TS_DATA_TOPIC_SUFFIX, SIMPLE_TS_DATA_TOPIC_RULE);
+    /* Publish the data if MQTT is initialized */
     if (esp_rmaker_params_mqtt_init_done) {
-        _esp_rmaker_param_t *_param = (_esp_rmaker_param_t *)param;
-        _esp_rmaker_device_t *_device = _param->parent;
-        ESP_LOGI(TAG, "Reporting Simple Time Series Data for %s.%s", _device->name, _param->name);
-        esp_rmaker_mqtt_publish(publish_topic, node_params_buf, strlen(node_params_buf), RMAKER_MQTT_QOS1, NULL);
+        const char *function_name = update_param ? "Directly reporting" : "Reporting";
+        ESP_LOGI(TAG, "%s Simple TS data: %s", function_name, node_params_buf);
+        return esp_rmaker_mqtt_publish(publish_topic, node_params_buf,
+                                     strlen(node_params_buf), RMAKER_MQTT_QOS1, NULL);
+    } else {
+        ESP_LOGW(TAG, "MQTT not initialized. Cannot report Simple TS data.");
+        return ESP_ERR_INVALID_STATE;
     }
-    return ESP_OK;
+}
+
+static esp_err_t esp_rmaker_param_report_simple_time_series(const esp_rmaker_param_t *param)
+{
+    if (!param) {
+        ESP_LOGE(TAG, "Param handle cannot be NULL.");
+        return ESP_ERR_INVALID_ARG;
+    }
+    _esp_rmaker_param_t *_param = (_esp_rmaker_param_t *)param;
+    if (!(_param->prop_flags & PROP_FLAG_SIMPLE_TIME_SERIES)) {
+        ESP_LOGE(TAG, "Parameter does not have SIMPLE_TIME_SERIES flag set.");
+        return ESP_ERR_INVALID_ARG;
+    }
+    /* Use common implementation with no custom value, timestamp, or TTL */
+    return esp_rmaker_simple_ts_data_report_internal(param, NULL, 0, 0, false);
 }
 
 esp_err_t esp_rmaker_param_notify(const esp_rmaker_param_t *param)
@@ -1026,4 +1069,20 @@ esp_err_t esp_rmaker_raise_alert(const char *alert_str)
     esp_rmaker_create_mqtt_topic(publish_topic, sizeof(publish_topic), NODE_PARAMS_ALERT_TOPIC_SUFFIX, NODE_PARAMS_ALERT_TOPIC_RULE);
     ESP_LOGI(TAG, "Reporting alert: %s", buf);
     return esp_rmaker_mqtt_publish(publish_topic, buf, strlen(buf), RMAKER_MQTT_QOS1, NULL);
+}
+
+esp_err_t esp_rmaker_param_report_simple_ts_data(const esp_rmaker_param_t *param, esp_rmaker_param_val_t val, int timestamp, uint16_t ttl_days)
+{
+    if (!param) {
+        ESP_LOGE(TAG, "Param handle cannot be NULL.");
+        return ESP_ERR_INVALID_ARG;
+    }
+    /* Verify that the parameter supports simple time series */
+    _esp_rmaker_param_t *_param = (_esp_rmaker_param_t *)param;
+    if (!(_param->prop_flags & PROP_FLAG_SIMPLE_TIME_SERIES)) {
+        ESP_LOGE(TAG, "Parameter \"%s\" does not have PROP_FLAG_SIMPLE_TIME_SERIES flag.", _param->name);
+        return ESP_ERR_INVALID_ARG;
+    }
+    /* Use common implementation with custom value, timestamp, and TTL */
+    return esp_rmaker_simple_ts_data_report_internal(param, &val, timestamp, ttl_days, true);
 }
