@@ -225,6 +225,15 @@ menu "ESP RainMaker Config"
         default 0 if ESP_RMAKER_LOCAL_CTRL_SECURITY_0
         default 1 if ESP_RMAKER_LOCAL_CTRL_SECURITY_1
 
+    config ESP_RMAKER_LOCAL_CTRL_LEASE_INTERVAL_SECONDS
+        int "Local Control SRP Service Lease Interval (Seconds)"
+        depends on ESP_RMAKER_LOCAL_CTRL_FEATURE_ENABLE && ESP_RMAKER_NETWORK_OVER_THREAD
+        default 180
+        help
+            This parameter defines, in seconds, how long a Thread Border Router waits before removing an SRP service
+            after the Thread End Device powers off. To minimize unnecessary packet exchanges, we set the lease interval
+            to 180 seconds (3 minutes) by default.
+
     choice ESP_RMAKER_CONSOLE_UART_NUM
         prompt "UART for console input"
         default ESP_RMAKER_CONSOLE_UART_NUM_0
