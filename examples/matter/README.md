@@ -23,7 +23,7 @@ $ export RMAKER_PATH=/path/to/esp-rainmaker
 
 ### Claiming device certificates
 
-Self Claiming or Assisted Claiming can't be used with the RainMaker + Matter examples because the certificate needs to be present even before Matter commissioning stars.
+Self Claiming or Assisted Claiming can't be used with the RainMaker + Matter examples because the certificate needs to be present even before Matter commissioning starts.
 So, we will use [host driven claiming](https://rainmaker.espressif.com/docs/claiming#host-driven-claiming) via the [RainMaker CLI](https://rainmaker.espressif.com/docs/cli-setup).
 
 Make sure your device is connected to the host machine, login into the CLI and execute this:
