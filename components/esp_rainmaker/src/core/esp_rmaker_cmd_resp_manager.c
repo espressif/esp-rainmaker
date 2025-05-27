@@ -65,7 +65,7 @@ esp_err_t esp_rmaker_test_cmd_resp(const void *cmd, size_t cmd_len, void *priv_d
 }
 #endif /* !CONFIG_ESP_RMAKER_CMD_RESP_TEST_ENABLE */
 
-static esp_err_t esp_rmaker_publish_response(void *output, size_t output_len)
+esp_err_t esp_rmaker_cmd_response_publish(void *output, size_t output_len)
 {
     if (output) {
         char publish_topic[MQTT_TOPIC_BUFFER_SIZE];
@@ -90,7 +90,7 @@ static void esp_rmaker_cmd_callback(const char *topic, void *payload, size_t pay
      * the response (if any) is sent back to the MQTT Broker.
      */
     if (esp_rmaker_cmd_response_handler(payload, payload_len, &output, &output_len) == ESP_OK) {
-        esp_rmaker_publish_response(output, output_len);
+        esp_rmaker_cmd_response_publish(output, output_len);
     }
 }
 
@@ -116,7 +116,7 @@ static esp_err_t esp_rmaker_cmd_resp_check_pending(void)
     void *output = NULL;
     size_t output_len = 0;
     if (esp_rmaker_cmd_prepare_empty_response(&output, &output_len) == ESP_OK) {
-        return esp_rmaker_publish_response(output, output_len);
+        return esp_rmaker_cmd_response_publish(output, output_len);
     }
     return ESP_FAIL;
 }
