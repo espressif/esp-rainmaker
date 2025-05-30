@@ -810,6 +810,21 @@ esp_err_t esp_rmaker_param_add_bounds(const esp_rmaker_param_t *param,
     esp_rmaker_param_val_t min, esp_rmaker_param_val_t max, esp_rmaker_param_val_t step);
 
 /**
+ * Add Time-To-Live for a simple time series parameter
+ *
+ * This adds a TTL value (in days) for a simple time series parameter,
+ * which will be sent as "d" field in the JSON payload.
+ * This is applicable only for parameters with PROP_FLAG_SIMPLE_TIME_SERIES flag.
+ *
+ * @param[in] param Parameter Handle
+ * @param[in] ttl_days Time-to-live value in days
+ *
+ * @return ESP_OK on success
+ * @return error in case of failure
+ */
+esp_err_t esp_rmaker_param_add_simple_time_series_ttl(const esp_rmaker_param_t *param, uint16_t ttl_days);
+
+/**
  * Add a list of valid strings for a string parameter
  *
  * This can be used to add a list of valid strings for a given string parameter.
@@ -1063,6 +1078,29 @@ esp_err_t esp_rmaker_local_ctrl_enable(void);
  * @return error on failure
  */
 esp_err_t esp_rmaker_local_ctrl_disable(void);
+
+/**
+ * Report simple time series data directly with specified timestamp and TTL
+ *
+ * This API allows reporting simple time series data directly with control over
+ * the timestamp and TTL values. The value is stored in the simple time series
+ * database and also cached locally.
+ *
+ * @note This function only updates the value in the simple time series database,
+ * not the regular parameters, which helps keep costs lower. It won't trigger any
+ * automations. However, it will internally cache the value so it may be reported
+ * when reporting other parameters or if someone queries for it via local control.
+ *
+ * @param[in] param Parameter handle, must have PROP_FLAG_SIMPLE_TIME_SERIES flag
+ * @param[in] val Value to report (can be any supported data type)
+ * @param[in] timestamp Epoch timestamp in seconds (0 to use current time)
+ * @param[in] ttl_days Time-to-live in days (0 to omit TTL field)
+ *
+ * @return ESP_OK on success
+ * @return error in case of failure
+ */
+esp_err_t esp_rmaker_param_report_simple_ts_data(const esp_rmaker_param_t *param, esp_rmaker_param_val_t val, int timestamp, uint16_t ttl_days);
+
 #ifdef __cplusplus
 }
 #endif
