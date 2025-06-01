@@ -67,3 +67,16 @@ esp_rmaker_device_t *esp_rmaker_temp_sensor_device_create(const char *dev_name,
 	}
     return device;
 }
+
+esp_rmaker_device_t *esp_rmaker_humd_sensor_device_create(const char *dev_name,
+        void *priv_data, float humidity)
+{
+    esp_rmaker_device_t *device = esp_rmaker_device_create(dev_name, ESP_RMAKER_DEVICE_HUMD_SENSOR, priv_data);
+    if (device) {
+        esp_rmaker_device_add_param(device, esp_rmaker_name_param_create(ESP_RMAKER_DEF_NAME_PARAM, dev_name));
+        esp_rmaker_param_t *primary = esp_rmaker_humidity_param_create(ESP_RMAKER_DEF_HUMIDITY_NAME, humidity);
+        esp_rmaker_device_add_param(device, primary);
+        esp_rmaker_device_assign_primary_param(device, primary);
+	}
+    return device;
+}
