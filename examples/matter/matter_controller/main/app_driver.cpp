@@ -12,6 +12,7 @@
 
 #include <app_priv.h>
 #include <device.h>
+#include <button_gpio.h>
 #include <esp_matter.h>
 #include <esp_matter_console.h>
 #include <esp_matter_controller_cluster_command.h>
@@ -69,9 +70,15 @@ static void app_driver_button_double_click_cb(void* handle, void* user_data)
 app_driver_handle_t app_driver_button_init(void* user_data)
 {
     /* Initialize button */
-    button_config_t config = button_driver_get_config();
-    button_handle_t handle = iot_button_create(&config);
-    iot_button_register_cb(handle, BUTTON_SINGLE_CLICK, app_driver_button_single_click_cb, user_data);
-    iot_button_register_cb(handle, BUTTON_DOUBLE_CLICK, app_driver_button_double_click_cb, user_data);
+    button_handle_t handle = NULL;
+    const button_config_t btn_cfg = {0};
+    const button_gpio_config_t btn_gpio_cfg = button_driver_get_config();
+
+    if (iot_button_new_gpio_device(&btn_cfg, &btn_gpio_cfg, &handle) != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to create button device");
+        return NULL;
+    }
+    iot_button_register_cb(handle, BUTTON_SINGLE_CLICK, NULL, app_driver_button_single_click_cb, user_data);
+    iot_button_register_cb(handle, BUTTON_DOUBLE_CLICK, NULL, app_driver_button_double_click_cb, user_data);
     return (app_driver_handle_t)handle;
 }

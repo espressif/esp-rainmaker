@@ -44,7 +44,12 @@ It is released on pypi: https://pypi.org/project/esp-matter-mfg-tool and can be 
 
 ```
 $ export ESP_SECURE_CERT_PATH=/path/to/esp_secure_cert_mgr
-$ esp-matter-mfg-tool -v 0x131B -p 0x2 -cd $RMAKER_PATH/examples/matter/mfg/cd_131B_0002.der --csv $RMAKER_PATH/examples/matter/mfg/keys.csv --mcsv $RMAKER_PATH/examples/matter/mfg/master.csv
+$ esp-matter-mfg-tool --vendor-id 0x131B --product-id 0x2 \
+                      --vendor-name "Espressif" --product-name "RainMaker-Matter-Light" \
+                      --hw-ver-str "DevKitM1" \
+                      -cd $RMAKER_PATH/examples/matter/mfg/cd_131B_0002.der \
+                      --csv $RMAKER_PATH/examples/matter/mfg/keys.csv \
+                      --mcsv $RMAKER_PATH/examples/matter/mfg/master.csv
 ```
 
 This not only generates the factory nvs binary required for matter, but also embeds the RainMaker MQTT Host url into it via the master.csv file. Optionally, you can embed the MQTT host into the firmware itself by using `idf.py menuconfig -> ESP RainMaker Config -> ESP_RMAKER_READ_MQTT_HOST_FROM_CONFIG` and then skipping the --csv and --mcsv options to mfg_tool
