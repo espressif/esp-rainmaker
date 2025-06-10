@@ -2,6 +2,7 @@ menu "Example Configuration"
 
     config EXAMPLE_BOARD_BUTTON_GPIO
         int "Boot Button GPIO"
+        default 28 if IDF_TARGET_ESP32C5
         default 9 if IDF_TARGET_ESP32C3 || IDF_TARGET_ESP32C6 || IDF_TARGET_ESP32C2 || IDF_TARGET_ESP32H2
         default 0
         help

@@ -9,6 +9,7 @@ menu "WS2812 RGB LED"
 
     config WS2812_LED_GPIO
         int "WS2812 LED GPIO"
+        default 27 if IDF_TARGET_ESP32C5
         default 8 if IDF_TARGET_ESP32C3 || IDF_TARGET_ESP32C6 || IDF_TARGET_ESP32H2
         default 48 if IDF_TARGET_ESP32S3
         default 18
