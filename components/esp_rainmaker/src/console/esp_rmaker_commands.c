@@ -23,6 +23,9 @@
 #include <esp_rmaker_user_mapping.h>
 #include <esp_rmaker_utils.h>
 #include <esp_rmaker_cmd_resp.h>
+#include <esp_err.h>
+#include <esp_rmaker_standard_params.h>
+#include <esp_rmaker_standard_types.h>
 
 #include <esp_rmaker_internal.h>
 #include <esp_rmaker_console_internal.h>
@@ -196,6 +199,148 @@ static void register_sign_data_command()
     esp_console_cmd_register(&cmd);
 }
 
+static int smart_set_handler(int argc, char** argv)
+{
+    if (argc != 4) {
+        printf("%s: Invalid Usage.\n", TAG);
+        printf("Usage: smart-set <device_name> <param_name> <value>\n");
+        return ESP_ERR_INVALID_ARG;
+    }
+    
+    const char *device_name = argv[1];
+    const char *param_name = argv[2];
+    const char *value_str = argv[3];
+
+    // Get the device handle
+    esp_rmaker_device_t *device = esp_rmaker_node_get_device_by_name(esp_rmaker_get_node(), device_name);
+    if (!device) {
+        printf("%s: Device %s not found\n", TAG, device_name);
+        return ESP_FAIL;
+    }
+
+    // Get the parameter handle
+    esp_rmaker_param_t *param = esp_rmaker_device_get_param_by_name(device, param_name);
+    if (!param) {
+        printf("%s: Parameter %s not found in device %s\n", TAG, param_name, device_name);
+        return ESP_FAIL;
+    }
+
+    // Get current value to determine type
+    esp_rmaker_param_val_t *val = esp_rmaker_param_get_val(param);
+    if (!val) {
+        printf("%s: Failed to get parameter value\n", TAG);
+        return ESP_FAIL;
+    }
+
+    // Update value based on type
+    esp_rmaker_param_val_t new_val;
+    new_val.type = val->type;
+
+    switch(val->type) {
+        case RMAKER_VAL_TYPE_BOOLEAN:
+            new_val.val.b = (strcmp(value_str, "true") == 0 || strcmp(value_str, "1") == 0);
+            break;
+        case RMAKER_VAL_TYPE_INTEGER:
+            new_val.val.i = atoi(value_str);
+            break;
+        case RMAKER_VAL_TYPE_FLOAT:
+            new_val.val.f = atof(value_str);
+            break;
+        case RMAKER_VAL_TYPE_STRING:
+            new_val.val.s = (char *)value_str;
+            break;
+        default:
+            printf("%s: Unsupported value type\n", TAG);
+            return ESP_FAIL;
+    }
+
+    // Update the parameter value
+    esp_err_t err = esp_rmaker_param_update_and_report(param, new_val);
+    if (err != ESP_OK) {
+        printf("%s: Failed to update parameter value\n", TAG);
+        return err;
+    }
+
+    printf("%s: Successfully set %s.%s to %s\n", TAG, device_name, param_name, value_str);
+    return ESP_OK;
+}
+
+static void register_smart_set()
+{
+    const esp_console_cmd_t cmd = {
+        .command = "smart-set",
+        .help = "Smart set command for ESP RainMaker",
+        .func = &smart_set_handler,
+    };
+    ESP_LOGI(TAG, "Registering command: %s", cmd.command);
+    esp_console_cmd_register(&cmd);
+}
+
+static int smart_get_handler(int argc, char** argv)
+{
+    if (argc != 3) {
+        printf("%s: Invalid Usage.\n", TAG);
+        printf("Usage: smart-get <device_name> <param_name>\n");
+        return ESP_ERR_INVALID_ARG;
+    }
+    
+    const char *device_name = argv[1];
+    const char *param_name = argv[2];
+
+    // Get the device handle
+    esp_rmaker_device_t *device = esp_rmaker_node_get_device_by_name(esp_rmaker_get_node(), device_name);
+    if (!device) {
+        printf("%s: Device %s not found\n", TAG, device_name);
+        return ESP_FAIL;
+    }
+
+    // Get the parameter handle
+    esp_rmaker_param_t *param = esp_rmaker_device_get_param_by_name(device, param_name);
+    if (!param) {
+        printf("%s: Parameter %s not found in device %s\n", TAG, param_name, device_name);
+        return ESP_FAIL;
+    }
+
+    // Get the parameter value
+    esp_rmaker_param_val_t *val = esp_rmaker_param_get_val(param);
+    if (!val) {
+        printf("%s: Failed to get parameter value\n", TAG);
+        return ESP_FAIL;
+    }
+    
+    // Print value based on type
+    switch(val->type) {
+        case RMAKER_VAL_TYPE_BOOLEAN:
+            printf("%s: %s.%s = %s\n", TAG, device_name, param_name, val->val.b ? "true" : "false");
+            break;
+        case RMAKER_VAL_TYPE_INTEGER:
+            printf("%s: %s.%s = %d\n", TAG, device_name, param_name, val->val.i);
+            break;
+        case RMAKER_VAL_TYPE_FLOAT:
+            printf("%s: %s.%s = %f\n", TAG, device_name, param_name, val->val.f);
+            break;
+        case RMAKER_VAL_TYPE_STRING:
+            printf("%s: %s.%s = %s\n", TAG, device_name, param_name, val->val.s);
+            break;
+        default:
+            printf("%s: Unsupported value type\n", TAG);
+            return ESP_FAIL;
+    }
+
+    return ESP_OK;
+}
+
+static void register_smart_get()
+{
+    const esp_console_cmd_t cmd = {
+        .command = "smart-get",
+        .help = "Smart get command for ESP RainMaker",
+        .func = &smart_get_handler,
+    };
+    ESP_LOGI(TAG, "Registering command: %s", cmd.command);
+    esp_console_cmd_register(&cmd);
+}
+
 void register_commands()
 {
     register_user_node_mapping();
@@ -203,4 +348,6 @@ void register_commands()
     register_wifi_prov();
     register_cmd_resp_command();
     register_sign_data_command();
+    register_smart_set();
+    register_smart_get();
 }
