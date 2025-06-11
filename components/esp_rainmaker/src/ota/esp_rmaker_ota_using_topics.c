@@ -20,10 +20,12 @@
 #include <esp_log.h>
 #include <esp_system.h>
 #include <nvs.h>
+#include <string.h>
 #include <esp_rmaker_work_queue.h>
 #include <esp_rmaker_core.h>
 #include <esp_rmaker_ota.h>
 #include <esp_rmaker_utils.h>
+#include <esp_rmaker_common_events.h>
 
 #include "esp_rmaker_internal.h"
 #include "esp_rmaker_ota_internal.h"
@@ -31,15 +33,94 @@
 #include "esp_rmaker_mqtt_topics.h"
 
 #ifdef CONFIG_ESP_RMAKER_OTA_AUTOFETCH
-#include <esp_timer.h>
-static esp_timer_handle_t ota_autofetch_timer;
+/* Use FreeRTOS timer instead */
+static TimerHandle_t ota_autofetch_timer;
 /* Autofetch period in hours */
 #define OTA_AUTOFETCH_PERIOD   CONFIG_ESP_RMAKER_OTA_AUTOFETCH_PERIOD
-/* Autofetch period in micro-seconds */
-static uint64_t ota_autofetch_period = (OTA_AUTOFETCH_PERIOD * 60 * 60 * 1000000LL);
+/* Convert hours to milliseconds for FreeRTOS timer */
+#define OTA_AUTOFETCH_PERIOD_MS (OTA_AUTOFETCH_PERIOD * 60 * 60 * 1000)
 #endif /* CONFIG_ESP_RMAKER_OTA_AUTOFETCH */
 
 static const char *TAG = "esp_rmaker_ota_using_topics";
+
+/* OTA fetch retry configuration */
+#define OTA_FETCH_TIMEOUT_SECONDS   60
+#define OTA_FETCH_RETRY_BASE_DELAY  30
+#define OTA_FETCH_MAX_RETRIES       5
+
+
+
+/* OTA fetch state management structure */
+typedef struct {
+    int expected_msg_id;
+    unsigned int retry_count;
+    bool fetch_in_progress;
+    esp_event_handler_instance_t published_handler_instance;
+    TimerHandle_t timeout_timer;  /* Timer for PUBACK timeout */
+} ota_fetch_state_t;
+
+static ota_fetch_state_t g_ota_fetch_state = {0};
+
+/* Forward declarations */
+static void ota_fetch_schedule_retry(void);
+#ifdef CONFIG_ESP_RMAKER_OTA_AUTOFETCH
+static void esp_rmaker_ota_autofetch_cleanup(void);
+#endif
+
+/* Helper functions for OTA fetch reliability */
+static void ota_fetch_cleanup(void)
+{
+    if (g_ota_fetch_state.timeout_timer) {
+        xTimerStop(g_ota_fetch_state.timeout_timer, portMAX_DELAY);
+        xTimerDelete(g_ota_fetch_state.timeout_timer, portMAX_DELAY);
+        g_ota_fetch_state.timeout_timer = NULL;
+    }
+
+    if (g_ota_fetch_state.published_handler_instance) {
+        esp_event_handler_instance_unregister(RMAKER_COMMON_EVENT, RMAKER_MQTT_EVENT_PUBLISHED,
+                                             g_ota_fetch_state.published_handler_instance);
+        g_ota_fetch_state.published_handler_instance = NULL;
+    }
+
+    /* Reset state for next use instead of freeing */
+    memset(&g_ota_fetch_state, 0, sizeof(g_ota_fetch_state));
+}
+
+static void ota_fetch_timeout_timer_cb(TimerHandle_t xTimer)
+{
+    /* Timeout case: No PUBACK received within timeout period */
+    ESP_LOGW(TAG, "OTA fetch timeout - no PUBACK received");
+    g_ota_fetch_state.fetch_in_progress = false;
+
+    /* Clean up current attempt */
+    if (g_ota_fetch_state.published_handler_instance) {
+        esp_event_handler_instance_unregister(RMAKER_COMMON_EVENT, RMAKER_MQTT_EVENT_PUBLISHED,
+                                             g_ota_fetch_state.published_handler_instance);
+        g_ota_fetch_state.published_handler_instance = NULL;
+    }
+
+    /* Schedule retry using common retry logic */
+    ota_fetch_schedule_retry();
+}
+
+
+
+static void ota_fetch_mqtt_event_handler(void* arg, esp_event_base_t event_base,
+                                         int32_t event_id, void* event_data)
+{
+    if (!event_data || event_base != RMAKER_COMMON_EVENT) {
+        return;
+    }
+
+    if (event_id == RMAKER_MQTT_EVENT_PUBLISHED) {
+        int received_msg_id = *((int*)event_data);
+        if (received_msg_id != g_ota_fetch_state.expected_msg_id) {
+            return;
+        }
+
+        ota_fetch_cleanup();
+    }
+}
 
 esp_err_t esp_rmaker_ota_report_status_using_topics(esp_rmaker_ota_handle_t ota_handle, ota_status_t status, char *additional_info)
 {
@@ -240,14 +321,31 @@ end:
     return;
 }
 
-esp_err_t esp_rmaker_ota_fetch(void)
+static esp_err_t __esp_rmaker_ota_fetch(void)
 {
+    /* Check if fetch already in progress */
+    if (g_ota_fetch_state.fetch_in_progress) {
+        ESP_LOGW(TAG, "OTA fetch already in progress. Skipping.");
+        return ESP_ERR_INVALID_STATE;
+    }
+
+    /* Verify MQTT connection */
+    if (!esp_rmaker_is_mqtt_connected()) {
+        ESP_LOGW(TAG, "MQTT not connected. Cannot fetch OTA.");
+        return ESP_ERR_INVALID_STATE;
+    }
+
     ESP_LOGI(TAG, "Fetching OTA details, if any.");
     esp_rmaker_node_info_t *info = esp_rmaker_node_get_info(esp_rmaker_get_node());
     if (!info) {
         ESP_LOGE(TAG, "Node info not found. Cant send otafetch request");
         return ESP_FAIL;
     }
+
+    /* Initialize state for this fetch */
+    g_ota_fetch_state.expected_msg_id = -1;
+    g_ota_fetch_state.retry_count = 1;
+
     char publish_payload[150];
     json_gen_str_t jstr;
     json_gen_str_start(&jstr, publish_payload, sizeof(publish_payload), NULL, NULL);
@@ -258,18 +356,114 @@ esp_err_t esp_rmaker_ota_fetch(void)
     json_gen_str_end(&jstr);
     char publish_topic[MQTT_TOPIC_BUFFER_SIZE];
     esp_rmaker_create_mqtt_topic(publish_topic, sizeof(publish_topic), OTAFETCH_TOPIC_SUFFIX, OTAFETCH_TOPIC_RULE);
+
+    int msg_id = -1;
     esp_err_t err = esp_rmaker_mqtt_publish(publish_topic, publish_payload, strlen(publish_payload),
-                        RMAKER_MQTT_QOS1, NULL);
+                        RMAKER_MQTT_QOS1, &msg_id);
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "OTA Fetch Publish Error %d", err);
+        return err;
     }
+
+    if (msg_id == -1) {
+        ESP_LOGE(TAG, "Failed to get message ID for OTA fetch");
+        return ESP_FAIL;
+    }
+
+    /* Track the message for enhanced delivery */
+    g_ota_fetch_state.expected_msg_id = msg_id;
+    g_ota_fetch_state.fetch_in_progress = true;
+
+    /* Register event handler for MQTT PUBLISHED event */
+    err = esp_event_handler_instance_register(RMAKER_COMMON_EVENT, RMAKER_MQTT_EVENT_PUBLISHED,
+                                            ota_fetch_mqtt_event_handler, NULL,
+                                            &g_ota_fetch_state.published_handler_instance);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to register MQTT PUBLISHED event handler: %s", esp_err_to_name(err));
+        ota_fetch_cleanup();
+        return err;
+    }
+
+    /* Create timeout timer for PUBACK confirmation */
+    g_ota_fetch_state.timeout_timer = xTimerCreate("ota_timeout",
+                                                   pdMS_TO_TICKS(OTA_FETCH_TIMEOUT_SECONDS * 1000),
+                                                   pdFALSE, NULL, ota_fetch_timeout_timer_cb);
+    if (!g_ota_fetch_state.timeout_timer) {
+        ESP_LOGE(TAG, "Failed to create timeout timer");
+        ota_fetch_cleanup();
+        return ESP_ERR_NO_MEM;
+    }
+
+    if (xTimerStart(g_ota_fetch_state.timeout_timer, 0) != pdPASS) {
+        ESP_LOGE(TAG, "Failed to start timeout timer");
+        ota_fetch_cleanup();
+        return ESP_FAIL;
+    }
+
+    return ESP_OK;
+}
+
+static void ota_fetch_schedule_retry(void)
+{
+    g_ota_fetch_state.retry_count++;
+
+    /* Calculate delay with exponential backoff, but cap at maximum */
+    int delay;
+    if (g_ota_fetch_state.retry_count <= OTA_FETCH_MAX_RETRIES) {
+        delay = OTA_FETCH_RETRY_BASE_DELAY * (1 << (g_ota_fetch_state.retry_count - 1));
+        ESP_LOGI(TAG, "OTA fetch failed, retry %u in %d seconds",
+                 g_ota_fetch_state.retry_count, delay);
+    } else {
+        /* Continue retrying at maximum interval indefinitely */
+        delay = OTA_FETCH_RETRY_BASE_DELAY * (1 << (OTA_FETCH_MAX_RETRIES - 1));
+        ESP_LOGI(TAG, "OTA fetch failed, persistent retry %u at max interval (%d seconds)",
+                 g_ota_fetch_state.retry_count, delay);
+    }
+
+    /* Use existing delay function for retry scheduling */
+    esp_err_t err = esp_rmaker_ota_fetch_with_delay(delay);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to schedule OTA retry: %s", esp_err_to_name(err));
+        ota_fetch_cleanup();
+    }
+}
+
+esp_err_t esp_rmaker_ota_fetch(void)
+{
+    esp_err_t err = __esp_rmaker_ota_fetch();
+
+    /* If the fetch attempt failed (including publish failures), schedule retry */
+    if (err != ESP_OK) {
+        ESP_LOGW(TAG, "OTA fetch attempt failed: %s", esp_err_to_name(err));
+
+        /* Initialize state for retry tracking */
+        g_ota_fetch_state.expected_msg_id = -1;
+        g_ota_fetch_state.retry_count = 0; /* Start from 0 since this is the first failure */
+        g_ota_fetch_state.fetch_in_progress = false;
+
+        /* Schedule retry with exponential backoff */
+        ota_fetch_schedule_retry();
+    }
+
     return err;
 }
 
-void esp_rmaker_ota_autofetch_timer_cb(void *priv)
+#ifdef CONFIG_ESP_RMAKER_OTA_AUTOFETCH
+static void esp_rmaker_ota_autofetch_timer_cb(TimerHandle_t xTimer)
 {
     esp_rmaker_ota_fetch();
+    /* Restart for next autofetch period */
+    xTimerStart(xTimer, 0);
 }
+static void esp_rmaker_ota_autofetch_cleanup(void)
+{
+    if (ota_autofetch_timer) {
+        xTimerStop(ota_autofetch_timer, portMAX_DELAY);
+        xTimerDelete(ota_autofetch_timer, portMAX_DELAY);
+        ota_autofetch_timer = NULL;
+    }
+}
+#endif
 
 static esp_err_t esp_rmaker_ota_subscribe(void *priv_data)
 {
@@ -302,17 +496,17 @@ static void esp_rmaker_ota_work_fn(void *priv_data)
             ESP_LOGE(TAG, "Failed to create OTA Fetch timer.");
         }
     }
-    if (ota_autofetch_period > 0) {
-        esp_timer_create_args_t autofetch_timer_conf = {
-            .callback = esp_rmaker_ota_autofetch_timer_cb,
-            .arg = priv_data,
-            .dispatch_method = ESP_TIMER_TASK,
-            .name = "ota_autofetch_tm"
-        };
-        if (esp_timer_create(&autofetch_timer_conf, &ota_autofetch_timer) == ESP_OK) {
-            esp_timer_start_periodic(ota_autofetch_timer, ota_autofetch_period);
-        } else {
+    if (OTA_AUTOFETCH_PERIOD > 0) {
+        /* Clean up any existing timer first */
+        esp_rmaker_ota_autofetch_cleanup();
+
+        ota_autofetch_timer = xTimerCreate("ota_autofetch_tm",
+                                         pdMS_TO_TICKS(OTA_AUTOFETCH_PERIOD_MS),
+                                         pdFALSE, NULL, esp_rmaker_ota_autofetch_timer_cb);
+        if (ota_autofetch_timer == NULL) {
             ESP_LOGE(TAG, "Failed to create OTA Autofetch timer");
+        } else {
+            xTimerStart(ota_autofetch_timer, 0);
         }
     }
 #endif /* CONFIG_ESP_RMAKER_OTA_AUTOFETCH */
