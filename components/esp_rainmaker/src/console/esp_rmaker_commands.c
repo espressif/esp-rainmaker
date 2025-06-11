@@ -14,19 +14,15 @@
 
 #include <stdio.h>
 #include <string.h>
+#include <stdlib.h>
 #include <inttypes.h>
 #include <esp_log.h>
 #include <esp_wifi.h>
 #include <esp_console.h>
-#include <string.h>
 #include <esp_rmaker_core.h>
 #include <esp_rmaker_user_mapping.h>
 #include <esp_rmaker_utils.h>
 #include <esp_rmaker_cmd_resp.h>
-#include <esp_err.h>
-#include <esp_rmaker_standard_params.h>
-#include <esp_rmaker_standard_types.h>
-
 #include <esp_rmaker_internal.h>
 #include <esp_rmaker_console_internal.h>
 #if RMAKER_USING_NETWORK_PROV
@@ -199,11 +195,11 @@ static void register_sign_data_command()
     esp_console_cmd_register(&cmd);
 }
 
-static int smart_set_handler(int argc, char** argv)
+static int set_handler(int argc, char** argv)
 {
     if (argc != 4) {
         printf("%s: Invalid Usage.\n", TAG);
-        printf("Usage: smart-set <device_name> <param_name> <value>\n");
+        printf("Usage: set <device_name> <param_name> <value>\n");
         return ESP_ERR_INVALID_ARG;
     }
     
@@ -265,22 +261,22 @@ static int smart_set_handler(int argc, char** argv)
     return ESP_OK;
 }
 
-static void register_smart_set()
+static void register_set()
 {
     const esp_console_cmd_t cmd = {
-        .command = "smart-set",
-        .help = "Smart set command for ESP RainMaker",
-        .func = &smart_set_handler,
+        .command = "set",
+        .help = "Set command for ESP RainMaker device parameters",
+        .func = &set_handler,
     };
     ESP_LOGI(TAG, "Registering command: %s", cmd.command);
     esp_console_cmd_register(&cmd);
 }
 
-static int smart_get_handler(int argc, char** argv)
+static int get_handler(int argc, char** argv)
 {
     if (argc != 3) {
         printf("%s: Invalid Usage.\n", TAG);
-        printf("Usage: smart-get <device_name> <param_name>\n");
+        printf("Usage: get <device_name> <param_name>\n");
         return ESP_ERR_INVALID_ARG;
     }
     
@@ -330,12 +326,12 @@ static int smart_get_handler(int argc, char** argv)
     return ESP_OK;
 }
 
-static void register_smart_get()
+static void register_get()
 {
     const esp_console_cmd_t cmd = {
-        .command = "smart-get",
-        .help = "Smart get command for ESP RainMaker",
-        .func = &smart_get_handler,
+        .command = "get",
+        .help = "Get command for ESP RainMaker device parameters",
+        .func = &get_handler,
     };
     ESP_LOGI(TAG, "Registering command: %s", cmd.command);
     esp_console_cmd_register(&cmd);
@@ -348,6 +344,6 @@ void register_commands()
     register_wifi_prov();
     register_cmd_resp_command();
     register_sign_data_command();
-    register_smart_set();
-    register_smart_get();
+    register_set();
+    register_get();
 }
