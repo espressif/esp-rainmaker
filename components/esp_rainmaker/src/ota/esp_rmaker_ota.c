@@ -68,6 +68,9 @@ typedef enum {
 } esp_rmaker_ota_action_t;
 
 static esp_rmaker_ota_t *g_ota_priv;
+#ifdef CONFIG_ESP_RMAKER_OTA_PROGRESS_SUPPORT
+static int last_ota_progress = 0;
+#endif
 
 char *esp_rmaker_ota_status_to_string(ota_status_t status)
 {
@@ -421,6 +424,9 @@ esp_err_t esp_rmaker_ota_default_cb(esp_rmaker_ota_handle_t ota_handle, esp_rmak
 
     esp_rmaker_ota_report_status(ota_handle, OTA_STATUS_IN_PROGRESS, "Downloading Firmware Image");
     int count = 0;
+#ifdef CONFIG_ESP_RMAKER_OTA_PROGRESS_SUPPORT
+    last_ota_progress = 0;
+#endif
     while (1) {
         err = esp_https_ota_perform(https_ota_handle);
         if (err == ESP_ERR_INVALID_VERSION) {
@@ -441,6 +447,20 @@ esp_err_t esp_rmaker_ota_default_cb(esp_rmaker_ota_handle_t ota_handle, esp_rmak
             ESP_LOGI(TAG, "Image bytes read: %d", esp_https_ota_get_image_len_read(https_ota_handle));
             count = 0;
         }
+#ifdef CONFIG_ESP_RMAKER_OTA_PROGRESS_SUPPORT
+        int image_size = esp_https_ota_get_image_size(https_ota_handle);
+        int read_size = esp_https_ota_get_image_len_read(https_ota_handle);
+        int ota_progress = 100 * read_size / image_size; // The unit is %
+        /* When ota_progress is 0 or 100, we will not report the progress, beacasue the 0 and 100 is reported by additional_info `Downloading Firmware Image` and
+         * `Firmware Image download complete`. And every progress will only report once and the progress is increasing.
+         */
+        if (((ota_progress != 0) && (ota_progress != 100)) && (ota_progress % CONFIG_ESP_RMAKER_OTA_PROGRESS_INTERVAL == 0) && (last_ota_progress < ota_progress)) {
+            last_ota_progress = ota_progress;
+            char description[40] = {0};
+            snprintf(description, sizeof(description), "Downloaded %d%% Firmware Image", ota_progress);
+            esp_rmaker_ota_report_status(ota_handle, OTA_STATUS_IN_PROGRESS, description);
+        }
+#endif
     }
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "ESP_HTTPS_OTA upgrade failed %s", esp_err_to_name(err));
