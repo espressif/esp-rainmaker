@@ -1,5 +1,10 @@
 # Changes
 
+## 24-Jun-2024: OTA Reliability Improvements
+
+ - Check details in esp_rainmaker component's [CHANGELOG](components/esp_rainmaker/CHANGELOG.md).
+ - Subsequent major changes in component will be maintained under component CHANGELOG.
+
 ## 27-Sep-2024: Modified esp-rainmaker examples to use partitions_4mb_optimised.csv
  - RainMaker examples now use `partitions_4mb_optimised.csv` by default instead of `partitions.csv` and it is recommended to use the same in any new RainMaker projects.
  - The fctry partition address is different for this partition table. So, if the host claiming is used, please pass the new address using:
