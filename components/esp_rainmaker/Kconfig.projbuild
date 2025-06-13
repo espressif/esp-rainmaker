@@ -348,7 +348,7 @@ menu "ESP RainMaker Config"
             help
                 When the device do OTA, it will report upgrade progress to cloud. If the APP need show the progress bar,
                 please enable it and APP can get the progress value in additional_info by API ota_status.
- 
+
         config ESP_RMAKER_OTA_PROGRESS_INTERVAL
             int "OTA Progress Interval (%)"
             default 10
@@ -359,6 +359,21 @@ menu "ESP RainMaker Config"
                 of the firmware is downloaded, range from 10%, 20%, 30% until 90%. For example, when downloaded 10% firmware size,
                 the ota_status is OTA_STATUS_IN_PROGRESS and the additional_info is `Downloaded 10% Firmware Image`.
                 The additional_info `Downloading Firmware Image` is 0% progress and `Firmware Image download complete` is 100% progress.
+
+        config ESP_RMAKER_OTA_MAX_RETRIES
+            int "Maximum OTA Retry Attempts"
+            default 3
+            range 1 10
+            help
+                Maximum number of times the device will retry OTA download on failure before giving up.
+
+        config ESP_RMAKER_OTA_RETRY_DELAY_MINUTES
+            int "OTA Retry Delay (Minutes)"
+            default 5
+            range 1 60
+            help
+                Delay (in minutes) before re-fetching OTA details after all retry attempts fail (for OTA using topics).
+
     endmenu
 
     menu "ESP RainMaker Scheduling"

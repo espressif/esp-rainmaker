@@ -26,6 +26,7 @@
 #include <esp_rmaker_ota.h>
 #include <esp_rmaker_utils.h>
 #include <esp_rmaker_common_events.h>
+#include <time.h>
 
 #include "esp_rmaker_internal.h"
 #include "esp_rmaker_ota_internal.h"
@@ -157,6 +158,10 @@ esp_err_t esp_rmaker_ota_report_status_using_topics(esp_rmaker_ota_handle_t ota_
     }
     json_gen_obj_set_string(&jstr, "status", esp_rmaker_ota_status_to_string(status));
     json_gen_obj_set_string(&jstr, "additional_info", additional_info);
+    /* Add timestamp field 'ts' */
+    time_t current_time;
+    time(&current_time);
+    json_gen_obj_set_int(&jstr, "ts", (int)current_time);
     json_gen_end_object(&jstr);
     json_gen_str_end(&jstr);
 
