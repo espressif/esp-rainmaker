@@ -143,7 +143,7 @@ void report_data_model()
     esp_rmaker_controller_report_status_using_params(json_data);
 }
 
-esp_err_t change_data_model_attribute(uint64_t node_id, uint16_t endpoint_id, uint32_t cluster_id, uint32_t attribute_id, std::string updated_val)
+esp_err_t change_data_model_attribute(uint64_t node_id, uint16_t endpoint_id, uint32_t cluster_id, uint32_t attribute_id, esp_matter_attr_val_t* updated_val)
 {
     if(get_dev_ptr.find(node_id)!=get_dev_ptr.end())
     {
@@ -169,7 +169,7 @@ esp_err_t change_data_model_attribute(uint64_t node_id, uint16_t endpoint_id, ui
 
                     cl_attribute* attr = cls->get_attribute_ptr[attribute_id];
 
-                    attr->value = updated_val;
+                    attr->esp_value = *updated_val;
 
                     ESP_LOGI(TAG,"\nValue set to updated value.\n");
                 }
@@ -260,51 +260,103 @@ static esp_err_t json_gen(json_gen_str_t *jstr)
 
             char dev_type[5];
             sprintf(dev_type, "%x", node_ptr.second->device_type);
-            json_gen_obj_set_string(jstr, "device_type",dev_type);
+            std::string dev_type_str = "0x";
+            dev_type_str += dev_type;
+            json_gen_obj_set_string(jstr, "device_type",(char*)dev_type_str.c_str());
+            dev_type_str.clear();
 
 
 
             if(node_ptr.second->get_cluster_ptr.size()>0)
             {
                 json_gen_push_object(jstr,"clusters");
+                json_gen_push_object(jstr,"servers");
                 for(const auto &cluster_ptr  : node_ptr.second->get_cluster_ptr)
                 {
 
-                    char cl_id[5];
-                    sprintf(cl_id,"%x",cluster_ptr.second->cluster_id);
-                    std::string val = "0x";
-                    val+= cl_id;
-
                     if(cluster_ptr.second->get_attribute_ptr.size()>0)
                     {
+                        char cl_id[5];
+                        sprintf(cl_id,"%x",cluster_ptr.second->cluster_id);
+                        std::string val = "0x";
+                        val+= cl_id;
                         json_gen_push_object(jstr,(char*)val.c_str());
                         val.clear();
+
+                        json_gen_push_object(jstr,"attributes");
                         for(const auto& attribute_ptr : cluster_ptr.second->get_attribute_ptr)
                         {
-                            // std::cout<<"\t\t\t\""<<std::hex<<attribute_ptr.second->attribute_id<<"\" : "<<std::hex<<attribute_ptr.second->value<<std::endl;
                             char attr_id[9];
                             sprintf(attr_id, "%x", attribute_ptr.second->attribute_id);
                             std::string attr_id_str = "0x";
                             attr_id_str += attr_id;
-                            json_gen_obj_set_string(jstr,(char*)attr_id_str.c_str() ,(char*)attribute_ptr.second->value.c_str());
+
+                            if(attribute_ptr.second->esp_value.type == ESP_MATTER_VAL_TYPE_BOOLEAN)
+                                json_gen_obj_set_bool(jstr,(char*)attr_id_str.c_str() ,attribute_ptr.second->esp_value.val.b);
+                            else if(attribute_ptr.second->esp_value.type == ESP_MATTER_VAL_TYPE_UINT16)
+                                json_gen_obj_set_int(jstr,(char*)attr_id_str.c_str() ,attribute_ptr.second->esp_value.val.u16);
+                            else
+                                // json_gen_obj_set_null(jstr, (char*)attr_id_str.c_str());
+                                json_gen_obj_set_string(jstr,(char*)attr_id_str.c_str() ,(char*)attribute_ptr.second->esp_value.val.a.b);
+
 
                             attr_id_str.clear();
                             val.clear();
                         }
-                        json_gen_pop_object(jstr);
+                        json_gen_pop_object(jstr); //close attributes object
+
+                        //write logic for event list
+                        if(cluster_ptr.second->events_list.size()>0)
+                        {
+                            json_gen_push_object(jstr,"events");
+
+                            for(std::pair<uint32_t,bool> evt:cluster_ptr.second->events_list)
+                            {
+                                char evt_id[5];
+                                sprintf(evt_id,"%x",evt.first);
+                                std::string val = "0x";
+                                val+= evt_id;
+                                json_gen_obj_set_bool(jstr,(char*)val.c_str(),evt.second);
+                                val.clear();
+
+                            }
+
+                            json_gen_pop_object(jstr);//close events object
+                        }
+                        json_gen_pop_object(jstr); //close particular cluster object
 
                     }
 
                 }
+                json_gen_pop_object(jstr); //close server object
 
-                json_gen_pop_object(jstr);
+                //put logic for client cluster
+                if(node_ptr.second->client_list.size()>0)
+                {
+                    json_gen_push_array(jstr,"clients");
+
+                    for(uint32_t client_id:node_ptr.second->client_list)
+                    {
+                        char clt_id[5];
+                        sprintf(clt_id,"%x",client_id);
+                        std::string val = "0x";
+                        val+= clt_id;
+                        json_gen_arr_set_string(jstr,(char*)val.c_str());
+                        val.clear();
+
+                    }
+
+                    json_gen_pop_array(jstr);
+                }
+
+                json_gen_pop_object(jstr); //close cluster object
             }
 
-            json_gen_pop_object(jstr);
+            json_gen_pop_object(jstr); //close particular endpoint
         }
 
-        json_gen_pop_object(jstr);
-        json_gen_pop_object(jstr);
+        json_gen_pop_object(jstr); //close endpoints object
+        json_gen_pop_object(jstr); //close node object
     }
 
     ESP_LOGI(TAG,"\ndata model JSON generation done\n");
@@ -379,27 +431,64 @@ static void parse_cb_response(cb_data* _data)
 
 
     }
+    else if(_data->attr_path.mEndpointId!=0x0 && _data->attr_path.mClusterId== Descriptor::Id && _data->attr_path.mAttributeId == Descriptor::Attributes::ClientList::Id)
+    {
+        chip::app::DataModel::DecodableList<chip::ClusterId> value;
+        if(chip::app::DataModel::Decode(*_data->tlv_data, value)==CHIP_NO_ERROR){};
+
+
+        auto iter = value.begin();
+        // size_t i  = 0;
+        while (iter.Next())
+        {
+
+            chip::ClusterId val = iter.GetValue();
+            // ep_cluster* ncluster = new ep_cluster(val);
+            get_ep_ptr[_data->attr_path.mEndpointId]->client_list.push_back(val);
+
+        }
+
+
+    }
+    else if(_data->attr_path.mEndpointId!=0x0 && _data->attr_path.mAttributeId == Globals::Attributes::EventList::Id)
+    {
+        chip::app::DataModel::DecodableList<chip::EventId> value;
+        CHIP_ERROR err = chip::app::DataModel::Decode(*_data->tlv_data, value);
+        if (err !=CHIP_NO_ERROR)
+            ESP_LOGE(TAG,"\nevents Decode not OK err %d\n",err);
+
+        auto iter = value.begin();
+
+        while (iter.Next())
+        {
+
+            chip::EventId ev = iter.GetValue();
+            get_ep_ptr[_data->attr_path.mEndpointId]->get_cluster_ptr[_data->attr_path.mClusterId]->events_list.push_back({ev,false});
+
+        }
+    }
     else if(_data->attr_path.mEndpointId!=0x0 && _data->attr_path.mClusterId!=0x1d  && _data->attr_path.mAttributeId != 0xFFF8 &&
             _data->attr_path.mAttributeId != 0xFFF9 && _data->attr_path.mAttributeId != 0xFFFA && _data->attr_path.mAttributeId != 0xFFFB && _data->attr_path.mAttributeId != 0xFFFC && _data->attr_path.mAttributeId != 0xFFFD)
     {
         data_model* node_ptr = get_ep_ptr[_data->attr_path.mEndpointId];
 
         int type = _data->tlv_data->GetType();
-        std::string val;
 
-
+        esp_matter_attr_val_t esp_val;
         switch(type)
         {
             // case 0x0:
             // {
-            //     int attribute_value;
+            //     int16_t attribute_value;
             //     if(chip::app::DataModel::Decode(*_data->tlv_data, attribute_value)==CHIP_NO_ERROR)
             //     {
             //         printf("\nattribute decode OK.\n");
-            //         val = std::to_string(attribute_value);
+            //         // val = std::to_string(attribute_value);
+            //         esp_val = esp_matter_int16 (attribute_value);
+
             //     }
             //     else
-            //         printf("\nattribute decode not OK.\n");
+            //         ESP_LOGE(TAG,"\nattribute decode not OK.\n");
             //     break;
             // }
 
@@ -408,7 +497,7 @@ static void parse_cb_response(cb_data* _data)
                 u_int16_t attribute_value;
                 if(chip::app::DataModel::Decode(*_data->tlv_data, attribute_value)==CHIP_NO_ERROR)
                 {
-                    val = std::to_string(attribute_value);
+                    esp_val = esp_matter_uint16 (attribute_value);
                 }
                 else
                     ESP_LOGE(TAG,"\nattribute decode not OK.\n");
@@ -419,15 +508,15 @@ static void parse_cb_response(cb_data* _data)
                 bool attribute_value;
                 if(chip::app::DataModel::Decode(*_data->tlv_data, attribute_value)==CHIP_NO_ERROR)
                 {
-
-                    val = std::to_string(attribute_value);
+                    esp_val = esp_matter_bool(attribute_value);
                 }
                 else
                     ESP_LOGE(TAG,"\nattribute decode not OK.\n");
                 break;
             }
             default:
-                val = "Unhandled type";
+                // esp_val = esp_matter_invalid(NULL);
+                esp_val = esp_matter_char_str("Unhandled",sizeof("Unhandled"));
                 break;
         }
 
@@ -437,7 +526,7 @@ static void parse_cb_response(cb_data* _data)
 
             ep_cluster* curr_cluster = node_ptr->get_cluster_ptr[_data->attr_path.mClusterId];
 
-            cl_attribute* nattribute = new cl_attribute(_data->attr_path.mAttributeId,val);
+            cl_attribute* nattribute = new cl_attribute(_data->attr_path.mAttributeId,esp_val);
 
             curr_cluster->get_attribute_ptr[_data->attr_path.mAttributeId] = nattribute;
 

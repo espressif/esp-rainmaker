@@ -87,6 +87,7 @@ $ ./rainmaker.py getparams <rainmaker-node-id-of-controller>
 1) Please use the same account credentials that are used to claim the controller and signed into the Rainmaker app.
 2) Get the rainmaker-node-id-of-controller by logging into [ESP Rainmaker Dashboard](https://dashboard.rainmaker.espressif.com/login).
 
+
 ## Controlling the devices remotely using rainmaker cli:
 
 ```
@@ -103,3 +104,184 @@ $ ./rainmaker.py setparams --data '{"Matter-Controller":{"Matter-Devices":{"matt
 ```
 **Note**:
 1) Get the matter-node-id-of-device from the details reported by the controller using getparams command.
+
+**Node config of Matter-Controller:**
+```
+        {
+            "name": "Matter-Controller",
+            "params": [
+                {
+                    "data_type": "object",
+                    "name": "Matter-Devices",
+                    "properties": [
+                        "read"
+                    ],
+                    "type": "esp.param.matter-devices"
+                },
+                {
+                    "data_type": "string",
+                    "name": "Matter-Controller-Data-Version",
+                    "properties": [
+                        "read"
+                    ],
+                    "type": "esp.param.matter-controller-data-version"
+                }
+            ],
+            "type": "esp.service.matter-controller"
+        }
+
+
+```
+
+**Example of getparams:**
+
+```
+{
+    "Matter Controller":{
+        "Name":"Controller",
+        "Power":true
+    },
+    "Matter-Controller":{
+        "Matter-Controller-Data-Version":"1.0.1",
+        "Matter-Devices":{
+            "d81b1178e484c26d":{
+                "enabled":true,
+                "endpoints":{
+                    "0x1":{
+                        "clusters":{
+                            "servers":{
+                                "0x3":{
+                                    "attributes":{
+                                        "0x0":0,
+                                        "0x1":0
+                                    }
+                                },
+                                "0x300":{
+                                    "attributes":{
+                                        "0x10":0,
+                                        "0x2":0,
+                                        "0x3":24939,
+                                        "0x4":24701,
+                                        "0x4001":2,
+                                        "0x400a":24,
+                                        "0x400b":0,
+                                        "0x400c":65279,
+                                        "0x400d":0,
+                                        "0x4010":"Unhandled",
+                                        "0x7":250,
+                                        "0x8":2,
+                                        "0xf":0
+                                    }
+                                },
+                                "0x4":{
+                                    "attributes":{
+                                        "0x0":128
+                                    }
+                                },
+                                "0x6":{
+                                    "attributes":{
+                                        "0x0":true,
+                                        "0x4000":true,
+                                        "0x4001":0,
+                                        "0x4002":0,
+                                        "0x4003":"Unhandled"
+                                    }
+                                },
+                                "0x62":{
+                                    "attributes":{
+                                        "0x1":16,
+                                        "0x2":"Unhandled"
+                                    }
+                                },
+                                "0x8":{
+                                    "attributes":{
+                                        "0x0":64,
+                                        "0x1":0,
+                                        "0x11":"Unhandled",
+                                        "0x2":1,
+                                        "0x3":254,
+                                        "0x4000":64,
+                                        "0xf":0
+                                    }
+                                }
+                            }
+                        },
+                        "device_type":"0x10d"
+                    },
+                    "0x2":{
+                        "clusters":{
+                            "servers":{
+                                "0x3":{
+                                    "attributes":{
+                                        "0x0":0,
+                                        "0x1":0
+                                    }
+                                },
+                                "0x3b":{
+                                    "attributes":{
+                                        "0x0":2,
+                                        "0x1":0
+                                    },
+                                    "events":{
+                                        "0x0":false,
+                                        "0x1":false,
+                                        "0x2":false,
+                                        "0x3":false,
+                                        "0x4":false,
+                                        "0x5":false,
+                                        "0x6":false
+                                    }
+                                }
+                            }
+                        },
+                        "device_type":"0xf"
+                    },
+                    "0x3":{
+                        "clusters":{
+                            "clients":[
+                                "0x3",
+                                "0x6",
+                                "0x4"
+                            ],
+                            "servers":{
+                                "0x1e":{
+                                    "attributes":{
+                                        "0x0":"Unhandled"
+                                    }
+                                },
+                                "0x3":{
+                                    "attributes":{
+                                        "0x0":0,
+                                        "0x1":0
+                                    }
+                                },
+                                "0x4":{
+                                    "attributes":{
+                                        "0x0":128
+                                    }
+                                }
+                            }
+                        },
+                        "device_type":"0x103"
+                    }
+                },
+                "reachable":true
+            }
+        }
+    },
+    "Scenes":{
+        "Scenes":[
+
+        ]
+    },
+    "Schedule":{
+        "Schedules":[
+
+        ]
+    },
+    "Time":{
+        "TZ":"",
+        "TZ-POSIX":""
+    }
+}
+```

@@ -118,8 +118,8 @@ static void attribute_data_cb(uint64_t remote_node_id, const chip::app::Concrete
                         ui_set_onoff_state(dev_ptr->lv_obj, dev_ptr->device_type, value);
                     }
                     dev_ptr->OnOff = value;
-                    std::string update_val = std::to_string(value);
-                    change_data_model_attribute(remote_node_id, path.mEndpointId,path.mClusterId, path.mAttributeId,update_val);
+                    esp_matter_attr_val_t update_val = esp_matter_bool(value);
+                    change_data_model_attribute(remote_node_id, path.mEndpointId,path.mClusterId, path.mAttributeId,&update_val);
                     ESP_LOGI(TAG, "%llx OnOff attribute change %d", remote_node_id, value);
                     return;
                 }
