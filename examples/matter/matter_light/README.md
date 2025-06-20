@@ -23,3 +23,120 @@ TO optimize the DRAM usage, this example uses the following optimizations:
 - As this example has two endpoints (Endpoint 0: Root endpoint, Endpoint 1: Extended Color Light), the default dynamic endpoint count is set to 2. This is done by setting `CONFIG_ESP_MATTER_MAX_ENDPOINT_COUNT=2` in the menuconfig.
 
 For more optimizations please refer [esp-matter’s RAM Flash optimization guide](https://docs.espressif.com/projects/esp-matter/en/latest/esp32/optimizations.html)
+
+## How to use this example
+
+This example demonstrates three different functional configurations:
+
+- Matter + RainMaker Fabric  
+- Matter + RainMaker Non-Fabric + Static Matter QR Code  
+- Matter + RainMaker Non-Fabric + Dynamic Matter QR Code  
+
+### 1. What is Fabric  
+The provisioning process uses the standard Matter protocol. Devices can be provisioned using either any Matter-compatible app or Espressif's ESP-RainMaker app.  
+
+- **Matter App Provisioning**: Only enables Matter functionality. The device connects to RainMaker cloud but won't be bound to a RainMaker account, preventing RainMaker-based control.  
+- **ESP-RainMaker App Provisioning**: The app acts as a Matter Controller for provisioning while simultaneously transmitting RainMaker user binding through Matter Fabric.  
+  - Local control via Matter protocol when app and device are on the same LAN  
+  - Remote control via RainMaker when on different networks  
+
+**Advantages**:  
+1. Full Matter ecosystem compatibility with ESP-RainMaker app provisioning supporting both local and remote control  
+2. Extends functionality beyond Matter standards through RainMaker platform  
+
+**Disadvantages**:  
+1. Requires Matter feature integration in both app and cloud  
+
+### 2. What is Non-Fabric  
+Literally means without Fabric functionality, while supporting both standard Matter and RainMaker provisioning independently. Users may choose either or both protocols.  
+
+- **RainMaker-first Provisioning**:  
+  1. Provision via RainMaker app → device appears in RainMaker ecosystem
+  2. Open Matter Commissioning Window → add to Matter ecosystem without reset
+
+**Advantages**:  
+1. Independent provisioning paths for Matter and RainMaker  
+2. Broad application scenarios with flexible user choices  
+
+**Disadvantages**:  
+1. Requires Matter Controller (e.g., Apple/Google smart speakers)  
+2. Additional app development needed for RainMaker binding post-Matter provisioning  
+
+### 3. What is Dynamic Matter QR Code  
+Implements Matter-standard dynamic passcode generation. QR codes/pairing codes are generated during provisioning and shared via RainMaker:  
+1. User first provisions via RainMaker app  
+2. App displays dynamically generated QR/pairing codes  
+3. User scans QR code or enters manual code for Matter provisioning  
+
+**Advantages**:  
+1. Eliminates pre-production QR code labeling  
+2. Prevents provisioning failures from physical QR code damage/loss  
+3. Enhanced security  
+
+**Disadvantages**:  
+1. Requires RainMaker provisioning first when no display is available  
+
+### 4. Compilation Instructions  
+
+*Note: Currently, use no fabric feature, need update the [ESP-Matter SDK](https://github.com/espressif/esp-matter). Latest known working commit is [057ac6a3](https://github.com/espressif/esp-matter/tree/057ac6a3e06f29a8a6f0e942228d01064e6942d3).
+
+**Fabric Example**:  
+```bash
+idf.py build
+```  
+*(Default configuration)*  
+
+**Non-Fabric + Static QR Code**:  
+```bash
+idf.py -D SDKCONFIG_DEFAULTS="sdkconfig.esp32c3.no_fabric" set-target esp32c3 build
+```  
+*Note: Currently only ESP32-C3 configurations are provided. Other modules require manual adaptation.*  
+
+**Non-Fabric + Dynamic QR Code**:  
+```bash
+idf.py -D SDKCONFIG_DEFAULTS="sdkconfig.esp32c3.dynamic_passcode" set-target esp32c3 build
+```  
+*For dynamic QR factory images, add `--enable-dynamic-passcode` during manufacturing:*  
+```bash
+esp-matter-mfg-tool --enable-dynamic-passcode --dac-in-secure-cert -v 0xFFF2 -p 0x8001 --pai -k $ESP_MATTER_PATH/... (full command as original)
+```
+*Note: `sdkconfig.esp32c3.dynamic_passcode` file already enable `CONFIG_DYNAMIC_PASSCODE_COMMISSIONABLE_DATA_PROVIDER` option, so it can support Dynamic QR Code function.*
+
+### 5. CLI Commands for Non-Fabric Provisioning  
+The device creates a `MatterCWM` service for managing commissioning:  
+
+**Service Definition**:  
+```json
+{
+  "name": "MatterCWM",
+  "params": [
+    {"name": "QRCode", "type": "esp.param.matter-qrcode", "properties": ["read"]},
+    {"name": "ManualCode", "type": "esp.param.matter-manualcode", "properties": ["read"]},
+    {"name": "WindowOpen", "type": "esp.param.window-open", "properties": ["read","write"]}
+  ]
+}
+```
+
+**5.1 Open Commissioning Window**:  
+```bash
+esp-rainmaker-cli setparams [node-id] --data "{\"MatterCWM\":{\"WindowOpen\":true}}"
+```  
+
+**5.2 Close Commissioning Window**:  
+```bash
+esp-rainmaker-cli setparams [node-id] --data "{\"MatterCWM\":{\"WindowOpen\":false}}"
+```  
+
+**5.3 Retrieve QR/Pairing Codes**:  
+```bash
+esp-rainmaker-cli getparams [node-id]
+```  
+*Output Example*:  
+```json
+"MatterCWM": {
+  "ManualCode": "35306901693",
+  "QRCode": "MT:U9VJ0CQM00YHG.48200",
+  "WindowOpen": true
+}
+```  
+*(Use `QRCode` payload for QR generation, `ManualCode` for numeric input)*  
