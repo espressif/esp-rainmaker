@@ -279,7 +279,7 @@ static esp_err_t esp_rmaker_local_ctrl_service_disable(void)
 }
 
 #ifdef CONFIG_ESP_RMAKER_NETWORK_OVER_THREAD
-#define SRP_MAX_HOST_NAME_LEN 32
+#define SRP_MAX_HOST_NAME_LEN 40
 static char srp_host_name[SRP_MAX_HOST_NAME_LEN + 1];
 
 static esp_err_t srp_client_set_host(const char *host_name)
