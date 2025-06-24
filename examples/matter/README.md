@@ -4,10 +4,9 @@
 
 ## Prerequisites
 
-- ESP-IDF [v5.2.2](https://github.com/espressif/esp-idf/releases/v5.2.2)
-- [ESP-Matter SDK](https://github.com/espressif/esp-matter). Latest known working commit is [8a7c81f2](https://github.com/espressif/esp-matter/tree/8a7c81f28b8d787247d42b0992ae264555bec936).
+- ESP-IDF [v5.4.1](https://github.com/espressif/esp-idf/releases/v5.4.1)
+- [Espressif's SDK for Matter](https://github.com/espressif/esp-matter).
 - [ESP Rainmaker SDK](https://github.com/espressif/esp-rainmaker)
-- [ESP Secure Cert Manager](https://github.com/espressif/esp_secure_cert_mgr)
 Please go through the installation process (if required) for all of the above prerequisites.
 
 ## Setting up the environment
@@ -23,8 +22,8 @@ $ export RMAKER_PATH=/path/to/esp-rainmaker
 
 ### Claiming device certificates
 
-Self Claiming or Assisted Claiming can't be used with the RainMaker + Matter examples because the certificate needs to be present even before Matter commissioning stars.
-So, we will use [host driven claiming](https://rainmaker.espressif.com/docs/claiming#host-driven-claiming) via the [RainMaker CLI](https://rainmaker.espressif.com/docs/cli-setup).
+Self Claiming or Assisted Claiming can't be used with the RainMaker + Matter examples because the certificate needs to be present even before Matter commissioning starts.
+So, we will use [host driven claiming](https://docs.rainmaker.espressif.com/docs/product_overview/concepts/claiming#host-driven-claiming-publicprivate-rainmaker) via the [RainMaker CLI](https://github.com/espressif/esp-rainmaker-cli/blob/master/docs/README.md#installation).
 
 Make sure your device is connected to the host machine, login into the CLI and execute this:
 
@@ -36,14 +35,11 @@ This will fetch the device certificates and flash them on your device.
 
 ### Generating the factory nvs binary
 
-The factory nvs (fctry partition) needs to be generated using the mfg_tool of esp-matter
-
-mfg_tool is moved to esp-matter-tools repo: https://github.com/espressif/esp-matter-tools/tree/main/mfg_tool.
+The factory nvs (fctry partition) needs to be generated using the [esp-matter-mfg-tool](https://github.com/espressif/esp-matter-tools).
 
 It is released on pypi: https://pypi.org/project/esp-matter-mfg-tool and can be installed by running `pip install esp-matter-mfg-tool`
 
 ```
-$ export ESP_SECURE_CERT_PATH=/path/to/esp_secure_cert_mgr
 $ esp-matter-mfg-tool --vendor-id 0x131B --product-id 0x2 \
                       --vendor-name "Espressif" --product-name "RainMaker-Matter-Light" \
                       --hw-ver-str "DevKitM1" \
@@ -72,8 +68,8 @@ $ idf.py flash monitor
 ```
 
 ### Commissioning
-The QR Code required for commissioning your device can be found at `${ESP_MATTER_PATH}/tools/mfg_tool/out/<vendor-id>_<product-id>/<node-id>/<node-id>-qrcode.png`
-
+The QR Code required for commissioning your device can be found at the directory where esp-matter-mfg-tool command is executed or argument provided to `--outdir`.
+For e.g: If the command is run in esp-rainmaker directory , the QR code will be located at `${RMAKER_PATH}/out/<vendor-id>_<product-id>/<node-id>/<node-id>-qrcode.png`
 
 ## Manufacturing Considerations
 
@@ -89,19 +85,13 @@ For production devices which may have a different matter vid and pid, please set
 
 ### Matter DAC
 
-For public RainMaker, some test DACs are provided via claiming. For private deployments, test DACs can be generated using mfg_tool
-
-mfg_tool is moved to esp-matter-tools repo: https://github.com/espressif/esp-matter-tools/tree/main/mfg_tool.
-
-It is released on pypi: https://pypi.org/project/esp-matter-mfg-tool and can be installed by running `pip install esp-matter-mfg-tool`
+For public RainMaker, some test DACs are provided via claiming. For private deployments, test DACs can be generated using esp-matter-mfg-tool.
 
 ```
-$ export ESP_SECURE_CERT_PATH=/path/to/esp_secure_cert_mgr
 $ esp-matter-mfg-tool -v <vendor-id> -p <product-id> --pai -k <pai-key> -c <pai-cert> -cd <cert-dclrn> --csv /path/to/keys.csv --mcsv /path/to/master.csv
 ```
 
 Samples of keys.csv and master.csv can be found in $RMAKER_PATH/examples/matter/mfg/.
-
 
 For testing, you can use the test vid, pid, PAI and CD as shown below
 
@@ -110,39 +100,6 @@ $ esp-matter-mfg-tool --dac-in-secure-cert -v 0xFFF2 -p 0x8001 --pai -k $ESP_MAT
 ```
 
 Note the path where the files are generated after running the above command since it will be required later.
-
-### Configure your app
-Open the project configuration menu using -
-
-```
-idf.py menuconfig
-```
-In the configuration menu, set the following additional configuration to use custom factory partition and different values for Data and Device Info Providers.
-
-1. Enable `ESP32 Factory Data Provider` [Component config → CHIP Device Layer → Commissioning options → Use ESP32 Factory Data Provider]
-
-    Enable config option `CONFIG_ENABLE_ESP32_FACTORY_DATA_PROVIDER`
-    to use ESP32 specific implementation of CommissionableDataProvider and DeviceAttestationCredentialsProvider.
-
-2. Enable `ESP32 Device Instance Info Provider` [Component config → CHIP Device Layer → Commissioning options → Use ESP32 Device Instance Info Provider]
-
-    Enable config option `ENABLE_ESP32_DEVICE_INSTANCE_INFO_PROVIDER`
-    to get device instance info from factory partition.
-
-3. Enable `Attestation - Secure Cert` [ Component config → ESP Matter → DAC Provider options → Attestation - Secure Cert]
-
-    Enable config option `CONFIG_FACTORY_PARTITION_DAC_PROVIDER` to use DAC certificates from the secure_cert partition during Attestation.
-
-4. Set `chip-factory namespace partition label` [Component config → CHIP Device Layer → Matter Manufacturing Options → chip-factory namespace partition label]
-
-    Set config option `CHIP_FACTORY_NAMESPACE_PARTITION_LABEL`
-    to choose the label of the partition to store key-values in the "chip-factory" namespace. The default chosen partition label is `nvs`, change it to `fctry`.
-
-
-Connect your esp32 device to your computer. Enter the below command to flash certificates and factory partition
-```
-$ esptool.py write_flash 0xd000 /out/<vendor-id>_<product-id>/<node-id>/<node-id>_esp_secure_cert.bin 0x3e0000 ./out/<vendor-id>_<product-id>/<node-id>/<node-id>-partition.bin
-```
 
 The csv file generate at `/out/<vendor-id>_<product-id>/cn_dacs-<date>-<time>.csv` should be registered to your private RainMaker deployment (if applicable) using the steps mentioned [here](https://github.com/espressif/esp-rainmaker-admin-cli#register-device-certificates).
 
