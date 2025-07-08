@@ -243,7 +243,11 @@ static int set_handler(int argc, char** argv)
             new_val.val.f = atof(value_str);
             break;
         case RMAKER_VAL_TYPE_STRING:
-            new_val.val.s = (char *)value_str;
+            new_val.val.s = strdup(value_str);  // Create a copy to avoid lifetime issues
+            if (!new_val.val.s) {
+                printf("%s: Failed to allocate memory for string value\n", TAG);
+                return ESP_FAIL;
+            }
             break;
         default:
             printf("%s: Unsupported value type\n", TAG);
@@ -252,6 +256,12 @@ static int set_handler(int argc, char** argv)
 
     // Update the parameter value
     esp_err_t err = esp_rmaker_param_update_and_report(param, new_val);
+    
+    // Free allocated string memory if it was a string type
+    if (val->type == RMAKER_VAL_TYPE_STRING && new_val.val.s) {
+        free(new_val.val.s);
+    }
+    
     if (err != ESP_OK) {
         printf("%s: Failed to update parameter value\n", TAG);
         return err;
@@ -261,11 +271,11 @@ static int set_handler(int argc, char** argv)
     return ESP_OK;
 }
 
-static void register_set()
+static void register_set_command()
 {
     const esp_console_cmd_t cmd = {
         .command = "set",
-        .help = "Set command for ESP RainMaker device parameters",
+        .help = "Set device parameter value. Usage: set <device_name> <param_name> <value>",
         .func = &set_handler,
     };
     ESP_LOGI(TAG, "Registering command: %s", cmd.command);
@@ -326,11 +336,11 @@ static int get_handler(int argc, char** argv)
     return ESP_OK;
 }
 
-static void register_get()
+static void register_get_command()
 {
     const esp_console_cmd_t cmd = {
         .command = "get",
-        .help = "Get command for ESP RainMaker device parameters",
+        .help = "Get device parameter value. Usage: get <device_name> <param_name>",
         .func = &get_handler,
     };
     ESP_LOGI(TAG, "Registering command: %s", cmd.command);
@@ -344,6 +354,6 @@ void register_commands()
     register_wifi_prov();
     register_cmd_resp_command();
     register_sign_data_command();
-    register_set();
-    register_get();
+    register_set_command();
+    register_get_command();
 }
