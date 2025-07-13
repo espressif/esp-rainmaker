@@ -1101,6 +1101,18 @@ esp_err_t esp_rmaker_local_ctrl_disable(void);
  */
 esp_err_t esp_rmaker_param_report_simple_ts_data(const esp_rmaker_param_t *param, esp_rmaker_param_val_t val, int timestamp, uint16_t ttl_days);
 
+/** Publish command response payload to the cloud
+ *
+ * @param[in] output Pointer to the data to publish
+ *                   Ensure that the pointer is dynamically allocated memory. The API will free it internally.
+ *                   Do not reuse the pointer after calling this API as it may cause undefined access since the
+ *                   memory could have been freed before use.
+ *
+ * @param[in] output_len Length of the output data.
+ *
+ * @return ESP_OK on success, appropriate error on failure.
+ */
+esp_err_t esp_rmaker_cmd_response_publish(void *output, size_t output_len);
 #ifdef __cplusplus
 }
 #endif
