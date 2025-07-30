@@ -179,6 +179,15 @@ void app_main()
     /* Enable Scenes */
     esp_rmaker_scenes_enable();
 
+    /* Enable system service */
+    esp_rmaker_system_serv_config_t system_serv_config = {
+        .flags = SYSTEM_SERV_FLAGS_ALL,
+        .reboot_seconds = 2,
+        .reset_seconds = 2,
+        .reset_reboot_seconds = 2,
+    };
+    esp_rmaker_system_service_enable(&system_serv_config);
+
     /* Enable Insights. Requires CONFIG_ESP_INSIGHTS_ENABLED=y */
     app_insights_enable();
 
