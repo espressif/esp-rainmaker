@@ -258,13 +258,10 @@ esp_err_t app_matter_light_create(app_driver_handle_t driver_handle)
 
     extended_color_light::config_t light_config;
     light_config.on_off.on_off = DEFAULT_POWER;
-    light_config.on_off.features.lighting.start_up_on_off = nullptr;
     light_config.level_control.current_level = DEFAULT_BRIGHTNESS;
-    light_config.level_control.features.lighting.start_up_current_level = DEFAULT_BRIGHTNESS;
     light_config.color_control.color_mode = static_cast<uint8_t>(ColorControl::ColorMode::kColorTemperature);
     light_config.color_control.enhanced_color_mode =
         static_cast<uint8_t>(ColorControl::ColorMode::kColorTemperature);
-    light_config.color_control.features.color_temperature.startup_color_temperature_mireds = nullptr;
     endpoint_t *endpoint = extended_color_light::create(node, &light_config, ENDPOINT_FLAG_NONE, driver_handle);
 
     /* These node and endpoint handles can be used to create/add other endpoints and clusters. */
@@ -276,6 +273,22 @@ esp_err_t app_matter_light_create(app_driver_handle_t driver_handle)
     light_endpoint_id = endpoint::get_id(endpoint);
     ESP_LOGI(TAG, "Light created with endpoint_id %d", light_endpoint_id);
 
+    // Set default values for feature-dependent attributes.
+    // Variable names differ between main and release/v1.4 branches,
+    // so use attribute::set_val() as a workaround for compatibility.
+    {
+        esp_matter_attr_val_t start_up_on_off = esp_matter_nullable_enum8(nullable<uint8_t>());
+        attribute_t * attr = attribute::get(light_endpoint_id, OnOff::Id, OnOff::Attributes::StartUpOnOff::Id);
+        attribute::set_val(attr, &start_up_on_off);
+
+        attr = attribute::get(light_endpoint_id, LevelControl::Id, LevelControl::Attributes::StartUpCurrentLevel::Id);
+        esp_matter_attr_val_t start_up_current_level = esp_matter_nullable_uint8(DEFAULT_BRIGHTNESS);
+        attribute::set_val(attr, &start_up_current_level);
+
+        attr = attribute::get(light_endpoint_id, ColorControl::Id, ColorControl::Attributes::StartUpColorTemperatureMireds::Id);
+        esp_matter_attr_val_t startup_color_temp_mireds = esp_matter_nullable_uint16(nullable<uint16_t>());
+        attribute::set_val(attr, &startup_color_temp_mireds);
+    }
 
     /* Add additional features to the node */
     cluster_t *cluster = cluster::get(endpoint, ColorControl::Id);
