@@ -331,7 +331,8 @@ static esp_err_t __esp_rmaker_ota_fetch(void)
     /* Check if fetch already in progress */
     if (g_ota_fetch_state.fetch_in_progress) {
         ESP_LOGW(TAG, "OTA fetch already in progress. Skipping.");
-        return ESP_ERR_INVALID_STATE;
+        /* Returning success since OTA fetch is already in progress */
+        return ESP_OK;
     }
 
     /* Verify MQTT connection */
