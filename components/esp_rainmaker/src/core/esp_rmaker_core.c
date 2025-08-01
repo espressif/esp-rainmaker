@@ -225,6 +225,10 @@ esp_err_t esp_rmaker_change_node_id(char *node_id, size_t len)
     return ESP_ERR_INVALID_STATE;
 }
 
+static void esp_rmaker_params_mqtt_init_cb(void *data)
+{
+    esp_rmaker_params_mqtt_init();
+}
 
 /* Event handler for catching system events */
 static void esp_rmaker_event_handler(void* arg, esp_event_base_t event_base,
@@ -261,7 +265,7 @@ static void esp_rmaker_event_handler(void* arg, esp_event_base_t event_base,
             (event_id == RMAKER_EVENT_USER_NODE_MAPPING_DONE ||
             event_id == RMAKER_EVENT_USER_NODE_MAPPING_RESET)) {
         esp_event_handler_unregister(RMAKER_EVENT, event_id, &esp_rmaker_event_handler);
-        esp_rmaker_params_mqtt_init();
+        esp_rmaker_work_queue_add_task(esp_rmaker_params_mqtt_init_cb, NULL);
     } else if (event_base == RMAKER_COMMON_EVENT && event_id == RMAKER_MQTT_EVENT_CONNECTED) {
         if (rmaker_core_event_group) {
             /* Signal rmaker thread to continue execution */
