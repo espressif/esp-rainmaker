@@ -1,0 +1,44 @@
+syntax = "proto3";
+
+package rmaker_ch_resp;
+
+enum RMakerChRespStatus {
+    Success = 0;
+    Fail = 1;
+    InvalidParam = 2;
+}
+
+message CmdCRPayload {
+    bytes payload = 1;
+}
+
+message RespCRPayload {
+    bytes payload = 1;
+    string node_id = 2;
+}
+
+message CmdGetNodeIDPayload {
+    /* Empty payload */
+}
+
+message RespGetNodeIDPayload {
+    string node_id = 1;
+}
+
+enum RMakerChRespMsgType {
+    TypeCmdChallengeResponse = 0;
+    TypeRespChallengeResponse = 1;
+    TypeCmdGetNodeID = 2;
+    TypeRespGetNodeID = 3;
+}
+
+message RMakerChRespPayload {
+    RMakerChRespMsgType msg = 1;
+    RMakerChRespStatus status = 2;
+    oneof payload {
+        CmdCRPayload cmdChallengeResponsePayload = 10;
+        RespCRPayload respChallengeResponsePayload = 11;
+        CmdGetNodeIDPayload cmdGetNodeIDPayload = 12;
+        RespGetNodeIDPayload respGetNodeIDPayload = 13;
+    }
+} 

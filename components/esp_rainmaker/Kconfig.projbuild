@@ -155,14 +155,42 @@ menu "ESP RainMaker Config"
 
     config ESP_RMAKER_USER_ID_CHECK
         bool "User id check for User Node mapping"
+        depends on !ESP_RMAKER_DISABLE_USER_MAPPING_PROV && !ESP_RMAKER_ENABLE_CHALLENGE_RESPONSE
+        select ESP_RMAKER_FACTORY_RESET_REPORTING
         default n
         help
             This enables the additional user id checks during user node mapping. Whenever a new user
-            id is received, it is checked against the existing user id in NVS. If there is a mismatch,
-            or if no user id exists in NVS, this is considered as a reset state and the same is reported
-            to the ESP RainMaker Cloud during the User Node association MQTT Publish so that the cloud
-            can take appropriate action w.r.t user permissions. It is recommended to enable this option
-            for security reasons.
+            id is received during provisioning, it is checked against the existing user id in NVS.
+            If there is a mismatch, or if no user id exists in NVS, this is considered as a reset
+            state and the same is reported to the ESP RainMaker Cloud during the User Node association
+            MQTT Publish so that the cloud can take appropriate action w.r.t user permissions.
+            It is recommended to enable this option for security reasons.
+
+    config ESP_RMAKER_FACTORY_RESET_REPORTING
+        bool "Enable factory reset reporting to cloud"
+        default n
+        help
+            Enable reporting of factory reset state to cloud using dummy user ID. This allows the cloud
+            to clean up old user-node mappings when a device is factory reset or when an incorrect
+            provisioning app is used. The device will send a dummy user ID with reset flag to indicate
+            that previous user-node associations should be cleared. This feature works with both
+            traditional MQTT-based and challenge-response based user-node association mechanisms.
+
+    config ESP_RMAKER_ENABLE_CHALLENGE_RESPONSE
+        bool "Enable Challenge Response during provisioning"
+        select ESP_RMAKER_FACTORY_RESET_REPORTING
+        default n
+        help
+            Enable challenge response mechanism during provisioning to verify node authenticity.
+            The node will receive a challenge from the client during provisioning, which it will
+            sign using its private key. The signed response along with the node id will be sent
+            back to the client for verification.
+
+            Important: Traditional user-node mapping provisioning is automatically disabled when
+            this option is enabled, regardless of CONFIG_ESP_RMAKER_DISABLE_USER_MAPPING_PROV
+            setting. The challenge response mechanism replaces the traditional user mapping flow.
+
+            Note: This feature is cannot be enabled if the node is not already claimed.
 
     config RMAKER_NAME_PARAM_CB
         bool "Call device callback for Name param"

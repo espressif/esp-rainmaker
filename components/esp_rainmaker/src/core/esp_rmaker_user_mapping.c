@@ -186,6 +186,12 @@ static void esp_rmaker_user_mapping_cb(void *priv_data)
     return;
 }
 
+/* This function only runs when esp_rmaker_start_user_node_mapping() is called,
+ * which happens either during:
+ * 1. Actual provisioning (when user provides credentials)
+ * 2. Factory reset reporting (with dummy USER_RESET_ID)
+ * It never runs during normal MQTT operation without provisioning.
+ */
 static bool esp_rmaker_user_mapping_detect_reset(const char *user_id)
 {
 #ifdef CONFIG_ESP_RMAKER_USER_ID_CHECK
@@ -216,6 +222,13 @@ static bool esp_rmaker_user_mapping_detect_reset(const char *user_id)
     nvs_close(handle);
     return reset_state;
 #else
+    /* If factory reset reporting is enabled but user ID check is disabled,
+     * detect reset by checking if this is the dummy reset user ID */
+#ifdef CONFIG_ESP_RMAKER_FACTORY_RESET_REPORTING
+    if (strcmp(user_id, USER_RESET_ID) == 0) {
+        return true;  /* This is a factory reset */
+    }
+#endif
     return false;
 #endif
 }
@@ -270,10 +283,12 @@ user_mapping_error:
     return ESP_FAIL;
 }
 
+#ifdef CONFIG_ESP_RMAKER_FACTORY_RESET_REPORTING
 esp_err_t esp_rmaker_reset_user_node_mapping(void)
 {
     return esp_rmaker_start_user_node_mapping(USER_RESET_ID, USER_RESET_KEY);
 }
+#endif
 
 int esp_rmaker_user_mapping_handler(uint32_t session_id, const uint8_t *inbuf, ssize_t inlen, uint8_t **outbuf, ssize_t *outlen, void *priv_data)
 {

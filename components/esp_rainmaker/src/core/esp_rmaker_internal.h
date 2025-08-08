@@ -119,7 +119,9 @@ esp_err_t esp_rmaker_user_mapping_prov_init(void);
 esp_err_t esp_rmaker_user_mapping_prov_deinit(void);
 esp_err_t esp_rmaker_user_node_mapping_init(void);
 esp_err_t esp_rmaker_user_node_mapping_deinit(void);
+#ifdef CONFIG_ESP_RMAKER_FACTORY_RESET_REPORTING
 esp_err_t esp_rmaker_reset_user_node_mapping(void);
+#endif
 esp_err_t esp_rmaker_init_local_ctrl_service(void);
 esp_err_t esp_rmaker_start_local_ctrl_service(const char *serv_name);
 static inline esp_err_t esp_rmaker_post_event(esp_rmaker_event_t event_id, void* data, size_t data_size)
