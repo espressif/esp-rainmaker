@@ -18,6 +18,7 @@
 #include <nvs.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/semphr.h>
+#include <freertos/timers.h>
 #include <json_generator.h>
 #include <esp_rmaker_work_queue.h>
 #include <esp_rmaker_core.h>
@@ -47,6 +48,10 @@ static const char *TAG = "esp_rmaker_user_mapping";
  */
 #define SEMAPHORE_DELAY_MSEC         5000
 
+/* User mapping queue retry configuration */
+#define USER_MAPPING_RETRY_DELAY_SECONDS  5
+#define USER_MAPPING_MAX_RETRIES          5
+
 typedef struct {
     char *user_id;
     char *secret_key;
@@ -54,9 +59,22 @@ typedef struct {
     bool sent;
 } esp_rmaker_user_mapping_data_t;
 
+/* User mapping queue retry state management structure */
+typedef struct {
+    unsigned int retry_count;
+    bool retry_in_progress;
+    TimerHandle_t retry_timer;
+} user_mapping_retry_state_t;
+
 static esp_rmaker_user_mapping_data_t *rmaker_user_mapping_data;
 esp_rmaker_user_mapping_state_t rmaker_user_mapping_state;
 SemaphoreHandle_t esp_rmaker_user_mapping_lock = NULL;
+static user_mapping_retry_state_t g_user_mapping_retry_state = {0};
+
+/* Forward declarations */
+static void esp_rmaker_user_mapping_cb(void *priv_data);
+static void user_mapping_retry_cleanup(void);
+static void user_mapping_schedule_retry(void);
 
 static void esp_rmaker_user_mapping_cleanup_data(void)
 {
@@ -69,6 +87,80 @@ static void esp_rmaker_user_mapping_cleanup_data(void)
         }
         free(rmaker_user_mapping_data);
         rmaker_user_mapping_data = NULL;
+    }
+}
+
+/* Helper functions for user mapping queue retry */
+static void user_mapping_retry_cleanup(void)
+{
+    if (g_user_mapping_retry_state.retry_timer) {
+        xTimerStop(g_user_mapping_retry_state.retry_timer, portMAX_DELAY);
+        xTimerDelete(g_user_mapping_retry_state.retry_timer, portMAX_DELAY);
+        g_user_mapping_retry_state.retry_timer = NULL;
+    }
+
+    /* Reset state for next use */
+    memset(&g_user_mapping_retry_state, 0, sizeof(g_user_mapping_retry_state));
+}
+
+static void user_mapping_retry_timer_cb(TimerHandle_t xTimer)
+{
+    ESP_LOGI(TAG, "Retrying user mapping task queue (attempt %u/%u)",
+             g_user_mapping_retry_state.retry_count, USER_MAPPING_MAX_RETRIES);
+
+    g_user_mapping_retry_state.retry_in_progress = false;
+
+    /* Try to queue the user mapping task again */
+    if (esp_rmaker_work_queue_add_task(esp_rmaker_user_mapping_cb, NULL) != ESP_OK) {
+        ESP_LOGW(TAG, "Failed to queue user mapping task on retry %u", g_user_mapping_retry_state.retry_count);
+        /* Schedule another retry if we haven't exceeded max attempts */
+        user_mapping_schedule_retry();
+    } else {
+        ESP_LOGI(TAG, "Successfully queued user mapping task on retry %u", g_user_mapping_retry_state.retry_count);
+        user_mapping_retry_cleanup();
+    }
+}
+
+static void user_mapping_schedule_retry(void)
+{
+    g_user_mapping_retry_state.retry_count++;
+
+    if (g_user_mapping_retry_state.retry_count > USER_MAPPING_MAX_RETRIES) {
+        ESP_LOGE(TAG, "User mapping task queue failed after %u attempts. Giving up.", USER_MAPPING_MAX_RETRIES);
+        user_mapping_retry_cleanup();
+        return;
+    }
+
+    if (g_user_mapping_retry_state.retry_in_progress) {
+        ESP_LOGW(TAG, "User mapping retry already in progress. Skipping.");
+        return;
+    }
+
+    g_user_mapping_retry_state.retry_in_progress = true;
+
+    ESP_LOGI(TAG, "Scheduling user mapping retry %u/%u in %d seconds",
+             g_user_mapping_retry_state.retry_count, USER_MAPPING_MAX_RETRIES, USER_MAPPING_RETRY_DELAY_SECONDS);
+
+    /* Check if timer already exists and clean it up to prevent resource leak */
+    if (g_user_mapping_retry_state.retry_timer) {
+        xTimerStop(g_user_mapping_retry_state.retry_timer, portMAX_DELAY);
+        xTimerDelete(g_user_mapping_retry_state.retry_timer, portMAX_DELAY);
+        g_user_mapping_retry_state.retry_timer = NULL;
+    }
+
+    /* Create retry timer */
+    g_user_mapping_retry_state.retry_timer = xTimerCreate("user_mapping_retry",
+                                                          pdMS_TO_TICKS(USER_MAPPING_RETRY_DELAY_SECONDS * 1000),
+                                                          pdFALSE, NULL, user_mapping_retry_timer_cb);
+    if (!g_user_mapping_retry_state.retry_timer) {
+        ESP_LOGE(TAG, "Failed to create user mapping retry timer");
+        user_mapping_retry_cleanup();
+        return;
+    }
+
+    if (xTimerStart(g_user_mapping_retry_state.retry_timer, 0) != pdPASS) {
+        ESP_LOGE(TAG, "Failed to start user mapping retry timer");
+        user_mapping_retry_cleanup();
     }
 }
 
@@ -143,6 +235,26 @@ static void esp_rmaker_user_mapping_event_handler(void* arg, esp_event_base_t ev
                     &esp_rmaker_user_mapping_event_handler);
         }
         xSemaphoreGive(esp_rmaker_user_mapping_lock);
+    }
+}
+
+static void esp_rmaker_user_mapping_mqtt_event_handler(void* arg, esp_event_base_t event_base,
+                          int32_t event_id, void* event_data)
+{
+    if (event_base == RMAKER_COMMON_EVENT && event_id == RMAKER_MQTT_EVENT_CONNECTED) {
+        ESP_LOGI(TAG, "MQTT connected, queuing pending user mapping task.");
+
+        /* Unregister this event handler as we only need it once */
+        esp_event_handler_unregister(RMAKER_COMMON_EVENT, RMAKER_MQTT_EVENT_CONNECTED,
+                &esp_rmaker_user_mapping_mqtt_event_handler);
+
+        /* Queue the user mapping task now that MQTT is connected */
+        if (esp_rmaker_work_queue_add_task(esp_rmaker_user_mapping_cb, NULL) != ESP_OK) {
+            ESP_LOGW(TAG, "Failed to queue user mapping task after MQTT connection. Starting retry mechanism.");
+            user_mapping_schedule_retry();
+        } else {
+            ESP_LOGI(TAG, "Successfully queued user mapping task after MQTT connection.");
+        }
     }
 }
 
@@ -269,9 +381,25 @@ esp_err_t esp_rmaker_start_user_node_mapping(char *user_id, char *secret_key)
     } else {
         rmaker_user_mapping_state = ESP_RMAKER_USER_MAPPING_DONE;
     }
+
+    /* Try to queue the task immediately regardless of MQTT connection status */
     if (esp_rmaker_work_queue_add_task(esp_rmaker_user_mapping_cb, NULL) != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to queue user mapping task.");
-        goto user_mapping_error;
+        ESP_LOGW(TAG, "Failed to queue user mapping task. Checking MQTT connection status.");
+
+        /* If MQTT is connected but queue failed, use retry mechanism */
+        if (esp_rmaker_is_mqtt_connected()) {
+            ESP_LOGW(TAG, "MQTT connected but queue full. Starting retry mechanism.");
+            user_mapping_schedule_retry();
+        } else {
+            /* MQTT not connected, register for MQTT connected event */
+            ESP_LOGI(TAG, "MQTT not connected, waiting for connection before retrying user mapping.");
+            esp_err_t err = esp_event_handler_register(RMAKER_COMMON_EVENT, RMAKER_MQTT_EVENT_CONNECTED,
+                    &esp_rmaker_user_mapping_mqtt_event_handler, NULL);
+            if (err != ESP_OK) {
+                ESP_LOGE(TAG, "Failed to register for MQTT connected event: %d", err);
+                goto user_mapping_error;
+            }
+        }
     }
     esp_rmaker_user_mapping_prov_deinit();
     xSemaphoreGive(esp_rmaker_user_mapping_lock);
@@ -421,6 +549,13 @@ esp_err_t esp_rmaker_user_node_mapping_init(void)
 
 esp_err_t esp_rmaker_user_node_mapping_deinit(void)
 {
+    /* Clean up retry state */
+    user_mapping_retry_cleanup();
+
+    /* Unregister any pending MQTT event handlers to prevent resource leak */
+    esp_event_handler_unregister(RMAKER_COMMON_EVENT, RMAKER_MQTT_EVENT_CONNECTED,
+            &esp_rmaker_user_mapping_mqtt_event_handler);
+
     if (esp_rmaker_user_mapping_lock) {
         vSemaphoreDelete(esp_rmaker_user_mapping_lock);
         esp_rmaker_user_mapping_lock = NULL;
