@@ -43,7 +43,7 @@ jobs:
 
     runs-on: ubuntu-latest
     container:
-      image: espressif/idf:v5.3.1
+      image: espressif/idf:v5.4.2
     strategy:
       matrix:
         example: [fan, led_light, multi_device, switch, temperature_sensor]
