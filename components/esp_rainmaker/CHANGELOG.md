@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.7.3
+
+### New Feature
+
+- Add parameter updates via command-response (command id 1): Enables triggering parameter
+  updates through the command-response framework with proper JSON response containing
+  updated parameter values. Controlled by `CONFIG_ESP_RMAKER_PARAM_CMD_RESP_ENABLE`
+  (enabled by default when command-response is enabled). This will also update the values
+  in the params DB returned via the regular get params APIs like GET /user/nodes/params.
+  - Sample command payload: `{"params":{"Light":{"Power":false}}}`
+  - Sample response payload: `{"status":"success","params":{"Light":{"Power":false}}}`
+
 ## 1.7.2
 
 ### New Feature
