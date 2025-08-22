@@ -13,7 +13,8 @@ set(core_srcs "src/core/esp_rmaker_core.c"
         "src/core/esp_rmaker_schedule.c"
         "src/core/esp_rmaker_scenes.c"
         "src/core/esp_rmaker_secure_boot_digest.c"
-        )
+        "src/core/esp_rmaker_aws_credentials.c"
+    )
 
 set(priv_req protobuf-c json_parser json_generator
              nvs_flash esp_http_client app_update esp-tls mbedtls esp_https_ota
