@@ -16,16 +16,7 @@
 #include <esp_rmaker_utils.h>
 #include <app_network.h>
 #include <app_wifi_internal.h>
-#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(4, 1, 0)
-// Features supported in 4.1+
-#define ESP_NETIF_SUPPORTED
-#endif
-
-#ifdef ESP_NETIF_SUPPORTED
 #include <esp_netif.h>
-#else
-#include <tcpip_adapter.h>
-#endif
 
 #include <network_provisioning/manager.h>
 #ifdef CONFIG_APP_NETWORK_PROV_TRANSPORT_BLE
@@ -37,11 +28,7 @@
 #include <app_wifi_internal.h>
 #include <app_network.h>
 
-#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 1, 3)
 #define APP_PROV_STOP_ON_CREDS_MISMATCH
-#elif (CONFIG_APP_NETWORK_PROV_MAX_RETRY_CNT > 0)
-#warning "Provisioning window stop on max credentials failures, needs IDF version >= 5.1.3"
-#endif
 
 #ifdef CONFIG_ESP_RMAKER_NETWORK_OVER_WIFI
 static const char* TAG = "app_wifi";
@@ -75,13 +62,9 @@ static void event_handler(void* arg, esp_event_base_t event_base,
 #ifdef CONFIG_APP_NETWORK_RESET_PROV_ON_FAILURE
                 retries++;
                 if (retries >= CONFIG_APP_NETWORK_PROV_MAX_RETRY_CNT) {
-#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(4, 3, 1)
                     ESP_LOGI(TAG, "Failed to connect with provisioned AP, reseting provisioned credentials");
                     network_prov_mgr_reset_wifi_sm_state_on_failure();
                     esp_event_post(APP_NETWORK_EVENT, APP_NETWORK_EVENT_PROV_RESTART, NULL, 0, portMAX_DELAY);
-#else
-                    ESP_LOGW(TAG, "Failed to connect with provisioned AP, please reset to provisioning manually");
-#endif // ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(4, 3, 1)
                     retries = 0;
                 }
 #endif // CONFIG_APP_NETWORK_RESET_PROV_ON_FAILURE
@@ -115,19 +98,13 @@ esp_err_t wifi_init(void)
 {
 #ifdef CONFIG_ESP_RMAKER_NETWORK_OVER_WIFI
     /* Initialize TCP/IP */
-#ifdef ESP_NETIF_SUPPORTED
     esp_netif_init();
-#else
-    tcpip_adapter_init();
-#endif
     /* Register our event handler for Wi-Fi, IP and Provisioning related events */
     ESP_ERROR_CHECK(esp_event_handler_register(NETWORK_PROV_EVENT, ESP_EVENT_ANY_ID, &event_handler, NULL));
     ESP_ERROR_CHECK(esp_event_handler_register(WIFI_EVENT, ESP_EVENT_ANY_ID, &event_handler, NULL));
 
     /* Initialize Wi-Fi including netif with default config */
-#ifdef ESP_NETIF_SUPPORTED
     esp_netif_create_default_wifi_sta();
-#endif
     wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
     ESP_ERROR_CHECK(esp_wifi_init(&cfg));
     return ESP_OK;
@@ -173,10 +150,8 @@ esp_err_t wifi_start(const char *pop, const char *service_name, const char *serv
     /* If device is not yet provisioned start provisioning service */
     if (!(*provisioned)) {
         ESP_LOGI(TAG, "Starting provisioning");
-#ifdef ESP_NETIF_SUPPORTED
 #if CONFIG_ESP_WIFI_SOFTAP_SUPPORT
         esp_netif_create_default_wifi_ap();
-#endif
 #endif
         /* What is the security level that we want (0 or 1):
          *      - NETWORK_PROV_SECURITY_0/WIFI_PROV_SECURITY_0 is simply plain text communication.
@@ -207,7 +182,6 @@ esp_err_t wifi_start(const char *pop, const char *service_name, const char *serv
             ESP_LOGE(TAG, "wifi_prov_scheme_ble_set_service_uuid failed %d", err);
             return err;
         }
-#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(4, 2, 0)
         if (mfg_data) {
             err = network_prov_scheme_ble_set_mfg_data(mfg_data, mfg_data_len);
             if (err != ESP_OK) {
@@ -215,7 +189,6 @@ esp_err_t wifi_start(const char *pop, const char *service_name, const char *serv
                 return err;
             }
         }
-#endif
 #endif /* CONFIG_APP_NETWORK_PROV_TRANSPORT_BLE */
 
         /* Start provisioning service */

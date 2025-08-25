@@ -7,7 +7,7 @@ variables:
   MAKEFLAGS: "-j8 --no-keep-going"
   APP_BUILD: "all"
   GIT_SUBMODULE_STRATEGY: recursive
-  ESP_DOCS_ENV_IMAGE: "$CI_DOCKER_REGISTRY/esp-idf-doc-env-v5.0:2-2"
+  ESP_DOCS_ENV_IMAGE: "$CI_DOCKER_REGISTRY/esp-idf-doc-env-v5.4:1-1"
   ESP_DOCS_PATH: "$CI_PROJECT_DIR"
 
 before_script:
@@ -58,11 +58,7 @@ before_script:
   - tar -zcvf esp-rainmaker-bins-${CI_JOB_ID}.zip esp-rainmaker-bins-${CI_JOB_ID}/
 
 .build_all_examples: &build_all_examples
-  - if [[ "$COMPONENT_MGR_142" == "1" ]]; then
-  - pip install idf-component-manager==1.4.2
-  - else
   - pip install --upgrade idf-component-manager
-  - fi
   - for EXAMPLE in $EXAMPLES; do
   - cd $CI_PROJECT_DIR/examples/$EXAMPLE
   - echo Building $EXAMPLE
@@ -109,16 +105,8 @@ before_script:
     EXTRA_CXXFLAGS: "${PEDANTIC_FLAGS}"
     EXAMPLE_TARGETS: "esp32"
     EXAMPLES: "switch led_light fan temperature_sensor multi_device gpio homekit_switch"
-    COMPONENT_MGR_142: "0" # Fix component manager version to 1.4.2
   script:
     - *build_all_examples
-
-build_idf_v5.0:
-  extends: .build_template
-  image: espressif/idf:release-v5.0
-  variables:
-    EXAMPLE_TARGETS: "esp32 esp32s2 esp32c3 esp32s3"
-    COMPONENT_MGR_142: "1"
 
 build_idf_v5.1:
   extends: .build_template

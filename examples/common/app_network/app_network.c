@@ -25,11 +25,7 @@
 #include <app_thread_internal.h>
 #endif
 
-#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 1, 0)
 #include <esp_mac.h>
-#else
-#include <esp_wifi.h>
-#endif
 
 #include <network_provisioning/manager.h>
 #ifdef CONFIG_APP_NETWORK_PROV_TRANSPORT_BLE
@@ -70,7 +66,7 @@ static uint64_t prov_timeout_period = (APP_NETWORK_PROV_TIMEOUT_PERIOD * 60 * 10
 
 #if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 1, 3)
 #define APP_PROV_STOP_ON_CREDS_MISMATCH
-#elif (CONFIG_APP_NETWOKR_PROV_MAX_RETRY_CNT > 0)
+#elif (CONFIG_APP_NETWORK_PROV_MAX_RETRY_CNT > 0)
 #warning "Provisioning window stop on max credentials failures, needs IDF version >= 5.1.3"
 #endif
 
@@ -230,11 +226,7 @@ static esp_err_t get_device_service_name(char *service_name, size_t max)
     size_t nvs_random_size = 0;
     if ((read_random_bytes_from_nvs(&nvs_random, &nvs_random_size) != ESP_OK) || nvs_random_size < 3) {
         uint8_t mac_addr[6];
-#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 1, 0)
         esp_read_mac(mac_addr, ESP_MAC_BASE);
-#else
-        esp_wifi_get_mac(WIFI_IF_STA, mac_addr);
-#endif
         snprintf(service_name, max, "%s_%02x%02x%02x", ssid_prefix, mac_addr[3], mac_addr[4], mac_addr[5]);
     } else {
         snprintf(service_name, max, "%s_%02x%02x%02x", ssid_prefix, nvs_random[nvs_random_size - 3],
@@ -266,11 +258,7 @@ static char *get_device_pop(app_network_pop_type_t pop_type)
 
     if (pop_type == POP_TYPE_MAC) {
         uint8_t mac_addr[6];
-#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 1, 0)
         esp_err_t err = esp_read_mac(mac_addr, ESP_MAC_BASE);
-#else
-        esp_err_t err = esp_wifi_get_mac(WIFI_IF_STA, mac_addr);
-#endif
         if (err == ESP_OK) {
             snprintf(pop, POP_STR_SIZE, "%02x%02x%02x%02x", mac_addr[2], mac_addr[3], mac_addr[4], mac_addr[5]);
             return pop;
