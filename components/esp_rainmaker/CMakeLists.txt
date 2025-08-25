@@ -18,22 +18,14 @@ set(core_srcs "src/core/esp_rmaker_core.c"
 
 set(priv_req protobuf-c json_parser json_generator
              nvs_flash esp_http_client app_update esp-tls mbedtls esp_https_ota
-             console esp_local_ctrl esp_https_server mdns esp_schedule efuse driver rmaker_common wifi_provisioning)
+             console esp_local_ctrl esp_https_server mdns esp_schedule efuse driver rmaker_common)
 
 # Add CBOR for MQTT OTA support
 if (CONFIG_ESP_RMAKER_OTA_USE_MQTT)
     list(APPEND priv_req cbor)
 endif()
 
-if ("${IDF_VERSION_MAJOR}.${IDF_VERSION_MINOR}" VERSION_GREATER_EQUAL "5.0")
-    list(APPEND priv_req esp_app_format)
-endif()
-
-if ("${IDF_VERSION_MAJOR}.${IDF_VERSION_MINOR}" VERSION_GREATER_EQUAL "5.1")
-    # NAT64 and DNS64 features were introduced for openthread component in IDF v5.1
-    # Network Provisioning component is supported for IDF v5.1+
-    list(APPEND priv_req openthread network_provisioning)
-endif()
+list(APPEND priv_req esp_app_format openthread network_provisioning)
 
 if(CONFIG_ESP_RMAKER_ENABLE_CHALLENGE_RESPONSE)
     list(APPEND core_srcs

@@ -47,17 +47,9 @@ esp_err_t esp_rmaker_secure_boot_digest_free(char **digest)
 char** esp_rmaker_get_secure_boot_digest()
 {
     char **secure_boot_digest = NULL;
-#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 0, 0)
     esp_secure_boot_key_digests_t trusted_keys;
-#else
-    ets_secure_boot_key_digests_t trusted_keys;
-#endif
 
-#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(4, 4, 0)
     esp_err_t ret = esp_secure_boot_read_key_digests(&trusted_keys);
-#else
-    esp_err_t ret = ets_secure_boot_read_key_digests(&trusted_keys);
-#endif
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "Could not read the secure boot key digests from efuse.");
         return NULL;

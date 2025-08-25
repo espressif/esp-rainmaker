@@ -50,9 +50,7 @@ static const int WIFI_CONNECTED_EVENT = BIT0;
 static const int THREAD_SET_DNS_SEVER_EVENT = BIT0;
 #endif
 
-#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 1, 0)
 #include "esp_mac.h"
-#endif
 
 static const int MQTT_CONNECTED_EVENT = BIT1;
 static EventGroupHandle_t rmaker_core_event_group;
@@ -185,18 +183,10 @@ static char *esp_rmaker_populate_node_id(bool use_claiming)
 #ifdef ESP_RMAKER_CLAIM_ENABLED
     if (!node_id && use_claiming) {
         uint8_t mac_addr[6];
-#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 1, 0)
-        /* ESP_MAC_BASE was introduced in ESP-IDF v5.1. It is the same as the Wi-Fi Station MAC address
-         * for chips supporting Wi-Fi. We can use base MAC address to generate claim init request for both
+        /* ESP_MAC_BASE provides the base MAC address for all chips, supporting both
          * Wi-Fi and Thread devices
          */
         esp_err_t err = esp_read_mac(mac_addr, ESP_MAC_BASE);
-#else
-        /* Thread was officially supported in ESP-IDF v5.1. Use Wi-Fi Station MAC address to generate claim
-         * init request.
-         */
-        esp_err_t err = esp_wifi_get_mac(WIFI_IF_STA, mac_addr);
-#endif
 
         if (err != ESP_OK) {
             ESP_LOGE(TAG, "Could not fetch MAC address.");

@@ -15,11 +15,7 @@
 #include <string.h>
 #include "esp_idf_version.h"
 #include <esp_log.h>
-#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 0, 0)
 #include <esp_app_desc.h>
-#else
-#include <esp_ota_ops.h>
-#endif
 #include <esp_rmaker_utils.h>
 #include <esp_rmaker_core.h>
 #include <esp_rmaker_secure_boot_digest.h>
@@ -131,11 +127,7 @@ esp_rmaker_node_t *esp_rmaker_node_create(const char *name, const char *type)
     node->info->name = strdup(name);
     node->info->type = strdup(type);
     const esp_app_desc_t *app_desc;
-#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 0, 0)
     app_desc = esp_app_get_description();
-#else
-    app_desc = esp_ota_get_app_description();
-#endif
     node->info->fw_version = strdup(app_desc->version);
     node->info->model = strdup(app_desc->project_name);
     if (esp_secure_boot_enabled()) {

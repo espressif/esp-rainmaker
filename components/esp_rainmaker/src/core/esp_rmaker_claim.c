@@ -55,31 +55,14 @@
 #include "esp_rmaker_client_data.h"
 #include "esp_rmaker_claim.h"
 
-#if RMAKER_USING_NETWORK_PROV
 #include <network_provisioning/manager.h>
-#else
-#include <wifi_provisioning/manager.h>
-#endif
-
-#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(4, 4, 0)
-// Features supported in 4.4+
 
 #ifdef CONFIG_ESP_RMAKER_USE_CERT_BUNDLE
 #define ESP_RMAKER_USE_CERT_BUNDLE
 #include <esp_crt_bundle.h>
 #endif
 
-#else
-
-#ifdef CONFIG_ESP_RMAKER_USE_CERT_BUNDLE
-#warning "Certificate Bundle not supported below IDF v4.4. Using provided certificate instead."
-#endif
-
-#endif /* !IDF4.4 */
-
-#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 1, 0)
 #include "esp_mac.h"
-#endif
 
 static const char *TAG = "esp_claim";
 
@@ -288,18 +271,10 @@ static esp_err_t generate_claim_init_request(esp_rmaker_claim_data_t *claim_data
         return ESP_ERR_INVALID_STATE;
     }
     uint8_t mac_addr[6];
-#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 1, 0)
-    /* ESP_MAC_BASE was introduced in ESP-IDF v5.1. It is the same as the Wi-Fi Station MAC address
-     * for chips supporting Wi-Fi. We can use base MAC address to generate claim init request for both
+    /* ESP_MAC_BASE provides the base MAC address for all chips, supporting both
      * Wi-Fi and Thread devices
      */
     esp_err_t err = esp_read_mac(mac_addr, ESP_MAC_BASE);
-#else
-    /* Thread was officially supported in ESP-IDF v5.1. Use Wi-Fi Station MAC address to generate claim
-     * init request.
-     */
-    esp_err_t err = esp_wifi_get_mac(WIFI_IF_STA, mac_addr);
-#endif
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "Could not fetch MAC address.");
         return err;
@@ -828,7 +803,6 @@ esp_err_t esp_rmaker_claiming_handler(uint32_t session_id, const uint8_t *inbuf,
 static void event_handler(void* arg, esp_event_base_t event_base,
                           int32_t event_id, void* event_data)
 {
-#if RMAKER_USING_NETWORK_PROV
     if (event_base == NETWORK_PROV_EVENT) {
         switch (event_id) {
             case NETWORK_PROV_INIT: {
@@ -848,27 +822,6 @@ static void event_handler(void* arg, esp_event_base_t event_base,
                 break;
         }
     }
-#else
-    if (event_base == WIFI_PROV_EVENT) {
-        switch (event_id) {
-            case WIFI_PROV_INIT: {
-                static const char *capabilities[] = {"claim"};
-                wifi_prov_mgr_set_app_info("rmaker", "1.0", capabilities, 1);
-                if (wifi_prov_mgr_endpoint_create(CLAIM_ENDPOINT) != ESP_OK) {
-                    ESP_LOGE(TAG, "Failed to create claim end point.");
-                }
-                break;
-            }
-            case WIFI_PROV_START:
-                if (wifi_prov_mgr_endpoint_register(CLAIM_ENDPOINT, esp_rmaker_claiming_handler, arg) != ESP_OK) {
-                    ESP_LOGE(TAG, "Failed to register claim end point.");
-                }
-                break;
-            default:
-                break;
-        }
-    }
-#endif /* RMAKER_USING_NETWORK_PROV */
 }
 #endif /* CONFIG_ESP_RMAKER_ASSISTED_CLAIM */
 esp_err_t __esp_rmaker_claim_init(esp_rmaker_claim_data_t *claim_data)
@@ -1012,13 +965,8 @@ esp_err_t esp_rmaker_assisted_claim_perform(esp_rmaker_claim_data_t *claim_data)
     if (claim_data->state == RMAKER_CLAIM_STATE_VERIFY_DONE) {
         err = ESP_OK;
     }
-#if RMAKER_USING_NETWORK_PROV
     esp_event_handler_unregister(NETWORK_PROV_EVENT, NETWORK_PROV_INIT, &event_handler);
     esp_event_handler_unregister(NETWORK_PROV_EVENT, NETWORK_PROV_START, &event_handler);
-#else
-    esp_event_handler_unregister(WIFI_PROV_EVENT, WIFI_PROV_INIT, &event_handler);
-    esp_event_handler_unregister(WIFI_PROV_EVENT, WIFI_PROV_START, &event_handler);
-#endif
     esp_rmaker_claim_data_free(claim_data);
     vEventGroupDelete(claim_event_group);
     return err;
@@ -1028,13 +976,8 @@ esp_rmaker_claim_data_t *esp_rmaker_assisted_claim_init(void)
     ESP_LOGI(TAG, "Initialising Assisted Claiming. This may take time.");
     esp_rmaker_claim_data_t *claim_data = esp_rmaker_claim_init();
     if (claim_data) {
-#if RMAKER_USING_NETWORK_PROV
         esp_event_handler_register(NETWORK_PROV_EVENT, NETWORK_PROV_INIT, &event_handler, claim_data);
         esp_event_handler_register(NETWORK_PROV_EVENT, NETWORK_PROV_START, &event_handler, claim_data);
-#else
-        esp_event_handler_register(WIFI_PROV_EVENT, WIFI_PROV_INIT, &event_handler, claim_data);
-        esp_event_handler_register(WIFI_PROV_EVENT, WIFI_PROV_START, &event_handler, claim_data);
-#endif
     }
     return claim_data;
 }

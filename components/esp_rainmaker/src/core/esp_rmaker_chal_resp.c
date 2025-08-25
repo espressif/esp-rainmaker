@@ -10,11 +10,7 @@
 #include "esp_rmaker_chal_resp.pb-c.h"
 #include "esp_rmaker_internal.h"
 #include <esp_rmaker_core.h>
-#if RMAKER_USING_NETWORK_PROV
 #include <network_provisioning/manager.h>
-#else
-#include <wifi_provisioning/manager.h>
-#endif
 
 static const char *TAG = "esp_rmaker_chal_resp";
 
@@ -196,27 +192,18 @@ cleanup:
 
 esp_err_t esp_rmaker_chal_resp_endpoint_create(void)
 {
-#if RMAKER_USING_NETWORK_PROV
     return network_prov_mgr_endpoint_create(CHAL_RESP_ENDPOINT);
-#else
-    return wifi_prov_mgr_endpoint_create(CHAL_RESP_ENDPOINT);
-#endif
 }
 
 esp_err_t esp_rmaker_chal_resp_endpoint_register(void)
 {
-#if RMAKER_USING_NETWORK_PROV
     return network_prov_mgr_endpoint_register(CHAL_RESP_ENDPOINT, esp_rmaker_chal_resp_handler, NULL);
-#else
-    return wifi_prov_mgr_endpoint_register(CHAL_RESP_ENDPOINT, esp_rmaker_chal_resp_handler, NULL);
-#endif
 }
 
 static void esp_rmaker_chal_resp_event_handler(void *arg, esp_event_base_t event_base,
                            int32_t event_id, void *event_data)
 {
     static const char *capabilities[] = {"ch_resp"};
-#if RMAKER_USING_NETWORK_PROV
     if (event_base == NETWORK_PROV_EVENT) {
         switch (event_id) {
             case NETWORK_PROV_INIT: {
@@ -236,57 +223,23 @@ static void esp_rmaker_chal_resp_event_handler(void *arg, esp_event_base_t event
                 break;
         }
     }
-#else
-    if (event_base == WIFI_PROV_EVENT) {
-        switch (event_id) {
-            case WIFI_PROV_INIT: {
-                wifi_prov_mgr_set_app_info(RMAKER_EXTRA_APP_NAME, RMAKER_EXTRA_APP_VERSION, capabilities, 1);
-                if (esp_rmaker_chal_resp_endpoint_create() != ESP_OK) {
-                    ESP_LOGE(TAG, "Failed to create challenge response endpoint.");
-                }
-                break;
-            }
-            case WIFI_PROV_START: {
-                if (esp_rmaker_chal_resp_endpoint_register() != ESP_OK) {
-                    ESP_LOGE(TAG, "Failed to register challenge response endpoint.");
-                }
-                break;
-            }
-            default:
-                break;
-        }
-    }
-#endif /* RMAKER_USING_NETWORK_PROV */
 }
 
 esp_err_t esp_rmaker_chal_resp_init(void)
 {
     /* Register for Wi-Fi Provisioning events */
-#if RMAKER_USING_NETWORK_PROV
     esp_err_t err = esp_event_handler_register(NETWORK_PROV_EVENT, NETWORK_PROV_INIT, &esp_rmaker_chal_resp_event_handler, NULL);
     if (err != ESP_OK) {
         return err;
     }
     err = esp_event_handler_register(NETWORK_PROV_EVENT, NETWORK_PROV_START, &esp_rmaker_chal_resp_event_handler, NULL);
-#else
-    esp_err_t err = esp_event_handler_register(WIFI_PROV_EVENT, WIFI_PROV_INIT, &esp_rmaker_chal_resp_event_handler, NULL);
-    if (err != ESP_OK) {
-        return err;
-    }
-    err = esp_event_handler_register(WIFI_PROV_EVENT, WIFI_PROV_START, &esp_rmaker_chal_resp_event_handler, NULL);
-#endif
     return err;
 }
 
 esp_err_t esp_rmaker_chal_resp_deinit(void)
 {
     /* Unregister the event handler */
-#if RMAKER_USING_NETWORK_PROV
     esp_event_handler_unregister(NETWORK_PROV_EVENT, NETWORK_PROV_INIT, &esp_rmaker_chal_resp_event_handler);
     esp_event_handler_unregister(NETWORK_PROV_EVENT, NETWORK_PROV_START, &esp_rmaker_chal_resp_event_handler);
-#else
-    esp_event_handler_unregister(WIFI_PROV_EVENT, WIFI_PROV_INIT, &esp_rmaker_chal_resp_event_handler);
-    esp_event_handler_unregister(WIFI_PROV_EVENT, WIFI_PROV_START, &esp_rmaker_chal_resp_event_handler);
-#endif
     return ESP_OK;
 }

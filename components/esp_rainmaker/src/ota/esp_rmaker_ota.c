@@ -39,21 +39,10 @@ static esp_err_t esp_rmaker_ota_handle_metadata_common(esp_rmaker_ota_handle_t o
 static esp_err_t esp_rmaker_ota_success_reboot_sequence(esp_rmaker_ota_handle_t ota_handle, const char *protocol_name, int attempt_count);
 
 
-#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(4, 4, 0)
-// Features supported in 4.4+
-
 #ifdef CONFIG_ESP_RMAKER_USE_CERT_BUNDLE
 #define ESP_RMAKER_USE_CERT_BUNDLE
 #include <esp_crt_bundle.h>
 #endif
-
-#else
-
-#ifdef CONFIG_ESP_RMAKER_USE_CERT_BUNDLE
-#warning "Certificate Bundle not supported below IDF v4.4. Using provided certificate instead."
-#endif
-
-#endif /* !IDF4.4 */
 static const char *TAG = "esp_rmaker_ota";
 
 /* OTA reboot timer and NVS constants */
