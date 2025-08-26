@@ -15,12 +15,6 @@
 extern "C" {
 #endif
 
-#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 1, 0) && defined(CONFIG_ESP_RMAKER_USING_NETWORK_PROV)
-#define RMAKER_USING_NETWORK_PROV 1
-#else
-#define RMAKER_USING_NETWORK_PROV 0
-#endif
-
 /** Initialize Wi-Fi
  *
  * This initializes Wi-Fi and the network/wifi provisioning manager

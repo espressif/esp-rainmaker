@@ -31,21 +31,12 @@
 #include <esp_wifi.h>
 #endif
 
-#if RMAKER_USING_NETWORK_PROV
 #include <network_provisioning/manager.h>
 #ifdef CONFIG_APP_NETWORK_PROV_TRANSPORT_BLE
 #include <network_provisioning/scheme_ble.h>
 #else /* CONFIG_APP_NETOWRK_PROV_TRANSPORT_SOFTAP */
 #include <network_provisioning/scheme_softap.h>
 #endif /* CONFIG_APP_NETWORK_PROV_TRANSPORT_BLE */
-#else
-#include <wifi_provisioning/manager.h>
-#ifdef CONFIG_APP_NETWORK_PROV_TRANSPORT_BLE
-#include <wifi_provisioning/scheme_ble.h>
-#else /* CONFIG_APP_NETWORK_PROV_TRANSPORT_SOFTAP */
-#include <wifi_provisioning/scheme_softap.h>
-#endif /* CONFIG_APP_NETWORK_PROV_TRANSPORT_BLE */
-#endif
 
 #ifdef CONFIG_APP_NETWORK_PROV_SHOW_QR
 #include <qrcode.h>
@@ -326,11 +317,7 @@ static void network_event_handler(void* arg, esp_event_base_t event_base, int32_
                 if (CONFIG_APP_NETWORK_PROV_MAX_POP_MISMATCH &&
                         (++failed_cnt >= CONFIG_APP_NETWORK_PROV_MAX_POP_MISMATCH)) {
                     /* stop provisioning for security reasons */
-#if RMAKER_USING_NETWORK_PROV
                     network_prov_mgr_stop_provisioning();
-#else
-                    wifi_prov_mgr_stop_provisioning();
-#endif
                     ESP_LOGW(TAG, "Max PoP attempts reached! Provisioning disabled for security reasons. Please reboot device to restart provisioning");
                     esp_event_post(APP_NETWORK_EVENT, APP_NETWORK_EVENT_PROV_CRED_MISMATCH, NULL, 0, portMAX_DELAY);
                 }
@@ -354,21 +341,13 @@ static void network_event_handler(void* arg, esp_event_base_t event_base, int32_
         xEventGroupSetBits(network_event_group, NETWORK_CONNECTED_EVENT);
     }
 #endif /* CONFIG_ESP_RMAKER_NETWORK_OVER_THREAD */
-#if RMAKER_USING_NETWORK_PROV
     if (event_base == NETWORK_PROV_EVENT && event_id == NETWORK_PROV_END) {
-#else
-    if (event_base == WIFI_PROV_EVENT && event_id == WIFI_PROV_END) {
-#endif
         if (prov_stop_timer) {
             esp_timer_stop(prov_stop_timer);
             esp_timer_delete(prov_stop_timer);
             prov_stop_timer = NULL;
         }
-#if RMAKER_USING_NETWORK_PROV
         network_prov_mgr_deinit();
-#else
-        wifi_prov_mgr_deinit();
-#endif
     }
 }
 
@@ -401,21 +380,13 @@ void app_network_init()
 #ifdef CONFIG_ESP_RMAKER_NETWORK_OVER_THREAD
     ESP_ERROR_CHECK(esp_event_handler_register(OPENTHREAD_EVENT, ESP_EVENT_ANY_ID, &network_event_handler, NULL));
 #endif
-#if RMAKER_USING_NETWORK_PROV
     ESP_ERROR_CHECK(esp_event_handler_register(NETWORK_PROV_EVENT, NETWORK_PROV_END, &network_event_handler, NULL));
-#else
-    ESP_ERROR_CHECK(esp_event_handler_register(WIFI_PROV_EVENT, WIFI_PROV_END, &network_event_handler, NULL));
-#endif
 }
 
 static void app_network_prov_stop(void *priv)
 {
     ESP_LOGW(TAG, "Provisioning timed out. Please reboot device to restart provisioning.");
-#if RMAKER_USING_NETWORK_PROV
     network_prov_mgr_stop_provisioning();
-#else
-    wifi_prov_mgr_stop_provisioning();
-#endif
     esp_event_post(APP_NETWORK_EVENT, APP_NETWORK_EVENT_PROV_TIMEOUT, NULL, 0, portMAX_DELAY);
 }
 
