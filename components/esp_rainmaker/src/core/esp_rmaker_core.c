@@ -656,16 +656,16 @@ static esp_err_t esp_rmaker_init(const esp_rmaker_config_t *config, bool use_cla
 #endif
 
 #ifdef CONFIG_ESP_RMAKER_ENABLE_CHALLENGE_RESPONSE
-    /* Check if claiming is needed - challenge response is incompatible with claiming */
-#ifdef ESP_RMAKER_CLAIM_ENABLED
+    /* Check if claiming is needed - challenge response is incompatible with self claiming only */
+#ifdef CONFIG_ESP_RMAKER_SELF_CLAIM
     if (esp_rmaker_priv_data->need_claim) {
         esp_rmaker_deinit_priv_data(esp_rmaker_priv_data);
         esp_rmaker_priv_data = NULL;
-        ESP_LOGE(TAG, "Challenge Response is incompatible with claiming. Please disable claiming or disable challenge response.");
-        ESP_LOGE(TAG, "Claiming is needed because device certificates are not found or device is not claimed yet.");
+        ESP_LOGE(TAG, "Challenge Response is incompatible with self claiming. Please disable self claiming or disable challenge response.");
+        ESP_LOGE(TAG, "Self claiming is needed because device certificates are not found or device is not claimed yet.");
         return ESP_FAIL;
     }
-#endif /* ESP_RMAKER_CLAIM_ENABLED */
+#endif /* CONFIG_ESP_RMAKER_SELF_CLAIM */
 
     /* Initialize challenge response */
     if (esp_rmaker_chal_resp_init() != ESP_OK) {

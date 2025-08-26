@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.6.7
+
+### Minor Change
+
+- Allow challenge-response based user-node mapping even for Assisted Claiming. However, the same will
+still not work with self claiming because the certificate gets registered with the RainMaker backend
+after node connects to Wi-Fi, whereas this user-node mapping happens before that.
+
 ## 1.6.6
 
 ### Bug Fix
