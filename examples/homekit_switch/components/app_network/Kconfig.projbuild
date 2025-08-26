@@ -1,12 +1,12 @@
-menu "App Wi-Fi Provisioning"
+menu "App Network Provisioning"
 
-    config APP_WIFI_PROV_SHOW_QR
+    config APP_NETWORK_PROV_SHOW_QR
         bool "Show provisioning QR code"
         default y
         help
             Show the QR code for provisioning.
 
-    config APP_WIFI_PROV_MAX_POP_MISMATCH
+    config APP_NETWORK_PROV_MAX_POP_MISMATCH
         int
         default 5
         range 0 20
@@ -17,33 +17,33 @@ menu "App Wi-Fi Provisioning"
             This safeguards the device from brute-force attempt by limiting the wrong pop allowed.
             Needs IDF version >= 5.1.3
 
-    choice APP_WIFI_PROV_TRANSPORT
+    choice APP_NETWORK_PROV_TRANSPORT
         bool "Provisioning Transport method"
-        default APP_WIFI_PROV_TRANSPORT_BLE
+        default APP_NETWORK_PROV_TRANSPORT_BLE
         help
             Wi-Fi provisioning component offers both, SoftAP and BLE transports. Choose any one.
 
-        config APP_WIFI_PROV_TRANSPORT_SOFTAP
+        config APP_NETWORK_PROV_TRANSPORT_SOFTAP
             bool "Soft AP"
-        config APP_WIFI_PROV_TRANSPORT_BLE
+        config APP_NETWORK_PROV_TRANSPORT_BLE
             bool "BLE"
             select BT_ENABLED
             depends on IDF_TARGET_ESP32 || IDF_TARGET_ESP32C3
     endchoice
 
-    config APP_WIFI_PROV_TRANSPORT
+    config APP_NETWORK_PROV_TRANSPORT
         int
-        default 1 if APP_WIFI_PROV_TRANSPORT_SOFTAP
-        default 2 if APP_WIFI_PROV_TRANSPORT_BLE
+        default 1 if APP_NETWORK_PROV_TRANSPORT_SOFTAP
+        default 2 if APP_NETWORK_PROV_TRANSPORT_BLE
 
-    config APP_WIFI_USE_WAC_PROVISIONING
+    config APP_NETWORK_USE_WAC_PROVISIONING
         bool "Apple WAC Provisioning"
         depends on HAP_MFI_ENABLE
         default n
         help
             "Use Apple WAC Provisioning"
 
-    config APP_WIFI_RESET_PROV_ON_FAILURE
+    config APP_NETWORK_RESET_PROV_ON_FAILURE
         bool
         default y
         prompt "Reset provisioned credentials and state machine after session failure"
@@ -51,17 +51,17 @@ menu "App Wi-Fi Provisioning"
             Enable reseting provisioned credentials and state machine after session failure.
             This will restart the provisioning service after retries are exhausted.
 
-    config APP_WIFI_PROV_MAX_RETRY_CNT
+    config APP_NETWORK_PROV_MAX_RETRY_CNT
         int
         default 5
         prompt "Max retries before reseting provisioning state machine"
-        depends on APP_WIFI_RESET_PROV_ON_FAILURE
+        depends on APP_NETWORK_RESET_PROV_ON_FAILURE
         help
             Set the Maximum retry to avoid reconnecting to an inexistent AP or if credentials
             are misconfigured. Provisioned credentials are erased and internal state machine
             is reset after this threshold is reached.
 
-    config APP_WIFI_PROV_TIMEOUT_PERIOD
+    config APP_NETWORK_PROV_TIMEOUT_PERIOD
         int "Provisioning Timeout"
         default 10
         help
@@ -70,7 +70,7 @@ menu "App Wi-Fi Provisioning"
             It is recommended to set this to 15 or 10 depending on the HomeKit spec version supported,
             to match the WAC timeout.
 
-    config APP_WIFI_PROV_NAME_PREFIX
+    config APP_NETWORK_PROV_NAME_PREFIX
         string "Provisioning Name Prefix"
         default "PROV"
         help
