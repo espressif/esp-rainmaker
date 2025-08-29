@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.6.6
+
+### Bug Fix
+
+- User-Node mapping could fail if ESP Insights is enabled.
+  -ESP Insights uses the ESP RainMaker Work Queue to send data. The queue itself is processed only after
+   MQTT connection. So, any Insights message (Eg. periodic metric reporting) triggered before that would be
+   queued, eventually causing it to get full. This can cause the user-node mapping to fail,
+   as it also uses the same queue.
+  - Fixed by adding a retry mechanism to the user-node mapping.
+
 ## 1.6.5
 
 ### New Feature

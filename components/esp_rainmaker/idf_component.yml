@@ -1,5 +1,5 @@
 ## IDF Component Manager Manifest File
-version: "1.6.5"
+version: "1.6.6"
 description: ESP RainMaker firmware agent
 url: https://github.com/espressif/esp-rainmaker/tree/master/components/esp_rainmaker
 repository: https://github.com/espressif/esp-rainmaker.git
