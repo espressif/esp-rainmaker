@@ -48,5 +48,3 @@ CONFIG_LOG_DEFAULT_LEVEL_WARN=y
 # Takes out manual efforts to enable this option
 CONFIG_ESP_INSIGHTS_TRANSPORT_MQTT=y
 
-# Disable network provisioning component as it conflicts with the wifi provisioning component used here
-CONFIG_ESP_RMAKER_USING_NETWORK_PROV=n

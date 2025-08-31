@@ -3,8 +3,6 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  */
-#include <esp_idf_version.h>
-#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(4, 4, 0)
 #include <string.h>
 #include <esp_log.h>
 #include "mbedtls/platform.h"
@@ -91,11 +89,7 @@ esp_err_t esp_rmaker_node_auth_sign_msg(const void *challenge, size_t inlen, voi
     /* Sign the hash using RSA or ECDSA */
     mbedtls_pk_context pk_ctx;
     mbedtls_pk_init(&pk_ctx);
-#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 0, 0)
     int ret = mbedtls_pk_parse_key(&pk_ctx, (uint8_t *)priv_key, priv_key_len, NULL, 0, NULL, 0);
-#else /* !(ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 0, 0)) */
-    int ret = mbedtls_pk_parse_key(&pk_ctx, (uint8_t *)priv_key, priv_key_len, NULL, 0);
-#endif /* ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 0, 0) */
     uint8_t *signature = NULL;
     if (mbedtls_pk_get_type(&pk_ctx) == MBEDTLS_PK_RSA) {
         ESP_LOGI(TAG, "RSA key found");
@@ -113,11 +107,7 @@ esp_err_t esp_rmaker_node_auth_sign_msg(const void *challenge, size_t inlen, voi
     }
     size_t slen = 0;
     if (mbedtls_pk_get_type(&pk_ctx) == MBEDTLS_PK_ECKEY) {
-#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 0, 0)
         ret = mbedtls_ecdsa_write_signature(mbedtls_pk_ec(pk_ctx), MBEDTLS_MD_SHA256, hash, sizeof(hash), signature, MBEDTLS_ECDSA_MAX_LEN, &slen, myrand, NULL);
-#else /* !(ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 0, 0)) */
-        ret = mbedtls_ecdsa_write_signature(mbedtls_pk_ec(pk_ctx), MBEDTLS_MD_SHA256, hash, sizeof(hash), signature, &slen, myrand, NULL);
-#endif /* (ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 0, 0)) */
         if (ret != 0) {
             ESP_LOGE(TAG, "Error in writing signature. err = %d", ret);
             free(signature);
@@ -188,4 +178,3 @@ esp_err_t esp_rmaker_node_auth_sign_msg(const void *challenge, size_t inlen, voi
     *outlen = 2 * slen; /* hex encoding takes 2 bytes per input byte */
     return ESP_OK;
 }
-#endif /* ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(4, 3, 0) */

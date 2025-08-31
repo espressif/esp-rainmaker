@@ -35,25 +35,9 @@
 
 #include <esp_idf_version.h>
 
-#if RMAKER_USING_NETWORK_PROV
 #include <network_provisioning/manager.h>
-#else
-#include <wifi_provisioning/manager.h>
-#endif
-
-#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(4, 2, 0)
-// Features supported in 4.2
 
 #define ESP_RMAKER_LOCAL_CTRL_SECURITY_TYPE CONFIG_ESP_RMAKER_LOCAL_CTRL_SECURITY
-
-#else
-
-#if CONFIG_ESP_RMAKER_LOCAL_CTRL_SECURITY != 0
-#warning "Local control security type is not supported in idf versions below 4.2. Using sec0 by default."
-#endif
-#define ESP_RMAKER_LOCAL_CTRL_SECURITY_TYPE 0
-
-#endif /* !IDF4.2 */
 
 static const char * TAG = "esp_rmaker_local";
 
@@ -426,11 +410,7 @@ static esp_err_t __esp_rmaker_start_local_ctrl_service(const char *serv_name)
     };
 
     /* If sec1, add security type details to the config */
-#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 0, 0)
 #define PROTOCOMM_SEC_DATA protocomm_security1_params_t
-#else
-#define PROTOCOMM_SEC_DATA  protocomm_security_pop_t
-#endif /* ESP_IDF_VERSION */
     PROTOCOMM_SEC_DATA *pop = NULL;
 #if ESP_RMAKER_LOCAL_CTRL_SECURITY_TYPE == 1
         char *pop_str = esp_rmaker_local_ctrl_get_pop();
@@ -451,11 +431,7 @@ static esp_err_t __esp_rmaker_start_local_ctrl_service(const char *serv_name)
 
         config.proto_sec.version = sec_ver;
         config.proto_sec.custom_handle = NULL;
-#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 0, 0)
         config.proto_sec.sec_params = pop;
-#else
-        config.proto_sec.pop = pop;
-#endif /* ESP_IDF_VERSION */
 #endif
 
     /* Start esp_local_ctrl service */
@@ -513,24 +489,12 @@ static void esp_rmaker_local_ctrl_prov_event_handler(void* arg, esp_event_base_t
                           int32_t event_id, void* event_data)
 {
     ESP_LOGI(TAG, "Event %"PRIu32, event_id);
-#if RMAKER_USING_NETWORK_PROV
     if (event_base == NETWORK_PROV_EVENT) {
-#else
-    if (event_base == WIFI_PROV_EVENT) {
-#endif
         switch (event_id) {
-#if RMAKER_USING_NETWORK_PROV
             case NETWORK_PROV_START:
-#else
-            case WIFI_PROV_START:
-#endif
                 wait_for_provisioning = true;
                 break;
-#if RMAKER_USING_NETWORK_PROV
             case NETWORK_PROV_DEINIT:
-#else
-            case WIFI_PROV_DEINIT:
-#endif
                 if (wait_for_provisioning == true) {
                     wait_for_provisioning = false;
                     if (g_serv_name) {
@@ -539,13 +503,8 @@ static void esp_rmaker_local_ctrl_prov_event_handler(void* arg, esp_event_base_t
                         g_serv_name = NULL;
                     }
                 }
-#if RMAKER_USING_NETWORK_PROV
                 esp_event_handler_unregister(NETWORK_PROV_EVENT, NETWORK_PROV_START, &esp_rmaker_local_ctrl_prov_event_handler);
                 esp_event_handler_unregister(NETWORK_PROV_EVENT, NETWORK_PROV_DEINIT, &esp_rmaker_local_ctrl_prov_event_handler);
-#else
-                esp_event_handler_unregister(WIFI_PROV_EVENT, WIFI_PROV_START, &esp_rmaker_local_ctrl_prov_event_handler);
-                esp_event_handler_unregister(WIFI_PROV_EVENT, WIFI_PROV_DEINIT, &esp_rmaker_local_ctrl_prov_event_handler);
-#endif
                 break;
             default:
                 break;
@@ -569,13 +528,8 @@ esp_err_t esp_rmaker_init_local_ctrl_service(void)
      * what provisioning transport is being used and hence this logic will come into picture for both,
      * SoftAP and BLE provisioning.
      */
-#if RMAKER_USING_NETWORK_PROV
     esp_event_handler_register(NETWORK_PROV_EVENT, NETWORK_PROV_START, &esp_rmaker_local_ctrl_prov_event_handler, NULL);
     esp_event_handler_register(NETWORK_PROV_EVENT, NETWORK_PROV_DEINIT, &esp_rmaker_local_ctrl_prov_event_handler, NULL);
-#else
-    esp_event_handler_register(WIFI_PROV_EVENT, WIFI_PROV_START, &esp_rmaker_local_ctrl_prov_event_handler, NULL);
-    esp_event_handler_register(WIFI_PROV_EVENT, WIFI_PROV_DEINIT, &esp_rmaker_local_ctrl_prov_event_handler, NULL);
-#endif
     return ESP_OK;
 }
 
@@ -618,13 +572,8 @@ esp_err_t esp_rmaker_local_ctrl_disable(void)
         free(g_serv_name);
         g_serv_name = NULL;
     }
-#if RMAKER_USING_NETWORK_PROV
     esp_event_handler_unregister(NETWORK_PROV_EVENT, NETWORK_PROV_START, &esp_rmaker_local_ctrl_prov_event_handler);
     esp_event_handler_unregister(NETWORK_PROV_EVENT, NETWORK_PROV_DEINIT, &esp_rmaker_local_ctrl_prov_event_handler);
-#else
-    esp_event_handler_unregister(WIFI_PROV_EVENT, WIFI_PROV_START, &esp_rmaker_local_ctrl_prov_event_handler);
-    esp_event_handler_unregister(WIFI_PROV_EVENT, WIFI_PROV_DEINIT, &esp_rmaker_local_ctrl_prov_event_handler);
-#endif
     if (!g_local_ctrl_is_started) {
         return ESP_OK;
     }

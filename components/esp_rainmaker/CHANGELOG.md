@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.7.0
+
+### Other changes
+
+- Removed legacy code for esp idf versions < 5.1 as they have reached their end of life.
+
 ## 1.6.7
 
 ### Minor Change
