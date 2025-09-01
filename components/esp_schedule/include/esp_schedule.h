@@ -45,6 +45,10 @@ typedef enum esp_schedule_type {
     ESP_SCHEDULE_TYPE_DAYS_OF_WEEK,
     ESP_SCHEDULE_TYPE_DATE,
     ESP_SCHEDULE_TYPE_RELATIVE,
+#if CONFIG_ESP_SCHEDULE_ENABLE_DAYLIGHT
+    ESP_SCHEDULE_TYPE_SUNRISE,
+    ESP_SCHEDULE_TYPE_SUNSET,
+#endif
 } esp_schedule_type_t;
 
 /** Schedule days. Used for ESP_SCHEDULE_TYPE_DAYS_OF_WEEK. */
@@ -86,12 +90,12 @@ typedef struct esp_schedule_trigger {
     uint8_t hours;
     /** Minutes in the given hour. Accepted values: 0-59. */
     uint8_t minutes;
-    /** For type ESP_SCHEDULE_TYPE_DAYS_OF_WEEK */
+    /** For type ESP_SCHEDULE_TYPE_DAYS_OF_WEEK and solar schedules with day-of-week patterns */
     struct {
         /** 'OR' list of esp_schedule_days_t */
         uint8_t repeat_days;
     } day;
-    /** For type ESP_SCHEDULE_TYPE_DATE */
+    /** For type ESP_SCHEDULE_TYPE_DATE and solar schedules with specific date patterns */
     struct {
         /** Day of the month. Accepted values: 1-31. */
         uint8_t day;
@@ -102,6 +106,20 @@ typedef struct esp_schedule_trigger {
         /** If the schedule is to be repeated every year. */
         bool repeat_every_year;
     } date;
+#if CONFIG_ESP_SCHEDULE_ENABLE_DAYLIGHT
+    /** For type ESP_SCHEDULE_TYPE_SUNRISE and ESP_SCHEDULE_TYPE_SUNSET
+     * Uses day.repeat_days for day-of-week patterns (if date.day == 0)
+     * Uses date.* fields for specific date patterns (if date.day != 0)
+     * If both are 0, treated as single-time schedule */
+    struct {
+        /** Latitude in decimal degrees (-90 to +90, positive North) */
+        double latitude;
+        /** Longitude in decimal degrees (-180 to +180, positive East) */
+        double longitude;
+        /** Offset in minutes from sunrise/sunset (positive = after, negative = before) */
+        int offset_minutes;
+    } solar;
+#endif
     /** For type ESP_SCHEDULE_TYPE_SECONDS */
     int relative_seconds;
     /** Used for passing the next schedule timestamp for

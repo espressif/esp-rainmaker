@@ -8,6 +8,7 @@
 #include <esp_log.h>
 #include <esp_sntp.h>
 #include <esp_rmaker_utils.h>
+#include <esp_daylight.h>
 #include "esp_schedule_internal.h"
 
 static const char *TAG = "esp_schedule";
@@ -130,7 +131,8 @@ static uint8_t esp_schedule_get_next_month(esp_schedule_trigger_t *trigger, stru
 
     /* Check if schedule is for this year and does not repeat */
     if (!trigger->date.repeat_every_year) {
-        if (trigger->date.year <= (current_time->tm_year + 1900)) {
+        /* For yearly repeating schedules with year=0, treat as repeating */
+        if (trigger->date.year != 0 && trigger->date.year <= (current_time->tm_year + 1900)) {
             ESP_LOGE(TAG, "Schedule does not repeat next year, but get_next_month has been called.");
             return 0;
         }
@@ -154,6 +156,63 @@ static uint16_t esp_schedule_get_next_year(esp_schedule_trigger_t *trigger, stru
     /* If the schedule has already passed in this year, we still return current year, as the additional months will be handled in get_next_month */
     return current_year;
 }
+
+#if CONFIG_ESP_SCHEDULE_ENABLE_DAYLIGHT
+/* Helper function to calculate solar time for a specific date */
+static time_t esp_schedule_calc_solar_time_for_date(const esp_schedule_trigger_t *trigger,
+                                                    int year, int month, int day,
+                                                    const char *schedule_name)
+{
+    time_t sunrise_utc, sunset_utc;
+
+    bool calc_ok = esp_daylight_calc_sunrise_sunset_utc(
+                       year, month, day,
+                       trigger->solar.latitude,
+                       trigger->solar.longitude,
+                       &sunrise_utc, &sunset_utc);
+
+    if (!calc_ok) {
+        ESP_LOGE(TAG, "Failed to calculate sunrise/sunset for date %04d-%02d-%02d for %s",
+                 year, month, day, schedule_name);
+        return 0;
+    }
+
+    time_t solar_time = (trigger->type == ESP_SCHEDULE_TYPE_SUNRISE) ? sunrise_utc : sunset_utc;
+    return esp_daylight_apply_offset(solar_time, trigger->solar.offset_minutes);
+}
+
+/* Helper function to handle logging and timer calculation for solar schedules */
+static int32_t esp_schedule_finalize_solar_time(time_t solar_time, time_t now,
+                                                const esp_schedule_trigger_t *trigger,
+                                                const char *schedule_name)
+{
+    char time_str[64];
+    struct tm schedule_time;
+
+    /* Convert solar time to local time for display and DST handling */
+    localtime_r(&solar_time, &schedule_time);
+
+    /* Print schedule time */
+    memset(time_str, 0, sizeof(time_str));
+    strftime(time_str, sizeof(time_str), "%c %z[%Z]", &schedule_time);
+    ESP_LOGI(TAG, "Schedule %s (%s%+d min) will be active on: %s. DST: %s",
+             schedule_name,
+             (trigger->type == ESP_SCHEDULE_TYPE_SUNRISE) ? "sunrise" : "sunset",
+             trigger->solar.offset_minutes,
+             time_str, schedule_time.tm_isdst ? "Yes" : "No");
+
+    /* Simple epoch-based timer calculation */
+    int32_t timer_seconds = (int32_t)difftime(solar_time, now);
+
+    /* With proactive logic, this should not happen, but log if it does */
+    if (timer_seconds < 0) {
+        ESP_LOGW(TAG, "Unexpected: Solar schedule time has passed (%" PRId32 " seconds ago). This should have been handled proactively.", -timer_seconds);
+        /* Return the negative value to help debug - caller will handle this as error */
+    }
+
+    return timer_seconds;
+}
+#endif /* CONFIG_ESP_SCHEDULE_ENABLE_DAYLIGHT */
 
 static uint32_t esp_schedule_get_next_schedule_time_diff(const char *schedule_name, esp_schedule_trigger_t *trigger)
 {
@@ -187,6 +246,173 @@ static uint32_t esp_schedule_get_next_schedule_time_diff(const char *schedule_na
         ESP_LOGI(TAG, "Schedule %s will be active on: %s. DST: %s", schedule_name, time_str, schedule_time.tm_isdst ? "Yes" : "No");
         return time_diff;
     }
+
+    /* Handle solar-based schedules (sunrise/sunset) */
+#if CONFIG_ESP_SCHEDULE_ENABLE_DAYLIGHT
+    if (trigger->type == ESP_SCHEDULE_TYPE_SUNRISE || trigger->type == ESP_SCHEDULE_TYPE_SUNSET) {
+        time_t solar_time = 0;
+
+        /* Start with current local time for day calculations */
+        localtime_r(&now, &current_time);
+
+                /* Determine schedule pattern using unified approach */
+        if (trigger->date.day != 0) {
+            /* Date-based solar schedule - check if today's solar time + offset has passed */
+            struct tm schedule_time = current_time;
+            schedule_time.tm_mday = trigger->date.day;
+
+            /* For same day, check if solar time + offset has passed before deciding year */
+            if (trigger->date.day == current_time.tm_mday) {
+                uint8_t current_month = current_time.tm_mon + 1;
+                uint16_t repeat_months = trigger->date.repeat_months;
+                uint16_t current_month_bit = 1 << (current_month - 1);
+
+                /* Check if this month is in the repeat pattern */
+                if (current_month_bit & repeat_months) {
+                    /* Calculate today's solar time + offset */
+                    time_t today_solar = esp_schedule_calc_solar_time_for_date(trigger,
+                                                                               current_time.tm_year + 1900,
+                                                                               current_time.tm_mon + 1,
+                                                                               current_time.tm_mday,
+                                                                               schedule_name);
+
+                    /* If today's solar time + offset hasn't passed, use today */
+                    if (today_solar > 0 && today_solar > now) {
+                        schedule_time.tm_mon = current_time.tm_mon;
+                        schedule_time.tm_year = current_time.tm_year;
+                    } else {
+                        /* Solar time has passed, use next occurrence */
+                        schedule_time.tm_mon = esp_schedule_get_next_month(trigger, &current_time, &schedule_time) - 1;
+                        schedule_time.tm_year = esp_schedule_get_next_year(trigger, &current_time, &schedule_time) - 1900;
+                    }
+                } else {
+                    /* Not this month, use normal logic */
+                    schedule_time.tm_mon = esp_schedule_get_next_month(trigger, &current_time, &schedule_time) - 1;
+                    schedule_time.tm_year = esp_schedule_get_next_year(trigger, &current_time, &schedule_time) - 1900;
+                }
+            } else {
+                /* Different day, use normal logic */
+                schedule_time.tm_mon = esp_schedule_get_next_month(trigger, &current_time, &schedule_time) - 1;
+                schedule_time.tm_year = esp_schedule_get_next_year(trigger, &current_time, &schedule_time) - 1900;
+            }
+
+            if (schedule_time.tm_mon < 0) {
+                ESP_LOGE(TAG, "Invalid month found for solar schedule: %s", schedule_name);
+                return 0;
+            }
+            if (schedule_time.tm_mon >= 12) {
+                schedule_time.tm_year += schedule_time.tm_mon / 12;
+                schedule_time.tm_mon = schedule_time.tm_mon % 12;
+            }
+            mktime(&schedule_time);
+
+            /* Calculate solar time for the determined date */
+            solar_time = esp_schedule_calc_solar_time_for_date(trigger,
+                                                               schedule_time.tm_year + 1900,
+                                                               schedule_time.tm_mon + 1,
+                                                               schedule_time.tm_mday,
+                                                               schedule_name);
+
+        } else if (trigger->day.repeat_days != 0) {
+            /* Day-of-week solar schedule - check if today's solar time + offset has passed */
+            struct tm schedule_time = current_time;
+
+            /* Check if today is one of the scheduled days */
+            int today = current_time.tm_wday == 0 ? 7 : current_time.tm_wday; /* Convert Sunday from 0 to 7 */
+            uint8_t today_bit = 1 << (today - 1); /* Monday=bit0, Tuesday=bit1, etc. */
+
+            if (trigger->day.repeat_days & today_bit) {
+                /* Today is a scheduled day, check if solar time + offset has passed */
+                time_t today_solar = esp_schedule_calc_solar_time_for_date(trigger,
+                                                                           current_time.tm_year + 1900,
+                                                                           current_time.tm_mon + 1,
+                                                                           current_time.tm_mday,
+                                                                           schedule_name);
+
+                /* If today's solar time + offset hasn't passed, use today */
+                if (today_solar > 0 && today_solar > now) {
+                    /* Use today */
+                    solar_time = today_solar;
+                } else {
+                    /* Solar time has passed, find next scheduled day */
+                    int no_of_days = esp_schedule_get_no_of_days(trigger, &current_time, &schedule_time);
+                    schedule_time.tm_mday += no_of_days;
+                    mktime(&schedule_time);
+
+                    solar_time = esp_schedule_calc_solar_time_for_date(trigger,
+                                                                       schedule_time.tm_year + 1900,
+                                                                       schedule_time.tm_mon + 1,
+                                                                       schedule_time.tm_mday,
+                                                                       schedule_name);
+                }
+            } else {
+                /* Today is not a scheduled day, use normal logic */
+                int no_of_days = esp_schedule_get_no_of_days(trigger, &current_time, &schedule_time);
+                schedule_time.tm_mday += no_of_days;
+                mktime(&schedule_time);
+
+                solar_time = esp_schedule_calc_solar_time_for_date(trigger,
+                                                                   schedule_time.tm_year + 1900,
+                                                                   schedule_time.tm_mon + 1,
+                                                                   schedule_time.tm_mday,
+                                                                   schedule_name);
+            }
+
+        } else {
+            /* Single-time solar schedule - use logic similar to regular schedules */
+            solar_time = esp_schedule_calc_solar_time_for_date(trigger,
+                                                               current_time.tm_year + 1900,
+                                                               current_time.tm_mon + 1,
+                                                               current_time.tm_mday,
+                                                               schedule_name);
+
+            /* If time has passed today, calculate for tomorrow (like regular schedules) */
+            if (solar_time > 0 && solar_time <= now) {
+                struct tm tomorrow_time;
+                localtime_r(&now, &tomorrow_time);  // Use fresh local time
+                tomorrow_time.tm_mday += 1;
+                mktime(&tomorrow_time);
+
+                solar_time = esp_schedule_calc_solar_time_for_date(trigger,
+                                                                   tomorrow_time.tm_year + 1900,
+                                                                   tomorrow_time.tm_mon + 1,
+                                                                   tomorrow_time.tm_mday,
+                                                                   schedule_name);
+
+                /* If tomorrow's time is still in the past (due to large negative offset), try day after tomorrow */
+                if (solar_time > 0 && solar_time <= now) {
+                    tomorrow_time.tm_mday += 1;
+                    mktime(&tomorrow_time);
+
+                    solar_time = esp_schedule_calc_solar_time_for_date(trigger,
+                                                                       tomorrow_time.tm_year + 1900,
+                                                                       tomorrow_time.tm_mon + 1,
+                                                                       tomorrow_time.tm_mday,
+                                                                       schedule_name);
+                }
+            }
+        }
+
+        /* Return error if solar calculation failed */
+        if (solar_time == 0) {
+            return 0;
+        }
+
+        /* Calculate timer - should always be positive since we proactively handle past times */
+        time_diff = esp_schedule_finalize_solar_time(solar_time, now, trigger, schedule_name);
+        if (time_diff < 0) {
+            /* This should not happen with proactive logic, but handle gracefully */
+            ESP_LOGE(TAG, "Solar schedule time calculation error for %s (got %" PRId32 " seconds)", schedule_name, time_diff);
+            return 0;
+        }
+
+        /* Store the final scheduled time - use raw UTC solar time for ts field (phone apps need UTC) */
+        trigger->next_scheduled_time_utc = solar_time;
+
+        return time_diff;
+    }
+#endif /* CONFIG_ESP_SCHEDULE_ENABLE_DAYLIGHT */
+
     localtime_r(&now, &current_time);
 
     /* Get schedule time */
@@ -221,7 +447,7 @@ static uint32_t esp_schedule_get_next_schedule_time_diff(const char *schedule_na
     time_t dst_adjust = 0;
     if (!current_time.tm_isdst && schedule_time.tm_isdst) {
         dst_adjust = -3600;
-    } else if (current_time.tm_isdst && !schedule_time.tm_isdst ) {
+    } else if (current_time.tm_isdst && !schedule_time.tm_isdst) {
         dst_adjust = 3600;
     }
     ESP_LOGD(TAG, "DST adjust seconds: %lld", (long long) dst_adjust);
@@ -267,6 +493,20 @@ static bool esp_schedule_is_expired(esp_schedule_trigger_t *trigger)
                 return true;
             }
         }
+#if CONFIG_ESP_SCHEDULE_ENABLE_DAYLIGHT
+    } else if (trigger->type == ESP_SCHEDULE_TYPE_SUNRISE || trigger->type == ESP_SCHEDULE_TYPE_SUNSET) {
+        /* Check if this is a single-time solar schedule */
+        if (trigger->date.day == 0 && trigger->day.repeat_days == 0) {
+            if (trigger->next_scheduled_time_utc > 0 && trigger->next_scheduled_time_utc <= current_timestamp) {
+                /* One time solar schedule has expired */
+                return true;
+            } else if (trigger->next_scheduled_time_utc == 0) {
+                /* Schedule has been disabled , so it is as good as expired. */
+                return true;
+            }
+        }
+        /* Repeating solar schedules (day-of-week or date-based) never expire - they recalculate */
+#endif
     } else if (trigger->type == ESP_SCHEDULE_TYPE_DATE) {
         if (trigger->date.repeat_months == 0) {
             if (trigger->next_scheduled_time_utc > 0 && trigger->next_scheduled_time_utc <= current_timestamp) {
@@ -462,6 +702,18 @@ static esp_err_t esp_schedule_set(esp_schedule_t *schedule, esp_schedule_config_
             schedule->trigger.date.repeat_months = schedule_config->trigger.date.repeat_months;
             schedule->trigger.date.year = schedule_config->trigger.date.year;
             schedule->trigger.date.repeat_every_year = schedule_config->trigger.date.repeat_every_year;
+#if CONFIG_ESP_SCHEDULE_ENABLE_DAYLIGHT
+        } else if (schedule->trigger.type == ESP_SCHEDULE_TYPE_SUNRISE || schedule->trigger.type == ESP_SCHEDULE_TYPE_SUNSET) {
+            schedule->trigger.solar.latitude = schedule_config->trigger.solar.latitude;
+            schedule->trigger.solar.longitude = schedule_config->trigger.solar.longitude;
+            schedule->trigger.solar.offset_minutes = schedule_config->trigger.solar.offset_minutes;
+            /* Copy day and date fields for unified solar schedule approach */
+            schedule->trigger.day.repeat_days = schedule_config->trigger.day.repeat_days;
+            schedule->trigger.date.day = schedule_config->trigger.date.day;
+            schedule->trigger.date.repeat_months = schedule_config->trigger.date.repeat_months;
+            schedule->trigger.date.year = schedule_config->trigger.date.year;
+            schedule->trigger.date.repeat_every_year = schedule_config->trigger.date.repeat_every_year;
+#endif
         }
     }
 
@@ -552,7 +804,6 @@ esp_schedule_handle_t *esp_schedule_init(bool enable_nvs, char *nvs_partition, u
     }
 
     /* Wait for time to be updated here */
-
 
     /* Below this is initialising schedules from NVS */
     esp_schedule_nvs_init(nvs_partition);

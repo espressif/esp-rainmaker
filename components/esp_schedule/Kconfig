@@ -1,0 +1,20 @@
+menu "ESP Schedule Configuration"
+
+    config ESP_SCHEDULE_ENABLE_DAYLIGHT
+        bool "Enable Daylight (Sunrise/Sunset) Schedules"
+        default y
+        help
+            Enable support for sunrise and sunset based schedules.
+
+            This feature allows scheduling based on astronomical calculations
+            for sunrise and sunset times at specific geographical locations.
+
+            Disabling this option will:
+            - Remove sunrise/sunset schedule types from the API
+            - Save memory by excluding solar calculation code
+            - Reduce binary size (by about 11500 bytes)
+
+            If disabled, ESP_SCHEDULE_TYPE_SUNRISE and ESP_SCHEDULE_TYPE_SUNSET
+            will not be available.
+
+endmenu
