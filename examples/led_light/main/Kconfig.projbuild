@@ -9,4 +9,12 @@ menu "Example Configuration"
             GPIO number on which the "Boot" button is connected. This is generally used
             by the application for custom operations like toggling states, resetting to defaults, etc.
 
+    config APP_POP_TYPE
+        int "Proof of Posession Type"
+        default 1
+        range 0 2
+        help
+            0: POP_TYPE_MAC
+            1: POP_TYPE_RANDOM
+            2: POP_TYPE_NONE
 endmenu
