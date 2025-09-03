@@ -172,7 +172,7 @@ static time_t esp_schedule_calc_solar_time_for_date(const esp_schedule_trigger_t
                        &sunrise_utc, &sunset_utc);
 
     if (!calc_ok) {
-        ESP_LOGE(TAG, "Failed to calculate sunrise/sunset for date %04d-%02d-%02d for %s",
+        ESP_LOGW(TAG, "Failed to calculate sunrise/sunset for date %04d-%02d-%02d for %s (likely polar night/day condition)",
                  year, month, day, schedule_name);
         return 0;
     }
@@ -255,7 +255,7 @@ static uint32_t esp_schedule_get_next_schedule_time_diff(const char *schedule_na
         /* Start with current local time for day calculations */
         localtime_r(&now, &current_time);
 
-                /* Determine schedule pattern using unified approach */
+        /* Determine schedule pattern using unified approach */
         if (trigger->date.day != 0) {
             /* Date-based solar schedule - check if today's solar time + offset has passed */
             struct tm schedule_time = current_time;
@@ -395,6 +395,7 @@ static uint32_t esp_schedule_get_next_schedule_time_diff(const char *schedule_na
 
         /* Return error if solar calculation failed */
         if (solar_time == 0) {
+            ESP_LOGW(TAG, "Solar schedule %s cannot be calculated (no sunrise/sunset at this location/date)", schedule_name);
             return 0;
         }
 
@@ -558,6 +559,15 @@ static void esp_schedule_start_timer(esp_schedule_t *schedule)
     }
 
     schedule->next_scheduled_time_diff = esp_schedule_get_next_schedule_time_diff(schedule->name, &schedule->trigger);
+
+    /* Check if schedule calculation failed (returns 0) */
+    if (schedule->next_scheduled_time_diff == 0) {
+        ESP_LOGW(TAG, "Schedule %s calculation failed or returned invalid time. Skipping timer creation.", schedule->name);
+        /* Reset timestamp to indicate schedule is not active */
+        schedule->trigger.next_scheduled_time_utc = 0;
+        return;
+    }
+
     ESP_LOGI(TAG, "Starting a timer for %"PRIu32" seconds for schedule %s", schedule->next_scheduled_time_diff, schedule->name);
 
     if (schedule->timestamp_cb) {

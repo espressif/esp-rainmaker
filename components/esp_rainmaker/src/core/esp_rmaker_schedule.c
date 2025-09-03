@@ -36,6 +36,10 @@ typedef enum trigger_type {
     TRIGGER_TYPE_DAYS_OF_WEEK,
     TRIGGER_TYPE_DATE,
     TRIGGER_TYPE_RELATIVE,
+#if CONFIG_ESP_RMAKER_SCHEDULE_ENABLE_DAYLIGHT
+    TRIGGER_TYPE_SUNRISE,
+    TRIGGER_TYPE_SUNSET,
+#endif
 } trigger_type_t;
 
 typedef struct esp_rmaker_schedule_trigger {
@@ -57,6 +61,18 @@ typedef struct esp_rmaker_schedule_trigger {
         uint16_t year;
         bool repeat_every_year;
     } date;
+#if CONFIG_ESP_RMAKER_SCHEDULE_ENABLE_DAYLIGHT
+    struct {
+        /* Latitude in decimal degrees (-90 to +90, positive North) */
+        double latitude;
+        /* Longitude in decimal degrees (-180 to +180, positive East) */
+        double longitude;
+        /* Offset in minutes from sunrise/sunset (positive = after, negative = before) */
+        int offset_minutes;
+        /* Optional location name for reference */
+        char location_name[32];
+    } solar;
+#endif
     /* Used for non repeating schedules */
     int64_t next_timestamp;
 } esp_rmaker_schedule_trigger_t;
@@ -136,7 +152,7 @@ static esp_rmaker_schedule_t *esp_rmaker_schedule_get_schedule_from_id(const cha
         return NULL;
     }
     esp_rmaker_schedule_t *schedule = schedule_priv_data->schedule_list;
-    while(schedule) {
+    while (schedule) {
         if (strncmp(id, schedule->id, sizeof(schedule->id)) == 0) {
             ESP_LOGD(TAG, "Schedule with id %s found in list for get.", id);
             return schedule;
@@ -150,7 +166,7 @@ static esp_rmaker_schedule_t *esp_rmaker_schedule_get_schedule_from_id(const cha
 static esp_rmaker_schedule_t *esp_rmaker_schedule_get_schedule_from_index(long index)
 {
     esp_rmaker_schedule_t *schedule = schedule_priv_data->schedule_list;
-    while(schedule) {
+    while (schedule) {
         if (schedule->index == index) {
             ESP_LOGD(TAG, "Schedule with index %ld found in list for get.", index);
             return schedule;
@@ -174,7 +190,7 @@ static esp_err_t esp_rmaker_schedule_add_to_list(esp_rmaker_schedule_t *schedule
     }
     /* Parse list */
     esp_rmaker_schedule_t *prev_schedule = schedule_priv_data->schedule_list;
-    while(prev_schedule) {
+    while (prev_schedule) {
         if (prev_schedule->next) {
             prev_schedule = prev_schedule->next;
         } else {
@@ -202,7 +218,7 @@ static esp_err_t esp_rmaker_schedule_remove_from_list(esp_rmaker_schedule_t *sch
     /* Parse list */
     esp_rmaker_schedule_t *curr_schedule = schedule_priv_data->schedule_list;
     esp_rmaker_schedule_t *prev_schedule = curr_schedule;
-    while(curr_schedule) {
+    while (curr_schedule) {
         if (strncmp(schedule->id, curr_schedule->id, sizeof(schedule->id)) == 0) {
             ESP_LOGD(TAG, "Schedule with id %s found in list for removing", schedule->id);
             break;
@@ -351,6 +367,29 @@ static esp_err_t esp_rmaker_schedule_prepare_config(esp_rmaker_schedule_t *sched
             if (schedule->trigger.date.repeat_months == 0) {
                 schedule_config->timestamp_cb = esp_rmaker_schedule_timestamp_common_cb;
             }
+#if CONFIG_ESP_RMAKER_SCHEDULE_ENABLE_DAYLIGHT
+        } else if (schedule->trigger.type == TRIGGER_TYPE_SUNRISE || schedule->trigger.type == TRIGGER_TYPE_SUNSET) {
+            /* Set the appropriate solar schedule type */
+            schedule_config->trigger.type = (schedule->trigger.type == TRIGGER_TYPE_SUNRISE) ?
+                                            ESP_SCHEDULE_TYPE_SUNRISE : ESP_SCHEDULE_TYPE_SUNSET;
+
+            /* Common solar schedule configuration */
+            schedule_config->trigger.solar.latitude = schedule->trigger.solar.latitude;
+            schedule_config->trigger.solar.longitude = schedule->trigger.solar.longitude;
+            schedule_config->trigger.solar.offset_minutes = schedule->trigger.solar.offset_minutes;
+
+            /* Copy day pattern using unified approach */
+            schedule_config->trigger.day.repeat_days = schedule->trigger.day.repeat_days;
+
+            /* Copy date pattern for date-based solar schedules */
+            schedule_config->trigger.date.day = schedule->trigger.date.day;
+            schedule_config->trigger.date.repeat_months = schedule->trigger.date.repeat_months;
+            schedule_config->trigger.date.year = schedule->trigger.date.year;
+            schedule_config->trigger.date.repeat_every_year = schedule->trigger.date.repeat_every_year;
+
+            /* Always set timestamp callback for solar schedules since next trigger time changes daily */
+            schedule_config->timestamp_cb = esp_rmaker_schedule_timestamp_common_cb;
+#endif /* CONFIG_ESP_RMAKER_SCHEDULE_ENABLE_DAYLIGHT */
         }
     }
 
@@ -573,8 +612,17 @@ static esp_err_t esp_rmaker_schedule_parse_trigger(jparse_ctx_t *jctx, esp_rmake
     int relative_seconds = 0, minutes = 0, repeat_days = 0, day = 0, repeat_months = 0, year = 0;
     bool repeat_every_year = false;
     int64_t timestamp = 0;
+
+    /* Solar trigger variables */
+#if CONFIG_ESP_RMAKER_SCHEDULE_ENABLE_DAYLIGHT
+    int sunrise_offset = 0, sunset_offset = 0;
+    float lat_float = 0.0f, lon_float = 0.0f;
+    char location_name[32] = {0};
+    int solar_repeat_days = 0;
+#endif
+
     trigger_type_t type = TRIGGER_TYPE_INVALID;
-    if(json_obj_get_array(jctx, "triggers", &total_triggers) != 0) {
+    if (json_obj_get_array(jctx, "triggers", &total_triggers) != 0) {
         ESP_LOGD(TAG, "Trigger not found in JSON");
         return ESP_OK;
     }
@@ -583,23 +631,48 @@ static esp_err_t esp_rmaker_schedule_parse_trigger(jparse_ctx_t *jctx, esp_rmake
         json_obj_leave_array(jctx);
         return ESP_OK;
     }
-    if(json_arr_get_object(jctx, 0) == 0) {
+    if (json_arr_get_object(jctx, 0) == 0) {
         json_obj_get_int64(jctx, "ts", &timestamp);
-        if (json_obj_get_int(jctx, "rsec", &relative_seconds) == 0) {
-            type = TRIGGER_TYPE_RELATIVE;
-        } else {
-            json_obj_get_int(jctx, "m", &minutes);
-            /* Check if it is of type day */
-            if (json_obj_get_int(jctx, "d", &repeat_days) == 0) {
-                type = TRIGGER_TYPE_DAYS_OF_WEEK;
+
+        /* Check for solar triggers first */
+#if CONFIG_ESP_RMAKER_SCHEDULE_ENABLE_DAYLIGHT
+        if (json_obj_get_int(jctx, "sr", &sunrise_offset) == 0) {
+            type = TRIGGER_TYPE_SUNRISE;
+            /* Get location data */
+            json_obj_get_float(jctx, "lat", &lat_float);
+            json_obj_get_float(jctx, "lon", &lon_float);
+            json_obj_get_string(jctx, "loc", location_name, sizeof(location_name));
+            json_obj_get_int(jctx, "d", &solar_repeat_days);
+            /* Parse date-based fields for solar schedules */
+            json_obj_get_int(jctx, "dd", &day);
+            json_obj_get_int(jctx, "mm", &repeat_months);
+        } else if (json_obj_get_int(jctx, "ss", &sunset_offset) == 0) {
+            type = TRIGGER_TYPE_SUNSET;
+            /* Get location data */
+            json_obj_get_float(jctx, "lat", &lat_float);
+            json_obj_get_float(jctx, "lon", &lon_float);
+            json_obj_get_string(jctx, "loc", location_name, sizeof(location_name));
+            json_obj_get_int(jctx, "d", &solar_repeat_days);
+            /* Parse date-based fields for solar schedules */
+            json_obj_get_int(jctx, "dd", &day);
+            json_obj_get_int(jctx, "mm", &repeat_months);
+        } else
+#endif
+            if (json_obj_get_int(jctx, "rsec", &relative_seconds) == 0) {
+                type = TRIGGER_TYPE_RELATIVE;
+            } else {
+                json_obj_get_int(jctx, "m", &minutes);
+                /* Check if it is of type day */
+                if (json_obj_get_int(jctx, "d", &repeat_days) == 0) {
+                    type = TRIGGER_TYPE_DAYS_OF_WEEK;
+                }
+                if (json_obj_get_int(jctx, "dd", &day) == 0) {
+                    type = TRIGGER_TYPE_DATE;
+                    json_obj_get_int(jctx, "mm", &repeat_months);
+                    json_obj_get_int(jctx, "yy", &year);
+                    json_obj_get_bool(jctx, "r", &repeat_every_year);
+                }
             }
-            if (json_obj_get_int(jctx, "dd", &day) == 0) {
-                type = TRIGGER_TYPE_DATE;
-                json_obj_get_int(jctx, "mm", &repeat_months);
-                json_obj_get_int(jctx, "yy", &year);
-                json_obj_get_bool(jctx, "r", &repeat_every_year);
-            }
-        }
         json_arr_leave_object(jctx);
     }
     json_obj_leave_array(jctx);
@@ -612,6 +685,23 @@ static esp_err_t esp_rmaker_schedule_parse_trigger(jparse_ctx_t *jctx, esp_rmake
     trigger->date.repeat_months = repeat_months;
     trigger->date.year = year;
     trigger->date.repeat_every_year = repeat_every_year;
+
+    /* Set solar trigger data using unified approach */
+#if CONFIG_ESP_RMAKER_SCHEDULE_ENABLE_DAYLIGHT
+    if (type == TRIGGER_TYPE_SUNRISE || type == TRIGGER_TYPE_SUNSET) {
+        trigger->solar.latitude = (double)lat_float;
+        trigger->solar.longitude = (double)lon_float;
+        trigger->solar.offset_minutes = (type == TRIGGER_TYPE_SUNRISE) ? sunrise_offset : sunset_offset;
+
+        /* Map repeat pattern to unified day struct */
+        trigger->day.repeat_days = solar_repeat_days;
+
+        /* Store location name in ESP RainMaker's own struct */
+        strncpy(trigger->solar.location_name, location_name, sizeof(trigger->solar.location_name) - 1);
+        trigger->solar.location_name[sizeof(trigger->solar.location_name) - 1] = '\0';
+    }
+#endif
+
     trigger->next_timestamp = timestamp;
     return ESP_OK;
 }
@@ -711,40 +801,40 @@ static esp_err_t esp_rmaker_schedule_perform_operation(esp_rmaker_schedule_t *sc
 {
     esp_err_t err = ESP_OK;
     switch (operation) {
-        case OPERATION_ADD:
-            if (schedule_priv_data->total_schedules < MAX_SCHEDULES) {
-                esp_rmaker_schedule_operation_add(schedule);
-                if (enabled == true) {
-                    esp_rmaker_schedule_operation_enable(schedule);
-                }
-            } else {
-                ESP_LOGE(TAG, "Max schedules (%d) reached. Not adding this schedule with id %s", MAX_SCHEDULES,
-                        schedule->id);
-                err = ESP_FAIL;
+    case OPERATION_ADD:
+        if (schedule_priv_data->total_schedules < MAX_SCHEDULES) {
+            esp_rmaker_schedule_operation_add(schedule);
+            if (enabled == true) {
+                esp_rmaker_schedule_operation_enable(schedule);
             }
-            break;
-
-        case OPERATION_EDIT:
-            esp_rmaker_schedule_operation_edit(schedule);
-            break;
-
-        case OPERATION_REMOVE:
-            esp_rmaker_schedule_operation_remove(schedule);
-            esp_rmaker_schedule_free(schedule);
-            break;
-
-        case OPERATION_ENABLE:
-            esp_rmaker_schedule_operation_enable(schedule);
-            break;
-
-        case OPERATION_DISABLE:
-            esp_rmaker_schedule_operation_disable(schedule);
-            break;
-
-        default:
-            ESP_LOGE(TAG, "Invalid Operation: %d", operation);
+        } else {
+            ESP_LOGE(TAG, "Max schedules (%d) reached. Not adding this schedule with id %s", MAX_SCHEDULES,
+                     schedule->id);
             err = ESP_FAIL;
-            break;
+        }
+        break;
+
+    case OPERATION_EDIT:
+        esp_rmaker_schedule_operation_edit(schedule);
+        break;
+
+    case OPERATION_REMOVE:
+        esp_rmaker_schedule_operation_remove(schedule);
+        esp_rmaker_schedule_free(schedule);
+        break;
+
+    case OPERATION_ENABLE:
+        esp_rmaker_schedule_operation_enable(schedule);
+        break;
+
+    case OPERATION_DISABLE:
+        esp_rmaker_schedule_operation_disable(schedule);
+        break;
+
+    default:
+        ESP_LOGE(TAG, "Invalid Operation: %d", operation);
+        err = ESP_FAIL;
+        break;
     }
     return err;
 }
@@ -765,7 +855,7 @@ static esp_err_t esp_rmaker_schedule_parse_json(void *data, size_t data_len, esp
     }
 
     /* Parse all schedules */
-    while(json_arr_get_object(&jctx, current_schedule) == 0) {
+    while (json_arr_get_object(&jctx, current_schedule) == 0) {
         /* Get ID */
         json_obj_get_string(&jctx, "id", id, sizeof(id));
         if (strlen(id) <= 0) {
@@ -869,6 +959,50 @@ static esp_err_t __esp_rmaker_schedule_get_params(char *buf, size_t *buf_size)
         if (schedule->trigger.type == TRIGGER_TYPE_RELATIVE) {
             json_gen_obj_set_int(&jstr, "rsec", schedule->trigger.relative_seconds);
             json_gen_obj_set_int(&jstr, "ts", schedule->trigger.next_timestamp);
+#if CONFIG_ESP_RMAKER_SCHEDULE_ENABLE_DAYLIGHT
+        } else if (schedule->trigger.type == TRIGGER_TYPE_SUNRISE) {
+            json_gen_obj_set_int(&jstr, "sr", schedule->trigger.solar.offset_minutes);
+            json_gen_obj_set_float(&jstr, "lat", schedule->trigger.solar.latitude);
+            json_gen_obj_set_float(&jstr, "lon", schedule->trigger.solar.longitude);
+
+            /* Add day-of-week or date-based pattern fields */
+            if (schedule->trigger.day.repeat_days > 0) {
+                json_gen_obj_set_int(&jstr, "d", schedule->trigger.day.repeat_days);
+            }
+            if (schedule->trigger.date.day > 0) {
+                json_gen_obj_set_int(&jstr, "dd", schedule->trigger.date.day);
+            }
+            if (schedule->trigger.date.repeat_months > 0) {
+                json_gen_obj_set_int(&jstr, "mm", schedule->trigger.date.repeat_months);
+            }
+
+            if (strlen(schedule->trigger.solar.location_name) > 0) {
+                json_gen_obj_set_string(&jstr, "loc", schedule->trigger.solar.location_name);
+            }
+            /* Always include next trigger timestamp for solar schedules */
+            json_gen_obj_set_int(&jstr, "ts", schedule->trigger.next_timestamp);
+        } else if (schedule->trigger.type == TRIGGER_TYPE_SUNSET) {
+            json_gen_obj_set_int(&jstr, "ss", schedule->trigger.solar.offset_minutes);
+            json_gen_obj_set_float(&jstr, "lat", schedule->trigger.solar.latitude);
+            json_gen_obj_set_float(&jstr, "lon", schedule->trigger.solar.longitude);
+
+            /* Add day-of-week or date-based pattern fields */
+            if (schedule->trigger.day.repeat_days > 0) {
+                json_gen_obj_set_int(&jstr, "d", schedule->trigger.day.repeat_days);
+            }
+            if (schedule->trigger.date.day > 0) {
+                json_gen_obj_set_int(&jstr, "dd", schedule->trigger.date.day);
+            }
+            if (schedule->trigger.date.repeat_months > 0) {
+                json_gen_obj_set_int(&jstr, "mm", schedule->trigger.date.repeat_months);
+            }
+
+            if (strlen(schedule->trigger.solar.location_name) > 0) {
+                json_gen_obj_set_string(&jstr, "loc", schedule->trigger.solar.location_name);
+            }
+            /* Always include next trigger timestamp for solar schedules */
+            json_gen_obj_set_int(&jstr, "ts", schedule->trigger.next_timestamp);
+#endif /* CONFIG_ESP_RMAKER_SCHEDULE_ENABLE_DAYLIGHT */
         } else {
             json_gen_obj_set_int(&jstr, "m", schedule->trigger.minutes);
             if (schedule->trigger.type == TRIGGER_TYPE_DAYS_OF_WEEK) {
@@ -939,7 +1073,7 @@ static esp_err_t esp_rmaker_schedule_report_params(void)
 }
 
 static esp_err_t write_cb(const esp_rmaker_device_t *device, const esp_rmaker_param_t *param,
-            const esp_rmaker_param_val_t val, void *priv_data, esp_rmaker_write_ctx_t *ctx)
+                          const esp_rmaker_param_val_t val, void *priv_data, esp_rmaker_write_ctx_t *ctx)
 {
     if (strcmp(esp_rmaker_param_get_type(param), ESP_RMAKER_PARAM_SCHEDULES) != 0) {
         ESP_LOGE(TAG, "Got callback for invalid param with name %s and type %s", esp_rmaker_param_get_name(param), esp_rmaker_param_get_type(param));
@@ -973,6 +1107,10 @@ esp_err_t esp_rmaker_schedule_enable(void)
         ESP_LOGE(TAG, "Failed to create Schedule Service");
         return ESP_FAIL;
     }
+#if CONFIG_ESP_RMAKER_SCHEDULE_ENABLE_DAYLIGHT
+    /* Add daylight schedule capability attribute when daylight feature is enabled */
+    esp_rmaker_device_add_attribute(schedule_priv_data->schedule_service, "daylight_support", "yes");
+#endif
     esp_err_t err = esp_rmaker_node_add_device(esp_rmaker_get_node(), schedule_priv_data->schedule_service);
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "Failed to add service Service");
