@@ -148,6 +148,7 @@ void esp_rmaker_ota_common_cb(void *priv)
 #endif
         .filesize = ota->filesize,
         .fw_version = ota->fw_version,
+        .file_md5 = ota->file_md5,
         .ota_job_id = (char *)ota->transient_priv,
         .server_cert = ota->server_cert,
         .priv = ota->priv,

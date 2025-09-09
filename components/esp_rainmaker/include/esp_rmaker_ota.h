@@ -77,6 +77,9 @@ typedef struct {
     int filesize;
     /** The firmware version of the OTA image **/
     char *fw_version;
+    /** The MD5 of the OTA File. Can be NULL if the MD5 isn't received from
+     * the ESP RainMaker Cloud */
+    char *file_md5;
     /** The OTA Job ID received from cloud **/
     char *ota_job_id;
     /** The server certificate passed in esp_rmaker_enable_ota() */

@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.7.2
+
+### New Feature
+
+- Add RainMaker OTA resumption feature. The OTA process will resume downloading from the last position instead of restarting the download.
+
+OTA will check whether the MD5 values of the two consecutive files are the same. If the same, the OTA will continue; if they are different, the OTA will restart.
+Therefore, cloud support for delivering the file MD5 value is required (supported in backend version 3.0.0 and above).
+In addition, this feature requires IDF version 5.5 and above.
+
 ## 1.7.1
 
 ### New Feature

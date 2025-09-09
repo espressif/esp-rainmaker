@@ -10,6 +10,7 @@
 #include <esp_wifi_types.h>
 #include <esp_wifi.h>
 #include <errno.h>
+#include <nvs.h>
 #include <esp_https_ota.h>
 
 #if CONFIG_BT_ENABLED
@@ -51,6 +52,83 @@ const char *ESP_RMAKER_OTA_DEFAULT_SERVER_CERT = esp_rmaker_ota_def_cert;
 
 #define ESP_RMAKER_HTTPS_OTA_TIMEOUT_MS 5000
 
+#ifdef CONFIG_ESP_RMAKER_HTTP_OTA_RESUMPTION
+#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 5, 0)
+#define RMAKER_OTA_HTTP_OTA_RESUMPTION
+#else
+#warning "HTTP OTA resumption, needs IDF version >= 5.5.0"
+#endif
+#endif
+
+#ifdef RMAKER_OTA_HTTP_OTA_RESUMPTION
+#define RMAKER_OTA_WRITTEN_LENGTH_NVS_NAME  "ota_writen"
+#define RMAKER_OTA_FILE_MD5_NVS_NAME  "ota_file_md5"
+static esp_err_t esp_rmaker_https_ota_get_len_and_md5_from_nvs(uint32_t *written_len, char **file_md5)
+{
+    *written_len = 0;
+    *file_md5 = NULL;
+    nvs_handle handle;
+    esp_err_t err = nvs_open_from_partition(ESP_RMAKER_NVS_PART_NAME, RMAKER_OTA_NVS_NAMESPACE, NVS_READWRITE, &handle);
+    if (err == ESP_OK) {
+        uint32_t len = 0;
+        err = nvs_get_u32(handle, RMAKER_OTA_WRITTEN_LENGTH_NVS_NAME, &len);
+        if (err == ESP_OK) {
+            *written_len = len;
+            size_t file_md5_len = 0;
+            err = nvs_get_str(handle, RMAKER_OTA_FILE_MD5_NVS_NAME, NULL, &file_md5_len);
+            if (err == ESP_OK) {
+                *file_md5 = MEM_CALLOC_EXTRAM(1, file_md5_len + 1);
+                if (!*file_md5) {
+                    err = ESP_ERR_NO_MEM;
+                } else {
+                    err = nvs_get_str(handle, RMAKER_OTA_FILE_MD5_NVS_NAME, *file_md5, &file_md5_len);
+                    if (err == ESP_OK) {
+                        (*file_md5)[file_md5_len] = '\0';
+                    } else {
+                        free(*file_md5);
+                        *file_md5 = NULL;
+                    }
+                }
+            }
+        }
+        nvs_close(handle);
+    }
+    return err;
+}
+
+static esp_err_t esp_rmaker_https_ota_set_len_and_md5_to_nvs(uint32_t written_len, char *file_md5)
+{
+    nvs_handle handle;
+    esp_err_t err = nvs_open_from_partition(ESP_RMAKER_NVS_PART_NAME, RMAKER_OTA_NVS_NAMESPACE, NVS_READWRITE, &handle);
+    if (err == ESP_OK) {
+        err = nvs_set_u32(handle, RMAKER_OTA_WRITTEN_LENGTH_NVS_NAME, written_len);
+        if (err == ESP_OK) {
+            if (file_md5) {
+                err = nvs_set_str(handle, RMAKER_OTA_FILE_MD5_NVS_NAME, file_md5);
+            }
+            if (err == ESP_OK) {
+                nvs_commit(handle);
+            }
+        }
+        nvs_close(handle);
+    }
+    return err;
+}
+
+static esp_err_t esp_rmaker_https_ota_cleanup_ota_cfg_from_nvs(void)
+{
+    nvs_handle handle;
+    esp_err_t err = nvs_open_from_partition(ESP_RMAKER_NVS_PART_NAME, RMAKER_OTA_NVS_NAMESPACE, NVS_READWRITE, &handle);
+    if (err == ESP_OK) {
+        nvs_erase_key(handle, RMAKER_OTA_WRITTEN_LENGTH_NVS_NAME);
+        nvs_erase_key(handle, RMAKER_OTA_FILE_MD5_NVS_NAME);
+        nvs_commit(handle);
+        nvs_close(handle);
+    }
+    return err;
+}
+#endif
+
 static esp_err_t esp_rmaker_ota_use_https(esp_rmaker_ota_handle_t ota_handle, esp_rmaker_ota_data_t *ota_data, char *err_desc, size_t err_desc_size)
 {
     int buffer_size_tx = DEF_HTTP_TX_BUFFER_SIZE;
@@ -85,6 +163,33 @@ static esp_err_t esp_rmaker_ota_use_https(esp_rmaker_ota_handle_t ota_handle, es
     esp_https_ota_config_t ota_config = {
         .http_config = &config,
     };
+#ifdef RMAKER_OTA_HTTP_OTA_RESUMPTION
+    /* Check if file md5 is present and match with the one in the ota_data, if yes, resume the OTA;
+    otherwise, start from the beginning and set the written length 0 and file md5 to NVS */
+    if (ota_data->file_md5) {
+        char *file_md5 = NULL;
+        uint32_t written_len = 0;
+        bool resume_ota = false;
+        if (esp_rmaker_https_ota_get_len_and_md5_from_nvs(&written_len, &file_md5) == ESP_OK) {
+            if (strncmp(file_md5, ota_data->file_md5, strlen(ota_data->file_md5)) != 0) {
+                ESP_LOGW(TAG, "File MD5 mismatch, seems a new firmware, not resuming OTA");
+            } else {
+                resume_ota = true;
+                ota_config.ota_resumption = true;
+                ota_config.ota_image_bytes_written = written_len;
+            }
+            free(file_md5);
+        }
+        if (!resume_ota) {
+            /* Start from the beginning and set the written length 0 and file md5 to NVS */
+            if (esp_rmaker_https_ota_set_len_and_md5_to_nvs(0, ota_data->file_md5) != ESP_OK) {
+                ESP_LOGE(TAG, "Failed to set written length 0 and file MD5 to NVS");
+            }
+        }
+    } else {
+        ESP_LOGW(TAG, "File MD5 not present, not resuming OTA because can not verify the already downloaded firmware is the same as the new firmware, please upgrade the backend to support it");
+    }
+#endif
     /* Using a warning just to highlight the message */
     ESP_LOGW(TAG, "Starting OTA. This may take time.");
     esp_https_ota_handle_t https_ota_handle = NULL;
@@ -158,6 +263,15 @@ static esp_err_t esp_rmaker_ota_use_https(esp_rmaker_ota_handle_t ota_handle, es
             ESP_LOGI(TAG, "Image bytes read: %d", esp_https_ota_get_image_len_read(https_ota_handle));
             count = 0;
         }
+#ifdef RMAKER_OTA_HTTP_OTA_RESUMPTION
+        /* if file md5 is present, save the written length to NVS */
+        if (ota_data->file_md5) {
+            /* file md5 is present, only set the written length to NVS */
+            if (esp_rmaker_https_ota_set_len_and_md5_to_nvs(esp_https_ota_get_image_len_read(https_ota_handle), NULL) != ESP_OK) {
+                ESP_LOGE(TAG, "Failed to save OTA written length to NVS");
+            }
+        }
+#endif
 #ifdef CONFIG_ESP_RMAKER_OTA_PROGRESS_SUPPORT
         int image_size = esp_https_ota_get_image_size(https_ota_handle);
         int read_size = esp_https_ota_get_image_len_read(https_ota_handle);
@@ -186,7 +300,11 @@ static esp_err_t esp_rmaker_ota_use_https(esp_rmaker_ota_handle_t ota_handle, es
         err = ESP_FAIL;
         goto ota_end;
     }
-
+#ifdef RMAKER_OTA_HTTP_OTA_RESUMPTION
+    if (esp_rmaker_https_ota_cleanup_ota_cfg_from_nvs() != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to cleanup OTA config from NVS");
+    }
+#endif
     /* Report completion before finishing */
     esp_rmaker_ota_report_status(ota_handle, OTA_STATUS_IN_PROGRESS, "Firmware Image download complete");
 

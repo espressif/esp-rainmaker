@@ -195,6 +195,10 @@ void esp_rmaker_ota_finish_using_topics(esp_rmaker_ota_t *ota)
         free(ota->fw_version);
         ota->fw_version = NULL;
     }
+    if (ota->file_md5) {
+        free(ota->file_md5);
+        ota->file_md5 = NULL;
+    }
     ota->ota_in_progress = false;
 }
 static void ota_url_handler(const char *topic, void *payload, size_t payload_len, void *priv_data)
@@ -215,12 +219,13 @@ static void ota_url_handler(const char *topic, void *payload, size_t payload_len
        {
        "ota_job_id": "<ota_job_id>",
        "url": "<fw_url>",
+       "file_md5": "<file_md5>",
        "fw_version": "<fw_version>",
        "filesize": <size_in_bytes>
        }
     */
     jparse_ctx_t jctx;
-    char *url = NULL, *ota_job_id = NULL, *fw_version = NULL;
+    char *url = NULL, *ota_job_id = NULL, *fw_version = NULL, *file_md5 = NULL;
 #ifdef CONFIG_ESP_RMAKER_OTA_USE_MQTT
     char *stream_id = NULL;
 #endif
@@ -270,7 +275,19 @@ static void ota_url_handler(const char *topic, void *payload, size_t payload_len
     }
     json_obj_get_string(&jctx, "url", url, len);
     ESP_LOGI(TAG, "URL: %s", url);
-
+    len = 0;
+    ret = json_obj_get_strlen(&jctx, "file_md5", &len);
+    if (ret == ESP_OK) {
+        len++; /* Increment for NULL character */
+        file_md5 = MEM_CALLOC_EXTRAM(1, len);
+        if (!file_md5) {
+            ESP_LOGE(TAG, "Aborted. File MD5 memory allocation failed");
+            esp_rmaker_ota_report_status(ota_handle, OTA_STATUS_FAILED, "Aborted. File MD5 memory allocation failed");
+            goto end;
+        }
+        json_obj_get_string(&jctx, "file_md5", file_md5, len);
+        ESP_LOGI(TAG, "File MD5: %s", file_md5);
+    }
 #ifdef CONFIG_ESP_RMAKER_OTA_USE_MQTT
     len = 0;
     ret = json_obj_get_strlen(&jctx, "stream_id", &len);
@@ -330,6 +347,7 @@ static void ota_url_handler(const char *topic, void *payload, size_t payload_len
     ota->stream_id = stream_id;
 #endif
     ota->fw_version = fw_version;
+    ota->file_md5 = file_md5;
     ota->filesize = filesize;
     ota->ota_in_progress = true;
     if (esp_rmaker_work_queue_add_task(esp_rmaker_ota_common_cb, ota) != ESP_OK) {
@@ -347,6 +365,9 @@ end:
 #endif
     if (fw_version) {
         free(fw_version);
+    }
+    if (file_md5) {
+        free(file_md5);
     }
     esp_rmaker_ota_finish_using_topics(ota);
     json_parse_end(&jctx);
