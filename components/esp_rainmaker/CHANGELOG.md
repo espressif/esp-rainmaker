@@ -1,5 +1,70 @@
 # Changelog
 
+## 1.7.1
+
+### New Feature
+
+- **Daylight (Sunrise/Sunset) Schedules**: Added support for scheduling device actions based on astronomical calculations for sunrise and sunset times.
+  - Supports scheduling at specific offsets from sunrise/sunset (e.g., 30 minutes before sunset)
+  - Works with day-of-week repeat patterns (e.g., "every weekday at sunset")
+  - Requires geographical location (latitude/longitude) for calculations. The location name is optional.
+  - Configurable via `CONFIG_ESP_SCHEDULE_ENABLE_DAYLIGHT` and `CONFIG_ESP_RMAKER_SCHEDULE_ENABLE_DAYLIGHT`
+  - Adds about 15KB of flash space when enabled.
+  - **Schedule service now includes `daylight_support` attribute** with value set to "yes" to indicate if daylight schedules are supported, enabling client applications to discover this capability.
+
+  **Example JSON for sunrise schedule:**
+  ```json
+  {
+    "Schedule Name": {
+      "triggers": [{
+        "sr": 30,
+        "lat": 37.7749,
+        "lon": -122.4194,
+        "loc": "San Francisco",
+        "d": 127,
+        "ts": 1641123456
+      }],
+      "action": {
+        "Light": {
+          "Power": true,
+          "Brightness": 80
+        }
+      }
+    }
+  }
+  ```
+
+  **Example JSON for sunset schedule:**
+  ```json
+  {
+    "Evening Schedule": {
+      "triggers": [{
+        "ss": -15,
+        "lat": 51.5074,
+        "lon": -0.1278,
+        "loc": "London",
+        "d": 31,
+        "ts": 1641123456
+      }],
+      "action": {
+        "Light": {
+          "Power": true,
+          "Brightness": 50
+        }
+      }
+    }
+  }
+  ```
+
+  **JSON Field Descriptions:**
+  - `sr`: Sunrise offset in minutes (positive = after sunrise, negative = before, zero = exact)
+  - `ss`: Sunset offset in minutes (positive = after sunset, negative = before, zero = exact)
+  - `lat`: Latitude in decimal degrees (-90 to +90, positive North)
+  - `lon`: Longitude in decimal degrees (-180 to +180, positive East)
+  - `loc`: Optional location name for reference
+  - `d`: Day pattern bitmask (1=Sunday, 2=Monday, 4=Tuesday, ..., 127=everyday)
+  - `ts`: Next trigger timestamp (automatically calculated). Can be used by the phone apps to display the next trigger time.
+
 ## 1.7.0
 
 ### Other changes

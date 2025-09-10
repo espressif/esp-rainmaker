@@ -16,5 +16,6 @@ jobs:
           directories: >
             components/esp_schedule;
             components/esp_rainmaker;
+            components/esp_daylight;
           namespace: "espressif"
           api_token: ${{ secrets.IDF_COMPONENT_API_TOKEN }}

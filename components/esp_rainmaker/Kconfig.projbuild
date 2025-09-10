@@ -452,6 +452,24 @@ menu "ESP RainMaker Config"
             help
                 Maximum Number of schedules allowed. The json size for report params increases as the number of schedules increases.
 
+        config ESP_RMAKER_SCHEDULE_ENABLE_DAYLIGHT
+            bool "Enable Daylight (Sunrise/Sunset) Schedules"
+            default y
+            depends on ESP_SCHEDULE_ENABLE_DAYLIGHT
+            help
+                Enable sunrise and sunset based schedules in ESP RainMaker.
+
+                This feature allows JSON API support for scheduling based on
+                astronomical calculations for sunrise and sunset times at specific
+                geographical locations.
+
+                Requires ESP_SCHEDULE_ENABLE_DAYLIGHT to be enabled.
+
+                Disabling this option will:
+                - Remove sunrise/sunset JSON API support
+                - Save memory by excluding solar schedule parsing/generation code
+                - Reduce binary size (by about 750 bytes. Disable CONFIG_ESP_SCHEDULE_ENABLE_DAYLIGHT for further saving of 11500 bytes)
+
     endmenu
 
     menu "ESP RainMaker Scenes"
@@ -492,7 +510,6 @@ menu "ESP RainMaker Config"
                 rather than receiving the commands from cloud. C API or the serial console can be used to trigger the commands.
                 This should be enabled only while testing commands, but should always be disabled in production firmware.
 
-    endmenu
-
+        endmenu
 
 endmenu
