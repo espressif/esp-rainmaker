@@ -393,6 +393,13 @@ menu "ESP RainMaker Config"
             help
                 Delay (in minutes) before re-fetching OTA details after all retry attempts fail (for OTA using topics).
 
+        config ESP_RMAKER_HTTP_OTA_RESUMPTION
+            bool "Enable HTTP OTA resumption"
+            default y
+            depends on ESP_RMAKER_OTA_USE_HTTPS
+            help
+                If you enable this, the OTA process will resume downloading from the last position instead of restarting the download.
+
         choice ESP_RMAKER_OTA_TYPE
             prompt "OTA Update Protocol Type"
             default ESP_RMAKER_OTA_USE_HTTPS

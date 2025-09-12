@@ -33,6 +33,7 @@ typedef struct {
     const char *server_cert;
     char *url;
     char *fw_version;
+    char *file_md5;
 #ifdef CONFIG_ESP_RMAKER_OTA_USE_MQTT
     char *stream_id;
 #endif
