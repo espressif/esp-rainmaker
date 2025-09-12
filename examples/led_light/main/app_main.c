@@ -205,7 +205,7 @@ void app_main()
      * else, it will start Wi-Fi provisioning. The function will return
      * after a connection has been successfully established
      */
-    err = app_network_start(POP_TYPE_RANDOM);
+    err = app_network_start((app_network_pop_type_t) CONFIG_APP_POP_TYPE);
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "Could not start network. Aborting!!!");
         vTaskDelay(5000/portTICK_PERIOD_MS);
