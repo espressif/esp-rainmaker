@@ -12,6 +12,8 @@ if (NOT CONFIG_EXAMPLE_USE_RAINMAKER_FABRIC)
     list(APPEND PRIV_REQUIRES_LIST network_provisioning)
 endif()
 
+list(APPEND PRIV_INCLUDE_DIRS "$ENV{ESP_MATTER_PATH}/examples/common")
+
 if (CONFIG_CUSTOM_COMMISSIONABLE_DATA_PROVIDER)
     list(APPEND SRCS "matter_cwm/dynamic_commissionable_data_provider.cpp")
 endif()
