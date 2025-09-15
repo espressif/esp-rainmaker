@@ -33,7 +33,6 @@
 
 #define ESP_RMAKER_ALERT_KEY                    "esp.alert.str"
 
-#define RMAKER_PARAMS_SIZE_MARGIN       50 /* To accommodate for changes in param values while creating JSON */
 #define RMAKER_ALERT_STR_MARGIN         25 /* To accommodate rest of the alert payload {"esp.alert.str":""}  */
 #define MAX_TS_DATA_PARAM_NAME          66 /* Time series data param name is of the format <device_name>.<param_name> */
 
@@ -54,6 +53,7 @@ static const char *cb_srcs[ESP_RMAKER_REQ_SRC_MAX] = {
     [ESP_RMAKER_REQ_SRC_SCENE_ACTIVATE] = "Scene Activate",
     [ESP_RMAKER_REQ_SRC_SCENE_DEACTIVATE] = "Scene Deactivate",
     [ESP_RMAKER_REQ_SRC_LOCAL] = "Local",
+    [ESP_RMAKER_REQ_SRC_CMD_RESP] = "Command Response",
 };
 
 const char *esp_rmaker_device_cb_src_to_str(esp_rmaker_req_src_t src)
@@ -118,7 +118,7 @@ esp_rmaker_param_val_t esp_rmaker_array(const char *val)
     return param_val;
 }
 
-static esp_err_t esp_rmaker_populate_params(char *buf, size_t *buf_len, uint8_t flags, bool reset_flags)
+esp_err_t esp_rmaker_populate_params(char *buf, size_t *buf_len, uint8_t flags, bool reset_flags)
 {
     esp_err_t err = ESP_OK;
     json_gen_str_t jstr;
@@ -258,10 +258,10 @@ static esp_err_t esp_rmaker_report_param_internal(uint8_t flags)
     esp_err_t err = esp_rmaker_allocate_and_populate_params(flags, true);
     if (err == ESP_OK) {
         /* Just checking if there are indeed any params to report by comparing with a decent enough
-         * length as even the smallest possible data, Eg. '{"d":{"p":0}}' will be > 10 bytes.
+         * length as even the smallest possible data, Eg. '{"D":{"P":1}}' will be >= 13 bytes.
          */
         char *node_params_buf = esp_rmaker_param_get_buf(0);
-        if (strlen(node_params_buf) > 10) {
+        if (strlen(node_params_buf) >= RMAKER_MIN_VALID_PARAMS_SIZE) {
             if (flags == RMAKER_PARAM_FLAG_VALUE_CHANGE) {
                 esp_rmaker_create_mqtt_topic(publish_topic, sizeof(publish_topic), NODE_PARAMS_LOCAL_TOPIC_SUFFIX, NODE_PARAMS_LOCAL_TOPIC_RULE);
                 ESP_LOGI(TAG, "Reporting params: %s", node_params_buf);
@@ -387,7 +387,10 @@ static esp_err_t esp_rmaker_device_set_params(_esp_rmaker_device_t *device, jpar
                     num_param, device->priv_data, &ctx) != ESP_OK) {
             ESP_LOGE(TAG, "Remote update for device %s failed", device->name);
         } else {
-            esp_rmaker_report_updated_params();
+            /* Skip MQTT reporting for command response source - it will be returned in response */
+            if (src != ESP_RMAKER_REQ_SRC_CMD_RESP) {
+                esp_rmaker_report_updated_params();
+            }
         }
     }
 set_params_free:
@@ -1011,10 +1014,10 @@ esp_err_t esp_rmaker_report_node_state(void)
     esp_err_t err = esp_rmaker_allocate_and_populate_params(0, false);
     if (err == ESP_OK) {
         /* Just checking if there are indeed any params to report by comparing with a decent enough
-         * length as even the smallest possible data, Eg. '{"d":{"p":0}}' will be > 10 bytes.
+         * length as even the smallest possible data, Eg. '{"D":{"P":1}}' will be >= 13 bytes.
          */
         char *node_params_buf = esp_rmaker_param_get_buf(0);
-        if (strlen(node_params_buf) > 10) {
+        if (strlen(node_params_buf) >= RMAKER_MIN_VALID_PARAMS_SIZE) {
             esp_rmaker_create_mqtt_topic(publish_topic, sizeof(publish_topic), NODE_PARAMS_LOCAL_INIT_TOPIC_SUFFIX, NODE_PARAMS_LOCAL_INIT_RULE);
             ESP_LOGI(TAG, "Reporting params (init): %s", node_params_buf);
             if (esp_rmaker_params_mqtt_init_done) {
@@ -1086,3 +1089,5 @@ esp_err_t esp_rmaker_param_report_simple_ts_data(const esp_rmaker_param_t *param
     /* Use common implementation with custom value, timestamp, and TTL */
     return esp_rmaker_simple_ts_data_report_internal(param, &val, timestamp, ttl_days, true);
 }
+
+

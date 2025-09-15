@@ -167,6 +167,8 @@ typedef enum {
     ESP_RMAKER_REQ_SRC_SCENE_DEACTIVATE,
     /** Request received from a local controller */
     ESP_RMAKER_REQ_SRC_LOCAL,
+    /** Request received via command-response framework */
+    ESP_RMAKER_REQ_SRC_CMD_RESP,
     /** This will always be the last value. Any value equal to or
      * greater than this should be considered invalid.
      */

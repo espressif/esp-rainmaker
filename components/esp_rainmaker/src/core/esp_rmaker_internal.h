@@ -17,12 +17,18 @@
 #include <freertos/queue.h>
 #include <json_generator.h>
 #include <esp_rmaker_core.h>
+#include <esp_rmaker_cmd_resp.h>
 #include <esp_idf_version.h>
 
 #define RMAKER_PARAM_FLAG_VALUE_CHANGE   (1 << 0)
 #define RMAKER_PARAM_FLAG_VALUE_NOTIFY   (1 << 1)
 #define ESP_RMAKER_NVS_PART_NAME            "nvs"
 
+/* Internal margin for parameter buffer allocation */
+#define RMAKER_PARAMS_SIZE_MARGIN       50 /* To accommodate for changes in param values while creating JSON */
+
+/* Minimum valid JSON params object size - length of '{"D":{"P":1}}' */
+#define RMAKER_MIN_VALID_PARAMS_SIZE    13
 
 typedef enum {
     ESP_RMAKER_STATE_DEINIT = 0,
@@ -110,6 +116,8 @@ esp_err_t esp_rmaker_attribute_delete(esp_rmaker_attr_t *attr);
 char *esp_rmaker_get_node_config(void);
 char *esp_rmaker_get_node_params(void);
 esp_err_t esp_rmaker_handle_set_params(char *data, size_t data_len, esp_rmaker_req_src_t src);
+esp_err_t esp_rmaker_populate_params(char *buf, size_t *buf_len, uint8_t flags, bool reset_flags);
+esp_err_t esp_rmaker_param_cmd_resp_enable(void);
 esp_err_t esp_rmaker_user_mapping_prov_init(void);
 esp_err_t esp_rmaker_user_mapping_prov_deinit(void);
 esp_err_t esp_rmaker_user_node_mapping_init(void);

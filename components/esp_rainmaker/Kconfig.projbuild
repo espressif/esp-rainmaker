@@ -508,6 +508,25 @@ menu "ESP RainMaker Config"
                 Enable the ESP RainMaker Command-Response module for semi-synchronous communication. Please refer the RainMaker documents
                 for additional information.
 
+        config ESP_RMAKER_PARAM_CMD_RESP_ENABLE
+            bool "Enable Parameter Command-Response"
+            default y
+            depends on ESP_RMAKER_CMD_RESP_ENABLE
+            help
+                Enable automatic registration of set params command handler (command id 1) for parameter updates
+                via command-response framework. This allows parameter updates through the command-response system
+                with proper request source tracking. The payload format is the same as regular set params operations.
+
+        config ESP_RMAKER_PARAM_CMD_RESP_BUFFER_SIZE
+            int "Parameter Command-Response Buffer Size"
+            default 2048
+            range 512 8192
+            depends on ESP_RMAKER_PARAM_CMD_RESP_ENABLE
+            help
+                Size of the static buffer used for parameter command-response operations. This buffer is used for
+                both parameter extraction and response generation. Larger buffers allow handling more parameters
+                in a single command but consume more memory. For memory-constrained devices, this can be reduced.
+
         config ESP_RMAKER_CMD_RESP_TEST_ENABLE
             bool "Enable Command-Response Testing"
             default n

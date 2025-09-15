@@ -477,6 +477,15 @@ static void esp_rmaker_task(void *data)
             goto rmaker_end;
         }
         esp_rmaker_node_add_attribute(esp_rmaker_get_node(), "cmd-resp", "1");
+
+#ifdef CONFIG_ESP_RMAKER_PARAM_CMD_RESP_ENABLE
+        err = esp_rmaker_param_cmd_resp_enable();
+        if (err != ESP_OK) {
+            ESP_LOGE(TAG, "Failed to enable parameter command-response. Aborting!!!");
+            goto rmaker_end;
+        }
+#endif /* CONFIG_ESP_RMAKER_PARAM_CMD_RESP_ENABLE */
+
 #else
     ESP_LOGW(TAG, "Command-Response Module not enabled. Set CONFIG_ESP_RMAKER_CMD_RESP_ENABLE=y to use it.");
 #endif /* !CONFIG_ESP_RMAKER_CMD_RESP_ENABLE */
