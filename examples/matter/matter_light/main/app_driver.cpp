@@ -18,6 +18,7 @@
 #include <esp_rmaker_standard_params.h>
 #include <app_priv.h>
 #include <app_matter_light.h>
+#include <utils/common_macros.h>
 
 using namespace esp_matter;
 using namespace chip::app::Clusters;
