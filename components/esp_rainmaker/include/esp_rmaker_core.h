@@ -476,6 +476,20 @@ esp_rmaker_node_info_t *esp_rmaker_node_get_info(const esp_rmaker_node_t *node);
  */
 esp_err_t esp_rmaker_node_add_attribute(const esp_rmaker_node_t *node, const char *attr_name, const char *val);
 
+/** Edit Node attribute
+ *
+ * Add a new attribute or edit an existing attribute as the metadata for the node.
+ * For the sake of simplicity, only string values are allowed.
+ *
+ * @param node Node handle.
+ * @param[in] attr_name Name of the attribute.
+ * @param[in] val Value for the attribute.
+ *
+ * @return ESP_OK on success.
+ * @return error in case of failure.
+ */
+esp_err_t esp_rmaker_node_edit_attribute(const esp_rmaker_node_t *node, const char *attr_name, const char *val);
+
 /** Add FW version for a node (Not recommended)
  *
  * FW version is set internally to the project version. This API can be used to

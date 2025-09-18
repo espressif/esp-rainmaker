@@ -214,29 +214,58 @@ esp_err_t esp_rmaker_node_add_subtype(const esp_rmaker_node_t *node, const char 
     return ESP_OK;
 }
 
-esp_err_t esp_rmaker_node_add_attribute(const esp_rmaker_node_t *node, const char *attr_name, const char *value)
+esp_err_t esp_rmaker_node_add_or_edit_attribute(const esp_rmaker_node_t *node, const char *attr_name, const char *value, bool edit)
 {
     if (!node || !attr_name || !value) {
-        ESP_LOGE(TAG, "Node handle, attribute name or value cannot be NULL.");
+        ESP_LOGE(TAG, "Node handle, attribute name or value cannot be NULL");
         return ESP_ERR_INVALID_ARG;
     }
+
     esp_rmaker_attr_t *attr = ((_esp_rmaker_node_t *)node)->attributes;
-    while(attr && attr->next) {
+    esp_rmaker_attr_t *existing_attr = NULL;
+
+    /* Find if attribute already exists */
+    while(attr) {
         if (strcmp(attr->name, attr_name) == 0) {
-            ESP_LOGE(TAG, "Node attribute with name %s already exists.", attr_name);
-            return ESP_FAIL;
+            existing_attr = attr;
+            break;
+        }
+        if (!attr->next) {
+            break;  /* Keep reference to last attribute for potential insertion */
         }
         attr = attr->next;
     }
+
+    if (existing_attr) {
+        if (!edit) {
+            ESP_LOGE(TAG, "Node attribute with name %s already exists", attr_name);
+            return ESP_FAIL;
+        } else {
+            /* Edit mode: safely replace the value */
+            char *new_value = strdup(value);
+            if (!new_value) {
+                ESP_LOGE(TAG, "Failed to allocate memory for new value for attribute %s", attr_name);
+                return ESP_ERR_NO_MEM;
+            }
+            /* Only free old value after successful allocation of new one */
+            free(existing_attr->value);
+            existing_attr->value = new_value;
+            ESP_LOGI(TAG, "Node attribute %s updated", attr_name);
+            return ESP_OK;
+        }
+    }
+
+    /* Attribute doesn't exist, create new one */
     esp_rmaker_attr_t *new_attr = MEM_CALLOC_EXTRAM(1, sizeof(esp_rmaker_attr_t));
     if (!new_attr) {
-        ESP_LOGE(TAG, "Failed to create node attribute %s.", attr_name);
+        ESP_LOGE(TAG, "Failed to create node attribute %s", attr_name);
         return ESP_ERR_NO_MEM;
     }
+
     new_attr->name = strdup(attr_name);
     new_attr->value = strdup(value);
     if (!new_attr->name || !new_attr->value) {
-        ESP_LOGE(TAG, "Failed to allocate memory for name/value for attribute %s.", attr_name);
+        ESP_LOGE(TAG, "Failed to allocate memory for name/value for attribute %s", attr_name);
         esp_rmaker_attribute_delete(new_attr);
         return ESP_ERR_NO_MEM;
     }
@@ -248,6 +277,14 @@ esp_err_t esp_rmaker_node_add_attribute(const esp_rmaker_node_t *node, const cha
     }
     ESP_LOGI(TAG, "Node attribute %s created", attr_name);
     return ESP_OK;
+}
+
+esp_err_t esp_rmaker_node_add_attribute(const esp_rmaker_node_t *node, const char *attr_name, const char *value) {
+    return esp_rmaker_node_add_or_edit_attribute(node, attr_name, value, false);
+}
+
+esp_err_t esp_rmaker_node_edit_attribute(const esp_rmaker_node_t *node, const char *attr_name, const char *value) {
+    return esp_rmaker_node_add_or_edit_attribute(node, attr_name, value, true);
 }
 
 esp_err_t esp_rmaker_node_add_device(const esp_rmaker_node_t *node, const esp_rmaker_device_t *device)

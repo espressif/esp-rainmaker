@@ -150,6 +150,10 @@ esp_err_t esp_rmaker_ota_report_status_using_topics(esp_rmaker_ota_handle_t ota_
         }
     }
     json_gen_obj_set_string(&jstr, "status", esp_rmaker_ota_status_to_string(status));
+    char *network_id = esp_rmaker_get_network_id();
+    if (network_id) {
+        json_gen_obj_set_string(&jstr, "network_id", network_id);
+    }
     json_gen_obj_set_string(&jstr, "additional_info", additional_info);
     /* Add timestamp field 'ts' */
     time_t current_time;
@@ -406,6 +410,10 @@ static esp_err_t __esp_rmaker_ota_fetch(void)
     json_gen_start_object(&jstr);
     json_gen_obj_set_string(&jstr, "node_id", esp_rmaker_get_node_id());
     json_gen_obj_set_string(&jstr, "fw_version", info->fw_version);
+    char *network_id = esp_rmaker_get_network_id();
+    if (network_id) {
+        json_gen_obj_set_string(&jstr, "network_id", network_id);
+    }
     json_gen_end_object(&jstr);
     json_gen_str_end(&jstr);
     char publish_topic[MQTT_TOPIC_BUFFER_SIZE];

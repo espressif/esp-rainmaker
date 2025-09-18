@@ -86,6 +86,8 @@ typedef struct {
     bool need_claim;
     esp_rmaker_claim_data_t *claim_data;
 #endif /* ESP_RMAKER_CLAIM_ENABLED */
+    /* Use Thread partition ID as the Thread network identifier. */
+    char *network_id;
 } esp_rmaker_priv_data_t;
 
 static esp_rmaker_priv_data_t *esp_rmaker_priv_data;
@@ -104,6 +106,46 @@ esp_rmaker_state_t esp_rmaker_get_state(void)
         return esp_rmaker_priv_data->state;
     }
     return ESP_RMAKER_STATE_DEINIT;
+}
+
+esp_err_t esp_rmaker_set_network_id(const char *network_id)
+{
+    if (!esp_rmaker_priv_data) {
+        return ESP_ERR_INVALID_STATE;
+    }
+    if (!network_id) {
+        return ESP_ERR_INVALID_ARG;
+    }
+    bool need_report_node_details = false;
+    if ((!esp_rmaker_priv_data->network_id) || (strcmp(esp_rmaker_priv_data->network_id, network_id) != 0)) {
+        need_report_node_details = true;
+    }
+    if (esp_rmaker_priv_data->network_id) {
+        free(esp_rmaker_priv_data->network_id);
+        esp_rmaker_priv_data->network_id = NULL;
+    }
+    esp_rmaker_priv_data->network_id = strdup(network_id);
+    if (!esp_rmaker_priv_data->network_id) {
+        ESP_LOGE(TAG, "Failed to allocate buffer for new network_id.");
+        return ESP_ERR_NO_MEM;
+    }
+    esp_err_t err = esp_rmaker_node_edit_attribute(esp_rmaker_get_node(), "network-id", network_id);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to add or edit network-id attribute.");
+        return err;
+    }
+    if (need_report_node_details) {
+        esp_rmaker_report_node_details();
+    }
+    return ESP_OK;
+}
+
+char *esp_rmaker_get_network_id(void)
+{
+    if (esp_rmaker_priv_data) {
+        return esp_rmaker_priv_data->network_id;
+    }
+    return NULL;
 }
 
 static void reset_event_handler(void* arg, esp_event_base_t event_base,
@@ -254,6 +296,18 @@ static void esp_rmaker_event_handler(void* arg, esp_event_base_t event_base,
             /* Signal rmaker thread to continue execution */
             xEventGroupSetBits(rmaker_core_event_group, THREAD_SET_DNS_SEVER_EVENT);
         }
+    } else if (event_base == OPENTHREAD_EVENT && event_id == OPENTHREAD_EVENT_ATTACHED) {
+        otInstance *instance = esp_openthread_get_instance();
+        if (instance) {
+            esp_openthread_lock_acquire(portMAX_DELAY);
+            uint32_t partition_id = otThreadGetPartitionId(instance);
+            esp_openthread_lock_release();
+            if (partition_id != 0) {
+                char network_id_buf[9] = {0};
+                sprintf(network_id_buf, "%08lX", partition_id);
+                esp_rmaker_set_network_id(network_id_buf);
+            }
+        }
     } else
 #endif /* CONFIG_ESP_RMAKER_NETWORK_OVER_THREAD */
      if (event_base == RMAKER_EVENT &&
@@ -376,6 +430,11 @@ static void esp_rmaker_task(void *data)
         ESP_LOGE(TAG, "Failed to register event handler. Error: %d. Aborting", err);
         goto rmaker_end;
     }
+    err = esp_event_handler_register(OPENTHREAD_EVENT, OPENTHREAD_EVENT_ATTACHED, &esp_rmaker_event_handler, esp_rmaker_priv_data);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to register event handler. Error: %d. Aborting", err);
+        goto rmaker_end;
+    }
 #endif
     err = esp_event_handler_register(RMAKER_COMMON_EVENT, RMAKER_MQTT_EVENT_CONNECTED, &esp_rmaker_event_handler, esp_rmaker_priv_data);
     if (err != ESP_OK) {
@@ -395,6 +454,7 @@ static void esp_rmaker_task(void *data)
             ESP_LOGE(TAG, "Node connected to Thread without Assisted claiming. Cannot proceed to MQTT connection.");
             ESP_LOGE(TAG, "Please update your phone apps and repeat Thread provisioning with BLE transport.");
             esp_event_handler_unregister(OPENTHREAD_EVENT, OPENTHREAD_EVENT_SET_DNS_SERVER, &esp_rmaker_event_handler);
+            esp_event_handler_unregister(OPENTHREAD_EVENT, OPENTHREAD_EVENT_ATTACHED, &esp_rmaker_event_handler);
 #endif
             err = ESP_FAIL;
             goto rmaker_end;
@@ -408,6 +468,7 @@ static void esp_rmaker_task(void *data)
             esp_event_handler_unregister(IP_EVENT, IP_EVENT_STA_GOT_IP, &esp_rmaker_event_handler);
 #elif defined(CONFIG_ESP_RMAKER_NETWORK_OVER_THREAD)
             esp_event_handler_unregister(OPENTHREAD_EVENT, OPENTHREAD_EVENT_SET_DNS_SERVER, &esp_rmaker_event_handler);
+            esp_event_handler_unregister(OPENTHREAD_EVENT, OPENTHREAD_EVENT_ATTACHED, &esp_rmaker_event_handler);
 #endif
             goto rmaker_end;
         }
