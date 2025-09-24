@@ -129,7 +129,7 @@ static void register_wifi_prov()
     ESP_LOGI(TAG, "Registering command: %s", cmd.command);
     esp_console_cmd_register(&cmd);
 }
-
+#ifdef CONFIG_ESP_RMAKER_CMD_RESP_ENABLE
 static int cmd_resp_cli_handler(int argc, char *argv[])
 {
     if (argc != 5) {
@@ -153,6 +153,7 @@ static void register_cmd_resp_command()
     ESP_LOGI(TAG, "Registering command: %s", cmd_resp_cmd.command);
     esp_console_cmd_register(&cmd_resp_cmd);
 }
+#endif
 
 static int sign_data_command(int argc, char *argv[])
 {
@@ -189,6 +190,8 @@ void register_commands()
     register_user_node_mapping();
     register_get_node_id();
     register_wifi_prov();
+#ifdef CONFIG_ESP_RMAKER_CMD_RESP_ENABLE
     register_cmd_resp_command();
+#endif
     register_sign_data_command();
 }

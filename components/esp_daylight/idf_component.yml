@@ -1,8 +1,0 @@
-## IDF Component Manager Manifest File
-version: "1.0.0"
-description: NOAA-based sunrise/sunset calculation library for ESP-IDF
-url: https://github.com/espressif/esp-rainmaker/tree/master/components/esp_daylight
-repository: https://github.com/espressif/esp-rainmaker.git
-issues: https://github.com/espressif/esp-rainmaker/issues
-dependencies:
-  idf: ">=5.1"

@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.7.5
+
+### Bug Fixes
+- Some guards for `CONFIG_ESP_RMAKER_CMD_RESP_ENABLE` and `CONFIG_ESP_RMAKER_PARAM_CMD_RESP_ENABLE` were missing.
+
+### Other changes
+- Changed default MQTT Host URL to mqtt.rainmaker.espressif.com to match the domain conigured on public RainMaker. 
+
+
 ## 1.7.4
 
 ### New Feature
