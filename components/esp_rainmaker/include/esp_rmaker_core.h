@@ -163,6 +163,8 @@ typedef enum {
     ESP_RMAKER_REQ_SRC_LOCAL,
     /** Request received via command-response framework */
     ESP_RMAKER_REQ_SRC_CMD_RESP,
+    /** Request initiated from firmware/console commands */
+    ESP_RMAKER_REQ_SRC_FIRMWARE,
     /** This will always be the last value. Any value equal to or
      * greater than this should be considered invalid.
      */
