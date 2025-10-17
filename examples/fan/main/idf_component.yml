@@ -6,3 +6,5 @@ dependencies:
   espressif/esp_rainmaker:
     version: ">=1.0"
     override_path: '../../../components/esp_rainmaker/'
+  espressif/button:
+    version: "^4.1.4"
