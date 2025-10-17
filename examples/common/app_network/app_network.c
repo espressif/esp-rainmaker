@@ -353,7 +353,7 @@ void app_network_init()
         }
     }
 #ifdef CONFIG_ESP_RMAKER_NETWORK_OVER_WIFI
-    ESP_ERROR_CHECK(wifi_init());
+    ESP_ERROR_CHECK(app_wifi_internal_init());
 #endif
 #ifdef CONFIG_ESP_RMAKER_NETWORK_OVER_THREAD
     ESP_ERROR_CHECK(thread_init());
@@ -424,7 +424,7 @@ esp_err_t app_network_start(app_network_pop_type_t pop_type)
     esp_err_t err = ESP_OK;
     bool provisioned = false;
 #ifdef CONFIG_ESP_RMAKER_NETWORK_OVER_WIFI
-    err = wifi_start(pop, service_name, service_key, custom_mfg_data, custom_mfg_data_len, &provisioned);
+    err = app_wifi_internal_start(pop, service_name, service_key, custom_mfg_data, custom_mfg_data_len, &provisioned);
 #endif
 #ifdef CONFIG_ESP_RMAKER_NETWORK_OVER_THREAD
     err = thread_start(pop, service_name, service_key, custom_mfg_data, custom_mfg_data_len, &provisioned);

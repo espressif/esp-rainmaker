@@ -24,6 +24,12 @@ extern "C" {
 #define RMAKER_OTA_UPDATE_FLAG_NVS_NAME     "ota_update"
 #define RMAKER_OTA_FETCH_DELAY              5
 
+#if defined(CONFIG_BT_ENABLED) && !defined(CONFIG_IDF_TARGET_ESP32P4)
+/* For checking if BT enabled on the device and disable Wi-Fi PS */
+#define RMAKER_OTA_BT_ENABLED_CHECK 1
+#include <esp_bt.h>
+#endif /* CONFIG_BT_ENABLED && !CONFIG_IDF_TARGET_ESP32P4 */
+
 typedef struct {
     esp_rmaker_ota_type_t type;
     esp_rmaker_ota_cb_t ota_cb;

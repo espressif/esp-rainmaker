@@ -94,7 +94,7 @@ static void wifi_init_sta()
 }
 #endif // CONFIG_ESP_RMAKER_NETWORK_OVER_WIFI
 
-esp_err_t wifi_init(void)
+esp_err_t app_wifi_internal_init(void)
 {
 #ifdef CONFIG_ESP_RMAKER_NETWORK_OVER_WIFI
     /* Initialize TCP/IP */
@@ -113,8 +113,9 @@ esp_err_t wifi_init(void)
 #endif /* CONFIG_ESP_RMAKER_NETWORK_OVER_WIFI */
 }
 
-esp_err_t wifi_start(const char *pop, const char *service_name, const char *service_key, uint8_t *mfg_data,
-                     size_t mfg_data_len, bool *provisioned)
+esp_err_t app_wifi_internal_start(const char *pop, const char *service_name,
+                                  const char *service_key, uint8_t *mfg_data,
+                                  size_t mfg_data_len, bool *provisioned)
 {
 #ifdef CONFIG_ESP_RMAKER_NETWORK_OVER_WIFI
     /* Configuration for the provisioning manager */
