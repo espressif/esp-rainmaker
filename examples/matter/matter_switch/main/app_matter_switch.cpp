@@ -152,8 +152,8 @@ esp_err_t app_matter_switch_create(app_driver_handle_t driver_handle)
         return ESP_FAIL;
     }
 
-    on_off_switch::config_t switch_config;
-    endpoint_t *endpoint = on_off_switch::create(node, &switch_config, ENDPOINT_FLAG_NONE, driver_handle);
+    on_off_light_switch::config_t switch_config;
+    endpoint_t *endpoint = on_off_light_switch::create(node, &switch_config, ENDPOINT_FLAG_NONE, driver_handle);
     if (!endpoint) {
         ESP_LOGE(TAG, "Matter endpoint creation failed");
         return ESP_FAIL;
