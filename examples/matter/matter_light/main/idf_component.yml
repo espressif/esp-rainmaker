@@ -5,5 +5,13 @@ dependencies:
     version: ">=5.0.0"
   espressif/esp_rainmaker:
     version: ">=1.0"
+  espressif/button:
+    version: "^4.1.4"
+  espressif/rmaker_common:
+    version: ">=1.0"
+    override_path: '../../../components/rmaker_common/'
   espressif/qrcode:
     version: "^0.1.0~2"
+  espressif/rmaker_app_insights:
+    version: "*"
+    override_path: '../../../common/rmaker_app_insights/'

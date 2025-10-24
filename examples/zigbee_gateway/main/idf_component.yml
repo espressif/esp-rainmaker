@@ -13,3 +13,9 @@ dependencies:
   espressif/m5stack_core_s3:
     version: "1.1.1"
   espressif/button: "=3.5.0"
+  espressif/rmaker_app_network:
+    version: "*"
+    override_path: '../../common/rmaker_app_network/'
+  espressif/rmaker_app_insights:
+    version: "*"
+    override_path: '../../common/rmaker_app_insights/'
