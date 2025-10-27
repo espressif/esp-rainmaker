@@ -10,6 +10,7 @@
 #include <sdkconfig.h>
 #include <esp_log.h>
 #include <iot_button.h>
+#include <button_gpio.h>
 #include <esp_rmaker_core.h>
 #include <esp_rmaker_standard_types.h>
 #include <esp_rmaker_standard_params.h>
@@ -121,7 +122,7 @@ esp_err_t app_light_set_saturation(uint16_t saturation)
     return app_light_set_led(g_hue, g_saturation, g_value);
 }
 
-static void push_btn_cb(void *arg)
+static void push_btn_cb(void *arg, void *data)
 {
     app_light_set_power(!g_power);
     esp_rmaker_param_update_and_report(
@@ -132,10 +133,19 @@ static void push_btn_cb(void *arg)
 void app_driver_init()
 {
     app_light_init();
-    button_handle_t btn_handle = iot_button_create(BUTTON_GPIO, BUTTON_ACTIVE_LEVEL);
-    if (btn_handle) {
-        /* Register a callback for a button tap (short press) event */
-        iot_button_set_evt_cb(btn_handle, BUTTON_CB_TAP, push_btn_cb, NULL);
+    button_config_t btn_cfg = {
+        .long_press_time = 0,  /* Use default */
+        .short_press_time = 0, /* Use default */
+    };
+    button_gpio_config_t gpio_cfg = {
+        .gpio_num = BUTTON_GPIO,
+        .active_level = BUTTON_ACTIVE_LEVEL,
+        .enable_power_save = false,
+    };
+    button_handle_t btn_handle = NULL;
+    if (iot_button_new_gpio_device(&btn_cfg, &gpio_cfg, &btn_handle) == ESP_OK && btn_handle) {
+        /* Register a callback for a button single click event */
+        iot_button_register_cb(btn_handle, BUTTON_SINGLE_CLICK, NULL, push_btn_cb, NULL);
         /* Register Wi-Fi reset and factory reset functionality on same button */
         app_reset_button_register(btn_handle, WIFI_RESET_BUTTON_TIMEOUT, FACTORY_RESET_BUTTON_TIMEOUT);
     }
