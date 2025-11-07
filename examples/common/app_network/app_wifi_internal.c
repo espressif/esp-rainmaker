@@ -36,10 +36,6 @@ static const char* TAG = "app_wifi";
 static void event_handler(void* arg, esp_event_base_t event_base,
                           int32_t event_id, void* event_data)
 {
-#ifdef CONFIG_APP_NETWORK_RESET_PROV_ON_FAILURE
-    static int retries = 0;
-#endif
-
     if (event_base == NETWORK_PROV_EVENT) {
         switch (event_id) {
             case NETWORK_PROV_START:
@@ -60,21 +56,20 @@ static void event_handler(void* arg, esp_event_base_t event_base,
                          (*reason == NETWORK_PROV_WIFI_STA_AUTH_ERROR) ?
                          "Wi-Fi station authentication failed" : "Wi-Fi access-point not found");
 #ifdef CONFIG_APP_NETWORK_RESET_PROV_ON_FAILURE
-                retries++;
-                if (retries >= CONFIG_APP_NETWORK_PROV_MAX_RETRY_CNT) {
-                    ESP_LOGI(TAG, "Failed to connect with provisioned AP, reseting provisioned credentials");
-                    network_prov_mgr_reset_wifi_sm_state_on_failure();
-                    esp_event_post(APP_NETWORK_EVENT, APP_NETWORK_EVENT_PROV_RESTART, NULL, 0, portMAX_DELAY);
-                    retries = 0;
-                }
+                /* Reset the state machine on provisioning failure.
+                 * This is enabled by the CONFIG_EXAMPLE_RESET_PROV_MGR_ON_FAILURE configuration.
+                 * It allows the provisioning manager to retry the provisioning process
+                 * based on the number of attempts specified in wifi_conn_attempts. After attempting
+                 * the maximum number of retries, the provisioning manager will reset the state machine
+                 * and the provisioning process will be terminated.
+                 */
+                ESP_LOGI(TAG, "Failed to connect with provisioned AP, reseting provisioned credentials");
+                network_prov_mgr_reset_wifi_sm_state_on_failure();
 #endif // CONFIG_APP_NETWORK_RESET_PROV_ON_FAILURE
                 break;
             }
             case NETWORK_PROV_WIFI_CRED_SUCCESS:
                 ESP_LOGI(TAG, "Provisioning successful");
-#ifdef CONFIG_APP_NETWORK_RESET_PROV_ON_FAILURE
-                retries = 0;
-#endif
                 break;
             default:
                 break;
@@ -120,6 +115,11 @@ esp_err_t app_wifi_internal_start(const char *pop, const char *service_name,
 #ifdef CONFIG_ESP_RMAKER_NETWORK_OVER_WIFI
     /* Configuration for the provisioning manager */
     network_prov_mgr_config_t config = {
+#ifdef CONFIG_APP_NETWORK_RESET_PROV_ON_FAILURE
+        .network_prov_wifi_conn_cfg = {
+            .wifi_conn_attempts =  CONFIG_APP_NETWORK_PROV_MAX_RETRY_CNT,
+        },
+#endif
         /* What is the Provisioning Scheme that we want ?
          * network_prov_scheme_softap or network_prov_scheme_ble */
 #ifdef CONFIG_APP_NETWORK_PROV_TRANSPORT_BLE
