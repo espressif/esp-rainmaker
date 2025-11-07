@@ -1,5 +1,20 @@
 # Changelog
 
+## 1.7.8
+
+## Changes
+- Make version dependency for network_provisioning more flexible 
+
+## 1.7.7
+
+### New Feature
+- Added AWS credential provider APIs, required for RainMaker Camera applications.
+
+## 1.7.6
+
+## Changes
+-  Disabled esp_bt code from ota code for supporting esp32-p4, which uses network adapters for Bluetooth.
+
 ## 1.7.5
 
 ### Bug Fixes
