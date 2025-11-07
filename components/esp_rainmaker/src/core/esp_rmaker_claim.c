@@ -370,6 +370,9 @@ static esp_err_t handle_self_claim_init_response(esp_rmaker_claim_data_t *claim_
                 }
                 json_gen_end_long_string(&jstr);
                 json_gen_obj_set_string(&jstr, "csr", (char *)claim_data->csr);
+#ifdef CONFIG_ESP_RMAKER_CLAIM_VIDEOSTREAM_SUPPORT
+                json_gen_obj_set_string(&jstr, "node_policies", "videostream");
+#endif
                 json_gen_end_object(&jstr);
                 json_gen_str_end(&jstr);
                 return ESP_OK;
@@ -806,7 +809,11 @@ static void event_handler(void* arg, esp_event_base_t event_base,
     if (event_base == NETWORK_PROV_EVENT) {
         switch (event_id) {
             case NETWORK_PROV_INIT: {
+#ifdef CONFIG_ESP_RMAKER_CLAIM_VIDEOSTREAM_SUPPORT
+                static const char *capabilities[] = {"camera_claim"};
+#else
                 static const char *capabilities[] = {"claim"};
+#endif
                 network_prov_mgr_set_app_info("rmaker", "1.0", capabilities, 1);
                 if (network_prov_mgr_endpoint_create(CLAIM_ENDPOINT) != ESP_OK) {
                     ESP_LOGE(TAG, "Failed to create claim end point.");
