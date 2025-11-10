@@ -60,6 +60,7 @@ void app_main()
 
     /* Create a device and add the relevant parameters to it */
     temp_sensor_device = esp_rmaker_temp_sensor_device_create("Temperature Sensor", NULL, app_get_current_temperature());
+    esp_rmaker_device_add_param(temp_sensor_device, esp_rmaker_humidity_param_create(ESP_RMAKER_DEF_HUMIDITY_NAME, app_get_current_humidity()));
     esp_rmaker_node_add_device(node, temp_sensor_device);
 
     /* Enable OTA */
