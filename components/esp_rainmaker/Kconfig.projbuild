@@ -90,6 +90,15 @@ menu "ESP RainMaker Config"
         help
             ESP RainMaker MQTT Host name.
 
+    config ESP_RMAKER_MQTT_CRED_HOST
+        string "ESP RainMaker MQTT credentials Host"
+        depends on ESP_RMAKER_SELF_CLAIM || ESP_RMAKER_ASSISTED_CLAIM || ESP_RMAKER_READ_MQTT_HOST_FROM_CONFIG
+        default "c10yordfvrjdjb.credentials.iot.us-east-1.amazonaws.com"
+        help
+            ESP RainMaker MQTT Credential Host.
+            This endpoint can be used to get expirable AWS security token with different node_policies if available.
+            For example, With `esp-videostream-v1-NodeRole`, token is issued which grants access to videostream service.
+
     config ESP_RMAKER_MQTT_USE_BASIC_INGEST_TOPICS
         bool "Use Basic Ingest Topics"
         default y

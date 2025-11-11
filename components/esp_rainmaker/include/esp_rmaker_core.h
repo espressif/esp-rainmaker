@@ -1,17 +1,11 @@
-// Copyright 2020 Espressif Systems (Shanghai) PTE LTD
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+/*
+ * SPDX-FileCopyrightText: 2020-2025 Espressif Systems (Shanghai) CO LTD
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
 #pragma once
+
 #include <stdint.h>
 #include <stdbool.h>
 #include <esp_err.h>
@@ -1129,6 +1123,50 @@ esp_err_t esp_rmaker_param_report_simple_ts_data(const esp_rmaker_param_t *param
  * @return ESP_OK on success, appropriate error on failure.
  */
 esp_err_t esp_rmaker_cmd_response_publish(void *output, size_t output_len);
+
+/**
+ * @brief Structure to hold AWS temporary credentials.
+ */
+typedef struct {
+    char *access_key;              /*!< AWS Access Key ID (null-terminated string, heap-allocated) */
+    uint32_t access_key_len;       /*!< Length of the access key string (excluding null terminator) */
+    char *secret_key;              /*!< AWS Secret Access Key (null-terminated string, heap-allocated) */
+    uint32_t secret_key_len;       /*!< Length of the secret key string (excluding null terminator) */
+    char *session_token;           /*!< AWS Session Token (null-terminated string, heap-allocated) */
+    uint32_t session_token_len;    /*!< Length of the session token string (excluding null terminator) */
+    uint32_t expiration;           /*!< Expiration time of the credentials (seconds from now) */
+} esp_rmaker_aws_credentials_t;
+
+/** Get AWS region from credential endpoint
+ *
+ * This function extracts the AWS region from the credential endpoint stored in factory.
+ * The region string is allocated on the heap and should be freed by the caller.
+ *
+ * @return Pointer to allocated region string on success
+ * @return NULL on failure
+ */
+char* esp_rmaker_get_aws_region(void);
+
+/** Get AWS security token credentials
+ *
+ * This function fetches AWS temporary credentials by assuming the specified role alias.
+ * The credentials are allocated on the heap and should be freed using esp_rmaker_free_aws_credentials().
+ *
+ * @param[in] role_alias AWS IoT role alias to assume
+ *
+ * @return Pointer to allocated credentials structure on success
+ * @return NULL on failure
+ */
+esp_rmaker_aws_credentials_t* esp_rmaker_get_aws_security_token(const char *role_alias);
+
+/** Free AWS credentials structure
+ *
+ * This function frees the memory allocated for AWS credentials structure and all its members.
+ *
+ * @param[in] credentials Pointer to credentials structure to free
+ */
+void esp_rmaker_free_aws_credentials(esp_rmaker_aws_credentials_t *credentials);
+
 #ifdef __cplusplus
 }
 #endif
