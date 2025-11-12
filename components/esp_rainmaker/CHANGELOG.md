@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.7.9
+
+### New Feature
+- Added set-param, get-param and update-param console commands to assist in some testing
+
 ## 1.7.8
 
 ## Changes
