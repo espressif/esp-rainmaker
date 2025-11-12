@@ -38,6 +38,9 @@ CONFIG_FREERTOS_TIMER_TASK_STACK_DEPTH=3120
 # For additional security on reset to factory
 CONFIG_ESP_RMAKER_USER_ID_CHECK=y
 
+# Enable parameter console commands
+CONFIG_ESP_RMAKER_CONSOLE_PARAM_CMDS_ENABLE=y
+
 # Application Rollback
 CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE=y
 

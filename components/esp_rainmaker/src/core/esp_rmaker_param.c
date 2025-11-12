@@ -54,6 +54,7 @@ static const char *cb_srcs[ESP_RMAKER_REQ_SRC_MAX] = {
     [ESP_RMAKER_REQ_SRC_SCENE_DEACTIVATE] = "Scene Deactivate",
     [ESP_RMAKER_REQ_SRC_LOCAL] = "Local",
     [ESP_RMAKER_REQ_SRC_CMD_RESP] = "Command Response",
+    [ESP_RMAKER_REQ_SRC_FIRMWARE] = "Firmware",
 };
 
 const char *esp_rmaker_device_cb_src_to_str(esp_rmaker_req_src_t src)

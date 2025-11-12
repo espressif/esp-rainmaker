@@ -14,21 +14,24 @@
 
 #include <stdio.h>
 #include <string.h>
+#include <stdlib.h>
 #include <inttypes.h>
 #include <esp_log.h>
 #include <esp_wifi.h>
 #include <esp_console.h>
-#include <string.h>
 #include <esp_rmaker_core.h>
 #include <esp_rmaker_user_mapping.h>
 #include <esp_rmaker_utils.h>
 #include <esp_rmaker_cmd_resp.h>
-
 #include <esp_rmaker_internal.h>
 #include <esp_rmaker_console_internal.h>
 #include <network_provisioning/manager.h>
 
+/* Include internal header to access device structure */
+#include "esp_rmaker_internal.h"
+
 static const char *TAG = "esp_rmaker_commands";
+
 
 static int user_node_mapping_handler(int argc, char** argv)
 {
@@ -185,6 +188,365 @@ static void register_sign_data_command()
     esp_console_cmd_register(&cmd);
 }
 
+#ifdef CONFIG_ESP_RMAKER_CONSOLE_PARAM_CMDS_ENABLE
+static int set_param_handler(int argc, char** argv)
+{
+    if (argc != 4) {
+        printf("%s: Invalid Usage.\n", TAG);
+        printf("Usage: set-param <device_name> <param_name> <value>\n");
+        printf("  Note: This command invokes device callbacks (simulates real parameter changes)\n");
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    const char *device_name = argv[1];
+    const char *param_name = argv[2];
+    const char *value_str_raw = argv[3];
+
+    /* Strip surrounding quotes if present */
+    char *value_str = strdup(value_str_raw);
+    if (!value_str) {
+        printf("%s: Failed to process value string\n", TAG);
+        return ESP_ERR_NO_MEM;
+    }
+
+    // Get the device handle
+    esp_rmaker_device_t *device = esp_rmaker_node_get_device_by_name(esp_rmaker_get_node(), device_name);
+    if (!device) {
+        printf("%s: Device %s not found\n", TAG, device_name);
+        free(value_str);
+        return ESP_FAIL;
+    }
+
+    // Get the parameter handle
+    esp_rmaker_param_t *param = esp_rmaker_device_get_param_by_name(device, param_name);
+    if (!param) {
+        printf("%s: Parameter %s not found in device %s\n", TAG, param_name, device_name);
+        free(value_str);
+        return ESP_FAIL;
+    }
+
+    // Get current value to determine type
+    esp_rmaker_param_val_t *val = esp_rmaker_param_get_val(param);
+    if (!val) {
+        printf("%s: Failed to get parameter value\n", TAG);
+        free(value_str);
+        return ESP_FAIL;
+    }
+
+
+    // Update value based on type
+    esp_rmaker_param_val_t new_val;
+    new_val.type = val->type;
+
+    switch(val->type) {
+        case RMAKER_VAL_TYPE_BOOLEAN:
+            new_val.val.b = (strcmp(value_str, "true") == 0 || strcmp(value_str, "1") == 0);
+            break;
+        case RMAKER_VAL_TYPE_INTEGER:
+            new_val.val.i = atoi(value_str);
+            break;
+        case RMAKER_VAL_TYPE_FLOAT:
+            new_val.val.f = atof(value_str);
+            break;
+        case RMAKER_VAL_TYPE_STRING:
+            new_val.val.s = strdup(value_str);  // Create a copy to avoid lifetime issues
+            if (!new_val.val.s) {
+                printf("%s: Failed to allocate memory for string value\n", TAG);
+                free(value_str);
+                return ESP_FAIL;
+            }
+            break;
+        case RMAKER_VAL_TYPE_OBJECT:
+            new_val.val.s = strdup(value_str);  // JSON objects are stored as strings
+            if (!new_val.val.s) {
+                printf("%s: Failed to allocate memory for object value\n", TAG);
+                free(value_str);
+                return ESP_FAIL;
+            }
+            break;
+        case RMAKER_VAL_TYPE_ARRAY:
+            new_val.val.s = strdup(value_str);  // JSON arrays are stored as strings
+            if (!new_val.val.s) {
+                printf("%s: Failed to allocate memory for array value\n", TAG);
+                free(value_str);
+                return ESP_FAIL;
+            }
+            break;
+        default:
+            printf("%s: Unsupported value type\n", TAG);
+            free(value_str);
+            return ESP_FAIL;
+    }
+
+    esp_err_t err = ESP_OK;
+
+    /* Create JSON for esp_rmaker_handle_set_params to invoke callbacks */
+    char json_str[1024];  /* Increased buffer size for complex JSON */
+    int json_len = 0;
+
+    switch(val->type) {
+            case RMAKER_VAL_TYPE_BOOLEAN:
+                json_len = snprintf(json_str, sizeof(json_str), "{\"%s\":{\"%s\":%s}}",
+                                  device_name, param_name, new_val.val.b ? "true" : "false");
+                break;
+            case RMAKER_VAL_TYPE_INTEGER:
+                json_len = snprintf(json_str, sizeof(json_str), "{\"%s\":{\"%s\":%d}}",
+                                  device_name, param_name, new_val.val.i);
+                break;
+            case RMAKER_VAL_TYPE_FLOAT:
+                json_len = snprintf(json_str, sizeof(json_str), "{\"%s\":{\"%s\":%f}}",
+                                  device_name, param_name, new_val.val.f);
+                break;
+            case RMAKER_VAL_TYPE_STRING:
+                json_len = snprintf(json_str, sizeof(json_str), "{\"%s\":{\"%s\":\"%s\"}}",
+                                  device_name, param_name, new_val.val.s);
+                break;
+            case RMAKER_VAL_TYPE_OBJECT:
+                /* JSON objects are embedded directly without quotes */
+                json_len = snprintf(json_str, sizeof(json_str), "{\"%s\":{\"%s\":%s}}",
+                                  device_name, param_name, new_val.val.s);
+                break;
+            case RMAKER_VAL_TYPE_ARRAY:
+                /* JSON arrays are embedded directly without quotes */
+                json_len = snprintf(json_str, sizeof(json_str), "{\"%s\":{\"%s\":%s}}",
+                                  device_name, param_name, new_val.val.s);
+                break;
+            default:
+                printf("%s: Unsupported value type for callback\n", TAG);
+                /* Fall back to direct update */
+                err = esp_rmaker_param_update_and_report(param, new_val);
+                break;
+        }
+
+    if (json_len > 0 && json_len < sizeof(json_str)) {
+        /* Use the standard parameter handling function to invoke callbacks */
+        err = esp_rmaker_handle_set_params(json_str, json_len, ESP_RMAKER_REQ_SRC_FIRMWARE);
+        if (err == ESP_OK) {
+            printf("%s: Successfully set %s.%s with callback\n", TAG, device_name, param_name);
+        } else {
+            printf("%s: Callback failed for %s.%s\n", TAG, device_name, param_name);
+        }
+    } else {
+        printf("%s: Failed to create JSON for callback (len=%d, max=%zu)\n", TAG, json_len, sizeof(json_str));
+        err = ESP_FAIL;
+    }
+
+    /* Free allocated string memory if it was a string, object, or array type */
+    if ((val->type == RMAKER_VAL_TYPE_STRING || val->type == RMAKER_VAL_TYPE_OBJECT || val->type == RMAKER_VAL_TYPE_ARRAY) && new_val.val.s) {
+        free(new_val.val.s);
+    }
+
+    if (err != ESP_OK) {
+        printf("%s: Failed to update parameter value\n", TAG);
+        free(value_str);
+        return err;
+    }
+
+    printf("%s: Successfully set %s.%s to %s\n", TAG, device_name, param_name, value_str);
+
+    /* Free the processed value string */
+    free(value_str);
+    return ESP_OK;
+}
+
+static int update_param_handler(int argc, char** argv)
+{
+    if (argc != 4) {
+        printf("%s: Invalid Usage.\n", TAG);
+        printf("Usage: update-param <device_name> <param_name> <value>\n");
+        printf("  Note: This command only updates the value without invoking callbacks\n");
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    const char *device_name = argv[1];
+    const char *param_name = argv[2];
+    const char *value_str_raw = argv[3];
+
+    /* Strip surrounding quotes if present */
+    char *value_str = strdup(value_str_raw);
+    if (!value_str) {
+        printf("%s: Failed to process value string\n", TAG);
+        return ESP_ERR_NO_MEM;
+    }
+
+    // Get the device handle
+    esp_rmaker_device_t *device = esp_rmaker_node_get_device_by_name(esp_rmaker_get_node(), device_name);
+    if (!device) {
+        printf("%s: Device %s not found\n", TAG, device_name);
+        free(value_str);
+        return ESP_FAIL;
+    }
+
+    // Get the parameter handle
+    esp_rmaker_param_t *param = esp_rmaker_device_get_param_by_name(device, param_name);
+    if (!param) {
+        printf("%s: Parameter %s not found in device %s\n", TAG, param_name, device_name);
+        free(value_str);
+        return ESP_FAIL;
+    }
+
+    // Get current value to determine type
+    esp_rmaker_param_val_t *val = esp_rmaker_param_get_val(param);
+    if (!val) {
+        printf("%s: Failed to get parameter value\n", TAG);
+        free(value_str);
+        return ESP_FAIL;
+    }
+
+    // Update value based on type
+    esp_rmaker_param_val_t new_val;
+    new_val.type = val->type;
+
+    switch(val->type) {
+        case RMAKER_VAL_TYPE_BOOLEAN:
+            new_val.val.b = (strcmp(value_str, "true") == 0 || strcmp(value_str, "1") == 0);
+            break;
+        case RMAKER_VAL_TYPE_INTEGER:
+            new_val.val.i = atoi(value_str);
+            break;
+        case RMAKER_VAL_TYPE_FLOAT:
+            new_val.val.f = atof(value_str);
+            break;
+        case RMAKER_VAL_TYPE_STRING:
+            new_val.val.s = strdup(value_str);  // Create a copy to avoid lifetime issues
+            if (!new_val.val.s) {
+                printf("%s: Failed to allocate memory for string value\n", TAG);
+                free(value_str);
+                return ESP_FAIL;
+            }
+            break;
+        case RMAKER_VAL_TYPE_OBJECT:
+            new_val.val.s = strdup(value_str);  // JSON objects are stored as strings
+            if (!new_val.val.s) {
+                printf("%s: Failed to allocate memory for object value\n", TAG);
+                free(value_str);
+                return ESP_FAIL;
+            }
+            break;
+        case RMAKER_VAL_TYPE_ARRAY:
+            new_val.val.s = strdup(value_str);  // JSON arrays are stored as strings
+            if (!new_val.val.s) {
+                printf("%s: Failed to allocate memory for array value\n", TAG);
+                free(value_str);
+                return ESP_FAIL;
+            }
+            break;
+        default:
+            printf("%s: Unsupported value type\n", TAG);
+            free(value_str);
+            return ESP_FAIL;
+    }
+
+    /* Update the parameter value without invoking callback */
+    esp_err_t err = esp_rmaker_param_update_and_report(param, new_val);
+
+    /* Free allocated string memory if it was a string, object, or array type */
+    if ((val->type == RMAKER_VAL_TYPE_STRING || val->type == RMAKER_VAL_TYPE_OBJECT || val->type == RMAKER_VAL_TYPE_ARRAY) && new_val.val.s) {
+        free(new_val.val.s);
+    }
+
+    if (err != ESP_OK) {
+        printf("%s: Failed to update parameter value\n", TAG);
+        free(value_str);
+        return err;
+    }
+
+    printf("%s: Successfully updated %s.%s to %s (no callback)\n", TAG, device_name, param_name, value_str);
+
+    /* Free the processed value string */
+    free(value_str);
+    return ESP_OK;
+}
+
+static int get_param_handler(int argc, char** argv)
+{
+    if (argc != 3) {
+        printf("%s: Invalid Usage.\n", TAG);
+        printf("Usage: get-param <device_name> <param_name>\n");
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    const char *device_name = argv[1];
+    const char *param_name = argv[2];
+
+    // Get the device handle
+    esp_rmaker_device_t *device = esp_rmaker_node_get_device_by_name(esp_rmaker_get_node(), device_name);
+    if (!device) {
+        printf("%s: Device %s not found\n", TAG, device_name);
+        return ESP_FAIL;
+    }
+
+    // Get the parameter handle
+    esp_rmaker_param_t *param = esp_rmaker_device_get_param_by_name(device, param_name);
+    if (!param) {
+        printf("%s: Parameter %s not found in device %s\n", TAG, param_name, device_name);
+        return ESP_FAIL;
+    }
+
+    // Get the parameter value
+    esp_rmaker_param_val_t *val = esp_rmaker_param_get_val(param);
+    if (!val) {
+        printf("%s: Failed to get parameter value\n", TAG);
+        return ESP_FAIL;
+    }
+
+    // Print value based on type
+    switch(val->type) {
+        case RMAKER_VAL_TYPE_BOOLEAN:
+            printf("%s: %s.%s = %s\n", TAG, device_name, param_name, val->val.b ? "true" : "false");
+            break;
+        case RMAKER_VAL_TYPE_INTEGER:
+            printf("%s: %s.%s = %d\n", TAG, device_name, param_name, val->val.i);
+            break;
+        case RMAKER_VAL_TYPE_FLOAT:
+            printf("%s: %s.%s = %f\n", TAG, device_name, param_name, val->val.f);
+            break;
+        case RMAKER_VAL_TYPE_STRING:
+            printf("%s: %s.%s = %s\n", TAG, device_name, param_name, val->val.s);
+            break;
+        case RMAKER_VAL_TYPE_OBJECT:
+            printf("%s: %s.%s = %s\n", TAG, device_name, param_name, val->val.s);
+            break;
+        case RMAKER_VAL_TYPE_ARRAY:
+            printf("%s: %s.%s = %s\n", TAG, device_name, param_name, val->val.s);
+            break;
+        default:
+            printf("%s: Unsupported value type\n", TAG);
+            return ESP_FAIL;
+    }
+
+    return ESP_OK;
+}
+
+static void register_param_commands()
+{
+    const esp_console_cmd_t set_cmd = {
+        .command = "set-param",
+        .help = "Set device parameter value with callback. Usage: set-param <device_name> <param_name> <value>",
+        .func = &set_param_handler,
+    };
+    ESP_LOGI(TAG, "Registering command: %s", set_cmd.command);
+    esp_console_cmd_register(&set_cmd);
+
+    const esp_console_cmd_t update_cmd = {
+        .command = "update-param",
+        .help = "Update device parameter value without callback. Usage: update-param <device_name> <param_name> <value>",
+        .func = &update_param_handler,
+    };
+    ESP_LOGI(TAG, "Registering command: %s", update_cmd.command);
+    esp_console_cmd_register(&update_cmd);
+
+    const esp_console_cmd_t get_cmd = {
+        .command = "get-param",
+        .help = "Get device parameter value. Usage: get-param <device_name> <param_name>",
+        .func = &get_param_handler,
+    };
+    ESP_LOGI(TAG, "Registering command: %s", get_cmd.command);
+    esp_console_cmd_register(&get_cmd);
+}
+
+#endif /* CONFIG_ESP_RMAKER_CONSOLE_PARAM_CMDS_ENABLE */
+
 void register_commands()
 {
     register_user_node_mapping();
@@ -194,4 +556,7 @@ void register_commands()
     register_cmd_resp_command();
 #endif
     register_sign_data_command();
+#ifdef CONFIG_ESP_RMAKER_CONSOLE_PARAM_CMDS_ENABLE
+    register_param_commands();
+#endif
 }
