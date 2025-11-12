@@ -5,7 +5,5 @@ dependencies:
     version: ">=5.0.0"
   espressif/esp_rainmaker:
     version: ">=1.0"
-  espressif/rmaker_common:
-    version: ">=1.0"
   espressif/json_generator:
     version: "*"

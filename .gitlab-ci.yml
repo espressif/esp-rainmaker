@@ -180,6 +180,8 @@ build_docs:
   # No cleaning when the artifacts
   after_script: []
   script:
+    - mkdir -p components
+    - git clone --branch master --depth 1 https://${GITLAB_USER}:${GITLAB_PASSWORD}@${GITLAB_HTTP_SERVER}/app-frameworks/esp-rainmaker-common.git components/rmaker_common
     - cd docs
     - pip install -r requirements.txt
     - build-docs -l en -t esp32

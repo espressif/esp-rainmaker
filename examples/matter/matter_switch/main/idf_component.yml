@@ -7,9 +7,6 @@ dependencies:
     version: ">=1.0"
   espressif/button:
     version: "^4.1.4"
-  espressif/rmaker_common:
-    version: ">=1.0"
-    override_path: '../../../components/rmaker_common/'
   espressif/rmaker_app_insights:
     version: "*"
     override_path: '../../../common/rmaker_app_insights/'
