@@ -17,4 +17,74 @@ menu "Example Configuration"
             0: POP_TYPE_MAC
             1: POP_TYPE_RANDOM
             2: POP_TYPE_NONE
+
+    choice LED_TYPE
+        prompt "LED Type"
+        default LED_TYPE_RGB if IDF_TARGET_ESP32C2
+        default LED_TYPE_NONE if IDF_TARGET_ESP32
+        default LED_TYPE_WS2812
+        help
+            Select the type of LED to use.
+
+        config LED_TYPE_RGB
+            bool "RGB LED (3-pin RGB LED)"
+            help
+                Use a 3-pin RGB LED with separate GPIO pins for red, green, and blue.
+
+        config LED_TYPE_WS2812
+            bool "WS2812 LED Strip"
+            help
+                Use WS2812 addressable LED strip.
+
+        config LED_TYPE_NONE
+            bool "No LED"
+            help
+                Disable LED hardware. Useful for testing without LED hardware connected.
+    endchoice
+
+    config RGB_LED_RED_GPIO
+        int "RGB LED Red GPIO"
+        default 0
+        depends on LED_TYPE_RGB
+        help
+            GPIO number for the red channel of the RGB LED.
+
+    config RGB_LED_GREEN_GPIO
+        int "RGB LED Green GPIO"
+        default 1
+        depends on LED_TYPE_RGB
+        help
+            GPIO number for the green channel of the RGB LED.
+
+    config RGB_LED_BLUE_GPIO
+        int "RGB LED Blue GPIO"
+        default 8
+        depends on LED_TYPE_RGB
+        help
+            GPIO number for the blue channel of the RGB LED.
+
+    config RGB_LED_ACTIVE_LEVEL_HIGH
+        bool "RGB LED Active Level High"
+        default n
+        depends on LED_TYPE_RGB
+        help
+            Set to y if the RGB LED is active high (common cathode), n if active low (common anode).
+
+    config WS2812_LED_GPIO
+        int "WS2812 LED GPIO"
+        default 27 if IDF_TARGET_ESP32C5
+        default 8 if IDF_TARGET_ESP32C3 || IDF_TARGET_ESP32C6 || IDF_TARGET_ESP32H2
+        default 48 if IDF_TARGET_ESP32S3
+        default 18
+        depends on LED_TYPE_WS2812
+        help
+            GPIO number for the WS2812 RGB LED strip.
+
+    config WS2812_LED_COUNT
+        int "Number of WS2812 LEDs"
+        default 1
+        range 1 256
+        depends on LED_TYPE_WS2812
+        help
+            Number of LEDs in the WS2812 strip.
 endmenu

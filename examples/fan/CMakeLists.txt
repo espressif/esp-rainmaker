@@ -8,9 +8,6 @@ else()
   set(RMAKER_PATH ${CMAKE_CURRENT_LIST_DIR}/../..)
 endif(DEFINED ENV{RMAKER_PATH})
 
-# Add RainMaker components and other common application components
-set(EXTRA_COMPONENT_DIRS ${RMAKER_PATH}/examples/common)
-
 set(PROJECT_VER "1.0")
 include($ENV{IDF_PATH}/tools/cmake/project.cmake)
 project(fan)

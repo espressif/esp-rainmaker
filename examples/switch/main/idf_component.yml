@@ -8,3 +8,18 @@ dependencies:
     override_path: '../../../components/esp_rainmaker/'
   espressif/button:
     version: "^4.1.4"
+  espressif/led_indicator:
+    version: "^2.0.0"
+  espressif/rmaker_common:
+    version: ">=1.0"
+    override_path: '../../../components/rmaker_common/'
+  ## Local components from examples/common
+  app_reset:
+    version: "*"
+    override_path: '../../common/app_reset/'
+  app_network:
+    version: "*"
+    override_path: '../../common/app_network/'
+  app_insights:
+    version: "*"
+    override_path: '../../common/app_insights/'
