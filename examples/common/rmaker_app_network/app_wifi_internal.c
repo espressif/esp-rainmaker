@@ -57,7 +57,7 @@ static void event_handler(void* arg, esp_event_base_t event_base,
                          "Wi-Fi station authentication failed" : "Wi-Fi access-point not found");
 #ifdef CONFIG_APP_NETWORK_RESET_PROV_ON_FAILURE
                 /* Reset the state machine on provisioning failure.
-                 * This is enabled by the CONFIG_EXAMPLE_RESET_PROV_MGR_ON_FAILURE configuration.
+                 * This is enabled by the CONFIG_APP_NETWORK_RESET_PROV_ON_FAILURE configuration.
                  * It allows the provisioning manager to retry the provisioning process
                  * based on the number of attempts specified in wifi_conn_attempts. After attempting
                  * the maximum number of retries, the provisioning manager will reset the state machine

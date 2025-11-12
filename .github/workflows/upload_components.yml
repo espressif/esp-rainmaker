@@ -15,5 +15,8 @@ jobs:
         with:
           directories: >
             components/esp_rainmaker;
+            examples/common/rmaker_app_reset;
+            examples/common/rmaker_app_network;
+            examples/common/rmaker_app_insights;
           namespace: "espressif"
           api_token: ${{ secrets.IDF_COMPONENT_API_TOKEN }}
