@@ -10,16 +10,12 @@ dependencies:
     version: "^4.1.4"
   espressif/led_indicator:
     version: "^2.0.0"
-  espressif/rmaker_common:
-    version: ">=1.0"
-    override_path: '../../../components/rmaker_common/'
-  ## Local components from examples/common
-  app_reset:
+  espressif/rmaker_app_reset:
     version: "*"
-    override_path: '../../common/app_reset/'
-  app_network:
+    override_path: '../../common/rmaker_app_reset/'
+  espressif/rmaker_app_network:
     version: "*"
-    override_path: '../../common/app_network/'
-  app_insights:
+    override_path: '../../common/rmaker_app_network/'
+  espressif/rmaker_app_insights:
     version: "*"
-    override_path: '../../common/app_insights/'
+    override_path: '../../common/rmaker_app_insights/'

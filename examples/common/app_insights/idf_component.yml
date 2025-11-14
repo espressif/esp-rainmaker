@@ -1,7 +1,0 @@
-## IDF Component Manager Manifest File
-dependencies:
-  espressif/esp_rainmaker:
-    version: ">=1.0"
-    override_path: '../../../components/esp_rainmaker/'
-  espressif/esp_insights:
-    version: "~1.3.0"

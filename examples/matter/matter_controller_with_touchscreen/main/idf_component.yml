@@ -1,6 +1,15 @@
 ## IDF Component Manager Manifest File
 dependencies:
+  ## Required IDF version
   idf: ">=5.1"
+  espressif/esp_rainmaker:
+    version: ">=1.0"
+    override_path: '../../../../components/esp_rainmaker/'
+  espressif/button:
+    version: "^4.1.4"
   espressif/led_strip: "^1.0.0"
   espressif/qrcode: ^0.1.0
   lvgl/lvgl: "==8.4.0"
+  espressif/rmaker_app_insights:
+    version: "*"
+    override_path: '../../../common/rmaker_app_insights/'

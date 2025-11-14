@@ -1,10 +1,10 @@
 ## IDF Component Manager Manifest File
 version: "1.0.0"
 description: Wi-Fi and Factory Reset helper component for ESP RainMaker applications
-url: https://github.com/espressif/esp-rainmaker/tree/master/examples/common/app_reset
+url: https://github.com/espressif/esp-rainmaker/tree/master/examples/common/rmaker_app_reset
 repository: https://github.com/espressif/esp-rainmaker.git
 issues: https://github.com/espressif/esp-rainmaker/issues
-documentation: https://github.com/espressif/esp-rainmaker/tree/master/examples/common/app_reset/README.md
+documentation: https://github.com/espressif/esp-rainmaker/tree/master/examples/common/rmaker_app_reset/README.md
 dependencies:
   ## Required IDF version
   idf:

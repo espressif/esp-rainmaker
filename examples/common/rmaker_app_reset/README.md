@@ -1,5 +1,7 @@
 # RainMaker App Reset Component
 
+[![Component Registry](https://components.espressif.com/components/espressif/rmaker_app_reset/badge.svg)](https://components.espressif.com/components/espressif/rmaker_app_reset)
+
 A simple helper component for ESP RainMaker applications that provides Wi-Fi reset and factory reset functionality using button long-press detection.
 
 ## Features

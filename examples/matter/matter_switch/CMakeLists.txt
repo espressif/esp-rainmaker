@@ -42,7 +42,6 @@ set(EXTRA_COMPONENT_DIRS
     "${ESP_MATTER_PATH}/components"
     "${ESP_MATTER_PATH}/device_hal/device"
     "${ESP_MATTER_PATH}/examples/common"
-    "${RMAKER_PATH}/examples/common/app_insights"
     "${RMAKER_PATH}/examples/matter/common"
     ${extra_components_dirs_append})
 

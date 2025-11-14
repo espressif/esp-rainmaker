@@ -11,11 +11,9 @@ dependencies:
   idf:
     version: ">=4.1.0"
 
-  ## Additional dependencies
-  app_reset:
-    path: examples/common/app_reset
-    git: https://github.com/espressif/esp-rainmaker.git
-    version: 72845bc
+  espressif/rmaker_app_reset:
+    version: "*"
+    override_path: '../../common/rmaker_app_reset/'
 
   gpio_button:
     path: examples/common/gpio_button

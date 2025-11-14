@@ -5,8 +5,5 @@ dependencies:
     version: ">=5.0.0"
   espressif/esp_rainmaker:
     version: ">=1.0"
-  espressif/button:
-    version: "^4.1.4"
-  espressif/rmaker_app_insights:
+  espressif/json_generator:
     version: "*"
-    override_path: '../../../common/rmaker_app_insights/'
