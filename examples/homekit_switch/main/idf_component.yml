@@ -13,9 +13,6 @@ dependencies:
   espressif/rmaker_app_reset:
     version: "*"
     override_path: '../../common/rmaker_app_reset/'
-  espressif/rmaker_app_network:
-    version: "*"
-    override_path: '../../common/rmaker_app_network/'
   espressif/rmaker_app_insights:
     version: "*"
     override_path: '../../common/rmaker_app_insights/'
