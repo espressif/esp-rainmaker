@@ -206,3 +206,24 @@ esp_rmaker_param_t *esp_rmaker_local_control_type_param_create(const char *param
             esp_rmaker_int(val), PROP_FLAG_READ);
     return param;
 }
+
+esp_rmaker_param_t *esp_rmaker_user_token_param_create(const char *param_name)
+{
+    esp_rmaker_param_t *param = esp_rmaker_param_create(param_name, ESP_RMAKER_PARAM_USER_TOKEN,
+            esp_rmaker_str(""), PROP_FLAG_WRITE | PROP_FLAG_PERSIST);
+    return param;
+}
+
+esp_rmaker_param_t *esp_rmaker_base_url_param_create(const char *param_name)
+{
+    esp_rmaker_param_t *param = esp_rmaker_param_create(param_name, ESP_RMAKER_PARAM_BASE_URL,
+            esp_rmaker_str(""), PROP_FLAG_READ | PROP_FLAG_WRITE | PROP_FLAG_PERSIST);
+    return param;
+}
+
+esp_rmaker_param_t *esp_rmaker_group_id_param_create(const char *param_name)
+{
+    esp_rmaker_param_t *param = esp_rmaker_param_create(param_name, ESP_RMAKER_PARAM_GROUP_ID,
+            esp_rmaker_str(""), PROP_FLAG_READ | PROP_FLAG_WRITE | PROP_FLAG_PERSIST);
+    return param;
+}

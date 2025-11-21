@@ -77,3 +77,15 @@ esp_rmaker_device_t *esp_rmaker_create_local_control_service(const char *serv_na
     }
     return service;
 }
+
+esp_rmaker_device_t *esp_rmaker_create_user_auth_service(const char *serv_name, esp_rmaker_device_bulk_write_cb_t bulk_write_cb,
+    esp_rmaker_device_bulk_read_cb_t bulk_read_cb, void *priv_data)
+{
+    esp_rmaker_device_t *service = esp_rmaker_service_create(serv_name, ESP_RMAKER_SERVICE_USER_AUTH, priv_data);
+    if (service) {
+        esp_rmaker_device_add_bulk_cb(service, bulk_write_cb, bulk_read_cb);
+        esp_rmaker_device_add_param(service, esp_rmaker_user_token_param_create(ESP_RMAKER_DEF_USER_TOKEN_NAME));
+        esp_rmaker_device_add_param(service, esp_rmaker_base_url_param_create(ESP_RMAKER_DEF_BASE_URL_NAME));
+    }
+    return service;
+}

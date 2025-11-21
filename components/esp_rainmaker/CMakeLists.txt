@@ -86,6 +86,9 @@ if (CONFIG_OPENTHREAD_BORDER_ROUTER)
     list(APPEND thread_br_priv_includes "src/thread_br")
 endif()
 
+# RainMaker Controller
+set(rainmaker_controller_srcs "src/rainmaker_controller/esp_rmaker_controller.c")
+
 # CONSOLE
 set(console_srcs "src/console/esp_rmaker_console.c"
         "src/console/esp_rmaker_commands.c")
@@ -96,9 +99,9 @@ set(standard_types_srcs "src/standard_types/esp_rmaker_standard_params.c"
         "src/standard_types/esp_rmaker_standard_devices.c"
         "src/standard_types/esp_rmaker_standard_services.c")
 
-idf_component_register(SRCS ${core_srcs} ${mqtt_srcs} ${ota_srcs} ${standard_types_srcs} ${console_srcs} ${thread_br_srcs}
+idf_component_register(SRCS ${core_srcs} ${mqtt_srcs} ${ota_srcs} ${standard_types_srcs} ${console_srcs} ${thread_br_srcs} ${rainmaker_controller_srcs}
                        INCLUDE_DIRS "include"
-                       PRIV_INCLUDE_DIRS ${core_priv_includes} ${ota_priv_includes} ${console_priv_includes} ${mqtt_priv_includes} ${thread_br_priv_includes}
+                       PRIV_INCLUDE_DIRS ${core_priv_includes} ${ota_priv_includes} ${console_priv_includes} ${mqtt_priv_includes} ${thread_br_priv_includes} ${rainmaker_controller_priv_includes}
                        REQUIRES rmaker_common
                        PRIV_REQUIRES ${priv_req})
 
