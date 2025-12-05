@@ -61,6 +61,8 @@ typedef struct {
     char *model;
     /** Subtype (Optional). */
     char *subtype;
+    /** Readme URL (Optional). Typically points to a readme URL. Will be included in node config only if not NULL and not empty. */
+    char *readme;
     /** An array of digests read from efuse. Should be freed after use*/
     char **secure_boot_digest;
 } esp_rmaker_node_info_t;
@@ -522,6 +524,16 @@ esp_err_t esp_rmaker_node_add_model(const esp_rmaker_node_t *node, const char *m
  * @return error in case of failure.
  */
 esp_err_t esp_rmaker_node_add_subtype(const esp_rmaker_node_t *node, const char *subtype);
+
+/** Add readme URL for a node
+ *
+ * @param node Node handle.
+ * @param[in] readme Readme URL string. Typically points to a readme URL. Will be included in node config only if not NULL and not empty.
+ *
+ * @return ESP_OK on success.
+ * @return error in case of failure.
+ */
+esp_err_t esp_rmaker_node_add_readme(const esp_rmaker_node_t *node, const char *readme);
 
 /**
  * Create a Device

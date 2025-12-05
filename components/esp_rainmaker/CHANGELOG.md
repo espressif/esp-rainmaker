@@ -1,5 +1,19 @@
 # Changelog
 
+## 1.8.1
+
+### New Feature
+
+- Added optional `readme` field to node info: Allows example projects to include
+  a README URL in the node configuration. The readme field will be included in
+  node config only if its value is not NULL and not an empty string. This can
+  be set using the `esp_rmaker_node_add_readme()` API.
+
+## 1.8.0
+
+### Changes
+- Decouple esp_rcp_update from esp_rainmaker and it is not a core functionality of RainMaker
+
 ## 1.7.9
 
 ### New Feature
@@ -8,7 +22,7 @@
 ## 1.7.8
 
 ## Changes
-- Make version dependency for network_provisioning more flexible 
+- Make version dependency for network_provisioning more flexible
 
 ## 1.7.7
 
@@ -26,7 +40,7 @@
 - Some guards for `CONFIG_ESP_RMAKER_CMD_RESP_ENABLE` and `CONFIG_ESP_RMAKER_PARAM_CMD_RESP_ENABLE` were missing.
 
 ### Other changes
-- Changed default MQTT Host URL to mqtt.rainmaker.espressif.com to match the domain conigured on public RainMaker. 
+- Changed default MQTT Host URL to mqtt.rainmaker.espressif.com to match the domain conigured on public RainMaker.
 
 
 ## 1.7.4
