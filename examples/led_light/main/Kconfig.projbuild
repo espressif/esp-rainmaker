@@ -87,4 +87,11 @@ menu "Example Configuration"
         depends on LED_TYPE_WS2812
         help
             Number of LEDs in the WS2812 strip.
+
+    config EXAMPLE_README_URL
+        string "Example README URL"
+        default "https://raw.githubusercontent.com/espressif/esp-rainmaker/master/examples/led_light/README.md"
+        help
+            URL pointing to the README documentation for this example.
+            This will be included in the node config if set to a non-empty value.
 endmenu

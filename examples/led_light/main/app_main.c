@@ -153,6 +153,11 @@ void app_main()
         abort();
     }
 
+    /* Add readme URL to node info */
+    if (strlen(CONFIG_EXAMPLE_README_URL) > 0) {
+        esp_rmaker_node_add_readme(node, CONFIG_EXAMPLE_README_URL);
+    }
+
     /* Create a device and add the relevant parameters to it */
     light_device = esp_rmaker_lightbulb_device_create("Light", NULL, DEFAULT_POWER);
     esp_rmaker_device_add_bulk_cb(light_device, bulk_write_cb, NULL);
