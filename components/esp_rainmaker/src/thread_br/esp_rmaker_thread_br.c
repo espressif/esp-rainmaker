@@ -137,8 +137,7 @@ static esp_err_t write_cb(const esp_rmaker_device_t *device, const esp_rmaker_pa
     return ESP_OK;
 }
 
-esp_err_t esp_rmaker_thread_br_enable(const esp_openthread_platform_config_t *platform_config,
-                                      const esp_rcp_update_config_t *rcp_update_config)
+esp_err_t esp_rmaker_thread_br_enable(const esp_openthread_platform_config_t *platform_config)
 {
     if (thread_br_service) {
         return ESP_ERR_INVALID_STATE;
@@ -153,7 +152,7 @@ esp_err_t esp_rmaker_thread_br_enable(const esp_openthread_platform_config_t *pl
         esp_rmaker_device_delete(thread_br_service);
         thread_br_service = NULL;
     }
-    thread_border_router_start(platform_config, rcp_update_config);
+    thread_border_router_start(platform_config);
     return ESP_OK;
 }
 

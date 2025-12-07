@@ -27,82 +27,20 @@
 #include <mdns.h>
 #include <openthread/logging.h>
 #include <openthread/thread.h>
-#ifdef CONFIG_AUTO_UPDATE_RCP
-#include <esp_rcp_update.h>
-#endif
 
 #include "esp_rmaker_thread_br_priv.h"
 
 static const char *TAG = "thread_br";
 
 static esp_openthread_platform_config_t s_platform_config;
-#ifdef CONFIG_AUTO_UPDATE_RCP
-static bool s_rcp_update = false;
-#endif
-
-#ifdef CONFIG_AUTO_UPDATE_RCP
-#define RCP_VERSION_MAX_SIZE 100
-static void update_rcp(void)
-{
-    // Deinit uart to transfer UART to the serial loader
-    esp_openthread_rcp_deinit();
-    if (esp_rcp_update() == ESP_OK) {
-        esp_rcp_mark_image_verified(true);
-    } else {
-        esp_rcp_mark_image_verified(false);
-    }
-    esp_restart();
-}
-
-static void try_update_ot_rcp(const esp_openthread_platform_config_t *config)
-{
-    char internal_rcp_version[RCP_VERSION_MAX_SIZE];
-    const char *running_rcp_version = otPlatRadioGetVersionString(esp_openthread_get_instance());
-
-    if (esp_rcp_load_version_in_storage(internal_rcp_version, sizeof(internal_rcp_version)) == ESP_OK) {
-        ESP_LOGI(TAG, "Internal RCP Version: %s", internal_rcp_version);
-        ESP_LOGI(TAG, "Running  RCP Version: %s", running_rcp_version);
-        if (strcmp(internal_rcp_version, running_rcp_version) == 0) {
-            esp_rcp_mark_image_verified(true);
-        } else {
-            update_rcp();
-        }
-    } else {
-        ESP_LOGI(TAG, "RCP firmware not found in storage, will reboot to try next image");
-        esp_rcp_mark_image_verified(false);
-        esp_restart();
-    }
-}
-#endif // CONFIG_AUTO_UPDATE_RCP
-
-static void rcp_failure_handler(void)
-{
-#ifdef CONFIG_AUTO_UPDATE_RCP
-    esp_rcp_mark_image_unusable();
-    char internal_rcp_version[RCP_VERSION_MAX_SIZE];
-    if (esp_rcp_load_version_in_storage(internal_rcp_version, sizeof(internal_rcp_version)) == ESP_OK) {
-        ESP_LOGI(TAG, "Internal RCP Version: %s", internal_rcp_version);
-        update_rcp();
-    } else {
-        ESP_LOGI(TAG, "RCP firmware not found in storage, will reboot to try next image");
-        esp_rcp_mark_image_verified(false);
-        esp_restart();
-    }
-#endif // CONFIG_AUTO_UPDATE_RCP
-}
 
 static void ot_task_worker(void *aContext)
 {
     esp_netif_config_t cfg = ESP_NETIF_DEFAULT_OPENTHREAD();
     esp_netif_t *openthread_netif = esp_netif_new(&cfg);
     assert(openthread_netif != NULL);
-
-    esp_openthread_register_rcp_failure_handler(rcp_failure_handler);
     // Initialize the OpenThread stack
     ESP_ERROR_CHECK(esp_openthread_init(&s_platform_config));
-#ifdef CONFIG_AUTO_UPDATE_RCP
-    try_update_ot_rcp(&s_platform_config);
-#endif
     // Initialize border routing features
     esp_openthread_lock_acquire(portMAX_DELAY);
     ESP_ERROR_CHECK(esp_netif_attach(openthread_netif, esp_openthread_netif_glue_init(&s_platform_config)));
@@ -150,8 +88,7 @@ static void thread_br_event_handler(void* arg, esp_event_base_t event_base, int3
     }
 }
 
-esp_err_t thread_border_router_start(const esp_openthread_platform_config_t *platform_config,
-                                     const esp_rcp_update_config_t *rcp_update_config)
+esp_err_t thread_border_router_start(const esp_openthread_platform_config_t *platform_config)
 {
     static bool thread_br_started = false;
     if (thread_br_started) {
@@ -173,12 +110,6 @@ esp_err_t thread_border_router_start(const esp_openthread_platform_config_t *pla
         // if hostname is not set we will set it with the rainmaker node id.
         ESP_ERROR_CHECK(mdns_hostname_set(esp_rmaker_get_node_id()));
     }
-#ifdef CONFIG_AUTO_UPDATE_RCP
-    if (rcp_update_config) {
-        esp_rcp_update_init(rcp_update_config);
-        s_rcp_update = true;
-    }
-#endif
 #define THREAD_TASK_STACK_SIZE 8192
     if (xTaskCreate(ot_task_worker, "ot_br", THREAD_TASK_STACK_SIZE, NULL, 5, NULL) != pdTRUE) {
         ESP_LOGE(TAG, "Failed to start openthread task for thread br");

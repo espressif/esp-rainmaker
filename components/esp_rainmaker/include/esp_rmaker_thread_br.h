@@ -21,7 +21,6 @@ extern "C"
 
 #include <esp_err.h>
 #include <esp_openthread.h>
-#include <esp_rcp_update.h>
 
 /** Enable Thread Border Router
  *
@@ -31,13 +30,11 @@ extern "C"
  * @note This API should be called after esp_rmaker_node_init() but before esp_rmaker_start().
  *
  * @param[in] platform_config Platform config for OpenThread
- * @param[in] rcp_update_config RCP update config
  *
  * @return ESP_OK on success.
  * @return error in case of failure.
  */
-esp_err_t esp_rmaker_thread_br_enable(const esp_openthread_platform_config_t *platform_config,
-                                      const esp_rcp_update_config_t *rcp_update_config);
+esp_err_t esp_rmaker_thread_br_enable(const esp_openthread_platform_config_t *platform_config);
 
 #ifdef __cplusplus
 }
