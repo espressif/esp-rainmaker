@@ -14,7 +14,6 @@
 
 #pragma once
 
-#include "esp_rcp_update.h"
 #include <esp_rmaker_core.h>
 #include <esp_openthread.h>
 #include <openthread/border_agent.h>
@@ -63,5 +62,4 @@ otDeviceRole thread_br_get_device_role(void);
 
 esp_err_t thread_br_generate_and_commit_new_dataset(void);
 
-esp_err_t thread_border_router_start(const esp_openthread_platform_config_t *platform_config,
-                                     const esp_rcp_update_config_t *rcp_update_config);
+esp_err_t thread_border_router_start(const esp_openthread_platform_config_t *platform_config);

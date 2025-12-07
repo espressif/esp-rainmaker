@@ -31,6 +31,12 @@
 #include "m5display.h"
 #endif
 
+#ifdef CONFIG_AUTO_UPDATE_RCP
+#include <esp_openthread_spinel.h>
+#include <esp_ot_rcp_update.h>
+#include <esp_rcp_update.h>
+#endif // CONFIG_AUTO_UPDATE_RCP
+
 static const char *TAG = "app_main";
 
 esp_rmaker_device_t *thread_br_device;
@@ -95,10 +101,11 @@ void app_main()
     };
 #ifdef CONFIG_AUTO_UPDATE_RCP
     esp_rcp_update_config_t rcp_update_cfg = ESP_OPENTHREAD_RCP_UPDATE_CONFIG();
-    esp_rmaker_thread_br_enable(&thread_cfg, &rcp_update_cfg);
-#else
-    esp_rmaker_thread_br_enable(&thread_cfg, NULL);
+    esp_rcp_update_init(&rcp_update_cfg);
+    esp_ot_register_rcp_handler();
 #endif
+    esp_rmaker_thread_br_enable(&thread_cfg);
+
     /* Enable OTA */
     esp_rmaker_ota_enable_default();
 
@@ -124,6 +131,9 @@ void app_main()
 
 #if CONFIG_M5STACK_THREAD_BR_BOARD
     app_register_m5stack_display_event_handler();
+#endif
+#ifdef CONFIG_AUTO_UPDATE_RCP
+    esp_ot_update_rcp_if_different();
 #endif
 
     /* Start the Wi-Fi.

@@ -14,3 +14,5 @@ dependencies:
   espressif/rmaker_app_insights:
     version: "*"
     override_path: '../../common/rmaker_app_insights/'
+  espressif/esp_rcp_update:
+    version: "~1.5.3"
