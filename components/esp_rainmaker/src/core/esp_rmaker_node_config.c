@@ -40,6 +40,9 @@ static esp_err_t esp_rmaker_report_info(json_gen_str_t *jptr)
     if (info->subtype) {
         json_gen_obj_set_string(jptr, "subtype",  info->subtype);
     }
+    if (info->readme && strlen(info->readme) > 0) {
+        json_gen_obj_set_string(jptr, "readme",  info->readme);
+    }
     json_gen_obj_set_string(jptr, "model",  info->model);
     const esp_app_desc_t *app_desc;
     app_desc = esp_app_get_description();

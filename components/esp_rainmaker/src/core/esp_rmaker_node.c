@@ -42,6 +42,9 @@ static void esp_rmaker_node_info_free(esp_rmaker_node_info_t *info)
         if (info->subtype) {
             free(info->subtype);
         }
+        if (info->readme) {
+            free(info->readme);
+        }
         if (info->secure_boot_digest) {
             esp_rmaker_secure_boot_digest_free(info->secure_boot_digest);
             info->secure_boot_digest = NULL;
@@ -209,6 +212,28 @@ esp_err_t esp_rmaker_node_add_subtype(const esp_rmaker_node_t *node, const char 
     info->subtype = strdup(subtype);
     if (!info->subtype) {
         ESP_LOGE(TAG, "Failed to allocate memory for node subtype.");
+        return ESP_ERR_NO_MEM;
+    }
+    return ESP_OK;
+}
+
+esp_err_t esp_rmaker_node_add_readme(const esp_rmaker_node_t *node, const char *readme)
+{
+    if (!node || !readme) {
+        ESP_LOGE(TAG, "Node handle or readme cannot be NULL.");
+        return ESP_ERR_INVALID_ARG;
+    }
+    esp_rmaker_node_info_t *info = esp_rmaker_node_get_info(node);
+    if (!info) {
+        ESP_LOGE(TAG, "Failed to get Node Info.");
+        return ESP_ERR_INVALID_ARG;
+    }
+    if (info->readme) {
+        free(info->readme);
+    }
+    info->readme = strdup(readme);
+    if (!info->readme) {
+        ESP_LOGE(TAG, "Failed to allocate memory for node readme.");
         return ESP_ERR_NO_MEM;
     }
     return ESP_OK;
