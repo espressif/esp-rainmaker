@@ -2,8 +2,8 @@ menu "ESP RainMaker Config"
 
     choice ESP_RMAKER_CLAIM_TYPE
         bool "Claiming Type"
+        default ESP_RMAKER_ASSISTED_CLAIM if BT_ENABLED && !IDF_TARGET_ESP32S2
         default ESP_RMAKER_SELF_CLAIM
-        default ESP_RMAKER_ASSISTED_CLAIM if IDF_TARGET_ESP32
         help
             Claiming type to be used.
 
@@ -200,7 +200,7 @@ menu "ESP RainMaker Config"
     config ESP_RMAKER_ENABLE_CHALLENGE_RESPONSE
         bool "Enable Challenge Response during provisioning"
         select ESP_RMAKER_FACTORY_RESET_REPORTING
-        default n
+        default y
         help
             Enable challenge response mechanism during provisioning to verify node authenticity.
             The node will receive a challenge from the client during provisioning, which it will

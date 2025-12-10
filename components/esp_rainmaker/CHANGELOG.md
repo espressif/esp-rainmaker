@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.8.5
+
+### Changes
+
+- Assisted claiming is now the default for all supported platforms (requires Bluetooth enabled and not ESP32S2).
+  Previously, it was only the default for ESP32. To revert to self claiming, set `CONFIG_ESP_RMAKER_SELF_CLAIM=y` in menuconfig.
+- Challenge response based user-node mapping is now enabled by default. This replaces the traditional user-node mapping flow.
+  To disable it, set `CONFIG_ESP_RMAKER_ENABLE_CHALLENGE_RESPONSE=n` in menuconfig.
+  Note that challenge response requires the node to be claimed before it can be used.
+
 ## 1.8.4
 
 ### New Feature
