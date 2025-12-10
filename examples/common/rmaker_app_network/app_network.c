@@ -45,14 +45,16 @@
 
 ESP_EVENT_DEFINE_BASE(APP_NETWORK_EVENT);
 static const char *TAG = "app_network";
+#if !CONFIG_APP_NETWORK_ASYNCHRONOUS_CONNECTION
 static const int NETWORK_CONNECTED_EVENT = BIT0;
 static EventGroupHandle_t network_event_group;
+#endif /* CONFIG_APP_NETWORK_ASYNCHRONOUS_CONNECTION */
 
 #define PROV_QR_VERSION "v1"
 
 #define PROV_TRANSPORT_SOFTAP   "softap"
 #define PROV_TRANSPORT_BLE      "ble"
-#define QRCODE_BASE_URL     "https://rainmaker.espressif.com/qrcode.html"
+#define QRCODE_BASE_URL         "https://rainmaker.espressif.com/qrcode.html"
 
 #define CREDENTIALS_NAMESPACE   "rmaker_creds"
 #define RANDOM_NVS_KEY          "random"
@@ -319,14 +321,18 @@ static void network_event_handler(void* arg, esp_event_base_t event_base, int32_
     if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP) {
         ip_event_got_ip_t* event = (ip_event_got_ip_t*) event_data;
         ESP_LOGI(TAG, "Connected with IP Address:" IPSTR, IP2STR(&event->ip_info.ip));
+#if !CONFIG_APP_NETWORK_ASYNCHRONOUS_CONNECTION
         /* Signal main application to continue execution */
         xEventGroupSetBits(network_event_group, NETWORK_CONNECTED_EVENT);
+#endif /* CONFIG_APP_NETWORK_ASYNCHRONOUS_CONNECTION */
     }
 #endif /* CONFIG_ESP_RMAKER_NETWORK_OVER_WIFI */
 #ifdef CONFIG_ESP_RMAKER_NETWORK_OVER_THREAD
     if (event_base == OPENTHREAD_EVENT && event_id == OPENTHREAD_EVENT_ATTACHED) {
+#if !CONFIG_APP_NETWORK_ASYNCHRONOUS_CONNECTION
         /* Signal main application to continue execution */
         xEventGroupSetBits(network_event_group, NETWORK_CONNECTED_EVENT);
+#endif /* CONFIG_APP_NETWORK_ASYNCHRONOUS_CONNECTION */
     }
 #endif /* CONFIG_ESP_RMAKER_NETWORK_OVER_THREAD */
     if (event_base == NETWORK_PROV_EVENT && event_id == NETWORK_PROV_END) {
@@ -358,7 +364,9 @@ void app_network_init()
 #ifdef CONFIG_ESP_RMAKER_NETWORK_OVER_THREAD
     ESP_ERROR_CHECK(thread_init());
 #endif
+#if !CONFIG_APP_NETWORK_ASYNCHRONOUS_CONNECTION
     network_event_group = xEventGroupCreate();
+#endif /* CONFIG_APP_NETWORK_ASYNCHRONOUS_CONNECTION */
 #ifdef APP_PROV_STOP_ON_CREDS_MISMATCH
     ESP_ERROR_CHECK(esp_event_handler_register(PROTOCOMM_SECURITY_SESSION_EVENT, ESP_EVENT_ANY_ID, &network_event_handler, NULL));
 #endif
@@ -448,7 +456,9 @@ esp_err_t app_network_start(app_network_pop_type_t pop_type)
         custom_mfg_data = NULL;
         custom_mfg_data_len = 0;
     }
+#if !CONFIG_APP_NETWORK_ASYNCHRONOUS_CONNECTION
     /* Wait for Network connection */
     xEventGroupWaitBits(network_event_group, NETWORK_CONNECTED_EVENT, false, true, portMAX_DELAY);
+#endif /* CONFIG_APP_NETWORK_ASYNCHRONOUS_CONNECTION */
     return err;
 }
