@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.1.0]
+
+### Added
+- Asynchronous network connection support using CONFIG_APP_NETWORK_ASYNCHRONOUS_CONNECTION
+- User authentication device type
+- AI agent device subtype
+
 ## [1.0.0]
 
 ### Added
