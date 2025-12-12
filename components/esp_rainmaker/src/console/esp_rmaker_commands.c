@@ -1,16 +1,8 @@
-// Copyright 2020 Espressif Systems (Shanghai) PTE LTD
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+/*
+ * SPDX-FileCopyrightText: 2020-2025 Espressif Systems (Shanghai) PTE LTD
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
 
 #include <stdio.h>
 #include <string.h>
@@ -24,7 +16,6 @@
 #include <esp_rmaker_utils.h>
 #include <esp_rmaker_cmd_resp.h>
 #include <esp_rmaker_internal.h>
-#include <esp_rmaker_console_internal.h>
 #include <network_provisioning/manager.h>
 
 /* Include internal header to access device structure */
@@ -547,7 +538,7 @@ static void register_param_commands()
 
 #endif /* CONFIG_ESP_RMAKER_CONSOLE_PARAM_CMDS_ENABLE */
 
-void register_commands()
+void esp_rmaker_register_commands()
 {
     register_user_node_mapping();
     register_get_node_id();

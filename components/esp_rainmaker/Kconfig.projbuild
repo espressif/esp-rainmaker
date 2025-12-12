@@ -68,6 +68,18 @@ menu "ESP RainMaker Config"
         help
             ESP RainMaker Claiming Service Base URL.
 
+    config ESP_RMAKER_CLAIM_VIDEOSTREAM_SUPPORT
+        bool "Enable Video Stream Support for Claiming"
+        default n
+        depends on ESP_RMAKER_SELF_CLAIM || ESP_RMAKER_ASSISTED_CLAIM
+        help
+            Enable video stream support during claiming. When enabled:
+            - For Self Claiming: The device will register certificates with "videostream" node policies,
+              granting access to AWS Kinesis Video Streams (KVS) services.
+            - For Assisted Claiming: The phone app will be notified via capabilities that this device
+              requires video stream support, so it can register certificates with appropriate policies.
+            This is required for camera devices that need to use WebRTC or KVS streaming.
+
     config ESP_RMAKER_READ_MQTT_HOST_FROM_CONFIG
         bool "Read MQTT Host from ESP_RMAKER_MQTT_HOST (Read Docs)"
         default n

@@ -25,8 +25,22 @@ extern "C"
  *
  * @return ESP_OK on success.
  * @return error in case of failures.
+ *
+ * @note This function does console initialization and registers the rmaker console commands.
+ *  If you wish to initialize the console yourself, you can call esp_rmaker_console_register_commands after console init
  */
 esp_err_t esp_rmaker_console_init(void);
+
+/**
+ * @brief Register rmaker console commands
+ *
+ * @return void
+ *
+ * @note This function must be called after console initialization
+ *  If you wish to register commands yourself, you can call this function after console initialization
+ *  Should not be called if esp_rmaker_console_init is called which does this implicitly
+ */
+void esp_rmaker_register_commands(void);
 
 /* Reference for adding custom console commands:
 #include <esp_console.h>
