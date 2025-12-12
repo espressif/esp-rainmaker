@@ -1,0 +1,49 @@
+## IDF Component Manager Manifest File
+dependencies:
+  ## Required IDF version
+  idf:
+    version: ">=5.4.0"
+  espressif/esp_rainmaker:
+    version: ">=1.0"
+    override_path: ../../../../components/esp_rainmaker
+  espressif/button:
+    version: "^4.1.4"
+  espressif/json_parser:
+    version: "~1.0.3"
+  espressif/rmaker_common:
+    version: "*"
+  espressif/rmaker_app_reset:
+    version: "*"
+  espressif/rmaker_app_network:
+    version: "*"
+  espressif/rmaker_app_insights:
+    version: "*"
+
+  # Components from KVS SDK
+  esp_webrtc_utils:
+    path: ${KVS_SDK_PATH}/esp_port/components/esp_webrtc_utils
+    version: "*"
+  app_webrtc:
+    path: ${KVS_SDK_PATH}/esp_port/components/app_webrtc
+    version: "*"
+  kvs_webrtc:
+    path: ${KVS_SDK_PATH}/esp_port/components/kvs_webrtc
+    version: "*"
+  media_stream:
+    path: ${KVS_SDK_PATH}/esp_port/components/media_stream
+    version: "*"
+  espressif/esp_hosted:
+    override_path: ${KVS_SDK_PATH}/esp_port/components/esp_hosted
+    version: "*"
+    rules:
+      - if: "target in [esp32p4]"
+  espressif/esp_wifi_remote:
+    override_path: ${KVS_SDK_PATH}/esp_port/components/esp_wifi_remote
+    version: "*"
+    rules:
+      - if: "target in [esp32p4]"
+
+  # Local components
+  rmaker_camera:
+    path: ../../components/rmaker_camera
+    version: "*"
