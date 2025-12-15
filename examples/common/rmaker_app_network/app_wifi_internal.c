@@ -27,13 +27,28 @@
 
 #include <app_wifi_internal.h>
 #include <app_network.h>
-
 #define APP_PROV_STOP_ON_CREDS_MISMATCH
 
 #ifdef CONFIG_ESP_RMAKER_NETWORK_OVER_WIFI
 static const char* TAG = "app_wifi";
-/* Event handler for catching system events */
-static void event_handler(void* arg, esp_event_base_t event_base,
+
+/* WiFi event handler for post-provisioning reconnection management.
+ * This handler should only be active after provisioning succeeds or when device is already provisioned.
+ * During provisioning, the network_provisioning component handles WiFi connections internally.
+ */
+static void wifi_event_handler(void* arg, esp_event_base_t event_base,
+                               int32_t event_id, void* event_data)
+{
+    if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_START) {
+        esp_wifi_connect();
+    } else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_DISCONNECTED) {
+        ESP_LOGI(TAG, "Disconnected. Connecting to the AP again...");
+        esp_wifi_connect();
+    }
+}
+
+/* Event handler for provisioning events */
+static void prov_event_handler(void* arg, esp_event_base_t event_base,
                           int32_t event_id, void* event_data)
 {
     if (event_base == NETWORK_PROV_EVENT) {
@@ -70,15 +85,14 @@ static void event_handler(void* arg, esp_event_base_t event_base,
             }
             case NETWORK_PROV_WIFI_CRED_SUCCESS:
                 ESP_LOGI(TAG, "Provisioning successful");
+                /* After provisioning succeeds, register WiFi event handlers for reconnection management.
+                 * The provisioning manager will deinit, so we need to handle WiFi reconnections ourselves.
+                 */
+                ESP_ERROR_CHECK(esp_event_handler_register(WIFI_EVENT, ESP_EVENT_ANY_ID, &wifi_event_handler, NULL));
                 break;
             default:
                 break;
         }
-    } else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_START) {
-        esp_wifi_connect();
-    } else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_DISCONNECTED) {
-        ESP_LOGI(TAG, "Disconnected. Connecting to the AP again...");
-        esp_wifi_connect();
     }
 }
 
@@ -94,9 +108,8 @@ esp_err_t app_wifi_internal_init(void)
 #ifdef CONFIG_ESP_RMAKER_NETWORK_OVER_WIFI
     /* Initialize TCP/IP */
     esp_netif_init();
-    /* Register our event handler for Wi-Fi, IP and Provisioning related events */
-    ESP_ERROR_CHECK(esp_event_handler_register(NETWORK_PROV_EVENT, ESP_EVENT_ANY_ID, &event_handler, NULL));
-    ESP_ERROR_CHECK(esp_event_handler_register(WIFI_EVENT, ESP_EVENT_ANY_ID, &event_handler, NULL));
+    /* Register event handler for Provisioning related events */
+    ESP_ERROR_CHECK(esp_event_handler_register(NETWORK_PROV_EVENT, ESP_EVENT_ANY_ID, &prov_event_handler, NULL));
 
     /* Initialize Wi-Fi including netif with default config */
     esp_netif_create_default_wifi_sta();
@@ -199,6 +212,11 @@ esp_err_t app_wifi_internal_start(const char *pop, const char *service_name,
         /* We don't need the manager as device is already provisioned,
          * so let's release it's resources */
         network_prov_mgr_deinit();
+
+        /* Register WiFi event handlers for reconnection management.
+         * Since device is already provisioned, we need to handle WiFi reconnections ourselves.
+         */
+        ESP_ERROR_CHECK(esp_event_handler_register(WIFI_EVENT, ESP_EVENT_ANY_ID, &wifi_event_handler, NULL));
 
         /* Start Wi-Fi station */
         wifi_init_sta();
