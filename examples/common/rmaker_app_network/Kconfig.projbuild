@@ -74,6 +74,13 @@ menu "ESP RainMaker App Wi-Fi Provisioning"
         help
             Provisioning Name Prefix.
 
+    config APP_NETWORK_ASYNCHRONOUS_CONNECTION
+        bool "Asynchronous network connection"
+        default n
+        help
+            If this option is enabled, app_network_start() will perform the network connection asynchronously.
+            If this option is disabled, app_network_start() will return *after* network connection is established.
+
     config APP_WIFI_PROV_COMPAT
         bool "Stay compatible with App Wi-Fi component"
         depends on ESP_RMAKER_NETWORK_OVER_WIFI
