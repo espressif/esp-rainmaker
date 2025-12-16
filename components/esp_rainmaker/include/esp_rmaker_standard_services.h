@@ -119,6 +119,22 @@ esp_rmaker_device_t *esp_rmaker_create_system_service(const char *serv_name, voi
  */
 esp_rmaker_device_t *esp_rmaker_create_local_control_service(const char *serv_name, const char *pop, int sec_type, void *priv_data);
 
+/** Create a standard User Auth service
+ *
+ * This creates a User Auth service with the mandatory parameters. The default parameter names will be used.
+ * Refer \ref esp_rmaker_standard_params.h for default names.
+ *
+ * @param[in] serv_name The unique service name
+ * @param[in] write_cb Write callback.
+ * @param[in] read_cb Read callback.
+ * @param[in] priv_data (Optional) Private data associated with the service. This should stay
+ * allocated throughout the lifetime of the service.
+ *
+ * @return service_handle on success.
+ * @return NULL in case of any error.
+ */
+esp_rmaker_device_t *esp_rmaker_create_user_auth_service(const char *serv_name, esp_rmaker_device_bulk_write_cb_t bulk_write_cb, esp_rmaker_device_bulk_read_cb_t read_cb, void *priv_data);
+
 #ifdef __cplusplus
 }
 #endif

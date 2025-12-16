@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.8.4
+
+### New Feature
+- Added RainMaker user Auth Service
+- Added helper layer for RainMaker Controller
+
 ## 1.8.1
 
 ### New Feature
