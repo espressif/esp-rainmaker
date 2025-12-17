@@ -46,7 +46,7 @@ menu "ESP RainMaker App Wi-Fi Provisioning"
 
     config APP_NETWORK_PROV_MAX_RETRY_CNT
         int
-        default 5
+        default 3
         prompt "Max retries before reseting provisioning state machine"
         depends on APP_NETWORK_RESET_PROV_ON_FAILURE
         help
