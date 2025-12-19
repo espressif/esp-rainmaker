@@ -11,12 +11,14 @@
 #include <esp_log.h>
 #include <esp_wifi.h>
 #include <esp_console.h>
+#include <esp_partition.h>
 #include <esp_rmaker_core.h>
 #include <esp_rmaker_user_mapping.h>
 #include <esp_rmaker_utils.h>
 #include <esp_rmaker_cmd_resp.h>
 #include <esp_rmaker_internal.h>
 #include <network_provisioning/manager.h>
+#include <sdkconfig.h>
 
 /* Include internal header to access device structure */
 #include "esp_rmaker_internal.h"
@@ -538,6 +540,45 @@ static void register_param_commands()
 
 #endif /* CONFIG_ESP_RMAKER_CONSOLE_PARAM_CMDS_ENABLE */
 
+static int clear_claim_data_handler(int argc, char** argv)
+{
+    const char *partition_name = "fctry";
+#ifdef CONFIG_ESP_RMAKER_FACTORY_PARTITION_NAME
+    partition_name = CONFIG_ESP_RMAKER_FACTORY_PARTITION_NAME;
+#endif
+
+    printf("%s: Erasing fctry partition (%s)...\n", TAG, partition_name);
+
+    const esp_partition_t *partition = esp_partition_find_first(ESP_PARTITION_TYPE_DATA,
+                                                                ESP_PARTITION_SUBTYPE_DATA_NVS,
+                                                                partition_name);
+    if (!partition) {
+        printf("%s: Failed to find partition '%s'\n", TAG, partition_name);
+        return ESP_FAIL;
+    }
+
+    esp_err_t err = esp_partition_erase_range(partition, 0, partition->size);
+    if (err != ESP_OK) {
+        printf("%s: Failed to erase partition '%s'. Error: %d\n", TAG, partition_name, err);
+        return err;
+    }
+
+    printf("%s: Successfully erased fctry partition (%s). Rebooting...\n", TAG, partition_name);
+    esp_rmaker_reboot(2);
+    return ESP_OK;
+}
+
+static void register_clear_claim_data()
+{
+    const esp_console_cmd_t cmd = {
+        .command = "clear-claim-data",
+        .help = "Erase the fctry NVS partition (clears claim data)",
+        .func = &clear_claim_data_handler,
+    };
+    ESP_LOGI(TAG, "Registering command: %s", cmd.command);
+    esp_console_cmd_register(&cmd);
+}
+
 void esp_rmaker_register_commands()
 {
     register_user_node_mapping();
@@ -547,6 +588,7 @@ void esp_rmaker_register_commands()
     register_cmd_resp_command();
 #endif
     register_sign_data_command();
+    register_clear_claim_data();
 #ifdef CONFIG_ESP_RMAKER_CONSOLE_PARAM_CMDS_ENABLE
     register_param_commands();
 #endif
