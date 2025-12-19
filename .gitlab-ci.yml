@@ -161,7 +161,7 @@ build_idf_v5.5:
   extends: .build_template
   image: espressif/idf:release-v5.5
   variables:
-    EXAMPLE_TARGETS: "esp32 esp32s2 esp32c3 esp32s3 esp32c6 esp32c2 esp32h2"
+    EXAMPLE_TARGETS: "esp32 esp32s2 esp32c3 esp32s3 esp32c6 esp32c2 esp32h2 esp32c5"
 
 build_standalone_camera:
   extends: .build_template
@@ -294,28 +294,3 @@ push_master_to_github:
     - git remote remove github &>/dev/null || true
     - git remote add github git@github.com:espressif/esp-rainmaker.git
     - git push github "${CI_COMMIT_SHA}:refs/heads/${CI_COMMIT_REF_NAME}"
-
-build_esp32c5_preview:
-  extends: .build_template
-  image: espressif/idf:release-v5.5
-  variables:
-    EXAMPLE_TARGETS: "esp32c5"
-    EXAMPLES: "switch led_light fan temperature_sensor multi_device gpio"
-  script:
-    - pip install --upgrade idf-component-manager
-    - for EXAMPLE in $EXAMPLES; do
-    - cd $CI_PROJECT_DIR/examples/$EXAMPLE
-    - echo Building $EXAMPLE
-    - for TARGET in $EXAMPLE_TARGETS; do
-    - echo Building for $TARGET
-    - idf.py --preview set-target $TARGET
-    - idf.py build
-    - mkdir -p $CI_PROJECT_DIR/esp-rainmaker-bins-${CI_JOB_ID}/$EXAMPLE/$TARGET/
-    - cp $CI_PROJECT_DIR/examples/$EXAMPLE/build/*.bin $CI_PROJECT_DIR/esp-rainmaker-bins-${CI_JOB_ID}/$EXAMPLE/$TARGET/
-    - done
-    - echo Build Complete for $EXAMPLE
-    - done
-    # Generating zip file for binaries generated
-    - cd $CI_PROJECT_DIR
-    - echo Generating zip file for binaries generated
-    - tar -zcvf esp-rainmaker-bins-${CI_JOB_ID}.zip esp-rainmaker-bins-${CI_JOB_ID}/
