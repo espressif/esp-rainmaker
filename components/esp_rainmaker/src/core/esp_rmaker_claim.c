@@ -486,14 +486,19 @@ esp_err_t esp_rmaker_self_claim_perform(esp_rmaker_claim_data_t *claim_data)
         ESP_LOGE(TAG, "Self claiming not initialised.");
         return ESP_ERR_INVALID_STATE;
     }
+    esp_rmaker_post_event(RMAKER_EVENT_CLAIM_STARTED, NULL, 0);
     esp_err_t err = esp_rmaker_claim_perform_init(claim_data);
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "Claim Init Sequence Failed.");
+        esp_rmaker_post_event(RMAKER_EVENT_CLAIM_FAILED, NULL, 0);
         return err;
     }
     err = esp_rmaker_claim_perform_verify(claim_data);
     if (err == ESP_OK) {
         ESP_LOGI(TAG, "Self Claiming was successful. Certificate received.");
+        esp_rmaker_post_event(RMAKER_EVENT_CLAIM_SUCCESSFUL, NULL, 0);
+    } else {
+        esp_rmaker_post_event(RMAKER_EVENT_CLAIM_FAILED, NULL, 0);
     }
     esp_rmaker_claim_data_free(claim_data);
     return err;
@@ -601,6 +606,7 @@ esp_err_t esp_rmaker_assisted_claim_handle_start(RmakerClaim__RMakerClaimPayload
     response->resppayload->status = RMAKER_CLAIM__RMAKER_CLAIM_STATUS__Success;
     claim_data->state = RMAKER_CLAIM_STATE_INIT;
     ESP_LOGI(TAG, "Assisted Claiming Started.");
+    esp_rmaker_post_event(RMAKER_EVENT_CLAIM_STARTED, NULL, 0);
     return ESP_OK;
 }
 
@@ -729,11 +735,16 @@ esp_err_t esp_rmaker_assisted_claim_handle_verify(RmakerClaim__RMakerClaimPayloa
         if (handle_claim_verify_response(claim_data) == ESP_OK) {
             ESP_LOGI(TAG,"Assisted Claiming was Successful.");
             claim_data->state = RMAKER_CLAIM_STATE_VERIFY_DONE;
+            esp_rmaker_post_event(RMAKER_EVENT_CLAIM_SUCCESSFUL, NULL, 0);
             if (claim_event_group) {
                 xEventGroupSetBits(claim_event_group, CLAIM_TASK_BIT);
             }
         } else {
+            esp_rmaker_post_event(RMAKER_EVENT_CLAIM_FAILED, NULL, 0);
             response->resppayload->status = RMAKER_CLAIM__RMAKER_CLAIM_STATUS__InvalidParam;
+            if (claim_event_group) {
+                xEventGroupSetBits(claim_event_group, CLAIM_TASK_BIT);
+            }
             return ESP_OK;
         }
     }
@@ -792,6 +803,10 @@ esp_err_t esp_rmaker_claiming_handler(uint32_t session_id, const uint8_t *inbuf,
             claim_data->state = RMAKER_CLAIM_STATE_PK_GENERATED;
             resppayload.status = RMAKER_CLAIM__RMAKER_CLAIM_STATUS__Success;
             ESP_LOGW(TAG, "Assisted Claiming Aborted.");
+            esp_rmaker_post_event(RMAKER_EVENT_CLAIM_FAILED, NULL, 0);
+            if (claim_event_group) {
+                xEventGroupSetBits(claim_event_group, CLAIM_TASK_BIT);
+            }
             break;
         default:
             break;
@@ -921,10 +936,13 @@ static esp_rmaker_claim_data_t *esp_rmaker_claim_init(void)
         ESP_LOGE(TAG, "Claim already initialised");
         return NULL;
     }
-    claim_event_group = xEventGroupCreate();
+    /* Create event group if it doesn't exist (for assisted claiming, it may already exist) */
     if (!claim_event_group) {
-        ESP_LOGE(TAG, "Couldn't create event group");
-        return NULL;
+        claim_event_group = xEventGroupCreate();
+        if (!claim_event_group) {
+            ESP_LOGE(TAG, "Couldn't create event group");
+            return NULL;
+        }
     }
     esp_rmaker_claim_data_t *claim_data = NULL;
 
@@ -935,14 +953,23 @@ static esp_rmaker_claim_data_t *esp_rmaker_claim_init(void)
     if (xTaskCreate(&esp_rmaker_claim_task, "claim_task", ESP_RMAKER_CLAIM_TASK_STACK_SIZE,
                 &claim_data, tskIDLE_PRIORITY, NULL) != pdPASS) {
         ESP_LOGE(TAG, "Couldn't create Claim task");
+        /* On failure, delete event group and reset handle */
         vEventGroupDelete(claim_event_group);
+        claim_event_group = NULL;
         return NULL;
     }
 
     /* Wait for claim init to complete */
     xEventGroupWaitBits(claim_event_group, CLAIM_TASK_BIT, false, true, portMAX_DELAY);
+#ifdef CONFIG_ESP_RMAKER_SELF_CLAIM
+    /* For self-claiming, delete event group after PK generation */
     vEventGroupDelete(claim_event_group);
     claim_event_group = NULL;
+#else
+    /* For assisted claiming, clear the bit as it would be re-used later*/
+    xEventGroupClearBits(claim_event_group, CLAIM_TASK_BIT);
+#endif
+    /* For assisted claiming, keep event group for claiming completion signaling */
     return claim_data;
 }
 
@@ -960,12 +987,11 @@ esp_err_t esp_rmaker_assisted_claim_perform(esp_rmaker_claim_data_t *claim_data)
         ESP_LOGE(TAG, "Assisted claiming not initialised.");
         return ESP_ERR_INVALID_STATE;
     }
-    claim_event_group = xEventGroupCreate();
     if (!claim_event_group) {
-        ESP_LOGE(TAG, "Couldn't create event group");
-        return ESP_ERR_NO_MEM;
+        ESP_LOGE(TAG, "Claim event group not created.");
+        return ESP_ERR_INVALID_STATE;
     }
-    /* Wait for assisted claim to complete */
+    /* Wait for assisted claim to complete (returns immediately if bit already set) */
     ESP_LOGI(TAG, "Waiting for assisted claim to finish.");
     xEventGroupWaitBits(claim_event_group, CLAIM_TASK_BIT, false, true, portMAX_DELAY);
     esp_err_t err = ESP_FAIL;
@@ -976,16 +1002,20 @@ esp_err_t esp_rmaker_assisted_claim_perform(esp_rmaker_claim_data_t *claim_data)
     esp_event_handler_unregister(NETWORK_PROV_EVENT, NETWORK_PROV_START, &event_handler);
     esp_rmaker_claim_data_free(claim_data);
     vEventGroupDelete(claim_event_group);
+    claim_event_group = NULL;
     return err;
 }
 esp_rmaker_claim_data_t *esp_rmaker_assisted_claim_init(void)
 {
     ESP_LOGI(TAG, "Initialising Assisted Claiming. This may take time.");
+    /* esp_rmaker_claim_init() will create the event group, and for assisted claiming,
+     * it will be kept after PK generation for claiming completion signaling */
     esp_rmaker_claim_data_t *claim_data = esp_rmaker_claim_init();
     if (claim_data) {
         esp_event_handler_register(NETWORK_PROV_EVENT, NETWORK_PROV_INIT, &event_handler, claim_data);
         esp_event_handler_register(NETWORK_PROV_EVENT, NETWORK_PROV_START, &event_handler, claim_data);
     }
+    /* If claim init failed, event group is already cleaned up in esp_rmaker_claim_init() */
     return claim_data;
 }
 #endif
