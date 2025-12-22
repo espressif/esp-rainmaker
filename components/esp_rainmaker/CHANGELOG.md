@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.8.7
+
+### Bug Fixes
+- If assisted claiming was already performed before calling `esp_rmaker_start()`,
+  the firmware was stalling with an incorrect print saying that the Node connected to network
+  without claiming.
+
 ## 1.8.6
 
 ### New Feature

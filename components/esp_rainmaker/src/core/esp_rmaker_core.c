@@ -84,6 +84,7 @@ typedef struct {
     esp_rmaker_mqtt_conn_params_t *mqtt_conn_params;
 #ifdef ESP_RMAKER_CLAIM_ENABLED
     bool need_claim;
+    bool claim_done;
     esp_rmaker_claim_data_t *claim_data;
 #endif /* ESP_RMAKER_CLAIM_ENABLED */
     /* Use Thread partition ID as the Thread network identifier. */
@@ -164,6 +165,27 @@ static void reset_event_handler(void* arg, esp_event_base_t event_base,
                 break;
         }
 }
+
+#ifdef ESP_RMAKER_CLAIM_ENABLED
+static void claim_event_handler(void* arg, esp_event_base_t event_base,
+                          int32_t event_id, void* event_data)
+{
+    if (!esp_rmaker_priv_data) {
+        return;
+    }
+    if (event_id == RMAKER_EVENT_CLAIM_SUCCESSFUL) {
+        esp_rmaker_priv_data->need_claim = false;
+        esp_rmaker_priv_data->claim_done = true;
+        esp_event_handler_unregister(RMAKER_EVENT, RMAKER_EVENT_CLAIM_STARTED, &claim_event_handler);
+        esp_event_handler_unregister(RMAKER_EVENT, RMAKER_EVENT_CLAIM_SUCCESSFUL, &claim_event_handler);
+        esp_event_handler_unregister(RMAKER_EVENT, RMAKER_EVENT_CLAIM_FAILED, &claim_event_handler);
+    } else if (event_id == RMAKER_EVENT_CLAIM_FAILED) {
+        esp_event_handler_unregister(RMAKER_EVENT, RMAKER_EVENT_CLAIM_STARTED, &claim_event_handler);
+        esp_event_handler_unregister(RMAKER_EVENT, RMAKER_EVENT_CLAIM_SUCCESSFUL, &claim_event_handler);
+        esp_event_handler_unregister(RMAKER_EVENT, RMAKER_EVENT_CLAIM_FAILED, &claim_event_handler);
+    }
+}
+#endif /* ESP_RMAKER_CLAIM_ENABLED */
 
 static void esp_rmaker_mqtt_event_handler(void* arg, esp_event_base_t event_base,
                           int32_t event_id, void* event_data)
@@ -459,11 +481,9 @@ static void esp_rmaker_task(void *data)
             err = ESP_FAIL;
             goto rmaker_end;
         }
-        esp_rmaker_post_event(RMAKER_EVENT_CLAIM_STARTED, NULL, 0);
         err = esp_rmaker_assisted_claim_perform(esp_rmaker_priv_data->claim_data);
         if (err != ESP_OK) {
-            esp_rmaker_post_event(RMAKER_EVENT_CLAIM_FAILED, NULL, 0);
-            ESP_LOGE(TAG, "esp_rmaker_self_claim_perform() returned %d. Aborting", err);
+            ESP_LOGE(TAG, "esp_rmaker_assisted_claim_perform() returned %d. Aborting", err);
 #if defined(CONFIG_ESP_RMAKER_NETWORK_OVER_WIFI)
             esp_event_handler_unregister(IP_EVENT, IP_EVENT_STA_GOT_IP, &esp_rmaker_event_handler);
 #elif defined(CONFIG_ESP_RMAKER_NETWORK_OVER_THREAD)
@@ -473,7 +493,6 @@ static void esp_rmaker_task(void *data)
             goto rmaker_end;
         }
         esp_rmaker_priv_data->claim_data = NULL;
-        esp_rmaker_post_event(RMAKER_EVENT_CLAIM_SUCCESSFUL, NULL, 0);
     }
 #endif /* CONFIG_ESP_RMAKER_ASSISTED_CLAIM */
 #if defined(CONFIG_ESP_RMAKER_NETWORK_OVER_WIFI)
@@ -504,19 +523,17 @@ static void esp_rmaker_task(void *data)
     /* Self claiming can be done only after Wi-Fi connection */
 #ifdef CONFIG_ESP_RMAKER_SELF_CLAIM
     if (esp_rmaker_priv_data->need_claim) {
-        esp_rmaker_post_event(RMAKER_EVENT_CLAIM_STARTED, NULL, 0);
         err = esp_rmaker_self_claim_perform(esp_rmaker_priv_data->claim_data);
         if (err != ESP_OK) {
-            esp_rmaker_post_event(RMAKER_EVENT_CLAIM_FAILED, NULL, 0);
             ESP_LOGE(TAG, "esp_rmaker_self_claim_perform() returned %d. Aborting", err);
             goto rmaker_end;
         }
         esp_rmaker_priv_data->claim_data = NULL;
-        esp_rmaker_post_event(RMAKER_EVENT_CLAIM_SUCCESSFUL, NULL, 0);
     }
 #endif
 #ifdef ESP_RMAKER_CLAIM_ENABLED
-    if (esp_rmaker_priv_data->need_claim) {
+    /* Initialize MQTT if claiming was needed (either still in progress or just completed) */
+    if (esp_rmaker_priv_data->need_claim || esp_rmaker_priv_data->claim_done) {
         esp_rmaker_priv_data->mqtt_conn_params = esp_rmaker_get_mqtt_conn_params();
         if (!esp_rmaker_priv_data->mqtt_conn_params) {
             ESP_LOGE(TAG, "Failed to initialise MQTT Config after claiming. Aborting");
@@ -529,6 +546,7 @@ static void esp_rmaker_task(void *data)
             goto rmaker_end;
         }
         esp_rmaker_priv_data->need_claim = false;
+        esp_rmaker_priv_data->claim_done = false;
     }
 #endif /* ESP_RMAKER_CLAIM_ENABLED */
 #ifdef CONFIG_ESP_RMAKER_CMD_RESP_ENABLE
@@ -643,6 +661,7 @@ static esp_err_t esp_rmaker_mqtt_conn_params_init(esp_rmaker_priv_data_t *rmaker
             return ESP_FAIL;
         } else {
             rmaker_priv_data->need_claim = true;
+            rmaker_priv_data->claim_done = false;
             return ESP_OK;
         }
     }
@@ -737,6 +756,13 @@ static esp_err_t esp_rmaker_init(const esp_rmaker_config_t *config, bool use_cla
 #endif /* CONFIG_ESP_RMAKER_ENABLE_CHALLENGE_RESPONSE */
 
     esp_rmaker_priv_data->enable_time_sync = config->enable_time_sync;
+#ifdef ESP_RMAKER_CLAIM_ENABLED
+    if (esp_rmaker_priv_data->need_claim) {
+        esp_event_handler_register(RMAKER_EVENT, RMAKER_EVENT_CLAIM_STARTED, &claim_event_handler, NULL);
+        esp_event_handler_register(RMAKER_EVENT, RMAKER_EVENT_CLAIM_SUCCESSFUL, &claim_event_handler, NULL);
+        esp_event_handler_register(RMAKER_EVENT, RMAKER_EVENT_CLAIM_FAILED, &claim_event_handler, NULL);
+    }
+#endif /* ESP_RMAKER_CLAIM_ENABLED */
     esp_rmaker_post_event(RMAKER_EVENT_INIT_DONE, NULL, 0);
     esp_rmaker_priv_data->state = ESP_RMAKER_STATE_INIT_DONE;
 
