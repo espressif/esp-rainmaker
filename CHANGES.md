@@ -1,5 +1,19 @@
 # Changes
 
+## Default Claiming Type and User-Node Mapping Changes (Behavioral Changes)
+
+**IMPORTANT BEHAVIORAL CHANGES**: Two significant default behavior changes have been made in ESP RainMaker:
+
+1. **Assisted Claiming is now the default for all supported platforms**: Assisted claiming (via phone apps) is now enabled by default for all platforms that support it (requires Bluetooth enabled and not ESP32S2). Previously, it was only the default for ESP32, with self claiming being the default for other platforms. This change provides a more consistent user experience across platforms and enables admin role support.
+
+   **To revert to self claiming**: Set `CONFIG_ESP_RMAKER_SELF_CLAIM=y` in menuconfig (`idf.py menuconfig -> ESP RainMaker Config -> Claiming Type -> Use Self Claiming`).
+
+2. **Challenge Response based user-node mapping is now enabled by default**: Challenge response mechanism during provisioning is now enabled by default for improved security and reliability. This replaces the traditional user-node mapping flow and ensures that node mapping happens before Wi-Fi credentials are sent. Traditional user-node mapping provisioning is automatically disabled when this is enabled.
+
+   **To disable challenge response**: Set `CONFIG_ESP_RMAKER_ENABLE_CHALLENGE_RESPONSE=n` in menuconfig (`idf.py menuconfig -> ESP RainMaker Config -> Enable Challenge Response during provisioning`). Note that challenge response requires the node to be claimed before it can be used.
+
+   For more details, check the esp_rainmaker component's [CHANGELOG](components/esp_rainmaker/CHANGELOG.md).
+
 ## 24-Jun-2024: OTA Reliability Improvements
 
  - Check details in esp_rainmaker component's [CHANGELOG](components/esp_rainmaker/CHANGELOG.md).
