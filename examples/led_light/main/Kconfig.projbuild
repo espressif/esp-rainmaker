@@ -94,4 +94,17 @@ menu "Example Configuration"
         help
             URL pointing to the README documentation for this example.
             This will be included in the node config if set to a non-empty value.
+
+    config EXAMPLE_DIRECT_MQTT
+        bool "Enable Direct MQTT Event Reporting"
+        default n
+        help
+            Enable direct MQTT event reporting feature. This includes:
+            - Groups service for managing group IDs
+            - Direct MQTT publish API (esp_rmaker_publish_direct)
+            - Group-specific topic subscriptions and reporting
+            - Direct parameter reporting on group-specific topics
+
+            When enabled, nodes can publish messages directly to group-specific MQTT topics,
+            bypassing cloud-side processing for lower latency and cost.
 endmenu

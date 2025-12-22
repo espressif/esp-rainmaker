@@ -1181,6 +1181,33 @@ esp_rmaker_aws_credentials_t* esp_rmaker_get_aws_security_token(const char *role
  */
 void esp_rmaker_free_aws_credentials(esp_rmaker_aws_credentials_t *credentials);
 
+/** Store group_id in NVS
+ *
+ * @param[in] group_id The group_id to store
+ *
+ * @return ESP_OK on success
+ * @return error in case of failure
+ */
+esp_err_t esp_rmaker_store_group_id(const char *group_id);
+
+/** Retrieve group_id from NVS
+ *
+ * @param[out] group_id The group_id to retrieve. Should be freed by the caller.
+ *
+ * @return ESP_OK on success
+ * @return error in case of failure
+ */
+esp_err_t esp_rmaker_get_stored_group_id(char **group_id);
+
+/**
+ * @brief Publish a string message to direct params topic
+ *
+ * @param[in] message The message to publish
+ *
+ * @return ESP_OK on success
+ */
+esp_err_t esp_rmaker_publish_direct(const char *message);
+
 #ifdef __cplusplus
 }
 #endif

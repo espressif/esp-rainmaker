@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-
 #include <esp_rmaker_standard_types.h>
 #include <esp_rmaker_standard_params.h>
 
@@ -86,6 +85,19 @@ esp_rmaker_device_t *esp_rmaker_create_user_auth_service(const char *serv_name, 
         esp_rmaker_device_add_bulk_cb(service, bulk_write_cb, bulk_read_cb);
         esp_rmaker_device_add_param(service, esp_rmaker_user_token_param_create(ESP_RMAKER_DEF_USER_TOKEN_NAME));
         esp_rmaker_device_add_param(service, esp_rmaker_base_url_param_create(ESP_RMAKER_DEF_BASE_URL_NAME));
+    }
+    return service;
+}
+
+esp_rmaker_device_t *esp_rmaker_create_groups_service(const char *serv_name, esp_rmaker_device_bulk_write_cb_t write_cb,
+    char *group_id, void *priv_data)
+{
+    esp_rmaker_device_t *service = esp_rmaker_service_create(serv_name, ESP_RMAKER_SERVICE_GROUPS, priv_data);
+    if (service) {
+        if (write_cb) {
+            esp_rmaker_device_add_bulk_cb(service, write_cb, NULL);
+        }
+        esp_rmaker_device_add_param(service, esp_rmaker_group_id_param_create(ESP_RMAKER_DEF_GROUP_ID_NAME, group_id));
     }
     return service;
 }

@@ -20,6 +20,9 @@
 #include <esp_rmaker_schedule.h>
 #include <esp_rmaker_console.h>
 #include <esp_rmaker_scenes.h>
+#ifdef CONFIG_EXAMPLE_DIRECT_MQTT
+#include <esp_rmaker_groups.h>
+#endif
 
 #include <app_network.h>
 #include <app_insights.h>
@@ -117,6 +120,14 @@ static esp_err_t bulk_write_cb(const esp_rmaker_device_t *device, const esp_rmak
         }
         esp_rmaker_param_update(param, val);
     }
+#ifdef CONFIG_EXAMPLE_DIRECT_MQTT
+    /* Dummy message publish to direct MQTT topic */
+    static int val;
+    val++;
+    char my_str[25];
+    snprintf(my_str, sizeof(my_str), "Direct msg: %d", val);
+    esp_rmaker_publish_direct(my_str);
+#endif
     return ESP_OK;
 }
 
@@ -193,6 +204,16 @@ void app_main()
     };
     esp_rmaker_system_service_enable(&system_serv_config);
 
+#ifdef CONFIG_EXAMPLE_DIRECT_MQTT
+    /* Enable Groups handling */
+    err = esp_rmaker_groups_service_enable();
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Could not enable Groups service. Aborting!!!");
+        vTaskDelay(5000/portTICK_PERIOD_MS);
+        abort();
+    }
+#endif
+
     /* Enable Insights. Requires CONFIG_ESP_INSIGHTS_ENABLED=y */
     app_insights_enable();
 
@@ -216,4 +237,5 @@ void app_main()
         vTaskDelay(5000/portTICK_PERIOD_MS);
         abort();
     }
+
 }

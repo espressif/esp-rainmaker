@@ -157,7 +157,7 @@ esp_err_t esp_rmaker_controller_enable(esp_rmaker_controller_config_t *config)
         return ESP_FAIL;
     }
 
-    esp_rmaker_device_add_param(controller_service, esp_rmaker_group_id_param_create(ESP_RMAKER_DEF_GROUP_ID_NAME));
+    esp_rmaker_device_add_param(controller_service, esp_rmaker_group_id_param_create(ESP_RMAKER_DEF_GROUP_ID_NAME, ""));
     esp_err_t err = esp_rmaker_node_add_device(esp_rmaker_get_node(), controller_service);
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "Failed to add controller service to node");

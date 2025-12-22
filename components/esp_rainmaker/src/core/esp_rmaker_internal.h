@@ -135,3 +135,15 @@ static inline esp_err_t esp_rmaker_post_event(esp_rmaker_event_t event_id, void*
 }
 esp_rmaker_state_t esp_rmaker_get_state(void);
 esp_err_t esp_rmaker_cmd_response_enable(void);
+
+/** Register for group parameter updates
+ *
+ * This function handles group subscriptions and manages MQTT topics for group communication.
+ * If there's an existing group subscription, it will be unsubscribed before subscribing to the new group.
+ *
+ * @param[in] pgrp The group identifier string
+ *
+ * @return ESP_OK on success
+ * @return error in case of failure
+ */
+esp_err_t esp_rmaker_register_for_group_params(const char *pgrp);

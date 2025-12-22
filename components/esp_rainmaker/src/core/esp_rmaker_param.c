@@ -36,6 +36,9 @@
 #define RMAKER_ALERT_STR_MARGIN         25 /* To accommodate rest of the alert payload {"esp.alert.str":""}  */
 #define MAX_TS_DATA_PARAM_NAME          66 /* Time series data param name is of the format <device_name>.<param_name> */
 
+#define RMAKER_GROUP_NVS_NAMESPACE  "rmaker_group"
+#define GROUP_ID_KEY                "group_id"
+
 static size_t max_node_params_size = CONFIG_ESP_RMAKER_MAX_PARAM_DATA_SIZE;
 /* This buffer will be allocated once and will be reused for all param updates.
  * It may be reallocated if the params size becomes too large */
@@ -45,6 +48,8 @@ static bool esp_rmaker_params_mqtt_init_done;
 
 static const char *TAG = "esp_rmaker_param";
 
+/* Add this to track active group_id */
+static char *active_group_id = NULL;
 
 static const char *cb_srcs[ESP_RMAKER_REQ_SRC_MAX] = {
     [ESP_RMAKER_REQ_SRC_INIT] = "Init",
@@ -264,14 +269,22 @@ static esp_err_t esp_rmaker_report_param_internal(uint8_t flags)
         char *node_params_buf = esp_rmaker_param_get_buf(0);
         if (strlen(node_params_buf) >= RMAKER_MIN_VALID_PARAMS_SIZE) {
             if (flags == RMAKER_PARAM_FLAG_VALUE_CHANGE) {
-                esp_rmaker_create_mqtt_topic(publish_topic, sizeof(publish_topic), NODE_PARAMS_LOCAL_TOPIC_SUFFIX, NODE_PARAMS_LOCAL_TOPIC_RULE);
+                if (active_group_id) {
+                    /* Use group-specific topic */
+                    snprintf(publish_topic, sizeof(publish_topic), "node/%s/%s/%s",
+                            esp_rmaker_get_node_id(), NODE_PARAMS_LOCAL_TOPIC_SUFFIX, active_group_id);
+                } else {
+                    /* Use default topic */
+                    esp_rmaker_create_mqtt_topic(publish_topic, sizeof(publish_topic),
+                            NODE_PARAMS_LOCAL_TOPIC_SUFFIX, NODE_PARAMS_LOCAL_TOPIC_RULE);
+                }
                 ESP_LOGI(TAG, "Reporting params: %s", node_params_buf);
             } else if (flags == RMAKER_PARAM_FLAG_VALUE_NOTIFY) {
-                esp_rmaker_create_mqtt_topic(publish_topic, sizeof(publish_topic), NODE_PARAMS_ALERT_TOPIC_SUFFIX, NODE_PARAMS_ALERT_TOPIC_RULE);
+                esp_rmaker_create_mqtt_topic(publish_topic, sizeof(publish_topic),
+                        NODE_PARAMS_ALERT_TOPIC_SUFFIX, NODE_PARAMS_ALERT_TOPIC_RULE);
                 ESP_LOGI(TAG, "Notifying params: %s", node_params_buf);
-            } else {
-                return ESP_FAIL;
             }
+
             if (esp_rmaker_params_mqtt_init_done) {
                 esp_rmaker_mqtt_publish(publish_topic, node_params_buf, strlen(node_params_buf), RMAKER_MQTT_QOS1, NULL);
             } else {
@@ -447,6 +460,44 @@ static esp_err_t esp_rmaker_register_for_set_params(void)
     return ESP_OK;
 }
 
+esp_err_t esp_rmaker_register_for_group_params(const char *group_id)
+{
+    /* First unsubscribe from existing group topic if any */
+    if (active_group_id) {
+        char old_topic[MQTT_TOPIC_BUFFER_SIZE];
+        snprintf(old_topic, sizeof(old_topic), "node/%s/%s/%s",
+                esp_rmaker_get_node_id(), NODE_PARAMS_REMOTE_TOPIC_SUFFIX, active_group_id);
+        esp_err_t err = esp_rmaker_mqtt_unsubscribe(old_topic);
+        if (err != ESP_OK) {
+            ESP_LOGW(TAG, "Failed to unsubscribe from old group topic %s. Error %d", old_topic, err);
+        } else {
+            ESP_LOGI(TAG, "Unsubscribed from old group topic: %s", old_topic);
+        }
+        free(active_group_id);
+        active_group_id = NULL;
+    }
+    esp_rmaker_store_group_id(group_id);
+
+    /* Check if group_id is empty or NULL - just clear stored group_id */
+    /* No need to subscribe to default topic as we're already subscribed via esp_rmaker_register_for_set_params() */
+    if (group_id && strlen(group_id) > 0) {
+        active_group_id = strdup(group_id);
+        if (!active_group_id) {
+            ESP_LOGE(TAG, "Failed to allocate memory for group_id, continuing with subscription");
+            // Continue execution - subscription is more critical than storing the ID
+        }
+        char subscribe_topic[MQTT_TOPIC_BUFFER_SIZE];
+        snprintf(subscribe_topic, sizeof(subscribe_topic), "node/%s/%s/%s",
+                 esp_rmaker_get_node_id(), NODE_PARAMS_REMOTE_TOPIC_SUFFIX, group_id);
+        esp_err_t err = esp_rmaker_mqtt_subscribe(subscribe_topic, esp_rmaker_set_params_callback, RMAKER_MQTT_QOS1, NULL);
+        if (err != ESP_OK) {
+            ESP_LOGE(TAG, "Failed to subscribe to group topic %s. Error %d", subscribe_topic, err);
+            return ESP_FAIL;
+        }
+    }
+    return ESP_OK;
+}
+
 esp_err_t esp_rmaker_param_get_stored_value(_esp_rmaker_param_t *param, esp_rmaker_param_val_t *val)
 {
     if (!param || !param->parent || !val) {
@@ -461,6 +512,7 @@ esp_err_t esp_rmaker_param_get_stored_value(_esp_rmaker_param_t *param, esp_rmak
                 (param->val.type == RMAKER_VAL_TYPE_ARRAY)) {
         size_t len = 0;
         if ((err = nvs_get_blob(handle, param->name, NULL, &len)) == ESP_OK) {
+            ESP_LOGD(TAG, "nvs_get_blob: %s, len: %d", param->name, len);
             char *s_val = MEM_CALLOC_EXTRAM(1, len + 1);
             if (!s_val) {
                 err = ESP_ERR_NO_MEM;
@@ -471,6 +523,7 @@ esp_err_t esp_rmaker_param_get_stored_value(_esp_rmaker_param_t *param, esp_rmak
                 val->val.s = s_val;
             }
         } else if ((err = nvs_get_str(handle, param->name, NULL, &len)) == ESP_OK) {
+            ESP_LOGD(TAG, "nvs_get_str: %s, len: %d", param->name, len);
             /* In order to be compatible with the previous nvs_set_str() */
             char *s_val = MEM_CALLOC_EXTRAM(1, len);
             if (!s_val) {
@@ -1033,10 +1086,28 @@ esp_err_t esp_rmaker_report_node_state(void)
     return err;
 }
 
+static esp_err_t esp_rmaker_restore_group_id(void)
+{
+    char *group_id = NULL;
+    esp_err_t err = esp_rmaker_get_stored_group_id(&group_id);
+    if (err == ESP_OK && group_id) {
+        /* Subscribe to the stored group */
+        err = esp_rmaker_register_for_group_params(group_id);
+        free(group_id);
+    }
+    return err;
+}
+
 esp_err_t esp_rmaker_params_mqtt_init(void)
 {
+    /* First try to restore any saved group_id */
+    esp_err_t err = esp_rmaker_restore_group_id();
+    if (err != ESP_OK && err != ESP_ERR_NVS_NOT_FOUND) {
+        ESP_LOGW(TAG, "Failed to restore group id from NVS");
+    }
+
     /* Subscribe for parameter update requests */
-    esp_err_t err = esp_rmaker_register_for_set_params();
+    err = esp_rmaker_register_for_set_params();
     if (err == ESP_OK) {
         ESP_LOGI(TAG, "Params MQTT Init done.");
         esp_rmaker_params_mqtt_init_done = true;
@@ -1092,3 +1163,78 @@ esp_err_t esp_rmaker_param_report_simple_ts_data(const esp_rmaker_param_t *param
 }
 
 
+/* Store group_id in NVS */
+esp_err_t esp_rmaker_store_group_id(const char *group_id)
+{
+    nvs_handle handle;
+    esp_err_t err = nvs_open_from_partition(ESP_RMAKER_NVS_PART_NAME, RMAKER_GROUP_NVS_NAMESPACE, NVS_READWRITE, &handle);
+    if (err != ESP_OK) {
+        return err;
+    }
+    if (group_id && strlen(group_id) > 0) {
+        err = nvs_set_str(handle, GROUP_ID_KEY, group_id);
+    } else {
+        err = nvs_erase_key(handle, GROUP_ID_KEY);
+    }
+    if (err == ESP_OK) {
+        err = nvs_commit(handle);
+    }
+    nvs_close(handle);
+    return err;
+}
+
+/* Retrieve group_id from NVS */
+esp_err_t esp_rmaker_get_stored_group_id(char **group_id)
+{
+    if (!group_id) {
+        return ESP_ERR_INVALID_ARG;
+    }
+    *group_id = NULL;
+
+    nvs_handle handle;
+    esp_err_t err = nvs_open_from_partition(ESP_RMAKER_NVS_PART_NAME, RMAKER_GROUP_NVS_NAMESPACE, NVS_READONLY, &handle);
+    if (err != ESP_OK) {
+        return err;
+    }
+
+    size_t required_size = 0;
+    err = nvs_get_str(handle, GROUP_ID_KEY, NULL, &required_size);
+    if (err != ESP_OK) {
+        nvs_close(handle);
+        return err;
+    }
+
+    char *id = calloc(1, required_size);
+    if (!id) {
+        nvs_close(handle);
+        return ESP_ERR_NO_MEM;
+    }
+    err = nvs_get_str(handle, GROUP_ID_KEY, id, &required_size);
+    nvs_close(handle);
+    if (err == ESP_OK) {
+        *group_id = id;
+    } else {
+        free(id);
+    }
+    return err;
+}
+
+esp_err_t esp_rmaker_publish_direct(const char *message)
+{
+    if (!active_group_id || !message) {
+        ESP_LOGW(TAG, "Invalid arguments or active group not set");
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    char topic[128];
+    snprintf(topic, sizeof(topic), "node/%s/direct/params/local/%s", esp_rmaker_get_node_id(), active_group_id);
+
+    esp_err_t err = esp_rmaker_mqtt_publish(topic, (void *)message, strlen(message), 1, NULL);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to publish message to topic: %s", topic);
+    } else {
+        ESP_LOGI(TAG, "Message published to topic: %s", topic);
+    }
+
+    return err;
+}

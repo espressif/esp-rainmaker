@@ -380,11 +380,12 @@ esp_rmaker_param_t *esp_rmaker_base_url_param_create(const char *param_name);
  * This will create the standard Group ID parameter.
  *
  * @param[in] param_name Name of the parameter
+ * @param[in] val Default Value of the parameter
  *
  * @return Parameter handle on success.
  * @return NULL in case of failures.
  */
-esp_rmaker_param_t *esp_rmaker_group_id_param_create(const char *param_name);
+esp_rmaker_param_t *esp_rmaker_group_id_param_create(const char *param_name, const char *val);
 
 #ifdef __cplusplus
 }
