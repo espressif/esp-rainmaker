@@ -62,22 +62,11 @@ before_script:
   - for EXAMPLE in $EXAMPLES; do
   - cd $CI_PROJECT_DIR/examples/$EXAMPLE
   - echo Building $EXAMPLE
-  - if [[ "$EXAMPLE" == "homekit_switch" ]]; then
-  - cd components
-  - echo Cloning esp-homekit-sdk
-  - git clone --recursive --branch master --depth 1 https://github.com/espressif/esp-homekit-sdk.git
-  - cd ..
-  - export HOMEKIT_PATH=$PWD/components/esp-homekit-sdk
-  - fi
   - if [[ "$EXAMPLE" == "thread_br" ]]; then
-  - sed -i "/CONFIG_LWIP_IPV6_NUM_ADDRESSES=8/c\\CONFIG_LWIP_IPV6_NUM_ADDRESSES=12" sdkconfig.defaults
+  -   sed -i "/CONFIG_LWIP_IPV6_NUM_ADDRESSES=8/c\\CONFIG_LWIP_IPV6_NUM_ADDRESSES=12" sdkconfig.defaults
   - fi
   - for TARGET in $EXAMPLE_TARGETS; do
   - echo Building for $TARGET
-  - if [[ "$EXAMPLE" == "homekit_switch" && "$TARGET" == "esp32h2" ]]; then
-  -   echo "Skipping homekit_switch build for esp32h2"
-  -   continue
-  - fi
   - rm -rf managed_components dependencies.lock build sdkconfig sdkconfig.old
   - idf.py set-target $TARGET
   - idf.py build
@@ -85,10 +74,10 @@ before_script:
   - cp $CI_PROJECT_DIR/examples/$EXAMPLE/build/*.bin $CI_PROJECT_DIR/esp-rainmaker-bins-${CI_JOB_ID}/$EXAMPLE/$TARGET/
   - done
   - echo Build Complete for $EXAMPLE
-  - done
   - if [[ "$EXAMPLE" == "thread_br" ]]; then
-  - sed -i "/CONFIG_LWIP_IPV6_NUM_ADDRESSES=12/c\\CONFIG_LWIP_IPV6_NUM_ADDRESSES=8" sdkconfig.defaults
+  -   sed -i "/CONFIG_LWIP_IPV6_NUM_ADDRESSES=12/c\\CONFIG_LWIP_IPV6_NUM_ADDRESSES=8" sdkconfig.defaults
   - fi
+  - done
   # Generating zip file for binaries generated
   - cd $CI_PROJECT_DIR
   - echo Generating zip file for binaries generated
@@ -119,6 +108,33 @@ before_script:
   - echo Generating zip file for binaries generated
   - tar -zcvf esp-rainmaker-bins-${CI_JOB_ID}.zip esp-rainmaker-bins-${CI_JOB_ID}/
 
+.build_homekit_examples: &build_homekit_examples
+  - pip install --upgrade idf-component-manager
+  # Clone esp-homekit-sdk
+  - cd $CI_PROJECT_DIR/examples/homekit_switch
+  - cd components
+  - echo Cloning esp-homekit-sdk
+  - git clone --recursive --branch master --depth 1 https://github.com/espressif/esp-homekit-sdk.git
+  - cd ..
+  - export HOMEKIT_PATH=$PWD/components/esp-homekit-sdk
+  # start building homekit_switch example
+  - cd $CI_PROJECT_DIR/examples/homekit_switch
+  - echo Building homekit_switch
+  # build for the targets
+  - for TARGET in $EXAMPLE_TARGETS; do
+  - echo Building for $TARGET
+  - rm -rf managed_components dependencies.lock build sdkconfig sdkconfig.old
+  - idf.py set-target $TARGET
+  - idf.py build
+  - mkdir -p $CI_PROJECT_DIR/esp-rainmaker-bins-${CI_JOB_ID}/homekit_switch/$TARGET/
+  - cp $CI_PROJECT_DIR/examples/homekit_switch/build/*.bin $CI_PROJECT_DIR/esp-rainmaker-bins-${CI_JOB_ID}/homekit_switch/$TARGET/
+  - done
+  - echo Build Complete for homekit_switch
+  # Generating zip file for binaries generated
+  - cd $CI_PROJECT_DIR
+  - echo Generating zip file for binaries generated
+  - tar -zcvf esp-rainmaker-bins-${CI_JOB_ID}.zip esp-rainmaker-bins-${CI_JOB_ID}/
+
 .build_template:
   stage: build
   image: espressif/idf:latest
@@ -129,7 +145,7 @@ before_script:
     EXTRA_CFLAGS: "${PEDANTIC_FLAGS}"
     EXTRA_CXXFLAGS: "${PEDANTIC_FLAGS}"
     EXAMPLE_TARGETS: "esp32"
-    EXAMPLES: "switch led_light fan temperature_sensor multi_device gpio homekit_switch"
+    EXAMPLES: "switch led_light fan temperature_sensor multi_device gpio"
   script:
     - *build_all_examples
 
@@ -182,6 +198,14 @@ build_split_camera:
     EXAMPLES: "camera/split_mode/rmaker_split_camera"
   script:
     - *build_camera_examples
+
+build_homekit:
+  extends: .build_template
+  image: espressif/idf:release-v5.5
+  variables:
+    EXAMPLE_TARGETS: "esp32 esp32s2 esp32c3 esp32s3 esp32c6 esp32c2"
+  script:
+    - *build_homekit_examples
 
 build_thread_br:
   extends: .build_template
