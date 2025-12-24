@@ -88,7 +88,7 @@ esp_err_t app_light_set_power(bool power)
         /* Use MAX_INDEX to control all LEDs (works for both RGB and WS2812) */
         return led_indicator_set_hsv(g_led_indicator, SET_IHSV(MAX_INDEX, hue_359, sat_255, val_255));
     } else {
-        return led_indicator_set_brightness(g_led_indicator, 0);
+        return led_indicator_set_hsv(g_led_indicator, SET_IHSV(MAX_INDEX, 0, 0, 0));
     }
 }
 
@@ -162,7 +162,7 @@ esp_err_t app_light_init(void)
         /* Use MAX_INDEX to control all LEDs (works for both RGB and WS2812) */
         return led_indicator_set_hsv(g_led_indicator, SET_IHSV(MAX_INDEX, hue_359, sat_255, val_255));
     } else {
-        return led_indicator_set_brightness(g_led_indicator, 0);
+        return led_indicator_set_hsv(g_led_indicator, SET_IHSV(MAX_INDEX, 0, 0, 0));
     }
 }
 
