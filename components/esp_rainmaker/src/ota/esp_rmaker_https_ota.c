@@ -269,7 +269,7 @@ static esp_err_t esp_rmaker_ota_use_https(esp_rmaker_ota_handle_t ota_handle, es
         }
 #endif
 #ifdef CONFIG_ESP_RMAKER_OTA_PROGRESS_SUPPORT
-        int image_size = esp_https_ota_get_image_size(https_ota_handle);
+        int image_size = ota_data->filesize;
         int read_size = esp_https_ota_get_image_len_read(https_ota_handle);
         int ota_progress = 100 * read_size / image_size; // The unit is %
         /* When ota_progress is 0 or 100, we will not report the progress, beacasue the 0 and 100 is reported by additional_info `Downloading Firmware Image` and
