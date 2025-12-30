@@ -201,6 +201,9 @@ static esp_err_t read_random_bytes_from_nvs(uint8_t **random_bytes, size_t *len)
 }
 
 static char *custom_pop;
+static app_network_pop_type_t s_cached_pop_type = POP_TYPE_NONE;
+static bool s_pop_type_cached = false;
+
 esp_err_t app_network_set_custom_pop(const char *pop)
 {
     /* NULL PoP is not allowed here. Use POP_TYPE_NONE instead. */
@@ -241,7 +244,7 @@ static esp_err_t get_device_service_name(char *service_name, size_t max)
 }
 
 
-static char *get_device_pop(app_network_pop_type_t pop_type)
+char *app_network_get_device_pop(app_network_pop_type_t pop_type)
 {
     if (pop_type == POP_TYPE_NONE) {
         return NULL;
@@ -286,6 +289,30 @@ static char *get_device_pop(app_network_pop_type_t pop_type)
 pop_err:
     free(pop);
     return NULL;
+}
+
+char *app_network_get_device_pop_default(void)
+{
+    if (!s_pop_type_cached) {
+        ESP_LOGW(TAG, "PoP type not cached. Call app_network_start() first.");
+        return NULL;
+    }
+    return app_network_get_device_pop(s_cached_pop_type);
+}
+
+char *app_network_get_device_service_name(void)
+{
+    /* Buffer size: prefix + "_" + 6 hex chars + null terminator */
+    size_t buf_size = strlen(CONFIG_APP_NETWORK_PROV_NAME_PREFIX) + 1 + 6 + 1;
+    char *service_name = malloc(buf_size);
+    if (!service_name) {
+        return NULL;
+    }
+    if (get_device_service_name(service_name, buf_size) != ESP_OK) {
+        free(service_name);
+        return NULL;
+    }
+    return service_name;
 }
 
 static void network_event_handler(void* arg, esp_event_base_t event_base, int32_t event_id, void* event_data)
@@ -410,19 +437,24 @@ esp_err_t app_network_start_timer(void)
 
 esp_err_t app_network_start(app_network_pop_type_t pop_type)
 {
+    /* Cache the pop_type for later use by app_network_get_device_pop_default() */
+    s_cached_pop_type = pop_type;
+    s_pop_type_cached = true;
+
     /* Do we want a proof-of-possession (ignored if Security 0 is selected):
      *      - this should be a string with length > 0
      *      - NULL if not used
      */
-    char *pop = get_device_pop(pop_type);
+    char *pop = app_network_get_device_pop(pop_type);
     if ((pop_type != POP_TYPE_NONE) && (pop == NULL)) {
         return ESP_ERR_NO_MEM;
     }
     /* What is the Device Service Name that we want
      * This translates to :
      *     - device name when scheme is network_prov_scheme_ble/wifi_prov_scheme_ble
+     * Buffer size: prefix + "_" + 6 hex chars + null terminator
      */
-    char service_name[12];
+    char service_name[strlen(CONFIG_APP_NETWORK_PROV_NAME_PREFIX) + 1 + 6 + 1];
     get_device_service_name(service_name, sizeof(service_name));
     /* What is the service key (Wi-Fi password)
      * NULL = Open network

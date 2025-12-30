@@ -105,6 +105,40 @@ esp_err_t app_network_set_custom_mfg_data(uint16_t device_type, uint8_t device_s
  */
 esp_err_t app_network_set_custom_pop(const char *pop);
 
+/** Get device PoP string
+ *
+ * Generate and return the Proof of Possession (PoP) string based on the specified type.
+ * The caller is responsible for freeing the returned string.
+ *
+ * @param[in] pop_type The type of PoP to generate
+ *
+ * @return Pointer to the allocated PoP string on success (caller must free).
+ * @return NULL on failure or if pop_type is POP_TYPE_NONE.
+ */
+char *app_network_get_device_pop(app_network_pop_type_t pop_type);
+
+/** Get device PoP string using cached pop_type
+ *
+ * Returns the PoP string using the pop_type that was used in the last call to app_network_start().
+ * The caller is responsible for freeing the returned string.
+ *
+ * @note This function should only be called after app_network_start() has been called.
+ *
+ * @return Pointer to the allocated PoP string on success (caller must free).
+ * @return NULL if app_network_start() hasn't been called yet or on failure.
+ */
+char *app_network_get_device_pop_default(void);
+
+/** Get device service name
+ *
+ * Returns the service name used for provisioning (e.g., BLE device name or SoftAP SSID).
+ * The caller is responsible for freeing the returned string.
+ *
+ * @return Pointer to the allocated service name string on success (caller must free).
+ * @return NULL on failure.
+ */
+char *app_network_get_device_service_name(void);
+
 #if CONFIG_APP_WIFI_PROV_COMPAT
 #define APP_WIFI_EVENT APP_NETWORK_EVENT
 typedef app_network_event_t app_wifi_event_t;
