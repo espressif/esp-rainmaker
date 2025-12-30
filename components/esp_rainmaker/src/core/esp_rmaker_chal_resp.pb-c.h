@@ -19,6 +19,8 @@ typedef struct RmakerChResp__CmdCRPayload RmakerChResp__CmdCRPayload;
 typedef struct RmakerChResp__RespCRPayload RmakerChResp__RespCRPayload;
 typedef struct RmakerChResp__CmdGetNodeIDPayload RmakerChResp__CmdGetNodeIDPayload;
 typedef struct RmakerChResp__RespGetNodeIDPayload RmakerChResp__RespGetNodeIDPayload;
+typedef struct RmakerChResp__CmdDisableChalRespPayload RmakerChResp__CmdDisableChalRespPayload;
+typedef struct RmakerChResp__RespDisableChalRespPayload RmakerChResp__RespDisableChalRespPayload;
 typedef struct RmakerChResp__RMakerChRespPayload RmakerChResp__RMakerChRespPayload;
 
 
@@ -27,14 +29,17 @@ typedef struct RmakerChResp__RMakerChRespPayload RmakerChResp__RMakerChRespPaylo
 typedef enum _RmakerChResp__RMakerChRespStatus {
   RMAKER_CH_RESP__RMAKER_CH_RESP_STATUS__Success = 0,
   RMAKER_CH_RESP__RMAKER_CH_RESP_STATUS__Fail = 1,
-  RMAKER_CH_RESP__RMAKER_CH_RESP_STATUS__InvalidParam = 2
+  RMAKER_CH_RESP__RMAKER_CH_RESP_STATUS__InvalidParam = 2,
+  RMAKER_CH_RESP__RMAKER_CH_RESP_STATUS__Disabled = 3
     PROTOBUF_C__FORCE_ENUM_TO_BE_INT_SIZE(RMAKER_CH_RESP__RMAKER_CH_RESP_STATUS)
 } RmakerChResp__RMakerChRespStatus;
 typedef enum _RmakerChResp__RMakerChRespMsgType {
   RMAKER_CH_RESP__RMAKER_CH_RESP_MSG_TYPE__TypeCmdChallengeResponse = 0,
   RMAKER_CH_RESP__RMAKER_CH_RESP_MSG_TYPE__TypeRespChallengeResponse = 1,
   RMAKER_CH_RESP__RMAKER_CH_RESP_MSG_TYPE__TypeCmdGetNodeID = 2,
-  RMAKER_CH_RESP__RMAKER_CH_RESP_MSG_TYPE__TypeRespGetNodeID = 3
+  RMAKER_CH_RESP__RMAKER_CH_RESP_MSG_TYPE__TypeRespGetNodeID = 3,
+  RMAKER_CH_RESP__RMAKER_CH_RESP_MSG_TYPE__TypeCmdDisableChalResp = 4,
+  RMAKER_CH_RESP__RMAKER_CH_RESP_MSG_TYPE__TypeRespDisableChalResp = 5
     PROTOBUF_C__FORCE_ENUM_TO_BE_INT_SIZE(RMAKER_CH_RESP__RMAKER_CH_RESP_MSG_TYPE)
 } RmakerChResp__RMakerChRespMsgType;
 
@@ -80,12 +85,32 @@ struct  RmakerChResp__RespGetNodeIDPayload
 , (char *)protobuf_c_empty_string }
 
 
+struct  RmakerChResp__CmdDisableChalRespPayload
+{
+  ProtobufCMessage base;
+};
+#define RMAKER_CH_RESP__CMD_DISABLE_CHAL_RESP_PAYLOAD__INIT \
+ { PROTOBUF_C_MESSAGE_INIT (&rmaker_ch_resp__cmd_disable_chal_resp_payload__descriptor) \
+ }
+
+
+struct  RmakerChResp__RespDisableChalRespPayload
+{
+  ProtobufCMessage base;
+};
+#define RMAKER_CH_RESP__RESP_DISABLE_CHAL_RESP_PAYLOAD__INIT \
+ { PROTOBUF_C_MESSAGE_INIT (&rmaker_ch_resp__resp_disable_chal_resp_payload__descriptor) \
+ }
+
+
 typedef enum {
   RMAKER_CH_RESP__RMAKER_CH_RESP_PAYLOAD__PAYLOAD__NOT_SET = 0,
   RMAKER_CH_RESP__RMAKER_CH_RESP_PAYLOAD__PAYLOAD_CMD_CHALLENGE_RESPONSE_PAYLOAD = 10,
   RMAKER_CH_RESP__RMAKER_CH_RESP_PAYLOAD__PAYLOAD_RESP_CHALLENGE_RESPONSE_PAYLOAD = 11,
   RMAKER_CH_RESP__RMAKER_CH_RESP_PAYLOAD__PAYLOAD_CMD_GET_NODE_IDPAYLOAD = 12,
-  RMAKER_CH_RESP__RMAKER_CH_RESP_PAYLOAD__PAYLOAD_RESP_GET_NODE_IDPAYLOAD = 13
+  RMAKER_CH_RESP__RMAKER_CH_RESP_PAYLOAD__PAYLOAD_RESP_GET_NODE_IDPAYLOAD = 13,
+  RMAKER_CH_RESP__RMAKER_CH_RESP_PAYLOAD__PAYLOAD_CMD_DISABLE_CHAL_RESP_PAYLOAD = 14,
+  RMAKER_CH_RESP__RMAKER_CH_RESP_PAYLOAD__PAYLOAD_RESP_DISABLE_CHAL_RESP_PAYLOAD = 15
     PROTOBUF_C__FORCE_ENUM_TO_BE_INT_SIZE(RMAKER_CH_RESP__RMAKER_CH_RESP_PAYLOAD__PAYLOAD__CASE)
 } RmakerChResp__RMakerChRespPayload__PayloadCase;
 
@@ -100,6 +125,8 @@ struct  RmakerChResp__RMakerChRespPayload
     RmakerChResp__RespCRPayload *respchallengeresponsepayload;
     RmakerChResp__CmdGetNodeIDPayload *cmdgetnodeidpayload;
     RmakerChResp__RespGetNodeIDPayload *respgetnodeidpayload;
+    RmakerChResp__CmdDisableChalRespPayload *cmddisablechalresppayload;
+    RmakerChResp__RespDisableChalRespPayload *respdisablechalresppayload;
   };
 };
 #define RMAKER_CH_RESP__RMAKER_CH_RESP_PAYLOAD__INIT \
@@ -183,6 +210,44 @@ RmakerChResp__RespGetNodeIDPayload *
 void   rmaker_ch_resp__resp_get_node_idpayload__free_unpacked
                      (RmakerChResp__RespGetNodeIDPayload *message,
                       ProtobufCAllocator *allocator);
+/* RmakerChResp__CmdDisableChalRespPayload methods */
+void   rmaker_ch_resp__cmd_disable_chal_resp_payload__init
+                     (RmakerChResp__CmdDisableChalRespPayload         *message);
+size_t rmaker_ch_resp__cmd_disable_chal_resp_payload__get_packed_size
+                     (const RmakerChResp__CmdDisableChalRespPayload   *message);
+size_t rmaker_ch_resp__cmd_disable_chal_resp_payload__pack
+                     (const RmakerChResp__CmdDisableChalRespPayload   *message,
+                      uint8_t             *out);
+size_t rmaker_ch_resp__cmd_disable_chal_resp_payload__pack_to_buffer
+                     (const RmakerChResp__CmdDisableChalRespPayload   *message,
+                      ProtobufCBuffer     *buffer);
+RmakerChResp__CmdDisableChalRespPayload *
+       rmaker_ch_resp__cmd_disable_chal_resp_payload__unpack
+                     (ProtobufCAllocator  *allocator,
+                      size_t               len,
+                      const uint8_t       *data);
+void   rmaker_ch_resp__cmd_disable_chal_resp_payload__free_unpacked
+                     (RmakerChResp__CmdDisableChalRespPayload *message,
+                      ProtobufCAllocator *allocator);
+/* RmakerChResp__RespDisableChalRespPayload methods */
+void   rmaker_ch_resp__resp_disable_chal_resp_payload__init
+                     (RmakerChResp__RespDisableChalRespPayload         *message);
+size_t rmaker_ch_resp__resp_disable_chal_resp_payload__get_packed_size
+                     (const RmakerChResp__RespDisableChalRespPayload   *message);
+size_t rmaker_ch_resp__resp_disable_chal_resp_payload__pack
+                     (const RmakerChResp__RespDisableChalRespPayload   *message,
+                      uint8_t             *out);
+size_t rmaker_ch_resp__resp_disable_chal_resp_payload__pack_to_buffer
+                     (const RmakerChResp__RespDisableChalRespPayload   *message,
+                      ProtobufCBuffer     *buffer);
+RmakerChResp__RespDisableChalRespPayload *
+       rmaker_ch_resp__resp_disable_chal_resp_payload__unpack
+                     (ProtobufCAllocator  *allocator,
+                      size_t               len,
+                      const uint8_t       *data);
+void   rmaker_ch_resp__resp_disable_chal_resp_payload__free_unpacked
+                     (RmakerChResp__RespDisableChalRespPayload *message,
+                      ProtobufCAllocator *allocator);
 /* RmakerChResp__RMakerChRespPayload methods */
 void   rmaker_ch_resp__rmaker_ch_resp_payload__init
                      (RmakerChResp__RMakerChRespPayload         *message);
@@ -216,6 +281,12 @@ typedef void (*RmakerChResp__CmdGetNodeIDPayload_Closure)
 typedef void (*RmakerChResp__RespGetNodeIDPayload_Closure)
                  (const RmakerChResp__RespGetNodeIDPayload *message,
                   void *closure_data);
+typedef void (*RmakerChResp__CmdDisableChalRespPayload_Closure)
+                 (const RmakerChResp__CmdDisableChalRespPayload *message,
+                  void *closure_data);
+typedef void (*RmakerChResp__RespDisableChalRespPayload_Closure)
+                 (const RmakerChResp__RespDisableChalRespPayload *message,
+                  void *closure_data);
 typedef void (*RmakerChResp__RMakerChRespPayload_Closure)
                  (const RmakerChResp__RMakerChRespPayload *message,
                   void *closure_data);
@@ -231,6 +302,8 @@ extern const ProtobufCMessageDescriptor rmaker_ch_resp__cmd_crpayload__descripto
 extern const ProtobufCMessageDescriptor rmaker_ch_resp__resp_crpayload__descriptor;
 extern const ProtobufCMessageDescriptor rmaker_ch_resp__cmd_get_node_idpayload__descriptor;
 extern const ProtobufCMessageDescriptor rmaker_ch_resp__resp_get_node_idpayload__descriptor;
+extern const ProtobufCMessageDescriptor rmaker_ch_resp__cmd_disable_chal_resp_payload__descriptor;
+extern const ProtobufCMessageDescriptor rmaker_ch_resp__resp_disable_chal_resp_payload__descriptor;
 extern const ProtobufCMessageDescriptor rmaker_ch_resp__rmaker_ch_resp_payload__descriptor;
 
 PROTOBUF_C__END_DECLS

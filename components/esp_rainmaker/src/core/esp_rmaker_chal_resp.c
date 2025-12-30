@@ -65,6 +65,36 @@ static esp_err_t hex_str_to_bin(const char *hex, size_t hex_len, uint8_t **out, 
     return ESP_OK;
 }
 
+/* Generic challenge-response disabled flag */
+static bool g_chal_resp_disabled = false;
+
+bool esp_rmaker_chal_resp_is_disabled(void)
+{
+    return g_chal_resp_disabled;
+}
+
+esp_err_t esp_rmaker_chal_resp_disable(void)
+{
+    if (g_chal_resp_disabled) {
+        ESP_LOGW(TAG, "Challenge-response already disabled");
+        return ESP_OK;
+    }
+    ESP_LOGI(TAG, "Disabling challenge-response");
+    g_chal_resp_disabled = true;
+    return ESP_OK;
+}
+
+esp_err_t esp_rmaker_chal_resp_enable(void)
+{
+    if (!g_chal_resp_disabled) {
+        ESP_LOGW(TAG, "Challenge-response already enabled");
+        return ESP_OK;
+    }
+    ESP_LOGI(TAG, "Enabling challenge-response");
+    g_chal_resp_disabled = false;
+    return ESP_OK;
+}
+
 static esp_err_t esp_rmaker_handle_challenge(const char *challenge, size_t challenge_len, char **response, size_t *response_len)
 {
     if (!challenge || !response || !response_len) {
@@ -81,7 +111,7 @@ static esp_err_t esp_rmaker_handle_challenge(const char *challenge, size_t chall
     return ESP_OK;
 }
 
-static esp_err_t esp_rmaker_chal_resp_handler(uint32_t session_id, const uint8_t *inbuf, ssize_t inlen,
+esp_err_t esp_rmaker_chal_resp_handler(uint32_t session_id, const uint8_t *inbuf, ssize_t inlen,
                                             uint8_t **outbuf, ssize_t *outlen, void *priv_data)
 {
     ESP_LOGI(TAG, "Challenge-Response handler invoked");
@@ -99,6 +129,25 @@ static esp_err_t esp_rmaker_chal_resp_handler(uint32_t session_id, const uint8_t
     uint8_t *resp_buf = NULL;
     esp_err_t ret = ESP_FAIL;
 
+    /* Check if challenge-response is disabled */
+    if (g_chal_resp_disabled) {
+        ESP_LOGW(TAG, "Challenge-response is disabled");
+        /* Return a "Disabled" response */
+        RmakerChResp__RMakerChRespPayload resp_msg = RMAKER_CH_RESP__RMAKER_CH_RESP_PAYLOAD__INIT;
+        resp_msg.msg = RMAKER_CH_RESP__RMAKER_CH_RESP_MSG_TYPE__TypeRespChallengeResponse;
+        resp_msg.status = RMAKER_CH_RESP__RMAKER_CH_RESP_STATUS__Disabled;
+
+        size_t resp_len = rmaker_ch_resp__rmaker_ch_resp_payload__get_packed_size(&resp_msg);
+        resp_buf = calloc(1, resp_len);
+        if (!resp_buf) {
+            return ESP_ERR_NO_MEM;
+        }
+        rmaker_ch_resp__rmaker_ch_resp_payload__pack(&resp_msg, resp_buf);
+        *outbuf = resp_buf;
+        *outlen = resp_len;
+        return ESP_OK;
+    }
+
     /* Parse the received protobuf message */
     msg = rmaker_ch_resp__rmaker_ch_resp_payload__unpack(NULL, inlen, inbuf);
     if (!msg) {
@@ -106,6 +155,35 @@ static esp_err_t esp_rmaker_chal_resp_handler(uint32_t session_id, const uint8_t
         goto cleanup;
     }
     ESP_LOGD(TAG, "Successfully unpacked protobuf message");
+
+    /* Handle disable challenge-response command */
+    if (msg->msg == RMAKER_CH_RESP__RMAKER_CH_RESP_MSG_TYPE__TypeCmdDisableChalResp) {
+        ESP_LOGI(TAG, "Received Disable Challenge-Response command");
+
+        /* Disable challenge-response using generic API */
+        esp_err_t disable_err = esp_rmaker_chal_resp_disable();
+
+        /* Create response */
+        RmakerChResp__RMakerChRespPayload resp_msg = RMAKER_CH_RESP__RMAKER_CH_RESP_PAYLOAD__INIT;
+        resp_msg.msg = RMAKER_CH_RESP__RMAKER_CH_RESP_MSG_TYPE__TypeRespDisableChalResp;
+        resp_msg.status = (disable_err == ESP_OK) ?
+                          RMAKER_CH_RESP__RMAKER_CH_RESP_STATUS__Success :
+                          RMAKER_CH_RESP__RMAKER_CH_RESP_STATUS__Fail;
+
+        size_t resp_len = rmaker_ch_resp__rmaker_ch_resp_payload__get_packed_size(&resp_msg);
+        resp_buf = calloc(1, resp_len);
+        if (!resp_buf) {
+            ret = ESP_ERR_NO_MEM;
+            goto cleanup;
+        }
+        rmaker_ch_resp__rmaker_ch_resp_payload__pack(&resp_msg, resp_buf);
+        *outbuf = resp_buf;
+        *outlen = resp_len;
+        resp_buf = NULL; /* Don't free in cleanup */
+
+        rmaker_ch_resp__rmaker_ch_resp_payload__free_unpacked(msg, NULL);
+        return ESP_OK;
+    }
 
     if (msg->msg != RMAKER_CH_RESP__RMAKER_CH_RESP_MSG_TYPE__TypeCmdChallengeResponse) {
         ESP_LOGE(TAG, "Invalid message type received: %d", msg->msg);

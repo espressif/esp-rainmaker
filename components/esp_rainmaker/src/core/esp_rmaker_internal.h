@@ -147,3 +147,47 @@ esp_err_t esp_rmaker_cmd_response_enable(void);
  * @return error in case of failure
  */
 esp_err_t esp_rmaker_register_for_group_params(const char *pgrp);
+
+/** Challenge-Response Handler
+ *
+ * Protocomm handler for challenge-response based user-node mapping.
+ * Used by provisioning, on-network challenge-response, and local control.
+ *
+ * @param[in] session_id Protocomm session ID
+ * @param[in] inbuf Input buffer containing the challenge request
+ * @param[in] inlen Length of input buffer
+ * @param[out] outbuf Output buffer for the signed response
+ * @param[out] outlen Length of output buffer
+ * @param[in] priv_data Private data (unused)
+ *
+ * @return ESP_OK on success
+ * @return error in case of failure
+ */
+esp_err_t esp_rmaker_chal_resp_handler(uint32_t session_id, const uint8_t *inbuf, ssize_t inlen,
+                                       uint8_t **outbuf, ssize_t *outlen, void *priv_data);
+
+/** Check if challenge-response signing is disabled (generic)
+ *
+ * @return true if challenge-response is disabled, false otherwise
+ */
+bool esp_rmaker_chal_resp_is_disabled(void);
+
+/** Disable challenge-response signing (generic)
+ *
+ * This disables the signing functionality in the handler.
+ * Service-specific cleanup (mDNS, etc.) should be done by calling
+ * the service-specific disable function.
+ *
+ * @return ESP_OK on success
+ */
+esp_err_t esp_rmaker_chal_resp_disable(void);
+
+/** Enable challenge-response signing (generic)
+ *
+ * Re-enables the signing functionality in the handler.
+ *
+ * @note Can only be called via API, not via ch_resp endpoint.
+ *
+ * @return ESP_OK on success
+ */
+esp_err_t esp_rmaker_chal_resp_enable(void);

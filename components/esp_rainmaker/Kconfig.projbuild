@@ -213,6 +213,27 @@ menu "ESP RainMaker Config"
 
             Note: This feature is cannot be enabled if the node is not already claimed.
 
+    config ESP_RMAKER_ON_NETWORK_CHAL_RESP_ENABLE
+        bool "Enable on-network challenge-response service"
+        default n
+        depends on ESP_RMAKER_ENABLE_CHALLENGE_RESPONSE
+        depends on !ESP_RMAKER_LOCAL_CTRL_FEATURE_ENABLE
+        help
+            Enable HTTP-based challenge-response service for on-network user-node mapping.
+            This allows clients to discover devices via mDNS and perform challenge-response
+            authentication over HTTP using protocomm Security 0, Security 1, or Security 2.
+
+            The service exposes an HTTP server with a challenge-response endpoint that can
+            be used for user-node mapping without requiring WiFi provisioning.
+
+            NOTE: This feature is mutually exclusive with ESP RainMaker Local Control
+            because both use protocomm_httpd, and only one instance can run at a time.
+            If you need Local Control, disable this feature and use the provisioning-based
+            challenge-response flow instead.
+
+            Note: This service uses protocomm HTTP which is a singleton. It should not be
+            used while WiFi provisioning is active (they use the same protocomm HTTP).
+
     config RMAKER_NAME_PARAM_CB
         bool "Call device callback for Name param"
         default n
@@ -273,6 +294,19 @@ menu "ESP RainMaker Config"
         int
         default 0 if ESP_RMAKER_LOCAL_CTRL_SECURITY_0
         default 1 if ESP_RMAKER_LOCAL_CTRL_SECURITY_1
+
+    config ESP_RMAKER_LOCAL_CTRL_CHAL_RESP_ENABLE
+        bool "Enable Challenge-Response endpoint in Local Control"
+        depends on ESP_RMAKER_LOCAL_CTRL_FEATURE_ENABLE
+        depends on ESP_RMAKER_ENABLE_CHALLENGE_RESPONSE
+        default n
+        help
+            Enables a challenge-response endpoint (ch_resp) in the Local Control service.
+            This allows clients to perform user-node mapping via the local control HTTP
+            server instead of requiring a separate on-network challenge-response service.
+
+            The endpoint uses the same challenge-response handler as provisioning, allowing
+            secure device authentication and user-node mapping over local network.
 
     config ESP_RMAKER_LOCAL_CTRL_LEASE_INTERVAL_SECONDS
         int "Local Control SRP Service Lease Interval (Seconds)"
