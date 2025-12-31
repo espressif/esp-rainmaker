@@ -20,6 +20,10 @@
 #include <network_provisioning/manager.h>
 #include <sdkconfig.h>
 
+#ifdef CONFIG_ESP_RMAKER_ON_NETWORK_CHAL_RESP_ENABLE
+#include <esp_rmaker_on_network_chal_resp.h>
+#endif
+
 /* Include internal header to access device structure */
 #include "esp_rmaker_internal.h"
 
@@ -540,6 +544,117 @@ static void register_param_commands()
 
 #endif /* CONFIG_ESP_RMAKER_CONSOLE_PARAM_CMDS_ENABLE */
 
+#ifdef CONFIG_ESP_RMAKER_CONSOLE_CHAL_RESP_CMDS_ENABLE
+
+static int chal_resp_enable_handler(int argc, char** argv)
+{
+    esp_err_t err = ESP_ERR_NOT_SUPPORTED;
+
+#ifdef CONFIG_ESP_RMAKER_ON_NETWORK_CHAL_RESP_ENABLE
+    if (esp_rmaker_on_network_chal_resp_is_running()) {
+        printf("%s: On-network challenge-response service already running\n", TAG);
+        return ESP_OK;
+    }
+    /* Get optional instance name argument */
+    const char *instance_name = NULL;
+    if (argc > 1) {
+        instance_name = argv[1];
+    }
+    printf("%s: Enabling on-network challenge-response service...\n", TAG);
+    esp_rmaker_on_network_chal_resp_config_t config = ESP_RMAKER_ON_NETWORK_CHAL_RESP_DEFAULT_CONFIG();
+    if (instance_name) {
+        config.mdns_instance_name = instance_name;
+        printf("%s: Using instance name: %s\n", TAG, instance_name);
+    }
+    err = esp_rmaker_on_network_chal_resp_start(&config);
+    if (err == ESP_OK) {
+        printf("%s: On-network challenge-response service enabled\n", TAG);
+    } else {
+        printf("%s: Failed to enable on-network challenge-response service: %s\n", TAG, esp_err_to_name(err));
+    }
+#elif defined(CONFIG_ESP_RMAKER_LOCAL_CTRL_CHAL_RESP_ENABLE)
+    if (!esp_rmaker_local_ctrl_service_started()) {
+        printf("%s: Local control service not started\n", TAG);
+        return ESP_ERR_INVALID_STATE;
+    }
+    /* Get optional instance name argument */
+    const char *instance_name = NULL;
+    if (argc > 1) {
+        instance_name = argv[1];
+    }
+    printf("%s: Enabling challenge-response for local control...\n", TAG);
+    if (instance_name) {
+        printf("%s: Using instance name: %s\n", TAG, instance_name);
+    }
+    err = esp_rmaker_local_ctrl_enable_chal_resp(instance_name);
+    if (err == ESP_OK) {
+        printf("%s: Challenge-response enabled for local control\n", TAG);
+    } else {
+        printf("%s: Failed to enable challenge-response: %s\n", TAG, esp_err_to_name(err));
+    }
+#else
+    printf("%s: No challenge-response service configured\n", TAG);
+#endif
+
+    return err;
+}
+
+static int chal_resp_disable_handler(int argc, char** argv)
+{
+    esp_err_t err = ESP_ERR_NOT_SUPPORTED;
+
+#ifdef CONFIG_ESP_RMAKER_ON_NETWORK_CHAL_RESP_ENABLE
+    if (!esp_rmaker_on_network_chal_resp_is_running()) {
+        printf("%s: On-network challenge-response service not running\n", TAG);
+        return ESP_OK;
+    }
+    printf("%s: Disabling on-network challenge-response service...\n", TAG);
+    err = esp_rmaker_on_network_chal_resp_stop();
+    if (err == ESP_OK) {
+        printf("%s: On-network challenge-response service disabled\n", TAG);
+    } else {
+        printf("%s: Failed to disable service: %s\n", TAG, esp_err_to_name(err));
+    }
+#elif defined(CONFIG_ESP_RMAKER_LOCAL_CTRL_CHAL_RESP_ENABLE)
+    if (!esp_rmaker_local_ctrl_service_started()) {
+        printf("%s: Local control service not started\n", TAG);
+        return ESP_ERR_INVALID_STATE;
+    }
+    printf("%s: Disabling challenge-response for local control...\n", TAG);
+    err = esp_rmaker_local_ctrl_disable_chal_resp();
+    if (err == ESP_OK) {
+        printf("%s: Challenge-response disabled for local control\n", TAG);
+    } else {
+        printf("%s: Failed to disable challenge-response: %s\n", TAG, esp_err_to_name(err));
+    }
+#else
+    printf("%s: No challenge-response service configured\n", TAG);
+#endif
+
+    return err;
+}
+
+static void register_chal_resp_commands(void)
+{
+    const esp_console_cmd_t enable_cmd = {
+        .command = "chal-resp-enable",
+        .help = "Enable challenge-response service. Usage: chal-resp-enable [instance_name]",
+        .func = &chal_resp_enable_handler,
+    };
+    ESP_LOGI(TAG, "Registering command: %s", enable_cmd.command);
+    esp_console_cmd_register(&enable_cmd);
+
+    const esp_console_cmd_t disable_cmd = {
+        .command = "chal-resp-disable",
+        .help = "Disable challenge-response service",
+        .func = &chal_resp_disable_handler,
+    };
+    ESP_LOGI(TAG, "Registering command: %s", disable_cmd.command);
+    esp_console_cmd_register(&disable_cmd);
+}
+
+#endif /* CONFIG_ESP_RMAKER_CONSOLE_CHAL_RESP_CMDS_ENABLE */
+
 static int clear_claim_data_handler(int argc, char** argv)
 {
     const char *partition_name = "fctry";
@@ -591,5 +706,8 @@ void esp_rmaker_register_commands()
     register_clear_claim_data();
 #ifdef CONFIG_ESP_RMAKER_CONSOLE_PARAM_CMDS_ENABLE
     register_param_commands();
+#endif
+#ifdef CONFIG_ESP_RMAKER_CONSOLE_CHAL_RESP_CMDS_ENABLE
+    register_chal_resp_commands();
 #endif
 }
