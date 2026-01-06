@@ -1,5 +1,25 @@
 # Changelog
 
+## 1.9.0
+
+### New Features
+
+- Implemented option to report 'failed' status on OTA rollback due to MQTT timeout.
+    - Enable via `CONFIG_ESP_RMAKER_OTA_ROLLBACK_REPORT_FAILED` in menuconfig.
+    - When enabled, if a rollback happens because MQTT did not connect within the configured timeout,
+      the rolled-back firmware will report 'failed' status instead of 'rejected'.
+    - Ensures backward compatibility: older firmware versions (without this feature) will not
+      report any status, preventing incorrect 'rejected' reports.
+    - Only applicable for `OTA_USING_TOPICS` type.
+    - Implementation details:
+        - New firmware stores failure reason and job ID in separate NVS keys before rollback.
+        - Rolled-back firmware reads these keys and reports 'failed' status with appropriate job ID.
+        - Main job ID key is erased before rollback to prevent old firmware from reporting 'rejected'.
+    - **WARNING**: Use this option with caution. If the new firmware has issues that cause persistent
+      MQTT connection failures, enabling this feature may cause the device to toggle between two
+      firmware versions indefinitely (new firmware boots → MQTT fails → rollback → OTA retry →
+      new firmware boots again).
+
 ## 1.8.9
 
 ### New Features

@@ -22,6 +22,8 @@ extern "C" {
 #define RMAKER_OTA_NVS_NAMESPACE            "rmaker_ota"
 #define RMAKER_OTA_JOB_ID_NVS_NAME          "rmaker_ota_id"
 #define RMAKER_OTA_UPDATE_FLAG_NVS_NAME     "ota_update"
+#define RMAKER_OTA_FAIL_REASON_NVS_NAME     "ota_fail_rsn"
+#define RMAKER_OTA_FAIL_JOB_ID_NVS_NAME     "ota_fail_jid"
 #define RMAKER_OTA_FETCH_DELAY              5
 
 #if defined(CONFIG_BT_ENABLED) && !defined(CONFIG_IDF_TARGET_ESP32P4)

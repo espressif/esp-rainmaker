@@ -550,6 +550,39 @@ static void esp_ota_rollback(TimerHandle_t handle)
 {
     ESP_LOGE(TAG, "Could not verify firmware even after %d seconds since boot-up. Rolling back.",
             RMAKER_OTA_ROLLBACK_WAIT_PERIOD);
+#ifdef CONFIG_ESP_RMAKER_OTA_ROLLBACK_REPORT_FAILED
+    /* Store failure reason and job_id in separate NVS keys so that after rollback,
+     * new firmware (with this feature) can report "failed" status with the correct job_id.
+     * Also erase the main job_id key so that old firmware (without this feature) won't
+     * report "rejected" status.
+     */
+    nvs_handle nvs_handle_fail;
+    esp_err_t err = nvs_open_from_partition(ESP_RMAKER_NVS_PART_NAME, RMAKER_OTA_NVS_NAMESPACE, NVS_READWRITE, &nvs_handle_fail);
+    if (err == ESP_OK) {
+        /* Store failure reason */
+        char fail_reason[64];
+        snprintf(fail_reason, sizeof(fail_reason), "MQTT did not connect within %d seconds", RMAKER_OTA_ROLLBACK_WAIT_PERIOD);
+        esp_err_t set_err = nvs_set_str(nvs_handle_fail, RMAKER_OTA_FAIL_REASON_NVS_NAME, fail_reason);
+        if (set_err != ESP_OK) {
+            ESP_LOGW(TAG, "Failed to store failure reason: %s", esp_err_to_name(set_err));
+        }
+
+        /* Copy job_id to a separate key for new firmware to use */
+        char job_id[64] = {0};
+        size_t job_id_len = sizeof(job_id);
+        if (nvs_get_blob(nvs_handle_fail, RMAKER_OTA_JOB_ID_NVS_NAME, job_id, &job_id_len) == ESP_OK) {
+            set_err = nvs_set_str(nvs_handle_fail, RMAKER_OTA_FAIL_JOB_ID_NVS_NAME, job_id);
+            if (set_err != ESP_OK) {
+                ESP_LOGW(TAG, "Failed to store failure job ID: %s", esp_err_to_name(set_err));
+            }
+        }
+
+        /* Erase main job_id key to prevent old firmware (without this feature) from reporting "rejected" */
+        nvs_erase_key(nvs_handle_fail, RMAKER_OTA_JOB_ID_NVS_NAME);
+        nvs_commit(nvs_handle_fail);
+        nvs_close(nvs_handle_fail);
+    }
+#endif /* CONFIG_ESP_RMAKER_OTA_ROLLBACK_REPORT_FAILED */
     esp_rmaker_ota_mark_invalid();
 }
 
@@ -617,9 +650,11 @@ static void esp_rmaker_ota_manage_rollback(esp_rmaker_ota_t *ota)
             if (ota->validation_in_progress) {
                 ota->rolled_back = true;
                 esp_rmaker_erase_rollback_flag();
+
                 if (ota->type == OTA_USING_PARAMS) {
-                    /* Calling this only for OTA_USING_PARAMS, because for OTA_USING_TOPICS,
-                     * the work queue function will manage the status reporting later.
+                    /* For OTA_USING_PARAMS, just report "rejected" as it doesn't use job IDs.
+                     * For OTA_USING_TOPICS, the work queue function will handle reading
+                     * failure info from NVS and reporting appropriate status.
                      */
                     esp_rmaker_ota_report_status((esp_rmaker_ota_handle_t )ota,
                             OTA_STATUS_REJECTED, "Firmware rolled back");
