@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.8.8
+
+### Bug Fixes
+- Fixed an issue where HTTP OTA resumption reported incorrect progress, even though the OTA itself could still succeed.
+- Fixed when use ECDSA to sign the data, the device will crash.
+
 ## 1.8.7
 
 ### Bug Fixes

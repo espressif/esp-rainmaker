@@ -5,6 +5,7 @@
  */
 
 #include <string.h>
+#include <ctype.h>
 #include <esp_log.h>
 #include <esp_event.h>
 #include "esp_rmaker_chal_resp.pb-c.h"
@@ -17,6 +18,52 @@ static const char *TAG = "esp_rmaker_chal_resp";
 #define CHAL_RESP_ENDPOINT       "ch_resp"
 #define RMAKER_EXTRA_APP_NAME    "rmaker_extra"
 #define RMAKER_EXTRA_APP_VERSION "1.0"
+
+static int hex_char_to_val(char c)
+{
+    if (c >= '0' && c <= '9') {
+        return c - '0';
+    }
+    if (c >= 'a' && c <= 'f') {
+        return 10 + (c - 'a');
+    }
+    if (c >= 'A' && c <= 'F') {
+        return 10 + (c - 'A');
+    }
+    return -1;
+}
+
+static esp_err_t hex_str_to_bin(const char *hex, size_t hex_len, uint8_t **out, size_t *out_len)
+{
+    if (!hex || !out || !out_len) {
+        return ESP_ERR_INVALID_ARG;
+    }
+    if (hex_len % 2) {
+        ESP_LOGE(TAG, "Hex string length is not even: %d", hex_len);
+        return ESP_ERR_INVALID_SIZE;
+    }
+
+    size_t bin_len = hex_len / 2;
+    uint8_t *buf = calloc(1, bin_len);
+    if (!buf) {
+        return ESP_ERR_NO_MEM;
+    }
+
+    for (size_t i = 0; i < bin_len; ++i) {
+        int hi = hex_char_to_val(hex[2 * i]);
+        int lo = hex_char_to_val(hex[2 * i + 1]);
+        if (hi < 0 || lo < 0) {
+            ESP_LOGE(TAG, "Invalid hex character at index %d", (int)(2 * i));
+            free(buf);
+            return ESP_ERR_INVALID_ARG;
+        }
+        buf[i] = (hi << 4) | lo;
+    }
+
+    *out = buf;
+    *out_len = bin_len;
+    return ESP_OK;
+}
 
 static esp_err_t esp_rmaker_handle_challenge(const char *challenge, size_t challenge_len, char **response, size_t *response_len)
 {
@@ -89,21 +136,13 @@ static esp_err_t esp_rmaker_chal_resp_handler(uint32_t session_id, const uint8_t
     ESP_LOGD(TAG, "Original signature (hex, len %d): %.*s", signed_len, signed_len, (char *)signed_data);
 
     /* Convert hex string to binary */
-    binary_data = calloc(1, signed_len/2);
-    if (!binary_data) {
-        ESP_LOGE(TAG, "Failed to allocate memory for binary data");
-        ret = ESP_ERR_NO_MEM;
+    size_t binary_len = 0;
+    err = hex_str_to_bin(signed_data, signed_len, &binary_data, &binary_len);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to convert signature to binary");
+        ret = err;
         goto cleanup;
     }
-
-    /* Convert each pair of hex chars to a byte */
-    for (int i = 0; i < signed_len; i += 2) {
-        char hex[3] = {((char *)signed_data)[i], ((char *)signed_data)[i+1], 0};
-        uint8_t byte;
-        sscanf(hex, "%02hhx", &byte);
-        binary_data[i/2] = byte;
-    }
-    size_t binary_len = signed_len/2;
 
     /* Create response protobuf message */
     RmakerChResp__RMakerChRespPayload resp_msg = RMAKER_CH_RESP__RMAKER_CH_RESP_PAYLOAD__INIT;
