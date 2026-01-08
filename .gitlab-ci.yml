@@ -181,7 +181,7 @@ build_idf_v5.5:
 
 build_standalone_camera:
   extends: .build_template
-  image: espressif/idf:release-v5.5
+  image: espressif/idf:v5.5.1
   variables:
     PEDANTIC_FLAGS: "-Werror -Werror=deprecated-declarations -Wno-error=cpp -Wno-error=int-to-pointer-cast -Wno-error=pointer-to-int-cast"
     EXAMPLE_TARGETS: "esp32p4 esp32s3 esp32"
@@ -191,7 +191,7 @@ build_standalone_camera:
 
 build_split_camera:
   extends: .build_template
-  image: espressif/idf:release-v5.5
+  image: espressif/idf:v5.5.1
   variables:
     PEDANTIC_FLAGS: "-Werror -Werror=deprecated-declarations -Wno-error=cpp -Wno-error=int-to-pointer-cast -Wno-error=pointer-to-int-cast"
     EXAMPLE_TARGETS: "esp32c6"
