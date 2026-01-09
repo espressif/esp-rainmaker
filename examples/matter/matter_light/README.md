@@ -15,6 +15,8 @@
 
 > Please refer to the [THREAD_INSTRUCTIONS](./THREAD_INSTRUCTIONS.md) for instructions of Thread devices(ESP32-H2 or ESP32-C6).
 
+> Please use [release/v1.4.2](https://github.com/espressif/esp-matter/tree/release/v1.4.2) branch to build this example.
+
 #### Optimization
 
 TO optimize the DRAM usage, this example uses the following optimizations:
@@ -90,7 +92,7 @@ idf.py build
 ```bash
 idf.py -D SDKCONFIG_DEFAULTS="sdkconfig.esp32c3.no_fabric" set-target esp32c3 build
 ```  
-*Note: Currently only ESP32-C3 configurations are provided. Other modules require manual adaptation.*  
+*Note: Currently only ESP32-C3 (sdkconfig.esp32c3.no_fabric) and ESP32-H2 (sdkconfig.esp32h2.no_fabric) configurations are provided. Other modules require manual adaptation.*  
 
 **Non-Fabric + Dynamic QR Code**:  
 ```bash

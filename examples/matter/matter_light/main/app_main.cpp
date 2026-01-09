@@ -114,11 +114,13 @@ extern "C" void app_main()
         .port_config = ESP_OPENTHREAD_DEFAULT_PORT_CONFIG(),
     };
     set_openthread_platform_config(&ot_config);
+#ifndef CONFIG_EXAMPLE_USE_RAINMAKER_FABRIC
     // This will not really initiaize Thread stack as the thread stack has been initialzed in app_network.
     // We call this function to pass the OpenThread instance to GenericThreadStackManagerImpl_OpenThread
     // so that it can be used for SRP service registration and network commissioning driver.
     chip::DeviceLayer::ThreadStackMgr().InitThreadStack();
-#endif
+#endif // !CONFIG_EXAMPLE_USE_RAINMAKER_FABRIC
+#endif // CHIP_DEVICE_CONFIG_ENABLE_THREAD
 
     /* Starting driver with default values */
     app_driver_light_set_defaults();
