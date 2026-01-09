@@ -1104,6 +1104,62 @@ esp_err_t esp_rmaker_local_ctrl_enable(void);
 esp_err_t esp_rmaker_local_ctrl_disable(void);
 
 /**
+ * @brief Set custom PoP for Local Control Service.
+ *
+ * This allows setting a custom Proof of Possession (PoP) for the local control
+ * service instead of the internally generated one. This is useful when you want
+ * to use the same PoP that was used for provisioning.
+ *
+ * @note This must be called before esp_rmaker_local_ctrl_enable() for it to take effect.
+ *       If not called, a random PoP will be generated and stored in NVS.
+ *
+ * @param[in] pop NULL terminated PoP string (typically 8 characters alphanumeric).
+ *                Pass NULL to clear any previously set custom PoP.
+ *
+ * @return ESP_OK on success
+ * @return ESP_ERR_INVALID_ARG if pop is empty string
+ * @return ESP_ERR_NO_MEM if memory allocation fails
+ */
+esp_err_t esp_rmaker_local_ctrl_set_pop(const char *pop);
+
+#ifdef CONFIG_ESP_RMAKER_LOCAL_CTRL_CHAL_RESP_ENABLE
+/**
+ * @brief Enable challenge-response for Local Control Service.
+ *
+ * This function enables the challenge-response endpoint for local control.
+ * When enabled:
+ * 1. Registers the ch_resp protocomm handler
+ * 2. Announces mDNS service (_esp_rmaker_chal_resp._tcp) with TXT records (for Wi-Fi transport)
+ *
+ * @note Applications should call this after receiving RMAKER_EVENT_LOCAL_CTRL_STARTED
+ *       to enable challenge-response based user-node mapping via local control.
+ *
+ * @param[in] instance_name Custom instance name (NULL to use node_id as default).
+ *                          For Wi-Fi transport, this maps to mDNS instance name.
+ *
+ * @return ESP_OK on success
+ * @return ESP_ERR_INVALID_STATE if local control is not started
+ */
+esp_err_t esp_rmaker_local_ctrl_enable_chal_resp(const char *instance_name);
+
+/**
+ * @brief Disable challenge-response for Local Control Service.
+ *
+ * This function disables the challenge-response endpoint for local control.
+ * Once disabled:
+ * 1. The ch_resp handler will return "Disabled" status for any requests
+ * 2. mDNS TXT records (chal_resp, sec_version, pop_required) are removed
+ *
+ * This is useful after a successful user-node mapping to prevent further
+ * mapping attempts via local control.
+ *
+ * @return ESP_OK on success
+ * @return ESP_ERR_INVALID_STATE if local control is not started
+ */
+esp_err_t esp_rmaker_local_ctrl_disable_chal_resp(void);
+#endif /* CONFIG_ESP_RMAKER_LOCAL_CTRL_CHAL_RESP_ENABLE */
+
+/**
  * Report simple time series data directly with specified timestamp and TTL
  *
  * This API allows reporting simple time series data directly with control over

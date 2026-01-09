@@ -37,6 +37,12 @@
 
 #include <network_provisioning/manager.h>
 
+#ifdef CONFIG_ESP_RMAKER_LOCAL_CTRL_CHAL_RESP_ENABLE
+#define CHAL_RESP_ENDPOINT      "ch_resp"
+#define MDNS_SERVICE_TYPE_CHAL_RESP       "_esp_rmaker_chal_resp"
+#define MDNS_SERVICE_PROTO               "_tcp"
+#endif
+
 #define ESP_RMAKER_LOCAL_CTRL_SECURITY_TYPE CONFIG_ESP_RMAKER_LOCAL_CTRL_SECURITY
 
 static const char * TAG = "esp_rmaker_local";
@@ -63,6 +69,11 @@ enum property_flags {
 };
 
 static bool g_local_ctrl_is_started = false;
+static char *s_local_ctrl_pop = NULL;  /* Current PoP storage (user-set, NVS, or generated, ~9 bytes) */
+#ifdef CONFIG_ESP_RMAKER_LOCAL_CTRL_CHAL_RESP_ENABLE
+static bool g_chal_resp_enabled = false;        /* Tracks if chal_resp handler is registered */
+static bool g_chal_resp_cleanup_done = false;   /* Tracks if mDNS cleanup is done */
+#endif
 
 static char *g_serv_name;
 static bool wait_for_provisioning;
@@ -181,35 +192,224 @@ static esp_err_t __esp_rmaker_local_ctrl_set_nvs(const char *key, const char *va
     return err;
 }
 
-static char *esp_rmaker_local_ctrl_get_pop()
+static const char *esp_rmaker_local_ctrl_get_pop()
 {
-    char *pop = __esp_rmaker_local_ctrl_get_nvs(ESP_RMAKER_NVS_LOCAL_CTRL_POP);
-    if (pop) {
-        return pop;
+    /* Return cached PoP if already allocated */
+    if (s_local_ctrl_pop) {
+        return s_local_ctrl_pop;
     }
 
+    /* Try to get PoP from NVS */
+    char *pop = __esp_rmaker_local_ctrl_get_nvs(ESP_RMAKER_NVS_LOCAL_CTRL_POP);
+    if (pop) {
+        /* Copy to static storage (NVS-allocated memory will be freed by caller) */
+        s_local_ctrl_pop = strdup(pop);
+        free(pop);
+        if (!s_local_ctrl_pop) {
+            ESP_LOGE(TAG, "Failed to allocate memory for PoP");
+            return NULL;
+        }
+        return s_local_ctrl_pop;
+    }
+
+    /* Generate new PoP and store in static storage */
     ESP_LOGI(TAG, "Couldn't find POP in NVS. Generating a new one.");
-    pop = (char *)MEM_CALLOC_EXTRAM(1, ESP_RMAKER_POP_LEN);
-    if (!pop) {
+    s_local_ctrl_pop = (char *)MEM_CALLOC_EXTRAM(1, ESP_RMAKER_POP_LEN);
+    if (!s_local_ctrl_pop) {
         ESP_LOGE(TAG, "Couldn't allocate POP");
         return NULL;
     }
     uint8_t random_bytes[ESP_RMAKER_POP_LEN] = {0};
     esp_fill_random(&random_bytes, sizeof(random_bytes));
-    snprintf(pop, ESP_RMAKER_POP_LEN, "%02x%02x%02x%02x", random_bytes[0], random_bytes[1], random_bytes[2], random_bytes[3]);
+    snprintf(s_local_ctrl_pop, ESP_RMAKER_POP_LEN, "%02x%02x%02x%02x", random_bytes[0], random_bytes[1], random_bytes[2], random_bytes[3]);
 
-    __esp_rmaker_local_ctrl_set_nvs(ESP_RMAKER_NVS_LOCAL_CTRL_POP, pop);
-    return pop;
+    __esp_rmaker_local_ctrl_set_nvs(ESP_RMAKER_NVS_LOCAL_CTRL_POP, s_local_ctrl_pop);
+    return s_local_ctrl_pop;
 }
 
-static int esp_rmaker_local_ctrl_get_security_type()
+esp_err_t esp_rmaker_local_ctrl_set_pop(const char *pop)
+{
+    /* Free current PoP */
+    if (s_local_ctrl_pop) {
+        free(s_local_ctrl_pop);
+        s_local_ctrl_pop = NULL;
+    }
+
+    /* NULL clears the custom PoP - next call will fetch from NVS or generate */
+    if (!pop) {
+        ESP_LOGI(TAG, "Custom PoP cleared. Will use NVS or generate new one.");
+        return ESP_OK;
+    }
+
+    /* Empty string is not allowed */
+    if (strlen(pop) == 0) {
+        ESP_LOGE(TAG, "Empty PoP string not allowed. Use NULL to clear.");
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    /* Set the new PoP */
+    s_local_ctrl_pop = strdup(pop);
+    if (!s_local_ctrl_pop) {
+        ESP_LOGE(TAG, "Failed to allocate memory for custom PoP");
+        return ESP_ERR_NO_MEM;
+    }
+
+    ESP_LOGI(TAG, "Custom PoP set for local control");
+    return ESP_OK;
+}
+
+/* Forward declaration */
+static int esp_rmaker_local_ctrl_get_security_type(void);
+
+#ifdef CONFIG_ESP_RMAKER_LOCAL_CTRL_CHAL_RESP_ENABLE
+/* Wrapper handler for local control challenge-response */
+static esp_err_t local_ctrl_chal_resp_wrapper(uint32_t session_id, const uint8_t *inbuf,
+                                               ssize_t inlen, uint8_t **outbuf,
+                                               ssize_t *outlen, void *priv_data)
+{
+    bool was_enabled = !esp_rmaker_chal_resp_is_disabled();
+
+    /* Call the core handler */
+    esp_err_t ret = esp_rmaker_chal_resp_handler(session_id, inbuf, inlen,
+                                                  outbuf, outlen, priv_data);
+
+    /* If chal_resp was just disabled via the endpoint, do local ctrl cleanup */
+    if (was_enabled && esp_rmaker_chal_resp_is_disabled()) {
+        esp_rmaker_local_ctrl_disable_chal_resp();
+    }
+
+    return ret;
+}
+
+esp_err_t esp_rmaker_local_ctrl_enable_chal_resp(const char *instance_name)
+{
+    if (!g_local_ctrl_is_started) {
+        ESP_LOGW(TAG, "Local Control service not started");
+        return ESP_ERR_INVALID_STATE;
+    }
+
+    /* Always re-enable the core handler (in case it was disabled via ch_resp endpoint) */
+    esp_rmaker_chal_resp_enable();
+
+    bool already_enabled = g_chal_resp_enabled;
+
+    if (already_enabled) {
+        ESP_LOGI(TAG, "Re-enabling challenge-response for local control");
+    } else {
+        ESP_LOGI(TAG, "Enabling challenge-response for local control");
+    }
+
+    /* Register the wrapper handler first, before announcing mDNS service.
+     * This ensures we don't advertise challenge-response support if handler registration fails.
+     */
+    if (!already_enabled) {
+        esp_err_t err = esp_local_ctrl_set_handler(CHAL_RESP_ENDPOINT,
+                                                   local_ctrl_chal_resp_wrapper, NULL);
+        if (err != ESP_OK) {
+            ESP_LOGW(TAG, "Failed to register challenge-response endpoint: %s", esp_err_to_name(err));
+            return err;
+        }
+        ESP_LOGI(TAG, "Challenge-response endpoint registered: %s", CHAL_RESP_ENDPOINT);
+    }
+
+#ifdef CONFIG_ESP_RMAKER_NETWORK_OVER_WIFI
+    /* Initialize mDNS if not already initialized */
+    esp_err_t err = mdns_init();
+    if (err != ESP_OK && err != ESP_ERR_INVALID_STATE) {
+        /* ESP_ERR_INVALID_STATE means already initialized, which is fine */
+        ESP_LOGW(TAG, "Failed to initialize mDNS: %s", esp_err_to_name(err));
+        /* Continue anyway, mDNS might already be initialized */
+    }
+
+    /* Remove service first if it already exists (for re-enable case) */
+    mdns_service_remove(MDNS_SERVICE_TYPE_CHAL_RESP, MDNS_SERVICE_PROTO);
+
+    /* Add the challenge-response mDNS service */
+    uint16_t port = CONFIG_ESP_RMAKER_LOCAL_CTRL_HTTP_PORT;
+    err = mdns_service_add(NULL, MDNS_SERVICE_TYPE_CHAL_RESP, MDNS_SERVICE_PROTO, port, NULL, 0);
+    if (err != ESP_OK) {
+        ESP_LOGW(TAG, "Failed to add challenge-response mDNS service: %s", esp_err_to_name(err));
+        /* Don't fail the entire enable operation if mDNS fails */
+    } else {
+        /* Set instance name - use provided name if set, otherwise use node_id */
+        const char *node_id = esp_rmaker_get_node_id();
+        const char *name_to_use = instance_name;
+        if (!name_to_use) {
+            name_to_use = node_id;
+        }
+        if (name_to_use) {
+            mdns_service_instance_name_set(MDNS_SERVICE_TYPE_CHAL_RESP, MDNS_SERVICE_PROTO, name_to_use);
+        }
+
+        /* Add TXT records */
+        if (node_id) {
+            mdns_service_txt_item_set(MDNS_SERVICE_TYPE_CHAL_RESP, MDNS_SERVICE_PROTO, "node_id", node_id);
+        }
+
+        char port_str[8];
+        snprintf(port_str, sizeof(port_str), "%d", port);
+        mdns_service_txt_item_set(MDNS_SERVICE_TYPE_CHAL_RESP, MDNS_SERVICE_PROTO, "port", port_str);
+
+        int sec_ver = esp_rmaker_local_ctrl_get_security_type();
+        char sec_ver_str[2];
+        snprintf(sec_ver_str, sizeof(sec_ver_str), "%d", sec_ver);
+        mdns_service_txt_item_set(MDNS_SERVICE_TYPE_CHAL_RESP, MDNS_SERVICE_PROTO, "sec_version", sec_ver_str);
+
+        /* Indicate if PoP is required */
+#if ESP_RMAKER_LOCAL_CTRL_SECURITY_TYPE == 1
+        const char *pop = esp_rmaker_local_ctrl_get_pop();
+        mdns_service_txt_item_set(MDNS_SERVICE_TYPE_CHAL_RESP, MDNS_SERVICE_PROTO, "pop_required",
+                                  (pop && strlen(pop) > 0) ? "true" : "false");
+#else
+        mdns_service_txt_item_set(MDNS_SERVICE_TYPE_CHAL_RESP, MDNS_SERVICE_PROTO, "pop_required", "false");
+#endif
+        ESP_LOGI(TAG, "Announced challenge-response mDNS service: %s.%s, port: %d", MDNS_SERVICE_TYPE_CHAL_RESP, MDNS_SERVICE_PROTO, port);
+    }
+#endif /* CONFIG_ESP_RMAKER_NETWORK_OVER_WIFI */
+
+    g_chal_resp_enabled = true;
+    g_chal_resp_cleanup_done = false;
+    return ESP_OK;
+}
+
+esp_err_t esp_rmaker_local_ctrl_disable_chal_resp(void)
+{
+    if (!g_local_ctrl_is_started) {
+        ESP_LOGW(TAG, "Local Control service not started");
+        return ESP_ERR_INVALID_STATE;
+    }
+
+    /* Call generic disable (idempotent) */
+    esp_rmaker_chal_resp_disable();
+
+    /* Do local control specific cleanup (only once) */
+    if (g_chal_resp_cleanup_done) {
+        ESP_LOGD(TAG, "Local control chal_resp cleanup already done");
+        return ESP_OK;
+    }
+
+    ESP_LOGI(TAG, "Disabling challenge-response for local control");
+
+#ifdef CONFIG_ESP_RMAKER_NETWORK_OVER_WIFI
+    /* Remove the challenge-response mDNS service */
+    mdns_service_remove(MDNS_SERVICE_TYPE_CHAL_RESP, MDNS_SERVICE_PROTO);
+    ESP_LOGI(TAG, "Removed challenge-response mDNS service");
+#endif
+
+    g_chal_resp_cleanup_done = true;
+    return ESP_OK;
+}
+
+#endif /* CONFIG_ESP_RMAKER_LOCAL_CTRL_CHAL_RESP_ENABLE */
+
+static int esp_rmaker_local_ctrl_get_security_type(void)
 {
     return ESP_RMAKER_LOCAL_CTRL_SECURITY_TYPE;
 }
 
 static esp_err_t esp_rmaker_local_ctrl_service_enable(void)
 {
-    char *pop_str = esp_rmaker_local_ctrl_get_pop();
+    const char *pop_str = esp_rmaker_local_ctrl_get_pop();
     if (!pop_str) {
         ESP_LOGE(TAG, "Get POP failed");
         return ESP_FAIL;
@@ -219,10 +419,8 @@ static esp_err_t esp_rmaker_local_ctrl_service_enable(void)
     esp_rmaker_device_t *local_ctrl_service = esp_rmaker_create_local_control_service(ESP_RMAKER_LOCAL_CTRL_DEVICE_NAME, pop_str, sec_ver, NULL);;
     if (!local_ctrl_service) {
         ESP_LOGE(TAG, "Failed to create Local Control Service.");
-        free(pop_str);
         return ESP_FAIL;
     }
-    free(pop_str);
 
     esp_err_t err = esp_rmaker_node_add_device(esp_rmaker_get_node(), local_ctrl_service);
     if (err != ESP_OK) {
@@ -413,8 +611,10 @@ static esp_err_t __esp_rmaker_start_local_ctrl_service(const char *serv_name)
 #define PROTOCOMM_SEC_DATA protocomm_security1_params_t
     PROTOCOMM_SEC_DATA *pop = NULL;
 #if ESP_RMAKER_LOCAL_CTRL_SECURITY_TYPE == 1
-        char *pop_str = esp_rmaker_local_ctrl_get_pop();
-        /* Note: pop_str shouldn't be freed. If it gets freed, the pointer which is internally copied in esp_local_ctrl_start() will become invalid which would cause corruption. */
+        const char *pop_str = esp_rmaker_local_ctrl_get_pop();
+        /* Note: pop_str points to s_local_ctrl_pop.
+         * The pointer remains valid until esp_rmaker_local_ctrl_set_pop() is called,
+         * which is acceptable as PoP is typically only ~9 bytes. */
 
         int sec_ver = esp_rmaker_local_ctrl_get_security_type();
 
@@ -422,7 +622,6 @@ static esp_err_t __esp_rmaker_start_local_ctrl_service(const char *serv_name)
             pop = (PROTOCOMM_SEC_DATA *)MEM_CALLOC_EXTRAM(1, sizeof(PROTOCOMM_SEC_DATA));
             if (!pop) {
                 ESP_LOGE(TAG, "Failed to allocate pop");
-                free(pop_str);
                 return ESP_ERR_NO_MEM;
             }
             pop->data = (uint8_t *)pop_str;
@@ -481,6 +680,7 @@ static esp_err_t __esp_rmaker_start_local_ctrl_service(const char *serv_name)
 
     /* update the global status */
     g_local_ctrl_is_started = true;
+
     esp_rmaker_post_event(RMAKER_EVENT_LOCAL_CTRL_STARTED, (void *)serv_name, strlen(serv_name) + 1);
     return ESP_OK;
 }

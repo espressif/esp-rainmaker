@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.3.0]
+
+### Added
+- Exposed `app_network_get_device_pop()` API to get PoP string for a given pop_type
+- Added `app_network_get_device_pop_default()` API to get PoP using cached pop_type from `app_network_start()`
+- Added `app_network_get_device_service_name()` API to get the provisioning service name (BLE device name / SoftAP SSID)
+
+### Fixed
+- Fixed buffer size for service name to accommodate longer `CONFIG_APP_NETWORK_PROV_NAME_PREFIX` values
+
 ## [1.2.0]
 
 ### Fixed

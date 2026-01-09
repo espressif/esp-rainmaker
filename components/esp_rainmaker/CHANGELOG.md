@@ -1,5 +1,41 @@
 # Changelog
 
+## 1.8.9
+
+### New Features
+
+- Added on-network challenge-response service for user-node mapping.
+    - Enable via `CONFIG_ESP_RMAKER_ON_NETWORK_CHAL_RESP_ENABLE` in menuconfig.
+    - Allows mapping already-provisioned devices to user accounts without re-provisioning.
+    - Starts an HTTP server (default port 80) with protocomm security (Sec0/Sec1/Sec2).
+    - Devices announce themselves via mDNS service type `_esp_rmaker_chal_resp._tcp`.
+    - Challenge-response endpoint: `ch_resp`.
+    - TXT records include: `node_id`, `port`, `sec_version`, `pop_required`.
+    - Optional instance name support via `config.mdns_instance_name` (NULL uses node_id).
+    - APIs: `esp_rmaker_on_network_chal_resp_start()`, `esp_rmaker_on_network_chal_resp_stop()`,
+      `esp_rmaker_on_network_chal_resp_is_running()`.
+    - **Note**: Mutually exclusive with Local Control (`CONFIG_ESP_RMAKER_LOCAL_CTRL_FEATURE_ENABLE`)
+      as both use protocomm_httpd which only supports one instance at a time.
+
+- Added challenge-response endpoint in Local Control service.
+    - Enable via `CONFIG_ESP_RMAKER_LOCAL_CTRL_CHAL_RESP_ENABLE` in menuconfig.
+    - Registers `ch_resp` endpoint in the Local Control HTTP server.
+    - Announces mDNS service `_esp_rmaker_chal_resp._tcp` (same as standalone service for consistency).
+    - TXT records include: `node_id`, `port`, `sec_version`, `pop_required`.
+    - Optional instance name parameter (NULL uses node_id as default).
+    - APIs: `esp_rmaker_local_ctrl_enable_chal_resp(instance_name)`,
+      `esp_rmaker_local_ctrl_disable_chal_resp()`.
+    - Both standalone and local control ch_resp use the same mDNS service type, simplifying discovery.
+
+- Added `esp_rmaker_local_ctrl_set_pop()` API to set custom PoP for Local Control.
+    - Allows using the same PoP as provisioning for Local Control service.
+    - Must be called before `esp_rmaker_local_ctrl_enable()`.
+
+- Added console commands to enable/disable these handlers based on `CONFIG_ESP_RMAKER_CONSOLE_CHAL_RESP_CMDS_ENABLE`.
+    - Console command: `chal-resp-enable [instance_name]` (instance name is optional).
+    - The appropriate APIs are called based on whether `CONFIG_ESP_RMAKER_ON_NETWORK_CHAL_RESP_ENABLE` or
+      `CONFIG_ESP_RMAKER_LOCAL_CTRL_CHAL_RESP_ENABLE` is enabled.
+
 ## 1.8.8
 
 ### Bug Fixes

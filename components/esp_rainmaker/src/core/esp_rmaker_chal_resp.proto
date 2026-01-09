@@ -6,6 +6,7 @@ enum RMakerChRespStatus {
     Success = 0;
     Fail = 1;
     InvalidParam = 2;
+    Disabled = 3;
 }
 
 message CmdCRPayload {
@@ -25,11 +26,21 @@ message RespGetNodeIDPayload {
     string node_id = 1;
 }
 
+message CmdDisableChalRespPayload {
+    /* Empty payload - command to disable challenge-response */
+}
+
+message RespDisableChalRespPayload {
+    /* Response contains only status in the parent message */
+}
+
 enum RMakerChRespMsgType {
     TypeCmdChallengeResponse = 0;
     TypeRespChallengeResponse = 1;
     TypeCmdGetNodeID = 2;
     TypeRespGetNodeID = 3;
+    TypeCmdDisableChalResp = 4;
+    TypeRespDisableChalResp = 5;
 }
 
 message RMakerChRespPayload {
@@ -40,5 +51,7 @@ message RMakerChRespPayload {
         RespCRPayload respChallengeResponsePayload = 11;
         CmdGetNodeIDPayload cmdGetNodeIDPayload = 12;
         RespGetNodeIDPayload respGetNodeIDPayload = 13;
+        CmdDisableChalRespPayload cmdDisableChalRespPayload = 14;
+        RespDisableChalRespPayload respDisableChalRespPayload = 15;
     }
-} 
+}

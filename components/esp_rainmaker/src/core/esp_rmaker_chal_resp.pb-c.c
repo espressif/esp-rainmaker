@@ -187,6 +187,96 @@ void   rmaker_ch_resp__resp_get_node_idpayload__free_unpacked
   assert(message->base.descriptor == &rmaker_ch_resp__resp_get_node_idpayload__descriptor);
   protobuf_c_message_free_unpacked ((ProtobufCMessage*)message, allocator);
 }
+void   rmaker_ch_resp__cmd_disable_chal_resp_payload__init
+                     (RmakerChResp__CmdDisableChalRespPayload         *message)
+{
+  static const RmakerChResp__CmdDisableChalRespPayload init_value = RMAKER_CH_RESP__CMD_DISABLE_CHAL_RESP_PAYLOAD__INIT;
+  *message = init_value;
+}
+size_t rmaker_ch_resp__cmd_disable_chal_resp_payload__get_packed_size
+                     (const RmakerChResp__CmdDisableChalRespPayload *message)
+{
+  assert(message->base.descriptor == &rmaker_ch_resp__cmd_disable_chal_resp_payload__descriptor);
+  return protobuf_c_message_get_packed_size ((const ProtobufCMessage*)(message));
+}
+size_t rmaker_ch_resp__cmd_disable_chal_resp_payload__pack
+                     (const RmakerChResp__CmdDisableChalRespPayload *message,
+                      uint8_t       *out)
+{
+  assert(message->base.descriptor == &rmaker_ch_resp__cmd_disable_chal_resp_payload__descriptor);
+  return protobuf_c_message_pack ((const ProtobufCMessage*)message, out);
+}
+size_t rmaker_ch_resp__cmd_disable_chal_resp_payload__pack_to_buffer
+                     (const RmakerChResp__CmdDisableChalRespPayload *message,
+                      ProtobufCBuffer *buffer)
+{
+  assert(message->base.descriptor == &rmaker_ch_resp__cmd_disable_chal_resp_payload__descriptor);
+  return protobuf_c_message_pack_to_buffer ((const ProtobufCMessage*)message, buffer);
+}
+RmakerChResp__CmdDisableChalRespPayload *
+       rmaker_ch_resp__cmd_disable_chal_resp_payload__unpack
+                     (ProtobufCAllocator  *allocator,
+                      size_t               len,
+                      const uint8_t       *data)
+{
+  return (RmakerChResp__CmdDisableChalRespPayload *)
+     protobuf_c_message_unpack (&rmaker_ch_resp__cmd_disable_chal_resp_payload__descriptor,
+                                allocator, len, data);
+}
+void   rmaker_ch_resp__cmd_disable_chal_resp_payload__free_unpacked
+                     (RmakerChResp__CmdDisableChalRespPayload *message,
+                      ProtobufCAllocator *allocator)
+{
+  if(!message)
+    return;
+  assert(message->base.descriptor == &rmaker_ch_resp__cmd_disable_chal_resp_payload__descriptor);
+  protobuf_c_message_free_unpacked ((ProtobufCMessage*)message, allocator);
+}
+void   rmaker_ch_resp__resp_disable_chal_resp_payload__init
+                     (RmakerChResp__RespDisableChalRespPayload         *message)
+{
+  static const RmakerChResp__RespDisableChalRespPayload init_value = RMAKER_CH_RESP__RESP_DISABLE_CHAL_RESP_PAYLOAD__INIT;
+  *message = init_value;
+}
+size_t rmaker_ch_resp__resp_disable_chal_resp_payload__get_packed_size
+                     (const RmakerChResp__RespDisableChalRespPayload *message)
+{
+  assert(message->base.descriptor == &rmaker_ch_resp__resp_disable_chal_resp_payload__descriptor);
+  return protobuf_c_message_get_packed_size ((const ProtobufCMessage*)(message));
+}
+size_t rmaker_ch_resp__resp_disable_chal_resp_payload__pack
+                     (const RmakerChResp__RespDisableChalRespPayload *message,
+                      uint8_t       *out)
+{
+  assert(message->base.descriptor == &rmaker_ch_resp__resp_disable_chal_resp_payload__descriptor);
+  return protobuf_c_message_pack ((const ProtobufCMessage*)message, out);
+}
+size_t rmaker_ch_resp__resp_disable_chal_resp_payload__pack_to_buffer
+                     (const RmakerChResp__RespDisableChalRespPayload *message,
+                      ProtobufCBuffer *buffer)
+{
+  assert(message->base.descriptor == &rmaker_ch_resp__resp_disable_chal_resp_payload__descriptor);
+  return protobuf_c_message_pack_to_buffer ((const ProtobufCMessage*)message, buffer);
+}
+RmakerChResp__RespDisableChalRespPayload *
+       rmaker_ch_resp__resp_disable_chal_resp_payload__unpack
+                     (ProtobufCAllocator  *allocator,
+                      size_t               len,
+                      const uint8_t       *data)
+{
+  return (RmakerChResp__RespDisableChalRespPayload *)
+     protobuf_c_message_unpack (&rmaker_ch_resp__resp_disable_chal_resp_payload__descriptor,
+                                allocator, len, data);
+}
+void   rmaker_ch_resp__resp_disable_chal_resp_payload__free_unpacked
+                     (RmakerChResp__RespDisableChalRespPayload *message,
+                      ProtobufCAllocator *allocator)
+{
+  if(!message)
+    return;
+  assert(message->base.descriptor == &rmaker_ch_resp__resp_disable_chal_resp_payload__descriptor);
+  protobuf_c_message_free_unpacked ((ProtobufCMessage*)message, allocator);
+}
 void   rmaker_ch_resp__rmaker_ch_resp_payload__init
                      (RmakerChResp__RMakerChRespPayload         *message)
 {
@@ -377,7 +467,43 @@ const ProtobufCMessageDescriptor rmaker_ch_resp__resp_get_node_idpayload__descri
   (ProtobufCMessageInit) rmaker_ch_resp__resp_get_node_idpayload__init,
   NULL,NULL,NULL    /* reserved[123] */
 };
-static const ProtobufCFieldDescriptor rmaker_ch_resp__rmaker_ch_resp_payload__field_descriptors[6] =
+#define rmaker_ch_resp__cmd_disable_chal_resp_payload__field_descriptors NULL
+#define rmaker_ch_resp__cmd_disable_chal_resp_payload__field_indices_by_name NULL
+#define rmaker_ch_resp__cmd_disable_chal_resp_payload__number_ranges NULL
+const ProtobufCMessageDescriptor rmaker_ch_resp__cmd_disable_chal_resp_payload__descriptor =
+{
+  PROTOBUF_C__MESSAGE_DESCRIPTOR_MAGIC,
+  "rmaker_ch_resp.CmdDisableChalRespPayload",
+  "CmdDisableChalRespPayload",
+  "RmakerChResp__CmdDisableChalRespPayload",
+  "rmaker_ch_resp",
+  sizeof(RmakerChResp__CmdDisableChalRespPayload),
+  0,
+  rmaker_ch_resp__cmd_disable_chal_resp_payload__field_descriptors,
+  rmaker_ch_resp__cmd_disable_chal_resp_payload__field_indices_by_name,
+  0,  rmaker_ch_resp__cmd_disable_chal_resp_payload__number_ranges,
+  (ProtobufCMessageInit) rmaker_ch_resp__cmd_disable_chal_resp_payload__init,
+  NULL,NULL,NULL    /* reserved[123] */
+};
+#define rmaker_ch_resp__resp_disable_chal_resp_payload__field_descriptors NULL
+#define rmaker_ch_resp__resp_disable_chal_resp_payload__field_indices_by_name NULL
+#define rmaker_ch_resp__resp_disable_chal_resp_payload__number_ranges NULL
+const ProtobufCMessageDescriptor rmaker_ch_resp__resp_disable_chal_resp_payload__descriptor =
+{
+  PROTOBUF_C__MESSAGE_DESCRIPTOR_MAGIC,
+  "rmaker_ch_resp.RespDisableChalRespPayload",
+  "RespDisableChalRespPayload",
+  "RmakerChResp__RespDisableChalRespPayload",
+  "rmaker_ch_resp",
+  sizeof(RmakerChResp__RespDisableChalRespPayload),
+  0,
+  rmaker_ch_resp__resp_disable_chal_resp_payload__field_descriptors,
+  rmaker_ch_resp__resp_disable_chal_resp_payload__field_indices_by_name,
+  0,  rmaker_ch_resp__resp_disable_chal_resp_payload__number_ranges,
+  (ProtobufCMessageInit) rmaker_ch_resp__resp_disable_chal_resp_payload__init,
+  NULL,NULL,NULL    /* reserved[123] */
+};
+static const ProtobufCFieldDescriptor rmaker_ch_resp__rmaker_ch_resp_payload__field_descriptors[8] =
 {
   {
     "msg",
@@ -451,12 +577,38 @@ static const ProtobufCFieldDescriptor rmaker_ch_resp__rmaker_ch_resp_payload__fi
     PROTOBUF_C_FIELD_FLAG_ONEOF,             /* flags */
     0,NULL,NULL    /* reserved1,reserved2, etc */
   },
+  {
+    "cmdDisableChalRespPayload",
+    14,
+    PROTOBUF_C_LABEL_NONE,
+    PROTOBUF_C_TYPE_MESSAGE,
+    offsetof(RmakerChResp__RMakerChRespPayload, payload_case),
+    offsetof(RmakerChResp__RMakerChRespPayload, cmddisablechalresppayload),
+    &rmaker_ch_resp__cmd_disable_chal_resp_payload__descriptor,
+    NULL,
+    PROTOBUF_C_FIELD_FLAG_ONEOF,             /* flags */
+    0,NULL,NULL    /* reserved1,reserved2, etc */
+  },
+  {
+    "respDisableChalRespPayload",
+    15,
+    PROTOBUF_C_LABEL_NONE,
+    PROTOBUF_C_TYPE_MESSAGE,
+    offsetof(RmakerChResp__RMakerChRespPayload, payload_case),
+    offsetof(RmakerChResp__RMakerChRespPayload, respdisablechalresppayload),
+    &rmaker_ch_resp__resp_disable_chal_resp_payload__descriptor,
+    NULL,
+    PROTOBUF_C_FIELD_FLAG_ONEOF,             /* flags */
+    0,NULL,NULL    /* reserved1,reserved2, etc */
+  },
 };
 static const unsigned rmaker_ch_resp__rmaker_ch_resp_payload__field_indices_by_name[] = {
   2,   /* field[2] = cmdChallengeResponsePayload */
+  6,   /* field[6] = cmdDisableChalRespPayload */
   4,   /* field[4] = cmdGetNodeIDPayload */
   0,   /* field[0] = msg */
   3,   /* field[3] = respChallengeResponsePayload */
+  7,   /* field[7] = respDisableChalRespPayload */
   5,   /* field[5] = respGetNodeIDPayload */
   1,   /* field[1] = status */
 };
@@ -464,7 +616,7 @@ static const ProtobufCIntRange rmaker_ch_resp__rmaker_ch_resp_payload__number_ra
 {
   { 1, 0 },
   { 10, 2 },
-  { 0, 6 }
+  { 0, 8 }
 };
 const ProtobufCMessageDescriptor rmaker_ch_resp__rmaker_ch_resp_payload__descriptor =
 {
@@ -474,24 +626,26 @@ const ProtobufCMessageDescriptor rmaker_ch_resp__rmaker_ch_resp_payload__descrip
   "RmakerChResp__RMakerChRespPayload",
   "rmaker_ch_resp",
   sizeof(RmakerChResp__RMakerChRespPayload),
-  6,
+  8,
   rmaker_ch_resp__rmaker_ch_resp_payload__field_descriptors,
   rmaker_ch_resp__rmaker_ch_resp_payload__field_indices_by_name,
   2,  rmaker_ch_resp__rmaker_ch_resp_payload__number_ranges,
   (ProtobufCMessageInit) rmaker_ch_resp__rmaker_ch_resp_payload__init,
   NULL,NULL,NULL    /* reserved[123] */
 };
-static const ProtobufCEnumValue rmaker_ch_resp__rmaker_ch_resp_status__enum_values_by_number[3] =
+static const ProtobufCEnumValue rmaker_ch_resp__rmaker_ch_resp_status__enum_values_by_number[4] =
 {
   { "Success", "RMAKER_CH_RESP__RMAKER_CH_RESP_STATUS__Success", 0 },
   { "Fail", "RMAKER_CH_RESP__RMAKER_CH_RESP_STATUS__Fail", 1 },
   { "InvalidParam", "RMAKER_CH_RESP__RMAKER_CH_RESP_STATUS__InvalidParam", 2 },
+  { "Disabled", "RMAKER_CH_RESP__RMAKER_CH_RESP_STATUS__Disabled", 3 },
 };
 static const ProtobufCIntRange rmaker_ch_resp__rmaker_ch_resp_status__value_ranges[] = {
-{0, 0},{0, 3}
+{0, 0},{0, 4}
 };
-static const ProtobufCEnumValueIndex rmaker_ch_resp__rmaker_ch_resp_status__enum_values_by_name[3] =
+static const ProtobufCEnumValueIndex rmaker_ch_resp__rmaker_ch_resp_status__enum_values_by_name[4] =
 {
+  { "Disabled", 3 },
   { "Fail", 1 },
   { "InvalidParam", 2 },
   { "Success", 0 },
@@ -503,29 +657,33 @@ const ProtobufCEnumDescriptor rmaker_ch_resp__rmaker_ch_resp_status__descriptor 
   "RMakerChRespStatus",
   "RmakerChResp__RMakerChRespStatus",
   "rmaker_ch_resp",
-  3,
+  4,
   rmaker_ch_resp__rmaker_ch_resp_status__enum_values_by_number,
-  3,
+  4,
   rmaker_ch_resp__rmaker_ch_resp_status__enum_values_by_name,
   1,
   rmaker_ch_resp__rmaker_ch_resp_status__value_ranges,
   NULL,NULL,NULL,NULL   /* reserved[1234] */
 };
-static const ProtobufCEnumValue rmaker_ch_resp__rmaker_ch_resp_msg_type__enum_values_by_number[4] =
+static const ProtobufCEnumValue rmaker_ch_resp__rmaker_ch_resp_msg_type__enum_values_by_number[6] =
 {
   { "TypeCmdChallengeResponse", "RMAKER_CH_RESP__RMAKER_CH_RESP_MSG_TYPE__TypeCmdChallengeResponse", 0 },
   { "TypeRespChallengeResponse", "RMAKER_CH_RESP__RMAKER_CH_RESP_MSG_TYPE__TypeRespChallengeResponse", 1 },
   { "TypeCmdGetNodeID", "RMAKER_CH_RESP__RMAKER_CH_RESP_MSG_TYPE__TypeCmdGetNodeID", 2 },
   { "TypeRespGetNodeID", "RMAKER_CH_RESP__RMAKER_CH_RESP_MSG_TYPE__TypeRespGetNodeID", 3 },
+  { "TypeCmdDisableChalResp", "RMAKER_CH_RESP__RMAKER_CH_RESP_MSG_TYPE__TypeCmdDisableChalResp", 4 },
+  { "TypeRespDisableChalResp", "RMAKER_CH_RESP__RMAKER_CH_RESP_MSG_TYPE__TypeRespDisableChalResp", 5 },
 };
 static const ProtobufCIntRange rmaker_ch_resp__rmaker_ch_resp_msg_type__value_ranges[] = {
-{0, 0},{0, 4}
+{0, 0},{0, 6}
 };
-static const ProtobufCEnumValueIndex rmaker_ch_resp__rmaker_ch_resp_msg_type__enum_values_by_name[4] =
+static const ProtobufCEnumValueIndex rmaker_ch_resp__rmaker_ch_resp_msg_type__enum_values_by_name[6] =
 {
   { "TypeCmdChallengeResponse", 0 },
+  { "TypeCmdDisableChalResp", 4 },
   { "TypeCmdGetNodeID", 2 },
   { "TypeRespChallengeResponse", 1 },
+  { "TypeRespDisableChalResp", 5 },
   { "TypeRespGetNodeID", 3 },
 };
 const ProtobufCEnumDescriptor rmaker_ch_resp__rmaker_ch_resp_msg_type__descriptor =
@@ -535,9 +693,9 @@ const ProtobufCEnumDescriptor rmaker_ch_resp__rmaker_ch_resp_msg_type__descripto
   "RMakerChRespMsgType",
   "RmakerChResp__RMakerChRespMsgType",
   "rmaker_ch_resp",
-  4,
+  6,
   rmaker_ch_resp__rmaker_ch_resp_msg_type__enum_values_by_number,
-  4,
+  6,
   rmaker_ch_resp__rmaker_ch_resp_msg_type__enum_values_by_name,
   1,
   rmaker_ch_resp__rmaker_ch_resp_msg_type__value_ranges,

@@ -42,6 +42,12 @@ if(CONFIG_ESP_RMAKER_ENABLE_CHALLENGE_RESPONSE)
         "src/core/esp_rmaker_chal_resp.pb-c.c")
 endif()
 
+if(CONFIG_ESP_RMAKER_ON_NETWORK_CHAL_RESP_ENABLE)
+    list(APPEND core_srcs
+        "src/core/esp_rmaker_on_network_chal_resp.c")
+    list(APPEND priv_req protocomm)
+endif()
+
 if(CONFIG_ESP_RMAKER_ASSISTED_CLAIM)
     list(APPEND core_srcs
         "src/core/esp_rmaker_claim.c"
