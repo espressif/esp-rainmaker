@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.10.1
+
+### Changes
+
+- Move User Authentication part of RainMaker controller service to an independent service. Components can register to `RMAKER_AUTH_SERVICE_EVENT` event to get the user token and base url updates.
+- Added `esp.param.user-token-status` in the RainMaker User Auth Service to indicate user-token state: 0 = not set; 1 = set but not verified; 2 = set and verified; 3 = set but expired/invalid.
+- Because group_id is not marked `PROP_FLAG_PERSIST`, it must be stored manually in the RainMaker Controller.
+
 ## 1.10.0
 
 ### New Features

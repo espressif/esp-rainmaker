@@ -13,6 +13,7 @@ set(core_srcs "src/core/esp_rmaker_core.c"
         "src/core/esp_rmaker_schedule.c"
         "src/core/esp_rmaker_scenes.c"
         "src/core/esp_rmaker_groups.c"
+        "src/core/esp_rmaker_auth_service.c"
         "src/core/esp_rmaker_secure_boot_digest.c"
         "src/core/esp_rmaker_aws_credentials.c"
     )

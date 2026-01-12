@@ -85,6 +85,7 @@ esp_rmaker_device_t *esp_rmaker_create_user_auth_service(const char *serv_name, 
         esp_rmaker_device_add_bulk_cb(service, bulk_write_cb, bulk_read_cb);
         esp_rmaker_device_add_param(service, esp_rmaker_user_token_param_create(ESP_RMAKER_DEF_USER_TOKEN_NAME));
         esp_rmaker_device_add_param(service, esp_rmaker_base_url_param_create(ESP_RMAKER_DEF_BASE_URL_NAME));
+        esp_rmaker_device_add_param(service, esp_rmaker_user_token_status_param_create(ESP_RMAKER_DEF_USER_TOKEN_STATUS_NAME, 0));
     }
     return service;
 }
