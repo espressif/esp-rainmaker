@@ -548,7 +548,64 @@ static void esp_rmaker_ota_work_fn(void *priv_data)
     esp_rmaker_ota_t *ota = (esp_rmaker_ota_t *)priv_data;
     /* If the firmware was rolled back, indicate that first */
     if (ota->rolled_back) {
-        esp_rmaker_ota_report_status((esp_rmaker_ota_handle_t )ota, OTA_STATUS_REJECTED, "Firmware rolled back");
+        char *rollback_fail_job_id = NULL;
+        char *rollback_fail_reason = NULL;
+
+        /* Check if there's a failure job_id stored (from new firmware with ROLLBACK_REPORT_FAILED enabled).
+         * The presence of ota_fail_jid is the primary indicator that we should report "failed" instead of "rejected".
+         */
+        nvs_handle nvs_handle_fail;
+        esp_err_t err = nvs_open_from_partition(ESP_RMAKER_NVS_PART_NAME, RMAKER_OTA_NVS_NAMESPACE, NVS_READWRITE, &nvs_handle_fail);
+        if (err == ESP_OK) {
+            size_t job_id_len = 0;
+            if (nvs_get_str(nvs_handle_fail, RMAKER_OTA_FAIL_JOB_ID_NVS_NAME, NULL, &job_id_len) == ESP_OK) {
+                rollback_fail_job_id = MEM_CALLOC_EXTRAM(1, job_id_len);
+                if (rollback_fail_job_id) {
+                    nvs_get_str(nvs_handle_fail, RMAKER_OTA_FAIL_JOB_ID_NVS_NAME, rollback_fail_job_id, &job_id_len);
+                    ESP_LOGI(TAG, "Rollback failure job_id found: %s", rollback_fail_job_id);
+                }
+
+                /* Also try to read the failure reason if available */
+                size_t fail_reason_len = 0;
+                if (nvs_get_str(nvs_handle_fail, RMAKER_OTA_FAIL_REASON_NVS_NAME, NULL, &fail_reason_len) == ESP_OK) {
+                    rollback_fail_reason = MEM_CALLOC_EXTRAM(1, fail_reason_len);
+                    if (rollback_fail_reason) {
+                        nvs_get_str(nvs_handle_fail, RMAKER_OTA_FAIL_REASON_NVS_NAME, rollback_fail_reason, &fail_reason_len);
+                        ESP_LOGI(TAG, "Rollback failure reason found: %s", rollback_fail_reason);
+                    }
+                }
+            }
+            nvs_close(nvs_handle_fail);
+        }
+
+        if (rollback_fail_job_id) {
+            /* Report "failed" - presence of rollback_fail_job_id indicates new firmware had the feature enabled */
+            ota->transient_priv = rollback_fail_job_id;
+            /* Use stored reason if available, else use default */
+            const char *fail_reason = rollback_fail_reason ?
+                    rollback_fail_reason : "Firmware verification failed";
+            esp_rmaker_ota_report_status((esp_rmaker_ota_handle_t )ota, OTA_STATUS_FAILED, (char *)fail_reason);
+
+            /* Erase NVS keys after successful reporting */
+            err = nvs_open_from_partition(ESP_RMAKER_NVS_PART_NAME, RMAKER_OTA_NVS_NAMESPACE, NVS_READWRITE, &nvs_handle_fail);
+            if (err == ESP_OK) {
+                nvs_erase_key(nvs_handle_fail, RMAKER_OTA_FAIL_JOB_ID_NVS_NAME);
+                nvs_erase_key(nvs_handle_fail, RMAKER_OTA_FAIL_REASON_NVS_NAME);
+                /* Also erase the main job_id key for safety, in case it wasn't erased before rollback */
+                nvs_erase_key(nvs_handle_fail, RMAKER_OTA_JOB_ID_NVS_NAME);
+                nvs_commit(nvs_handle_fail);
+                nvs_close(nvs_handle_fail);
+            }
+
+            /* Clean up memory */
+            free(rollback_fail_job_id);
+            if (rollback_fail_reason) {
+                free(rollback_fail_reason);
+            }
+            ota->transient_priv = NULL;
+        } else {
+            esp_rmaker_ota_report_status((esp_rmaker_ota_handle_t )ota, OTA_STATUS_REJECTED, "Firmware rolled back");
+        }
         ota->rolled_back = false;
     }
     esp_rmaker_ota_subscribe(priv_data);
