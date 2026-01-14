@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.9.1
+
+### New Features
+
+- Add support for ECDSA key type for claiming. You can choose between RSA (legacy) and ECDSA via Kconfig options
+  `CONFIG_ESP_RMAKER_CLAIM_KEY_RSA`/`CONFIG_ESP_RMAKER_CLAIM_KEY_ECDSA`.
+  `idf.py menuconfig -> ESP RainMaker Config -> Claiming Key Type -> RSA (2048-bit)/ECDSA (P-256)`
+
+
 ## 1.9.0
 
 ### New Features
