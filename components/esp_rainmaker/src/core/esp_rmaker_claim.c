@@ -31,6 +31,10 @@
 #include "mbedtls/x509_csr.h"
 #include "mbedtls/md.h"
 #include "mbedtls/sha512.h"
+#ifdef CONFIG_ESP_RMAKER_CLAIM_KEY_ECDSA
+#include "mbedtls/ecdsa.h"
+#include "mbedtls/ecp.h"
+#endif
 
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
@@ -82,7 +86,11 @@ extern uint8_t claim_service_server_root_ca_pem_start[] asm("_binary_rmaker_clai
 extern uint8_t claim_service_server_root_ca_pem_end[] asm("_binary_rmaker_claim_service_server_crt_end");
 #endif /* CONFIG_ESP_RMAKER_SELF_CLAIM */
 
+#ifdef CONFIG_ESP_RMAKER_CLAIM_KEY_ECDSA
+#define CLAIM_EC_CURVE     MBEDTLS_ECP_DP_SECP256R1
+#else
 #define CLAIM_PK_SIZE       2048
+#endif
 
 static EventGroupHandle_t claim_event_group;
 static const int CLAIM_TASK_BIT = BIT0;
@@ -195,7 +203,25 @@ static esp_err_t esp_rmaker_claim_generate_key(esp_rmaker_claim_data_t *claim_da
         goto exit;
     }
 
-    ESP_LOGW(TAG, "Generating the private key. This may take time." );
+#ifdef CONFIG_ESP_RMAKER_CLAIM_KEY_ECDSA
+    /* Generate ECDSA key */
+    ESP_LOGW(TAG, "Generating ECDSA private key. This may take time." );
+    ret = mbedtls_pk_setup(&claim_data->key, mbedtls_pk_info_from_type(MBEDTLS_PK_ECKEY));
+    if (ret != 0) {
+        ESP_LOGE(TAG, "mbedtls_pk_setup returned -0x%04x", -ret );
+        mbedtls_pk_free(&claim_data->key);
+        goto exit;
+    }
+
+    ret = mbedtls_ecdsa_genkey(mbedtls_pk_ec(claim_data->key), CLAIM_EC_CURVE, mbedtls_ctr_drbg_random, &ctr_drbg);
+    if (ret != 0) {
+        ESP_LOGE(TAG, "mbedtls_ecdsa_genkey returned -0x%04x", -ret );
+        mbedtls_pk_free(&claim_data->key);
+        goto exit;
+    }
+#else /* CONFIG_ESP_RMAKER_CLAIM_KEY_RSA */
+    /* Generate RSA key */
+    ESP_LOGW(TAG, "Generating RSA private key. This may take time." );
     ret = mbedtls_pk_setup(&claim_data->key, mbedtls_pk_info_from_type(MBEDTLS_PK_RSA));
     if (ret != 0) {
         ESP_LOGE(TAG, "mbedtls_pk_setup returned -0x%04x", -ret );
@@ -209,6 +235,7 @@ static esp_err_t esp_rmaker_claim_generate_key(esp_rmaker_claim_data_t *claim_da
         mbedtls_pk_free(&claim_data->key);
         goto exit;
     }
+#endif /* CONFIG_ESP_RMAKER_CLAIM_KEY_RSA */
 
     claim_data->state = RMAKER_CLAIM_STATE_PK_GENERATED;
     ESP_LOGD(TAG, "Converting Private Key to PEM...");
@@ -849,6 +876,15 @@ static void event_handler(void* arg, esp_event_base_t event_base,
 esp_err_t __esp_rmaker_claim_init(esp_rmaker_claim_data_t *claim_data)
 {
     esp_err_t err = ESP_OK;
+    bool node_already_claimed = false;
+
+    /* Check if node is already claimed by checking for certificate */
+    char *cert = esp_rmaker_get_client_cert();
+    if (cert) {
+        node_already_claimed = true;
+        free(cert);
+        ESP_LOGI(TAG, "Node already has certificate. Will use existing key if available.");
+    }
 
     char *key = esp_rmaker_get_client_key();
     if (key) {
@@ -860,8 +896,42 @@ esp_err_t __esp_rmaker_claim_init(esp_rmaker_claim_data_t *claim_data)
         int ret = mbedtls_pk_parse_key(&claim_data->key, (uint8_t *)key, strlen(key) + 1, NULL, 0, mbedtls_ctr_drbg_random, NULL);
 #endif
         if (ret == 0) {
-            ESP_LOGI(TAG, "Private key already exists. No need to re-initialise it.");
-            claim_data->state = RMAKER_CLAIM_STATE_PK_GENERATED;
+            mbedtls_pk_type_t key_type = mbedtls_pk_get_type(&claim_data->key);
+            bool key_type_matches_config = false;
+
+#ifdef CONFIG_ESP_RMAKER_CLAIM_KEY_ECDSA
+            /* Config expects ECDSA */
+            key_type_matches_config = (key_type == MBEDTLS_PK_ECKEY);
+#else /* CONFIG_ESP_RMAKER_CLAIM_KEY_RSA */
+            /* Config expects RSA */
+            key_type_matches_config = (key_type == MBEDTLS_PK_RSA);
+#endif
+
+            if (node_already_claimed) {
+                /* Node is already claimed - use existing key regardless of type */
+                ESP_LOGI(TAG, "Private key already exists and node is claimed. Using existing %s key.",
+                         (key_type == MBEDTLS_PK_RSA) ? "RSA" : (key_type == MBEDTLS_PK_ECKEY) ? "ECDSA" : "unknown");
+                claim_data->state = RMAKER_CLAIM_STATE_PK_GENERATED;
+            } else if (key_type_matches_config) {
+                /* Key type matches config and node is not claimed - use existing key */
+                ESP_LOGI(TAG, "Private key already exists with matching type. No need to re-initialise it.");
+                claim_data->state = RMAKER_CLAIM_STATE_PK_GENERATED;
+            } else {
+                /* Key type doesn't match config and node is not claimed - generate new key */
+                ESP_LOGW(TAG, "Existing key type (%s) doesn't match configured type (%s). Generating new key.",
+                         (key_type == MBEDTLS_PK_RSA) ? "RSA" : (key_type == MBEDTLS_PK_ECKEY) ? "ECDSA" : "unknown",
+#ifdef CONFIG_ESP_RMAKER_CLAIM_KEY_ECDSA
+                         "ECDSA"
+#else
+                         "RSA"
+#endif
+                         );
+                mbedtls_pk_free(&claim_data->key);
+                claim_data->state = RMAKER_CLAIM_STATE_INIT;
+            }
+        } else {
+            ESP_LOGW(TAG, "Failed to parse existing key. Will generate new key.");
+            mbedtls_pk_free(&claim_data->key);
         }
         free(key);
     }

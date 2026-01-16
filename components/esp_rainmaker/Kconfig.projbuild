@@ -31,6 +31,33 @@ menu "ESP RainMaker Config"
 
     endchoice
 
+    choice ESP_RMAKER_CLAIM_KEY_TYPE
+        prompt "Claiming Key Type"
+        default ESP_RMAKER_CLAIM_KEY_ECDSA
+        depends on ESP_RMAKER_SELF_CLAIM || ESP_RMAKER_ASSISTED_CLAIM
+        help
+            Cryptographic algorithm to use for key generation during claiming.
+            ECDSA is now the default since it offers smaller key sizes and faster operations.
+            To revert to the only supported key type earlier (RSA), change this config.
+
+        config ESP_RMAKER_CLAIM_KEY_RSA
+            bool "RSA (2048-bit)"
+            help
+                Use RSA 2048-bit keys for claiming. This is retained for backward compatibility
+                but is not recommended anymore, since the switch to ECDSA will be seamless.
+
+        config ESP_RMAKER_CLAIM_KEY_ECDSA
+            bool "ECDSA (P-256)"
+            help
+                Use ECDSA P-256 (secp256r1) keys for claiming. Provides smaller
+                key sizes and faster cryptographic operations compared to RSA.
+    endchoice
+
+    config ESP_RMAKER_CLAIM_KEY_TYPE
+        int
+        default 0 if ESP_RMAKER_CLAIM_KEY_RSA
+        default 1 if ESP_RMAKER_CLAIM_KEY_ECDSA
+
     choice ESP_RMAKER_CHOOSE_PKI_ACCESS_METHOD
         prompt "Choose PKI credentials access method"
         default ESP_RMAKER_USE_NVS
