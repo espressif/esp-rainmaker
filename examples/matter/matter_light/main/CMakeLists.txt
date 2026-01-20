@@ -1,4 +1,4 @@
-set(PRIV_REQUIRES_LIST device app_matter app_reset)
+set(PRIV_REQUIRES_LIST device app_matter)
 set(SRCS ./app_main.cpp ./app_matter_light.cpp ./app_driver.cpp)
 set(PRIV_INCLUDE_DIRS ./ )
 

@@ -9,7 +9,9 @@
 #include <platform/internal/CHIPDeviceLayerInternal.h>
 #include <platform/CHIPDeviceConfig.h>
 #include <ble/CHIPBleServiceData.h>
+#include <platform/CHIPDeviceLayer.h>
 #include <platform/internal/BLEManager.h>
+#include <platform/PlatformManager.h>
 #include <esp_err.h>
 #include <host/ble_gap.h>
 #include <host/ble_gatt.h>
@@ -552,7 +554,7 @@ esp_err_t protocomm_matter_ble_stop(protocomm_t *pc)
     if ((pc != NULL) && (protoble_internal != NULL ) && (pc == protoble_internal->pc_matter_ble)) {
         protoble_internal->pc_matter_ble = nullptr;
     }
-    chip::DeviceLayer::Internal::BLEMgr().Shutdown();
+    chip::DeviceLayer::PlatformMgr().ScheduleWork([](intptr_t){ chip::DeviceLayer::Internal::BLEMgr().Shutdown(); });
     free_gatt_ble_misc_memory(s_gatt_db);
     protocomm_matter_ble_cleanup();
     return ESP_OK;

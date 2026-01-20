@@ -15,6 +15,8 @@
 
 > Please refer to the [THREAD_INSTRUCTIONS](./THREAD_INSTRUCTIONS.md) for instructions of Thread devices(ESP32-H2 or ESP32-C6).
 
+> Please use [release/v1.4.2](https://github.com/espressif/esp-matter/tree/release/v1.4.2) branch to build this example.
+
 #### Optimization
 
 TO optimize the DRAM usage, this example uses the following optimizations:
@@ -60,7 +62,6 @@ Literally means without Fabric functionality, while supporting both standard Mat
 
 **Disadvantages**:  
 1. Requires Matter Controller (e.g., Apple/Google smart speakers)  
-2. Additional app development needed for RainMaker binding post-Matter provisioning  
 
 ### 3. What is Dynamic Matter QR Code  
 Implements Matter-standard dynamic passcode generation. QR codes/pairing codes are generated during provisioning and shared via RainMaker:  
@@ -90,7 +91,7 @@ idf.py build
 ```bash
 idf.py -D SDKCONFIG_DEFAULTS="sdkconfig.esp32c3.no_fabric" set-target esp32c3 build
 ```  
-*Note: Currently only ESP32-C3 configurations are provided. Other modules require manual adaptation.*  
+*Note: Currently only ESP32-C3 (sdkconfig.esp32c3.no_fabric) and ESP32-H2 (sdkconfig.esp32h2.no_fabric) configurations are provided. Other modules require manual adaptation.*  
 
 **Non-Fabric + Dynamic QR Code**:  
 ```bash
@@ -140,3 +141,46 @@ esp-rainmaker-cli getparams [node-id]
 }
 ```  
 *(Use `QRCode` payload for QR generation, `ManualCode` for numeric input)*  
+
+### 6. RainMaker On-Network Node Mapping
+
+If a device has already been commissioned over Matter and you want to manage it using the RainMaker app, RainMaker does not need to provision Wi‑Fi credentials again. Only on-network node mapping is required.
+
+When both `CONFIG_ESP_RMAKER_ON_NETWORK_CHAL_RESP_ENABLE` and `CONFIG_ESP_RMAKER_CONSOLE_CHAL_RESP_CMDS_ENABLE` are enabled, you can use console commands to open/close the node-mapping window (challenge-response service) for testing.
+
+Use the following console commands to control the on-network node-mapping window (challenge-response service):
+
+- `chal-resp-enable [instance_name]`: Starts the on-network challenge-response service by calling `esp_rmaker_on_network_chal_resp_start()`. If the service is already running, the command will print a message and return.
+- `chal-resp-disable`: Stops the on-network challenge-response service by calling `esp_rmaker_on_network_chal_resp_stop()`. If the service is not running, the command will print a message and return.
+
+For implementation details, refer to [`chal_resp_enable_handler`](https://github.com/espressif/esp-rainmaker/blob/master/components/esp_rainmaker/src/console/esp_rmaker_commands.c#L549) and [`chal_resp_disable_handler`](https://github.com/espressif/esp-rainmaker/blob/master/components/esp_rainmaker/src/console/esp_rmaker_commands.c#L602).
+
+In a real-world flow, when the user wants to bind this device, simply open the on-network node-mapping window by calling `esp_rmaker_on_network_chal_resp_start()`, and close it (optionally using a timeout) by calling `esp_rmaker_on_network_chal_resp_stop()`.
+
+**6.1 Enable RainMaker On-Network Node Mapping Window**:
+
+Run `chal-resp-enable` in the console to open the on-network node mapping window. Then, use the latest RainMaker app or the `esp-rainmaker-cli` tool to discover the device.
+*Note: The app or the PC running `esp-rainmaker-cli` must be on the same network as the device.*
+
+```bash
+esp-rainmaker-cli provision --transport on-network
+```
+*Output Example*:
+```
+Discovering devices on local network...
+
+Discovered 1 device(s):
+------------------------------------------------------------------------------------------------------------------------
+#   Instance Name        Node ID                   IP Address       Port   Sec  PoP      Service
+------------------------------------------------------------------------------------------------------------------------
+1   fAYFmRYS3NGdwaXJ...  fAYFmRYS3NGdwaXJAv7eYf    192.168.4.127    80     1    No       ChalResp
+------------------------------------------------------------------------------------------------------------------------
+
+Proceed with this device? (y/n): y
+++++ Connecting to 192.168.4.127:80++++
+✅ Node fAYFmRYS3NGdwaXJAv7eYf mapped to your account successfully!
+```
+
+**6.2 Disable RainMaker On-Network Node Mapping Window**:
+
+Input command `chal-resp-disable` in console and the on-network node mapping window will close.

@@ -40,6 +40,9 @@ dynamic_commissionable_data_provider g_dynamic_passcode_provider;
 #endif
 #endif
 
+#define WIFI_RESET_BUTTON_TIMEOUT       3
+#define FACTORY_RESET_BUTTON_TIMEOUT    10
+
 static const char *TAG = "app_main";
 
 static app_driver_handle_t light_handle;
@@ -94,7 +97,7 @@ extern "C" void app_main()
     /* Initialize drivers for light and button */
     light_handle = app_driver_light_init();
     app_driver_handle_t button_handle = app_driver_button_init(light_handle);
-    app_reset_button_register(button_handle);
+    app_reset_button_register((button_handle_t)button_handle, WIFI_RESET_BUTTON_TIMEOUT, FACTORY_RESET_BUTTON_TIMEOUT);
 
     /* Initialize Matter */
     app_matter_init(app_attribute_update_cb,app_identification_cb);
@@ -114,11 +117,13 @@ extern "C" void app_main()
         .port_config = ESP_OPENTHREAD_DEFAULT_PORT_CONFIG(),
     };
     set_openthread_platform_config(&ot_config);
+#ifndef CONFIG_EXAMPLE_USE_RAINMAKER_FABRIC
     // This will not really initiaize Thread stack as the thread stack has been initialzed in app_network.
     // We call this function to pass the OpenThread instance to GenericThreadStackManagerImpl_OpenThread
     // so that it can be used for SRP service registration and network commissioning driver.
     chip::DeviceLayer::ThreadStackMgr().InitThreadStack();
-#endif
+#endif // !CONFIG_EXAMPLE_USE_RAINMAKER_FABRIC
+#endif // CHIP_DEVICE_CONFIG_ENABLE_THREAD
 
     /* Starting driver with default values */
     app_driver_light_set_defaults();
@@ -175,6 +180,7 @@ extern "C" void app_main()
     esp_rmaker_system_serv_config_t servconfig = {
         .flags = SYSTEM_SERV_FLAGS_ALL,
         .reboot_seconds = 2,
+        .reset_seconds = 2,
         .reset_reboot_seconds = 2,
     };
     esp_rmaker_system_service_enable(&servconfig);
@@ -200,12 +206,12 @@ extern "C" void app_main()
 
     bool is_network_provisioned = false;
 #ifdef CONFIG_ESP_RMAKER_NETWORK_OVER_WIFI
-    // If Wi-Fi is provisioned and RainMaker user node mapping is done, deinitialize the BLE.
+    // If Wi-Fi is provisioned deinitialize the BLE. RainMaker user node mapping can use on-network channel.
     network_prov_mgr_is_wifi_provisioned(&is_network_provisioned);
 #else
     network_prov_mgr_is_thread_provisioned(&is_network_provisioned);
 #endif
-    if (is_network_provisioned && esp_rmaker_user_node_mapping_get_state() == ESP_RMAKER_USER_MAPPING_DONE) {
+    if (is_network_provisioned) {
         chip::DeviceLayer::PlatformMgr().ScheduleWork([](intptr_t) { chip::DeviceLayer::Internal::BLEMgr().Shutdown(); });
     }
 #endif
@@ -213,6 +219,13 @@ extern "C" void app_main()
     rmaker_init_done = true;
 
     app_matter_enable_matter_console();
+
+    /* Register RainMaker commands only for on-network node mapping.
+     * If the on-network node mapping not use console commands, can comment this line.
+     */
+#ifndef CONFIG_EXAMPLE_USE_RAINMAKER_FABRIC
+    esp_rmaker_register_commands();
+#endif
 
     // RainMaker start is deferred after Matter commissioning is complete
     // and BLE memory is reclaimed, so that MQTT connect doesnt fail.

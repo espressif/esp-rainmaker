@@ -139,6 +139,6 @@ app_driver_handle_t app_driver_button_init(void *user_data)
         return NULL;
     }
 
-    iot_button_register_cb(handle, BUTTON_PRESS_DOWN, NULL, app_driver_button_toggle_cb, user_data);
+    iot_button_register_cb(handle, BUTTON_SINGLE_CLICK, NULL, app_driver_button_toggle_cb, user_data);
     return (app_driver_handle_t)handle;
 }
