@@ -668,6 +668,83 @@ static esp_err_t esp_rmaker_mqtt_conn_params_init(esp_rmaker_priv_data_t *rmaker
 #endif /* ESP_RMAKER_CLAIM_ENABLED */
     return ESP_FAIL;
 }
+
+esp_err_t esp_rmaker_mqtt_reinit_with_new_params(void)
+{
+    if (!esp_rmaker_priv_data) {
+        ESP_LOGE(TAG, "RainMaker not initialized");
+        return ESP_ERR_INVALID_STATE;
+    }
+
+    /* Check if MQTT was initialized in the first place.
+     * If mqtt_conn_params is NULL, MQTT init was skipped (e.g., claiming pending).
+     * In this case, just return OK - MQTT init will happen later with LWT already set.
+     */
+    if (!esp_rmaker_priv_data->mqtt_conn_params) {
+        ESP_LOGI(TAG, "MQTT not yet initialized (claiming pending?), skipping reinit");
+        return ESP_OK;
+    }
+
+    ESP_LOGI(TAG, "Reinitializing MQTT with fresh connection parameters");
+
+    /* Deinit existing MQTT */
+    esp_rmaker_mqtt_deinit();
+
+    /* Clean up old conn_params */
+    esp_rmaker_clean_mqtt_conn_params(esp_rmaker_priv_data->mqtt_conn_params);
+    free(esp_rmaker_priv_data->mqtt_conn_params);
+    esp_rmaker_priv_data->mqtt_conn_params = NULL;
+
+    /* Get fresh conn_params (will now include any updated LWT) */
+    esp_rmaker_priv_data->mqtt_conn_params = esp_rmaker_get_mqtt_conn_params();
+    if (!esp_rmaker_priv_data->mqtt_conn_params) {
+        ESP_LOGE(TAG, "Failed to get fresh MQTT connection params");
+        return ESP_FAIL;
+    }
+
+    /* Reinit MQTT with new params */
+    esp_err_t err = esp_rmaker_mqtt_init(esp_rmaker_priv_data->mqtt_conn_params);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to reinit MQTT: %d", err);
+        return err;
+    }
+
+    ESP_LOGI(TAG, "MQTT reinitialized successfully");
+    return ESP_OK;
+}
+
+esp_err_t esp_rmaker_mqtt_reconnect(void)
+{
+    if (!esp_rmaker_priv_data) {
+        ESP_LOGE(TAG, "RainMaker not initialized");
+        return ESP_ERR_INVALID_STATE;
+    }
+
+    ESP_LOGI(TAG, "Reconnecting MQTT with fresh connection parameters");
+
+    /* Disconnect if connected */
+    if (esp_rmaker_is_mqtt_connected()) {
+        esp_rmaker_mqtt_disconnect();
+    }
+
+    /* Reinit with fresh params */
+    esp_err_t err = esp_rmaker_mqtt_reinit_with_new_params();
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to reinit MQTT: %d", err);
+        return err;
+    }
+
+    /* Reconnect */
+    err = esp_rmaker_mqtt_connect();
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to reconnect MQTT: %d", err);
+        return err;
+    }
+
+    ESP_LOGI(TAG, "MQTT reconnected successfully");
+    return ESP_OK;
+}
+
 /* Initialize ESP RainMaker */
 static esp_err_t esp_rmaker_init(const esp_rmaker_config_t *config, bool use_claiming)
 {

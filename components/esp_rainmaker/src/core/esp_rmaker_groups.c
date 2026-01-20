@@ -11,6 +11,7 @@
 #include <esp_rmaker_standard_services.h>
 #include <esp_rmaker_standard_params.h>
 #include <esp_rmaker_groups.h>
+#include <esp_rmaker_connectivity.h>
 #include "esp_rmaker_internal.h"
 
 static const char *TAG = "esp_rmaker_groups";
@@ -37,6 +38,17 @@ esp_err_t esp_rmaker_groups_service_enable(void)
     esp_err_t err = esp_rmaker_get_stored_group_id(&group_id);
     if (err == ESP_OK && group_id) {
         service = esp_rmaker_create_groups_service("Groups", groups_write_cb, group_id, NULL);
+
+        /* Update connectivity LWT with persisted group_id if connectivity service is enabled.
+         * Note: Connectivity service already reads persisted group_id during enable(),
+         * so this is mainly a safeguard to ensure LWT is updated if groups service
+         * is enabled after connectivity service.
+         */
+        if (esp_rmaker_connectivity_is_enabled()) {
+            ESP_LOGI(TAG, "Updating Connectivity LWT with persisted group_id: %s", group_id);
+            esp_rmaker_connectivity_update_lwt(group_id);
+        }
+
         free(group_id);
     } else {
         service = esp_rmaker_create_groups_service("Groups", groups_write_cb, "", NULL);

@@ -127,6 +127,15 @@ esp_err_t esp_rmaker_mqtt_publish(const char *topic, void *data, size_t data_len
     return ESP_OK;
 }
 
+esp_err_t esp_rmaker_mqtt_update_config(esp_rmaker_mqtt_conn_params_t *conn_params)
+{
+    if (g_mqtt_config.update_config) {
+        return g_mqtt_config.update_config(conn_params);
+    }
+    ESP_LOGW(TAG, "esp_rmaker_mqtt_update_config not registered");
+    return ESP_ERR_NOT_SUPPORTED;
+}
+
 void esp_rmaker_create_mqtt_topic(char *buf, size_t buf_size, const char *topic_suffix, const char *rule)
 {
 #ifdef CONFIG_ESP_RMAKER_MQTT_USE_BASIC_INGEST_TOPICS
