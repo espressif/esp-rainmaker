@@ -337,7 +337,7 @@ menu "ESP RainMaker Config"
 
     config ESP_RMAKER_LOCAL_CTRL_LEASE_INTERVAL_SECONDS
         int "Local Control SRP Service Lease Interval (Seconds)"
-        depends on ESP_RMAKER_LOCAL_CTRL_FEATURE_ENABLE && ESP_RMAKER_NETWORK_OVER_THREAD
+        depends on (ESP_RMAKER_LOCAL_CTRL_FEATURE_ENABLE || ESP_RMAKER_ON_NETWORK_CHAL_RESP_ENABLE) && ESP_RMAKER_NETWORK_OVER_THREAD
         default 180
         help
             This parameter defines, in seconds, how long a Thread Border Router waits before removing an SRP service

@@ -14,7 +14,13 @@
 #include <protocomm_security1.h>
 #ifdef CONFIG_ESP_RMAKER_NETWORK_OVER_WIFI
 #include <mdns.h>
-#endif
+#endif /* CONFIG_ESP_RMAKER_NETWORK_OVER_WIFI */
+#ifdef CONFIG_ESP_RMAKER_NETWORK_OVER_THREAD
+#include <esp_openthread.h>
+#include <esp_openthread_lock.h>
+#include <openthread/srp_client.h>
+#include <openthread/srp_client_buffers.h>
+#endif /* CONFIG_ESP_RMAKER_NETWORK_OVER_THREAD */
 
 #include <esp_rmaker_core.h>
 #include <esp_rmaker_on_network_chal_resp.h>
@@ -33,12 +39,19 @@ static const char *TAG = "on_network_chal_resp";
 
 #define MDNS_SERVICE_TYPE       "_esp_rmaker_chal_resp"
 #define MDNS_SERVICE_PROTO      "_tcp"
+#define MDNS_SERVICE_FULL_TYPE  MDNS_SERVICE_TYPE "." MDNS_SERVICE_PROTO
 /* Use esp_local_ctrl endpoints for consistency with Local Control.
  * This allows CLI to use the same logic for both on-network and local control. */
 #define SECURITY_ENDPOINT       "esp_local_ctrl/session"
 #define CHAL_RESP_ENDPOINT      "ch_resp"
 #define VERSION_ENDPOINT        "esp_local_ctrl/version"
 #define VERSION_STRING          "{\"on_network\":{\"ver\":\"v1.0\",\"cap\":[\"ch_resp\"]}}"
+
+/* MDNS TXT entry keys */
+#define MDNS_TXT_NODE_ID_KEY            "node_id"
+#define MDNS_TXT_PORT_KEY               "port"
+#define MDNS_TXT_SECURE_VERSION_KEY     "sec_version"
+#define MDNS_TXT_POP_REQUIRED_KEY       "pop_required"
 
 /* Helper macros for mDNS TXT record operations */
 #define MDNS_TXT_SET(key, value) \
@@ -174,19 +187,19 @@ static esp_err_t announce_mdns_service(const esp_rmaker_on_network_chal_resp_con
 
     /* Add TXT records */
     if (node_id) {
-        MDNS_TXT_SET("node_id", node_id);
+        MDNS_TXT_SET(MDNS_TXT_NODE_ID_KEY, node_id);
     }
 
     char port_str[8];
     snprintf(port_str, sizeof(port_str), "%d", s_state.port);
-    MDNS_TXT_SET("port", port_str);
+    MDNS_TXT_SET(MDNS_TXT_PORT_KEY, port_str);
 
     char sec_ver_str[2];
     snprintf(sec_ver_str, sizeof(sec_ver_str), "%d", config->sec_ver);
-    MDNS_TXT_SET("sec_version", sec_ver_str);
+    MDNS_TXT_SET(MDNS_TXT_SECURE_VERSION_KEY, sec_ver_str);
 
     if (config->sec_ver == ESP_RMAKER_ON_NETWORK_SEC1) {
-        MDNS_TXT_SET("pop_required", config->pop ? "true" : "false");
+        MDNS_TXT_SET(MDNS_TXT_POP_REQUIRED_KEY, config->pop ? "true" : "false");
     }
 
     ESP_LOGI(TAG, "mDNS service announced: %s.%s, port: %d", MDNS_SERVICE_TYPE, MDNS_SERVICE_PROTO, s_state.port);
@@ -202,6 +215,137 @@ static void remove_mdns_service(void)
     }
 }
 #endif /* CONFIG_ESP_RMAKER_NETWORK_OVER_WIFI */
+
+#ifdef CONFIG_ESP_RMAKER_NETWORK_OVER_THREAD
+#define SRP_MAX_HOST_NAME_LEN 40
+static char srp_host_name[SRP_MAX_HOST_NAME_LEN + 1] = {0};
+
+static esp_err_t srp_client_set_host(const char *host_name)
+{
+    if (!host_name || strlen(host_name) > SRP_MAX_HOST_NAME_LEN) {
+        return ESP_ERR_INVALID_ARG;
+    }
+    // Avoid adding the same host name multiple times
+    if (strncmp(srp_host_name, host_name, SRP_MAX_HOST_NAME_LEN) != 0) {
+        strncpy(srp_host_name, host_name, SRP_MAX_HOST_NAME_LEN);
+        srp_host_name[strnlen(host_name, SRP_MAX_HOST_NAME_LEN)] = 0;
+        esp_openthread_lock_acquire(portMAX_DELAY);
+        otInstance *instance = esp_openthread_get_instance();
+        otError err = otSrpClientSetHostName(instance, srp_host_name);
+        if (err != OT_ERROR_NONE && err != OT_ERROR_INVALID_STATE) {
+            esp_openthread_lock_release();
+            return ESP_FAIL;
+        }
+        /* When the host name was set successfully or it had been set previously */
+        if (otSrpClientEnableAutoHostAddress(instance) != OT_ERROR_NONE) {
+            esp_openthread_lock_release();
+            return ESP_FAIL;
+        }
+        esp_openthread_lock_release();
+    }
+    return ESP_OK;
+}
+
+static esp_err_t srp_client_register_service(const esp_rmaker_on_network_chal_resp_config_t *config)
+{
+    esp_err_t err;
+    /* Set hostname to node_id */
+    const char *node_id = esp_rmaker_get_node_id();
+    if (node_id) {
+        srp_client_set_host(node_id);
+    }
+
+    /* Get instance name */
+    const char *instance_name = config->mdns_instance_name;
+    if (!instance_name && node_id) {
+        instance_name = node_id;
+    }
+
+    if (instance_name) {
+        s_state.mdns_instance_name = strdup(instance_name);
+        if (!s_state.mdns_instance_name) {
+            ESP_LOGE(TAG, "Failed to allocate memory for instance name");
+            return ESP_ERR_NO_MEM;
+        }
+    }
+
+    /* TXT entries*/
+    static otDnsTxtEntry txt_entries[4] = {0};
+    size_t txt_index = 0;
+    if (node_id) {
+        static char rainmaker_node_id_txt_value[SRP_MAX_HOST_NAME_LEN + 1] = {0};
+        memcpy(rainmaker_node_id_txt_value, node_id, strlen(node_id));
+        txt_entries[txt_index].mKey = MDNS_TXT_NODE_ID_KEY;
+        txt_entries[txt_index].mValue = (const uint8_t *)rainmaker_node_id_txt_value;
+        txt_entries[txt_index].mValueLength = strlen(node_id);
+        txt_index++;
+    }
+
+    static char port_txt_value[8] = {0};
+    snprintf(port_txt_value, sizeof(port_txt_value), "%d", s_state.port);
+    txt_entries[txt_index].mKey = MDNS_TXT_PORT_KEY;
+    txt_entries[txt_index].mValue = (const uint8_t *)port_txt_value;
+    txt_entries[txt_index].mValueLength = strlen(port_txt_value);
+    txt_index++;
+
+    static char sec_ver_txt_value[2] = {0};
+    snprintf(sec_ver_txt_value, sizeof(sec_ver_txt_value), "%d", config->sec_ver);
+    txt_entries[txt_index].mKey = MDNS_TXT_SECURE_VERSION_KEY;
+    txt_entries[txt_index].mValue = (const uint8_t *)sec_ver_txt_value;
+    txt_entries[txt_index].mValueLength = 1;
+    txt_index++;
+
+    if (config->sec_ver == ESP_RMAKER_ON_NETWORK_SEC1) {
+        txt_entries[txt_index].mKey = MDNS_TXT_POP_REQUIRED_KEY;
+        txt_entries[txt_index].mValue = (const uint8_t *)(config->pop ? "true" : "false");
+        txt_entries[txt_index].mValueLength = config->pop ? 4 : 5;
+        txt_index++;
+    }
+
+    static otSrpClientService srp_client_service = {0};
+    srp_client_service.mName = MDNS_SERVICE_FULL_TYPE;
+    srp_client_service.mInstanceName = (const char*)s_state.mdns_instance_name;
+    srp_client_service.mTxtEntries = txt_entries;
+    srp_client_service.mPort = s_state.port;
+    srp_client_service.mNumTxtEntries = txt_index;
+    srp_client_service.mNext = NULL;
+    srp_client_service.mLease = CONFIG_ESP_RMAKER_LOCAL_CTRL_LEASE_INTERVAL_SECONDS;
+    srp_client_service.mKeyLease = 0;
+
+    esp_openthread_lock_acquire(portMAX_DELAY);
+    otInstance *instance = esp_openthread_get_instance();
+    /* Try to remove the service registered before adding a new service. If the previous service is not removed,
+     * Adding service will fail with a duplicated instance error. This could happen when the device reboots, which
+     * might result in the wrong resolved IP addresss on the phone app side.
+     */
+    (void)otSrpClientRemoveService(instance, &srp_client_service);
+    if (otSrpClientAddService(instance, &srp_client_service) != OT_ERROR_NONE) {
+        esp_openthread_lock_release();
+        return ESP_FAIL;
+    }
+    otSrpClientEnableAutoStartMode(instance, NULL, NULL);
+    esp_openthread_lock_release();
+    ESP_LOGI(TAG, "mDNS service announced: %s.%s, port: %d", MDNS_SERVICE_TYPE, MDNS_SERVICE_PROTO, s_state.port);
+    return ESP_OK;
+}
+
+static esp_err_t srp_client_clean_up_service(void)
+{
+    esp_err_t ret = ESP_OK;
+    esp_openthread_lock_acquire(portMAX_DELAY);
+    otInstance *instance = esp_openthread_get_instance();
+    if (otSrpClientRemoveHostAndServices(instance, false, true) != OT_ERROR_NONE) {
+        ret = ESP_FAIL;
+    }
+    memset(srp_host_name, 0, sizeof(srp_host_name));
+    esp_openthread_lock_release();
+    if (s_state.mdns_instance_name) {
+        free(s_state.mdns_instance_name);
+        s_state.mdns_instance_name = NULL;
+    }
+    return ret;
+}
+#endif /* CONFIG_ESP_RMAKER_NETWORK_OVER_THREAD */
 
 static esp_err_t setup_security(protocomm_t *pc, const esp_rmaker_on_network_chal_resp_config_t *config)
 {
@@ -348,18 +492,19 @@ esp_err_t esp_rmaker_on_network_chal_resp_start(const esp_rmaker_on_network_chal
 
     /* Announce mDNS service if enabled */
     s_state.sec_ver = config->sec_ver;
-#ifdef CONFIG_ESP_RMAKER_NETWORK_OVER_WIFI
     s_state.mdns_enabled = config->enable_mdns;
     if (config->enable_mdns) {
+#ifdef CONFIG_ESP_RMAKER_NETWORK_OVER_WIFI
         err = announce_mdns_service(config);
+#endif /* CONFIG_ESP_RMAKER_NETWORK_OVER_WIFI */
+#ifdef CONFIG_ESP_RMAKER_NETWORK_OVER_THREAD
+        err = srp_client_register_service(config);
+#endif /* CONFIG_ESP_RMAKER_NETWORK_OVER_THREAD */
         if (err != ESP_OK) {
             ESP_LOGW(TAG, "Failed to announce mDNS service, but service will still be accessible via IP");
             /* Don't fail the entire start, mDNS is optional */
         }
     }
-#else
-    s_state.mdns_enabled = false;
-#endif /* CONFIG_ESP_RMAKER_NETWORK_OVER_WIFI */
 
     s_state.running = true;
     ESP_LOGI(TAG, "On-network challenge-response service started successfully");
@@ -397,11 +542,14 @@ esp_err_t esp_rmaker_on_network_chal_resp_stop(void)
     }
 
     /* Remove mDNS service */
-#ifdef CONFIG_ESP_RMAKER_NETWORK_OVER_WIFI
     if (s_state.mdns_enabled) {
+#ifdef CONFIG_ESP_RMAKER_NETWORK_OVER_WIFI
         remove_mdns_service();
-    }
 #endif /* CONFIG_ESP_RMAKER_NETWORK_OVER_WIFI */
+#ifdef CONFIG_ESP_RMAKER_NETWORK_OVER_THREAD
+        srp_client_clean_up_service();
+#endif /* CONFIG_ESP_RMAKER_NETWORK_OVER_THREAD */
+    }
 
     /* Remove endpoints */
     protocomm_remove_endpoint(s_state.pc, CHAL_RESP_ENDPOINT);
@@ -456,6 +604,31 @@ static esp_err_t reannounce_mdns_service(void)
 }
 #endif /* CONFIG_ESP_RMAKER_NETWORK_OVER_WIFI */
 
+#ifdef CONFIG_ESP_RMAKER_NETWORK_OVER_THREAD
+static esp_err_t srp_client_re_register_service(void)
+{
+    if (!s_state.mdns_enabled) {
+        ESP_LOGD(TAG, "mDNS not enabled, skipping re-announce");
+        return ESP_OK;
+    }
+
+    /* Reconstruct config from stored state */
+    esp_rmaker_on_network_chal_resp_config_t config = {
+        .sec_ver = s_state.sec_ver,
+        .port = s_state.port,
+        .mdns_instance_name = s_state.mdns_instance_name,
+        .enable_mdns = true
+    };
+
+    /* Set pop if Security 1 is used */
+    if (s_state.sec_ver == ESP_RMAKER_ON_NETWORK_SEC1 && s_state.sec1_params) {
+        config.pop = (const char *)s_state.sec1_params->data;
+    }
+
+    return srp_client_register_service(&config);
+}
+#endif /* CONFIG_ESP_RMAKER_NETWORK_OVER_WIFI */
+
 /* Internal function to do on-network specific cleanup */
 static esp_err_t on_network_chal_resp_do_cleanup(void)
 {
@@ -465,12 +638,17 @@ static esp_err_t on_network_chal_resp_do_cleanup(void)
     }
 
     /* Remove mDNS service on disabling */
-#ifdef CONFIG_ESP_RMAKER_NETWORK_OVER_WIFI
     if (s_state.mdns_enabled) {
+#ifdef CONFIG_ESP_RMAKER_NETWORK_OVER_WIFI
         remove_mdns_service();
         ESP_LOGI(TAG, "mDNS service removed");
-    }
 #endif /* CONFIG_ESP_RMAKER_NETWORK_OVER_WIFI */
+#ifdef CONFIG_ESP_RMAKER_NETWORK_OVER_THREAD
+        srp_client_clean_up_service();
+        ESP_LOGI(TAG, "SRP service removed");
+#endif /* CONFIG_ESP_RMAKER_NETWORK_OVER_THREAD */
+
+    }
 
     s_state.cleanup_done = true;
     return ESP_OK;
@@ -508,15 +686,19 @@ esp_err_t esp_rmaker_on_network_chal_resp_enable(void)
     s_state.cleanup_done = false;
 
     /* Re-announce mDNS service */
-#ifdef CONFIG_ESP_RMAKER_NETWORK_OVER_WIFI
     if (s_state.mdns_enabled) {
-        esp_err_t err = reannounce_mdns_service();
+        esp_err_t err = ESP_OK;
+#ifdef CONFIG_ESP_RMAKER_NETWORK_OVER_WIFI
+        err = reannounce_mdns_service();
+#endif /* CONFIG_ESP_RMAKER_NETWORK_OVER_WIFI */
+#ifdef CONFIG_ESP_RMAKER_NETWORK_OVER_THREAD
+        err = srp_client_re_register_service();
+#endif /* CONFIG_ESP_RMAKER_NETWORK_OVER_WIFI */
         if (err != ESP_OK) {
             ESP_LOGW(TAG, "Failed to re-announce mDNS service: %s", esp_err_to_name(err));
             /* Don't fail the entire enable, mDNS is optional */
         }
     }
-#endif /* CONFIG_ESP_RMAKER_NETWORK_OVER_WIFI */
 
     return ESP_OK;
 }
