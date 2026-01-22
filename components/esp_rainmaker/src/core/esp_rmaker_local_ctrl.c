@@ -475,10 +475,12 @@ static esp_err_t srp_client_set_host(const char *host_name)
         srp_host_name[strnlen(host_name, SRP_MAX_HOST_NAME_LEN)] = 0;
         esp_openthread_lock_acquire(portMAX_DELAY);
         otInstance *instance = esp_openthread_get_instance();
-        if (otSrpClientSetHostName(instance, srp_host_name) != OT_ERROR_NONE) {
+        otError err = otSrpClientSetHostName(instance, srp_host_name);
+        if (err != OT_ERROR_NONE && err != OT_ERROR_INVALID_STATE) {
             esp_openthread_lock_release();
             return ESP_FAIL;
         }
+        /* When the host name was set successfully or it had been set previously */
         if (otSrpClientEnableAutoHostAddress(instance) != OT_ERROR_NONE) {
             esp_openthread_lock_release();
             return ESP_FAIL;

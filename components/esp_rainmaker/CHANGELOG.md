@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.9.2
+
+### New Features
+
+- Add support of on-network challenge-response service for Thread devices.
+
 ## 1.9.1
 
 ### New Features
