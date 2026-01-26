@@ -261,6 +261,19 @@ menu "ESP RainMaker Config"
             Note: This service uses protocomm HTTP which is a singleton. It should not be
             used while WiFi provisioning is active (they use the same protocomm HTTP).
 
+    config ESP_RMAKER_ENABLE_PROV_LOCAL_CTRL
+        bool "Enable local control during provisioning (get_params/set_params/get_config)"
+        depends on ESP_RMAKER_ENABLE_CHALLENGE_RESPONSE
+        default n
+        help
+            Enable get_params, set_params, and get_config endpoints during provisioning. These
+            endpoints allow direct parameter and configuration access during the provisioning phase,
+            bypassing esp_local_ctrl. This is particularly useful for BLE-only devices where
+            challenge-response is required for user-node mapping, as there is no other way to
+            perform user-node mapping if the device is not provisioned.
+
+            Note: This feature requires challenge-response to be enabled.
+
     config RMAKER_NAME_PARAM_CB
         bool "Call device callback for Name param"
         default n

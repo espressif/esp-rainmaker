@@ -122,6 +122,10 @@ esp_err_t esp_rmaker_user_mapping_prov_init(void);
 esp_err_t esp_rmaker_user_mapping_prov_deinit(void);
 esp_err_t esp_rmaker_user_node_mapping_init(void);
 esp_err_t esp_rmaker_user_node_mapping_deinit(void);
+#ifdef CONFIG_ESP_RMAKER_ENABLE_PROV_LOCAL_CTRL
+esp_err_t esp_rmaker_prov_local_ctrl_init(void);
+esp_err_t esp_rmaker_prov_local_ctrl_deinit(void);
+#endif /* CONFIG_ESP_RMAKER_ENABLE_PROV_LOCAL_CTRL */
 #ifdef CONFIG_ESP_RMAKER_FACTORY_RESET_REPORTING
 esp_err_t esp_rmaker_reset_user_node_mapping(void);
 #endif

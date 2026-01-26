@@ -17,6 +17,12 @@ set(core_srcs "src/core/esp_rmaker_core.c"
         "src/core/esp_rmaker_aws_credentials.c"
     )
 
+if(CONFIG_ESP_RMAKER_ENABLE_PROV_LOCAL_CTRL)
+    list(APPEND core_srcs
+        "src/core/esp_rmaker_prov_local_ctrl.c"
+        "src/core/esp_rmaker_prov_local_ctrl.pb-c.c")
+endif()
+
 set(priv_req protobuf-c json_parser json_generator
              nvs_flash esp_http_client app_update esp-tls mbedtls esp_https_ota
              console esp_local_ctrl esp_https_server mdns esp_schedule esp_daylight efuse driver rmaker_common)

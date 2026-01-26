@@ -1,0 +1,50 @@
+syntax = "proto3";
+
+package rmaker_prov_local_ctrl;
+
+enum RMakerLocalCtrlStatus {
+    Success = 0;
+    Fail = 1;
+    InvalidParam = 2;
+    NoMemory = 3;
+}
+
+enum RMakerLocalCtrlDataType {
+    TypeParams = 0;
+    TypeConfig = 1;
+}
+
+message PayloadBuf {
+    uint32 Offset = 1;
+    bytes Payload = 2;
+    uint32 TotalLen = 3;
+}
+
+/* Command to get data (params or config) - contains offset to request next chunk */
+message CmdGetData {
+    RMakerLocalCtrlDataType DataType = 1;
+    uint32 Offset = 2;
+    /* Optional timestamp for signed response */
+    int64 Timestamp = 3;
+    /* Flag to indicate if timestamp is provided (since 0 is a valid timestamp) */
+    bool HasTimestamp = 4;
+}
+
+/* Response with data (params or config) */
+message RespGetData {
+    RMakerLocalCtrlStatus Status = 1;
+    PayloadBuf Buf = 2;
+}
+
+enum RMakerLocalCtrlMsgType {
+    TypeCmdGetData = 0;
+    TypeRespGetData = 1;
+}
+
+message RMakerLocalCtrlPayload {
+    RMakerLocalCtrlMsgType msg = 1;
+    oneof payload {
+        CmdGetData cmdGetData = 10;
+        RespGetData respGetData = 11;
+    }
+}

@@ -755,6 +755,13 @@ static esp_err_t esp_rmaker_init(const esp_rmaker_config_t *config, bool use_cla
     }
 #endif /* CONFIG_ESP_RMAKER_ENABLE_CHALLENGE_RESPONSE */
 
+#ifdef CONFIG_ESP_RMAKER_ENABLE_PROV_LOCAL_CTRL
+    /* Initialize local control provisioning endpoints (get_params, set_params, get_config) */
+    if (esp_rmaker_prov_local_ctrl_init() != ESP_OK) {
+        ESP_LOGW(TAG, "Failed to initialize local control provisioning endpoints");
+    }
+#endif /* CONFIG_ESP_RMAKER_ENABLE_PROV_LOCAL_CTRL */
+
     esp_rmaker_priv_data->enable_time_sync = config->enable_time_sync;
 #ifdef ESP_RMAKER_CLAIM_ENABLED
     if (esp_rmaker_priv_data->need_claim) {
