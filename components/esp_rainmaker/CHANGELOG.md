@@ -1,5 +1,24 @@
 # Changelog
 
+## 1.10.0
+
+### New Features
+
+- Added BLE local control during provisioning phase.
+    - Enable via `CONFIG_ESP_RMAKER_ENABLE_PROV_LOCAL_CTRL` in menuconfig.
+    - Requires challenge-response to be enabled (`CONFIG_ESP_RMAKER_ENABLE_CHALLENGE_RESPONSE`).
+    - Adds custom provisioning endpoints for direct parameter access over BLE:
+        - `get_params`: Retrieve current device parameters.
+        - `set_params`: Update device parameters.
+        - `get_config`: Retrieve node configuration with fragmented transfer support for BLE MTU limits.
+    - `get_params` and `get_config` return raw JSON by default. If a timestamp is provided,
+      the response includes the data, timestamp, and signature for verification.
+    - These handlers stay active only while in provisioning mode.
+    - Recommend setting `CONFIG_APP_NETWORK_PROV_TIMEOUT_PERIOD=0` to keep device in provisioning mode
+      indefinitely and hence, reachable for local control over BLE.
+    - **Note**: This uses custom provisioning endpoints, not `esp_local_ctrl`, as the latter
+      is designed for HTTP-based local control.
+
 ## 1.9.2
 
 ### New Features
@@ -13,7 +32,6 @@
 - Add support for ECDSA key type for claiming. You can choose between RSA (legacy) and ECDSA via Kconfig options
   `CONFIG_ESP_RMAKER_CLAIM_KEY_RSA`/`CONFIG_ESP_RMAKER_CLAIM_KEY_ECDSA`.
   `idf.py menuconfig -> ESP RainMaker Config -> Claiming Key Type -> RSA (2048-bit)/ECDSA (P-256)`
-
 
 ## 1.9.0
 

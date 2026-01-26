@@ -320,11 +320,18 @@ esp_err_t esp_rmaker_chal_resp_endpoint_register(void)
 static void esp_rmaker_chal_resp_event_handler(void *arg, esp_event_base_t event_base,
                            int32_t event_id, void *event_data)
 {
-    static const char *capabilities[] = {"ch_resp"};
     if (event_base == NETWORK_PROV_EVENT) {
         switch (event_id) {
             case NETWORK_PROV_INIT: {
+                /* Set rmaker_extra capabilities
+                 * Always include ch_resp, and include local_ctrl if enabled */
+#ifdef CONFIG_ESP_RMAKER_ENABLE_PROV_LOCAL_CTRL
+                static const char *capabilities[] = {"ch_resp", "local_ctrl"};
+                network_prov_mgr_set_app_info(RMAKER_EXTRA_APP_NAME, RMAKER_EXTRA_APP_VERSION, capabilities, 2);
+#else
+                static const char *capabilities[] = {"ch_resp"};
                 network_prov_mgr_set_app_info(RMAKER_EXTRA_APP_NAME, RMAKER_EXTRA_APP_VERSION, capabilities, 1);
+#endif
                 if (esp_rmaker_chal_resp_endpoint_create() != ESP_OK) {
                     ESP_LOGE(TAG, "Failed to create challenge response endpoint.");
                 }
