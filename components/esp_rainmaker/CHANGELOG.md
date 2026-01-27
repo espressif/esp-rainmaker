@@ -1,5 +1,23 @@
 # Changelog
 
+## 1.10.5
+
+### New Features
+
+- Added Ethernet network support for ESP RainMaker.
+    - RainMaker now supports Ethernet connectivity alongside Wi-Fi and Thread networks.
+    - Devices can use Ethernet, Wi-Fi, Thread, or any combination of these networks.
+    - RainMaker automatically uses whichever network connects first (Wi-Fi, Thread, or Ethernet).
+    - Ethernet support includes:
+        - Full MQTT connectivity over Ethernet
+        - On-network challenge-response service for user-node mapping via Ethernet
+        - mDNS service discovery for Ethernet-based devices
+        - Local control service support over Ethernet
+    - **Note**: Assisted claiming (BLE-based) is not supported for Ethernet-only devices.
+    - When multiple networks are enabled, both can be active simultaneously and RainMaker
+      will use whichever connects first. The underlying network stack (LWIP) handles routing automatically.
+
+
 ## 1.10.4
 
 ### Bug Fixes

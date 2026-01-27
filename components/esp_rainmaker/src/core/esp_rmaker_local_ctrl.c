@@ -22,9 +22,15 @@
 #include <esp_rmaker_standard_services.h>
 #include <esp_https_server.h>
 #include <esp_rmaker_work_queue.h>
-#ifdef CONFIG_ESP_RMAKER_NETWORK_OVER_WIFI
-#include <mdns.h>
+
+/* Define macro for networks that support mDNS (Wi-Fi and Ethernet) */
+#if defined(CONFIG_ESP_RMAKER_NETWORK_OVER_WIFI) || defined(CONFIG_ETH_ENABLED)
+#define ESP_RMAKER_SUPPORTS_MDNS 1
 #endif
+
+#ifdef ESP_RMAKER_SUPPORTS_MDNS
+#include <mdns.h>
+#endif /* ESP_RMAKER_SUPPORTS_MDNS */
 #ifdef CONFIG_ESP_RMAKER_NETWORK_OVER_THREAD
 #include <esp_openthread.h>
 #include <esp_openthread_lock.h>
@@ -312,7 +318,7 @@ esp_err_t esp_rmaker_local_ctrl_enable_chal_resp(const char *instance_name)
         ESP_LOGI(TAG, "Challenge-response endpoint registered: %s", CHAL_RESP_ENDPOINT);
     }
 
-#ifdef CONFIG_ESP_RMAKER_NETWORK_OVER_WIFI
+#ifdef ESP_RMAKER_SUPPORTS_MDNS
     /* Initialize mDNS if not already initialized */
     esp_err_t err = mdns_init();
     if (err != ESP_OK && err != ESP_ERR_INVALID_STATE) {
@@ -365,7 +371,7 @@ esp_err_t esp_rmaker_local_ctrl_enable_chal_resp(const char *instance_name)
 #endif
         ESP_LOGI(TAG, "Announced challenge-response mDNS service: %s.%s, port: %d", MDNS_SERVICE_TYPE_CHAL_RESP, MDNS_SERVICE_PROTO, port);
     }
-#endif /* CONFIG_ESP_RMAKER_NETWORK_OVER_WIFI */
+#endif /* ESP_RMAKER_SUPPORTS_MDNS */
 
     g_chal_resp_enabled = true;
     g_chal_resp_cleanup_done = false;
@@ -584,7 +590,7 @@ static esp_err_t __esp_rmaker_start_local_ctrl_service(const char *serv_name)
     https_conf.httpd.ctrl_port = ESP_RMAKER_LOCAL_CTRL_HTTP_CTRL_PORT;
     https_conf.httpd.stack_size = CONFIG_ESP_RMAKER_LOCAL_CTRL_STACK_SIZE;
 
-#ifdef CONFIG_ESP_RMAKER_NETWORK_OVER_WIFI
+#ifdef ESP_RMAKER_SUPPORTS_MDNS
     mdns_init();
     mdns_hostname_set(serv_name);
 #endif
@@ -638,7 +644,7 @@ static esp_err_t __esp_rmaker_start_local_ctrl_service(const char *serv_name)
     /* Start esp_local_ctrl service */
     ESP_ERROR_CHECK(esp_local_ctrl_start(&config));
 
-#ifdef CONFIG_ESP_RMAKER_NETWORK_OVER_WIFI
+#ifdef ESP_RMAKER_SUPPORTS_MDNS
     /* The instance name of mdns service set by esp_local_ctrl_start is 'Local Control Service'.
      * We should ensure that each end-device should have an unique instance name.
      */
@@ -779,7 +785,7 @@ esp_err_t esp_rmaker_local_ctrl_disable(void)
     if (!g_local_ctrl_is_started) {
         return ESP_OK;
     }
-#ifdef CONFIG_ESP_RMAKER_NETWORK_OVER_WIFI
+#ifdef ESP_RMAKER_SUPPORTS_MDNS
     mdns_free();
 #endif
 #ifdef CONFIG_ESP_RMAKER_NETWORK_OVER_THREAD
