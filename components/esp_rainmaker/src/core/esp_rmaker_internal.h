@@ -1,17 +1,11 @@
-// Copyright 2020 Espressif Systems (Shanghai) PTE LTD
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+/*
+ * SPDX-FileCopyrightText: 2020-2026 Espressif Systems (Shanghai) CO LTD
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
 #pragma once
+
 #include <stdint.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/queue.h>
@@ -29,14 +23,6 @@
 
 /* Minimum valid JSON params object size - length of '{"D":{"P":1}}' */
 #define RMAKER_MIN_VALID_PARAMS_SIZE    13
-
-typedef enum {
-    ESP_RMAKER_STATE_DEINIT = 0,
-    ESP_RMAKER_STATE_INIT_DONE,
-    ESP_RMAKER_STATE_STARTING,
-    ESP_RMAKER_STATE_STARTED,
-    ESP_RMAKER_STATE_STOP_REQUESTED,
-} esp_rmaker_state_t;
 
 typedef struct {
     esp_rmaker_param_val_t min;
@@ -137,7 +123,7 @@ static inline esp_err_t esp_rmaker_post_event(esp_rmaker_event_t event_id, void*
 {
     return esp_event_post(RMAKER_EVENT, event_id, data, data_size, portMAX_DELAY);
 }
-esp_rmaker_state_t esp_rmaker_get_state(void);
+
 esp_err_t esp_rmaker_cmd_response_enable(void);
 
 /** Register for group parameter updates

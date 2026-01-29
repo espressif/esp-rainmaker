@@ -1,16 +1,9 @@
-// Copyright 2020 Espressif Systems (Shanghai) PTE LTD
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+/*
+ * SPDX-FileCopyrightText: 2020-2026 Espressif Systems (Shanghai) CO LTD
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
 #include <sdkconfig.h>
 #include <string.h>
 #include <freertos/FreeRTOS.h>
@@ -62,7 +55,6 @@ static const int ETHERNET_CONNECTED_EVENT = BIT2;
 
 #include "esp_mac.h"
 
-static const int MQTT_CONNECTED_EVENT = BIT3;
 static EventGroupHandle_t rmaker_core_event_group;
 
 ESP_EVENT_DEFINE_BASE(RMAKER_EVENT);
@@ -145,7 +137,12 @@ esp_err_t esp_rmaker_set_network_id(const char *network_id)
         ESP_LOGE(TAG, "Failed to add or edit network-id attribute.");
         return err;
     }
-    if (need_report_node_details) {
+    /* Only report node details if RainMaker config is already reported or started.
+     * If not, the node config will be reported during normal startup flow.
+     * This prevents queuing work before MQTT is connected and avoids duplicate reporting.
+     */
+    if (need_report_node_details && (esp_rmaker_priv_data->state == ESP_RMAKER_STATE_CONFIG_REPORTED
+            || esp_rmaker_priv_data->state == ESP_RMAKER_STATE_STARTED)) {
         esp_rmaker_report_node_details();
     }
     return ESP_OK;
@@ -316,6 +313,79 @@ esp_err_t esp_rmaker_change_node_id(char *node_id, size_t len)
 static void esp_rmaker_params_mqtt_init_cb(void *data)
 {
     esp_rmaker_params_mqtt_init();
+    esp_rmaker_priv_data->state = ESP_RMAKER_STATE_STARTED;
+    esp_rmaker_post_event(RMAKER_EVENT_STARTED, NULL, 0);
+}
+
+/* Forward declaration for event handler used in esp_rmaker_post_mqtt_connect_task */
+static void esp_rmaker_event_handler(void* arg, esp_event_base_t event_base,
+                                     int32_t event_id, void* event_data);
+
+/* Continuation task that runs after MQTT connection is established.
+ * This is queued to the work queue when RMAKER_MQTT_EVENT_CONNECTED is received,
+ * avoiding blocking the work queue during MQTT connection wait.
+ */
+static void esp_rmaker_post_mqtt_connect_task(void *data)
+{
+    esp_err_t err = ESP_OK;
+    err = esp_rmaker_report_node_config();
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "esp_rmaker_report_node_config failed. Aborting!!!");
+        goto post_mqtt_end;
+    }
+
+    esp_rmaker_priv_data->state = ESP_RMAKER_STATE_CONFIG_REPORTED;
+    esp_rmaker_post_event(RMAKER_EVENT_CONFIG_REPORTED, NULL, 0);
+
+    if (esp_rmaker_user_node_mapping_get_state() == ESP_RMAKER_USER_MAPPING_DONE) {
+        ESP_LOGI(TAG, "User node mapping done, initializing MQTT parameters.");
+        err = esp_rmaker_params_mqtt_init();
+        if (err != ESP_OK) {
+            ESP_LOGE(TAG, "esp_rmaker_params_mqtt_init failed. Aborting!!!");
+            goto post_mqtt_end;
+        }
+
+        /* Set the state to STARTED just after params mqtt init */
+        /* In case of USER_MAPPING is not yet done, this is done once the same is done in the event handler */
+        esp_rmaker_priv_data->state = ESP_RMAKER_STATE_STARTED;
+        esp_rmaker_post_event(RMAKER_EVENT_STARTED, NULL, 0);
+    } else {
+        /* If network is connected without even starting the user-node mapping workflow,
+         * it could mean that some incorrect app was used to provision the device. Even
+         * if the older user would not be able to update the params, it would be better
+         * to completely reset the user permissions by sending a dummy user node mapping
+         * request, so that the earlier user won't even see the connectivity and other
+         * status.
+         */
+        if (esp_rmaker_user_node_mapping_get_state() != ESP_RMAKER_USER_MAPPING_STARTED) {
+#ifdef CONFIG_ESP_RMAKER_FACTORY_RESET_REPORTING
+            esp_rmaker_reset_user_node_mapping();
+            /* Wait for user reset to finish. */
+            err = esp_event_handler_register(RMAKER_EVENT, RMAKER_EVENT_USER_NODE_MAPPING_RESET,
+                    &esp_rmaker_event_handler, NULL);
+#else
+            /* If factory reset reporting is disabled, just wait for user node mapping */
+            err = esp_event_handler_register(RMAKER_EVENT, RMAKER_EVENT_USER_NODE_MAPPING_DONE,
+                    &esp_rmaker_event_handler, NULL);
+#endif
+        } else {
+            /* Wait for User Node mapping to finish. */
+            err = esp_event_handler_register(RMAKER_EVENT, RMAKER_EVENT_USER_NODE_MAPPING_DONE,
+                    &esp_rmaker_event_handler, NULL);
+        }
+        if (err != ESP_OK) {
+            ESP_LOGE(TAG, "Failed to register event handler for user node mapping. Aborting!!!");
+            goto post_mqtt_end;
+        }
+        ESP_LOGI(TAG, "Waiting for User Node Association.");
+    }
+    return;
+
+post_mqtt_end:
+    if (esp_rmaker_priv_data->mqtt_connected) {
+        esp_rmaker_mqtt_disconnect();
+    }
+    esp_rmaker_priv_data->state = ESP_RMAKER_STATE_INIT_DONE;
 }
 
 /* Event handler for catching system events */
@@ -378,13 +448,12 @@ static void esp_rmaker_event_handler(void* arg, esp_event_base_t event_base,
     if (event_base == RMAKER_EVENT &&
             (event_id == RMAKER_EVENT_USER_NODE_MAPPING_DONE ||
             event_id == RMAKER_EVENT_USER_NODE_MAPPING_RESET)) {
+        ESP_LOGI(TAG, "User node mapping done or reset, initializing MQTT parameters event id %d", (int) event_id);
         esp_event_handler_unregister(RMAKER_EVENT, event_id, &esp_rmaker_event_handler);
         esp_rmaker_work_queue_add_task(esp_rmaker_params_mqtt_init_cb, NULL);
     } else if (event_base == RMAKER_COMMON_EVENT && event_id == RMAKER_MQTT_EVENT_CONNECTED) {
-        if (rmaker_core_event_group) {
-            /* Signal rmaker thread to continue execution */
-            xEventGroupSetBits(rmaker_core_event_group, MQTT_CONNECTED_EVENT);
-        }
+        esp_event_handler_unregister(RMAKER_COMMON_EVENT, RMAKER_MQTT_EVENT_CONNECTED, &esp_rmaker_event_handler);
+        esp_rmaker_work_queue_add_task(esp_rmaker_post_mqtt_connect_task, NULL);
     }
 }
 
@@ -666,51 +735,12 @@ static void esp_rmaker_task(void *data)
         ESP_LOGE(TAG, "esp_rmaker_mqtt_connect() returned %d. Aborting", err);
         goto rmaker_end;
     }
+    /* MQTT connection initiated. The rest of the initialization will be handled
+     * by esp_rmaker_post_mqtt_connect_task which is queued to work queue when
+     * RMAKER_MQTT_EVENT_CONNECTED is received. This allows the work queue to
+     * remain unblocked during MQTT connection wait.
+     */
     ESP_LOGI(TAG, "Waiting for MQTT connection");
-    xEventGroupWaitBits(rmaker_core_event_group, MQTT_CONNECTED_EVENT, false, true, portMAX_DELAY);
-    esp_event_handler_unregister(RMAKER_COMMON_EVENT, RMAKER_MQTT_EVENT_CONNECTED, &esp_rmaker_event_handler);
-    esp_rmaker_priv_data->state = ESP_RMAKER_STATE_STARTED;
-    err = esp_rmaker_report_node_config();
-    if (err != ESP_OK) {
-        ESP_LOGE(TAG, "Aborting!!!");
-        goto rmaker_end;
-    }
-    if (esp_rmaker_user_node_mapping_get_state() == ESP_RMAKER_USER_MAPPING_DONE) {
-        err = esp_rmaker_params_mqtt_init();
-        if (err != ESP_OK) {
-            ESP_LOGE(TAG, "Aborting!!!");
-            goto rmaker_end;
-        }
-    } else {
-        /* If network is connected without even starting the user-node mapping workflow,
-         * it could mean that some incorrect app was used to provision the device. Even
-         * if the older user would not be able to update the params, it would be better
-         * to completely reset the user permissions by sending a dummy user node mapping
-         * request, so that the earlier user won't even see the connectivity and other
-         * status.
-         */
-        if (esp_rmaker_user_node_mapping_get_state() != ESP_RMAKER_USER_MAPPING_STARTED) {
-#ifdef CONFIG_ESP_RMAKER_FACTORY_RESET_REPORTING
-            esp_rmaker_reset_user_node_mapping();
-            /* Wait for user reset to finish. */
-            err = esp_event_handler_register(RMAKER_EVENT, RMAKER_EVENT_USER_NODE_MAPPING_RESET,
-                    &esp_rmaker_event_handler, NULL);
-#else
-            /* If factory reset reporting is disabled, just wait for user node mapping */
-            err = esp_event_handler_register(RMAKER_EVENT, RMAKER_EVENT_USER_NODE_MAPPING_DONE,
-                    &esp_rmaker_event_handler, NULL);
-#endif
-        } else {
-            /* Wait for User Node mapping to finish. */
-            err = esp_event_handler_register(RMAKER_EVENT, RMAKER_EVENT_USER_NODE_MAPPING_DONE,
-                    &esp_rmaker_event_handler, NULL);
-        }
-        if (err != ESP_OK) {
-            ESP_LOGE(TAG, "Aborting!!!");
-            goto rmaker_end;
-        }
-        ESP_LOGI(TAG, "Waiting for User Node Association.");
-    }
     err = ESP_OK;
 
 rmaker_end:
@@ -720,9 +750,6 @@ rmaker_end:
     rmaker_core_event_group = NULL;
     if (err == ESP_OK) {
         return;
-    }
-    if (esp_rmaker_priv_data->mqtt_connected) {
-        esp_rmaker_mqtt_disconnect();
     }
     esp_rmaker_priv_data->state = ESP_RMAKER_STATE_INIT_DONE;
 }

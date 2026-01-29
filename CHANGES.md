@@ -14,7 +14,17 @@
 
    For more details, check the esp_rainmaker component's [CHANGELOG](components/esp_rainmaker/CHANGELOG.md).
 
-## 24-Jun-2024: OTA Reliability Improvements
+## 3-Mar-2026: De-couple work queue execution from MQTT connection
+
+ - De-couple work queue execution from MQTT connection. With this change, tasks added in work queue
+   using `esp_rmaker_work_queue_add_task()` can execute as soon as the network connects. It won't be
+   blocked for the MQTT connection and subsequent node config reporting. This is a behavioural change,
+   so ensure that your usage of `esp_rmaker_work_queue_add_task()` does not get affected. The internal
+   users of this API (OTA fetch, schedule execution and user-node mapping) have already been fixed to
+   account for this change. Please refer esp_rainmaker component's
+   [CHANGELOG v1.11.0](components/esp_rainmaker/CHANGELOG.md#1110) for more details.
+
+## 24-Jun-2025: OTA Reliability Improvements
 
  - Check details in esp_rainmaker component's [CHANGELOG](components/esp_rainmaker/CHANGELOG.md).
  - Subsequent major changes in component will be maintained under component CHANGELOG.
