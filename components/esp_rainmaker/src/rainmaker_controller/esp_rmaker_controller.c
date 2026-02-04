@@ -15,6 +15,7 @@
 #include <esp_rmaker_mqtt.h>
 #include <esp_rmaker_standard_services.h>
 #include <esp_rmaker_standard_params.h>
+#include <esp_rmaker_standard_types.h>
 #include <esp_rmaker_controller.h>
 
 #define ESP_RMAKER_DEF_CONTROLLER_SERVICE              "RMCTLService"
@@ -74,14 +75,16 @@ static void esp_rmaker_controller_create_topic(const char *group_id, char *topic
     snprintf(topic, topic_size, "node/+/%s/%s", NODE_PARAMS_LOCAL_TOPIC_SUFFIX, group_id);
 }
 
-static esp_err_t esp_rmaker_controller_unsubscribe_topic(const char *group_id)
+static esp_err_t esp_rmaker_controller_unsubscribe_topic(void)
 {
-    if (!group_id || strlen(group_id) == 0) {
-        return ESP_ERR_INVALID_ARG;
+    char *group_id = NULL;
+    esp_err_t err = esp_rmaker_get_stored_group_id(&group_id);
+    if (err != ESP_OK) {
+        /* If the group ID is not set, do nothing */
+        return ESP_OK;
     }
 
     char topic[MQTT_TOPIC_BUFFER_SIZE] = {0};
-    esp_err_t err = ESP_FAIL;
     esp_rmaker_controller_create_topic(group_id, topic, sizeof(topic));
     err = esp_rmaker_mqtt_unsubscribe(topic);
     if (err != ESP_OK) {
@@ -89,6 +92,7 @@ static esp_err_t esp_rmaker_controller_unsubscribe_topic(const char *group_id)
     } else {
         ESP_LOGI(TAG, "Unsubscribed from group topic: %s", topic);
     }
+    free(group_id);
     return err;
 }
 
@@ -112,33 +116,40 @@ static esp_err_t esp_rmaker_controller_subscribe_topic(const char *group_id)
 
 static esp_err_t bulk_write_cb(const esp_rmaker_device_t *device, const esp_rmaker_param_write_req_t write_req[], uint8_t count, void *priv_data, esp_rmaker_write_ctx_t *ctx)
 {
-    if (ctx) {
+    if (ctx && (ctx->src != ESP_RMAKER_REQ_SRC_INIT)) {
         ESP_LOGI(TAG, "Received write request via : %s", esp_rmaker_device_cb_src_to_str(ctx->src));
+    } else {
+        /* If the write request is via INIT, do nothing */
+        return ESP_OK;
     }
-    ESP_LOGI(TAG, "Controller received %d params in write", count);
+
+    esp_err_t err = ESP_OK;
+    ESP_LOGD(TAG, "Controller received %d params in write", count);
+
     for (int i = 0; i < count; i++) {
         const esp_rmaker_param_t *param = write_req[i].param;
         esp_rmaker_param_val_t val = write_req[i].val;
         const char *param_name = esp_rmaker_param_get_name(param);
-        if (strcmp(param_name, ESP_RMAKER_DEF_USER_TOKEN_NAME) == 0) {
+        if (strcmp(param_name, ESP_RMAKER_DEF_GROUP_ID_NAME) == 0) {
             ESP_LOGI(TAG, "Received value = %s for %s", (char *)val.val.s, param_name);
-        } else if (strcmp(param_name, ESP_RMAKER_DEF_BASE_URL_NAME) == 0) {
-            ESP_LOGI(TAG, "Received value = %s for %s", (char *)val.val.s, param_name);
-        } else if (strcmp(param_name, ESP_RMAKER_DEF_GROUP_ID_NAME) == 0) {
-            ESP_LOGI(TAG, "Received value = %s for %s", (char *)val.val.s, param_name);
-            /* Unsubscribe from the old group topic if the source is not INIT */
-            if (ctx->src != ESP_RMAKER_REQ_SRC_INIT) {
-                esp_rmaker_controller_unsubscribe_topic(esp_rmaker_controller_get_active_group_id());
+            /* Unsubscribe from the old group topic */
+            esp_rmaker_controller_unsubscribe_topic();
+            /* Store the new group ID */
+            err = esp_rmaker_store_group_id((char *)val.val.s);
+            if (err == ESP_OK) {
+                err = esp_rmaker_controller_subscribe_topic((char *)val.val.s);
+                if (err != ESP_OK) {
+                    ESP_LOGE(TAG, "Failed to subscribe to new group topic: %s", (char *)val.val.s);
+                }
+            } else {
+                ESP_LOGE(TAG, "Failed to store new group ID: %s", (char *)val.val.s);
             }
-            esp_rmaker_controller_subscribe_topic((char *)val.val.s);
         } else {
             ESP_LOGI(TAG, "Ignoring update for %s", param_name);
         }
-        if (ctx->src != ESP_RMAKER_REQ_SRC_INIT) {
-            esp_rmaker_param_update(param, val);
-        }
+        esp_rmaker_param_update(param, val);
     }
-    return ESP_OK;
+    return err;
 }
 
 esp_err_t esp_rmaker_controller_enable(esp_rmaker_controller_config_t *config)
@@ -151,14 +162,28 @@ esp_err_t esp_rmaker_controller_enable(esp_rmaker_controller_config_t *config)
         return ESP_ERR_INVALID_STATE;
     }
 
-    controller_service = esp_rmaker_create_user_auth_service(ESP_RMAKER_DEF_CONTROLLER_SERVICE, bulk_write_cb, NULL, NULL);
+    controller_service = esp_rmaker_service_create(ESP_RMAKER_DEF_CONTROLLER_SERVICE, ESP_RMAKER_SERVICE_RM_CONTROLLER, NULL);
     if (!controller_service) {
         ESP_LOGE(TAG, "Failed to create controller service");
         return ESP_FAIL;
     }
 
-    esp_rmaker_device_add_param(controller_service, esp_rmaker_group_id_param_create(ESP_RMAKER_DEF_GROUP_ID_NAME, ""));
-    esp_err_t err = esp_rmaker_node_add_device(esp_rmaker_get_node(), controller_service);
+    esp_rmaker_device_add_bulk_cb(controller_service, bulk_write_cb, NULL);
+    /* Add stored group_id parameter if it is set */
+    char *group_id = NULL;
+    esp_err_t err = esp_rmaker_get_stored_group_id(&group_id);
+    if (err == ESP_OK) {
+        esp_rmaker_device_add_param(controller_service, esp_rmaker_group_id_param_create(ESP_RMAKER_DEF_GROUP_ID_NAME, group_id));
+        /* Subscribe to the group topic */
+        err = esp_rmaker_controller_subscribe_topic(group_id);
+        if (err != ESP_OK) {
+            ESP_LOGE(TAG, "Failed to subscribe to group topic: %s", group_id);
+        }
+        free(group_id);
+    } else {
+        esp_rmaker_device_add_param(controller_service, esp_rmaker_group_id_param_create(ESP_RMAKER_DEF_GROUP_ID_NAME, ""));
+    }
+    err = esp_rmaker_node_add_device(esp_rmaker_get_node(), controller_service);
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "Failed to add controller service to node");
         esp_rmaker_device_delete(controller_service);
@@ -174,7 +199,7 @@ esp_err_t esp_rmaker_controller_enable(esp_rmaker_controller_config_t *config)
             ESP_LOGE(TAG, "Failed to report node details");
         }
     }
-    return ESP_OK;
+    return err;
 }
 
 esp_err_t esp_rmaker_controller_disable(void)
@@ -184,13 +209,10 @@ esp_err_t esp_rmaker_controller_disable(void)
     }
 
     /* First unsubscribe from the active group topic */
-    esp_err_t err = esp_rmaker_controller_unsubscribe_topic(esp_rmaker_controller_get_active_group_id());
-    if (err != ESP_OK) {
-        ESP_LOGW(TAG, "Failed to unsubscribe from active group topic");
-    }
+    esp_rmaker_controller_unsubscribe_topic();
 
     /* Remove the controller service from the node */
-    err = esp_rmaker_node_remove_device(esp_rmaker_get_node(), controller_service);
+    esp_err_t err = esp_rmaker_node_remove_device(esp_rmaker_get_node(), controller_service);
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "Failed to remove controller service from node");
         return err;
@@ -213,36 +235,7 @@ esp_err_t esp_rmaker_controller_disable(void)
     return err;
 }
 
-static char *esp_rmaker_controller_get_value_by_name(const char *name)
+esp_err_t esp_rmaker_controller_get_active_group_id(char **group_id)
 {
-    esp_rmaker_param_t *param = esp_rmaker_device_get_param_by_name(controller_service, name);
-    if (!param) {
-        ESP_LOGE(TAG, "Failed to get value by name: %s", name);
-        return NULL;
-    }
-    esp_rmaker_param_val_t *val = esp_rmaker_param_get_val(param);
-    if (!val) {
-        ESP_LOGE(TAG, "Failed to get value by name: %s", name);
-        return NULL;
-    }
-    if (val->type != RMAKER_VAL_TYPE_STRING) {
-        ESP_LOGE(TAG, "Value by name: %s is not a string", name);
-        return NULL;
-    }
-    return val->val.s;
-}
-
-char *esp_rmaker_controller_get_user_token(void)
-{
-    return esp_rmaker_controller_get_value_by_name(ESP_RMAKER_DEF_USER_TOKEN_NAME);
-}
-
-char *esp_rmaker_controller_get_base_url(void)
-{
-    return esp_rmaker_controller_get_value_by_name(ESP_RMAKER_DEF_BASE_URL_NAME);
-}
-
-char *esp_rmaker_controller_get_active_group_id(void)
-{
-    return esp_rmaker_controller_get_value_by_name(ESP_RMAKER_DEF_GROUP_ID_NAME);
+    return esp_rmaker_get_stored_group_id(group_id);
 }

@@ -64,6 +64,7 @@ extern "C"
 #define ESP_RMAKER_PARAM_AC_MODE        "esp.param.ac-mode"
 #define ESP_RMAKER_PARAM_ADD_ZIGBEE_DEVICE     "esp.param.add_zigbee_device"
 #define ESP_RMAKER_PARAM_USER_TOKEN     "esp.param.user-token"
+#define ESP_RMAKER_PARAM_USER_TOKEN_STATUS     "esp.param.user-token-status"
 #define ESP_RMAKER_PARAM_BASE_URL       "esp.param.base-url"
 #define ESP_RMAKER_PARAM_GROUP_ID       "esp.param.group-id"
 
@@ -100,6 +101,7 @@ extern "C"
 #define ESP_RMAKER_SERVICE_LOCAL_CONTROL    "esp.service.local_control"
 #define ESP_RMAKER_SERVICE_USER_AUTH        "esp.service.rmaker-user-auth"
 #define ESP_RMAKER_SERVICE_GROUPS       "esp.service.groups"
+#define ESP_RMAKER_SERVICE_RM_CONTROLLER   "esp.service.rmaker-controller"
 
 #ifdef __cplusplus
 }

@@ -64,28 +64,12 @@ esp_err_t esp_rmaker_controller_disable(void);
  *
  * This function gets the active group ID.
  *
- * @return The active group ID.
- * @return NULL if the active group ID is not set.
+ * @param[out] group_id The active group ID. Should be freed by the caller.
+ *
+ * @return ESP_OK on success
+ * @return error in case of failure
  */
-char *esp_rmaker_controller_get_active_group_id(void);
-
-/** Get the user token
- *
- * This function gets the user token.
- *
- * @return The user token.
- * @return NULL if the user token is not set.
- */
-char *esp_rmaker_controller_get_user_token(void);
-
-/** Get the base URL
- *
- * This function gets the base URL.
- *
- * @return The base URL.
- * @return NULL if the base URL is not set.
- */
-char *esp_rmaker_controller_get_base_url(void);
+esp_err_t esp_rmaker_controller_get_active_group_id(char **group_id);
 
 #ifdef __cplusplus
 }
