@@ -130,10 +130,9 @@ static void Layer_timer_cb(chip::System::Layer *aLayer, void *appState)
         esp_matter::controller::device_mgr::update_device_list(0);
         matter_ctrl_subscribe_device_state(SUBSCRIBE_LOCAL_DEVICE);
     }
-    esp_matter::lock::chip_stack_lock(portMAX_DELAY);
+    esp_matter::lock::ScopedChipStackLock lock(portMAX_DELAY);
     CHIP_ERROR chip_err = chip::DeviceLayer::SystemLayer().StartTimer(
         chip::System::Clock::Seconds32(device_update_timer), Layer_timer_cb, nullptr);
-    esp_matter::lock::chip_stack_unlock();
     if (chip_err != CHIP_NO_ERROR) {
         ESP_LOGE(TAG, "update timer start failed");
     }
@@ -142,10 +141,9 @@ static void Layer_timer_cb(chip::System::Layer *aLayer, void *appState)
 esp_err_t update_device_refresh_ui_init()
 {
     esp_err_t esp_log = ESP_OK;
-    esp_matter::lock::chip_stack_lock(portMAX_DELAY);
+    esp_matter::lock::ScopedChipStackLock lock(portMAX_DELAY);
     CHIP_ERROR chip_err = chip::DeviceLayer::SystemLayer().StartTimer(
         chip::System::Clock::Seconds32(device_update_timer), Layer_timer_cb, nullptr);
-    esp_matter::lock::chip_stack_unlock();
     if (chip_err != CHIP_NO_ERROR) {
         esp_log = ESP_FAIL;
         ESP_LOGE(TAG, "update timer start failed!");

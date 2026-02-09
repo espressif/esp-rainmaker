@@ -148,9 +148,8 @@ extern "C" void app_main()
 
     // Start matter
     esp_matter::start(NULL);
-    esp_matter::lock::chip_stack_lock(portMAX_DELAY);
+    esp_matter::lock::ScopedChipStackLock lock(portMAX_DELAY);
     esp_matter::controller::matter_controller_client::get_instance().init(0, 0, 5580);
-    esp_matter::lock::chip_stack_unlock();
     esp_matter::console::diagnostics_register_commands();
     esp_matter::console::init();
     esp_matter::console::controller_register_commands();

@@ -217,7 +217,7 @@ build_thread_br:
 
 build_matter:
   stage: build
-  image: espressif/esp-matter:latest_idf_v5.4.1@sha256:6995bcdbba6d6d0706318886aa4781bd18f165179e1bc52cd7bb9c8664520b14
+  image: espressif/esp-matter:latest_idf_v5.4.1
   tags:
     - build
   variables:

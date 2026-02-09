@@ -19,6 +19,7 @@
 #include <esp_rmaker_standard_params.h>
 #include <esp_rmaker_core.h>
 #include <esp_matter_client.h>
+#include <esp_matter.h>
 #include <lib/core/Optional.h>
 #include <app_matter.h>
 #include <app_priv.h>
@@ -44,9 +45,8 @@ esp_err_t app_matter_send_command_binding(bool power)
         req_handle.command_path.mCommandId = OnOff::Commands::Off::Id;
     }
 
-    lock::chip_stack_lock(portMAX_DELAY);
+    lock::ScopedChipStackLock lock(portMAX_DELAY);
     esp_err_t err = client::cluster_update(switch_endpoint_id, &req_handle);
-    lock::chip_stack_unlock();
     return err;
 }
 
