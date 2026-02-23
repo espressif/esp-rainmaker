@@ -320,8 +320,6 @@ static void network_event_handler(void* arg, esp_event_base_t event_base, int32_
 
 #ifdef APP_PROV_STOP_ON_CREDS_MISMATCH
     static int failed_cnt = 0;
-#endif
-#ifdef APP_PROV_STOP_ON_CREDS_MISMATCH
     if (event_base == PROTOCOMM_SECURITY_SESSION_EVENT) {
         switch (event_id) {
             case PROTOCOMM_SECURITY_SESSION_SETUP_OK:
@@ -334,6 +332,10 @@ static void network_event_handler(void* arg, esp_event_base_t event_base, int32_
                 if (CONFIG_APP_NETWORK_PROV_MAX_POP_MISMATCH &&
                         (++failed_cnt >= CONFIG_APP_NETWORK_PROV_MAX_POP_MISMATCH)) {
                     /* stop provisioning for security reasons */
+                    /* Deregister from protocomm security events immediately to prevent
+                     * further events from triggering this handler after provisioning stops.
+                     */
+                    esp_event_handler_unregister(PROTOCOMM_SECURITY_SESSION_EVENT, ESP_EVENT_ANY_ID, &network_event_handler);
                     network_prov_mgr_stop_provisioning();
                     ESP_LOGW(TAG, "Max PoP attempts reached! Provisioning disabled for security reasons. Please reboot device to restart provisioning");
                     esp_event_post(APP_NETWORK_EVENT, APP_NETWORK_EVENT_PROV_CRED_MISMATCH, NULL, 0, portMAX_DELAY);
@@ -368,6 +370,12 @@ static void network_event_handler(void* arg, esp_event_base_t event_base, int32_
             esp_timer_delete(prov_stop_timer);
             prov_stop_timer = NULL;
         }
+#ifdef APP_PROV_STOP_ON_CREDS_MISMATCH
+        /* Deregister from protocomm security events since provisioning is complete.
+         * This prevents local control errors from triggering provisioning error handlers.
+         */
+        esp_event_handler_unregister(PROTOCOMM_SECURITY_SESSION_EVENT, ESP_EVENT_ANY_ID, &network_event_handler);
+#endif
         network_prov_mgr_deinit();
     }
 }

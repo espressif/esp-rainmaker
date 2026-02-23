@@ -1,5 +1,5 @@
 ## IDF Component Manager Manifest File
-version: "1.3.0"
+version: "1.3.1"
 description: Network connectivity helper component for ESP RainMaker applications with WiFi and Thread support
 url: https://github.com/espressif/esp-rainmaker/tree/master/examples/common/rmaker_app_network
 repository: https://github.com/espressif/esp-rainmaker.git
