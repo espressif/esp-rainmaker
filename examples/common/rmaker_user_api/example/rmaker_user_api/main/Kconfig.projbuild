@@ -1,0 +1,43 @@
+menu "Example Configuration"
+
+    choice
+        prompt "RainMaker login method"
+        default EXAMPLE_RAINMAKER_LOGIN_REFRESH_TOKEN
+        help
+            Select the method for RainMaker login authentication.
+
+        config EXAMPLE_RAINMAKER_LOGIN_REFRESH_TOKEN
+            bool "Use refresh token"
+
+        config EXAMPLE_RAINMAKER_LOGIN_USERNAME_PASSWORD
+            bool "Use username and password"
+    endchoice
+
+    config EXAMPLE_RAINMAKER_USERNAME
+        string "RainMaker username"
+        default ""
+        depends on EXAMPLE_RAINMAKER_LOGIN_USERNAME_PASSWORD
+        help
+            Email (username) for RainMaker. Only used if 'username and password' is chosen.
+
+    config EXAMPLE_RAINMAKER_PASSWORD
+        string "RainMaker password"
+        default ""
+        depends on EXAMPLE_RAINMAKER_LOGIN_USERNAME_PASSWORD
+        help
+            Password for RainMaker. Only used if 'username and password' is chosen.
+
+    config EXAMPLE_RAINMAKER_REFRESH_TOKEN
+        string "RainMaker refresh token"
+        default ""
+        depends on EXAMPLE_RAINMAKER_LOGIN_REFRESH_TOKEN
+        help
+            Refresh token for RainMaker. Only used if 'refresh token' is chosen.
+            The way to get refresh token, please refer to README.
+
+    config EXAMPLE_RAINMAKER_BASE_URL
+        string "RainMaker API base endpoint url"
+        default "https://api.rainmaker.espressif.com"
+        help
+            The default RainMaker cloud base URL to communicate
+endmenu

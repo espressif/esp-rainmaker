@@ -18,5 +18,6 @@ jobs:
             examples/common/rmaker_app_reset;
             examples/common/rmaker_app_network;
             examples/common/rmaker_app_insights;
+            examples/common/rmaker_user_api;
           namespace: "espressif"
           api_token: ${{ secrets.IDF_COMPONENT_API_TOKEN }}
