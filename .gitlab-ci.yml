@@ -236,6 +236,13 @@ build_zigbee_gateway:
     EXAMPLE_TARGETS: "esp32s3"
     EXAMPLES: "zigbee_gateway"
 
+build_rainmaker_controller:
+  extends: .build_template
+  image: espressif/idf:release-v5.4
+  variables:
+    EXAMPLE_TARGETS: "esp32s3"
+    EXAMPLES: "rainmaker_controller"
+
 build_docs:
   stage: build
   image: $ESP_DOCS_ENV_IMAGE
