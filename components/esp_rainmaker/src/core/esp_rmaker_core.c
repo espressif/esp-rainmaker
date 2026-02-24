@@ -223,18 +223,22 @@ static char* esp_rmaker_populate_node_id_from_cert()
     if (ret != 0) {
         ESP_LOGE(TAG, "Parsing of device certificate failed, returned %02X", ret);
     } else {
-        mbedtls_asn1_named_data *cn_data;
+        const mbedtls_asn1_named_data *cn_data;
         cn_data = mbedtls_asn1_find_named_data(&crt.subject, MBEDTLS_OID_AT_CN,
                                                 MBEDTLS_OID_SIZE(MBEDTLS_OID_AT_CN));
         if (cn_data) {
             node_id = MEM_CALLOC_EXTRAM(1, cn_data->val.len + 1);
-            memcpy(node_id, (const char *)cn_data->val.p, cn_data->val.len);
+            if (node_id) {
+                memcpy(node_id, cn_data->val.p, cn_data->val.len);
+            }
         }
     }
+
     mbedtls_x509_crt_free(&crt);
+    free(addr);
     return node_id;
 }
-#endif
+#endif // CONFIG_ESP_RMAKER_READ_NODE_ID_FROM_CERT_CN
 
 static char *esp_rmaker_populate_node_id(bool use_claiming)
 {
@@ -257,6 +261,10 @@ static char *esp_rmaker_populate_node_id(bool use_claiming)
             return NULL;
         }
         node_id = MEM_CALLOC_EXTRAM(1, ESP_CLAIM_NODE_ID_SIZE + 1); /* +1 for NULL terminatation */
+        if (node_id == NULL) {
+            ESP_LOGE(TAG, "Failed to allocate memory for node id.");
+            return NULL;
+        }
         snprintf(node_id, ESP_CLAIM_NODE_ID_SIZE + 1, "%02X%02X%02X%02X%02X%02X",
                 mac_addr[0], mac_addr[1], mac_addr[2], mac_addr[3], mac_addr[4], mac_addr[5]);
     }

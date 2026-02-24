@@ -62,7 +62,23 @@ char * esp_rmaker_get_client_cert()
     uint32_t client_cert_len = 0;
     char *client_cert_addr = NULL;
     if (esp_secure_cert_get_device_cert(&client_cert_addr, &client_cert_len) == ESP_OK) {
-        return client_cert_addr;
+        /* Certificate returned by esp_secure_cert_get_device_cert shall be freed using
+         * esp_secure_cert_free_device_cert() and our fallback method expects it to be freed using
+         * free(). So to avoid any confusion, we are copying the certificate to a new buffer and
+         * returning that, and the caller is expected to free the returned buffer using free().
+         */
+
+        const char *client_cert_buf = MEM_CALLOC_EXTRAM(1, client_cert_len);
+        if (client_cert_buf) {
+            memcpy(client_cert_buf, client_cert_addr, client_cert_len);
+        }
+
+        /* Not using the fallback method if we run out of memory as the fallback
+         * method also performs the dynamic memory allocation and would fail as well.
+         */
+
+        esp_secure_cert_free_device_cert(client_cert_addr);
+        return client_cert_buf;
     } else {
         ESP_LOGE(TAG, "Failed to obtain flash address of device cert");
         ESP_LOGI(TAG, "Attempting to fetch client certificate from NVS");
@@ -77,6 +93,7 @@ size_t esp_rmaker_get_client_cert_len()
     uint32_t client_cert_len = 0;
     char *client_cert_addr = NULL;
     if (esp_secure_cert_get_device_cert(&client_cert_addr, &client_cert_len) == ESP_OK) {
+        esp_secure_cert_free_device_cert(client_cert_addr);
         return client_cert_len;
     } else {
         ESP_LOGE(TAG, "Failed to obtain flash address of device cert");
@@ -92,7 +109,23 @@ char * esp_rmaker_get_client_key()
     uint32_t client_key_len = 0;
     char *client_key_addr = NULL;
     if (esp_secure_cert_get_priv_key(&client_key_addr, &client_key_len) == ESP_OK) {
-        return client_key_addr;
+        /* Key returned by esp_secure_cert_get_priv_key shall be freed using
+         * esp_secure_cert_free_priv_key() and our fallback method expects it to be freed using
+         * free(). So to avoid any confusion, we are copying the key to a new buffer and
+         * returning that, and the caller is expected to free the returned buffer using free().
+         */
+
+        const char *client_key_buf = MEM_CALLOC_EXTRAM(1, client_key_len);
+        if (client_key_buf) {
+            memcpy(client_key_buf, client_key_addr, client_key_len);
+        }
+
+        /* Not using the fallback method if we run out of memory as the fallback
+         * method also performs the dynamic memory allocation and would fail as well.
+         */
+
+        esp_secure_cert_free_priv_key(client_key_addr);
+        return client_key_buf;
     } else {
         ESP_LOGE(TAG, "Failed to obtain flash address of private_key");
         ESP_LOGI(TAG, "Attempting to fetch key from NVS");
@@ -107,6 +140,7 @@ size_t esp_rmaker_get_client_key_len()
     uint32_t client_key_len = 0;
     char *client_key_addr = NULL;
     if (esp_secure_cert_get_priv_key(&client_key_addr, &client_key_len) == ESP_OK) {
+        esp_secure_cert_free_priv_key(client_key_addr);
         return client_key_len;
     } else {
         ESP_LOGE(TAG, "Failed to obtain flash address of private_key");
@@ -124,6 +158,9 @@ char * esp_rmaker_get_client_csr()
 esp_rmaker_mqtt_conn_params_t *esp_rmaker_get_mqtt_conn_params()
 {
     esp_rmaker_mqtt_conn_params_t *mqtt_conn_params = MEM_CALLOC_EXTRAM(1, sizeof(esp_rmaker_mqtt_conn_params_t));
+    if (mqtt_conn_params == NULL) {
+        return NULL;
+    }
 
 #if defined(CONFIG_ESP_RMAKER_USE_ESP_SECURE_CERT_MGR) && defined(CONFIG_ESP_SECURE_CERT_DS_PERIPHERAL)
     mqtt_conn_params->ds_data = esp_secure_cert_get_ds_ctx();

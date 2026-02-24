@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.10.3
+
+### Bug Fixes
+
+- Fixed memory management issues (leaks, missing NULL checks, inconsistent ownership) in client data retrieval APIs.
+
 ## 1.10.2
 
 ### New Features

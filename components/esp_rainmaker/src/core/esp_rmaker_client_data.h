@@ -21,13 +21,63 @@
 #define ESP_RMAKER_CLIENT_CSR_NVS_KEY    "csr"
 #define ESP_RMAKER_CLIENT_RANDOM_NVS_KEY "random"
 
+/** Returns the client certificate
+ *
+ * @return char pointer to the client certificate.
+ * @note Free the memory after use using free().
+ */
 char *esp_rmaker_get_client_cert();
+
+/** Returns the length of the client certificate
+ *
+ * @return size_t length of the client certificate.
+ */
 size_t esp_rmaker_get_client_cert_len();
+
+/** Returns the client key
+ *
+ * @return char pointer to the client key.
+ * @note Free the memory after use using free().
+ */
 char *esp_rmaker_get_client_key();
+
+/** Returns the length of the client key
+ *
+ * @return size_t length of the client key.
+ */
 size_t esp_rmaker_get_client_key_len();
+
+/** Returns the client CSR
+ *
+ * @return char pointer to the client CSR.
+ * @note Free the memory after use using free().
+ */
 char *esp_rmaker_get_client_csr();
+
+/** Returns the length of the client CSR
+ *
+ * @return size_t length of the client CSR.
+ */
+size_t esp_rmaker_get_client_csr_len();
+
+/** Returns the MQTT host
+ *
+ * @return char pointer to the MQTT host.
+ * @note Free the memory after use using free().
+ */
 char *esp_rmaker_get_mqtt_host();
+
+/** Returns the MQTT connection parameters
+ *
+ * @return esp_rmaker_mqtt_conn_params_t pointer to the MQTT connection parameters.
+ * @note Free the mqtt connection parameters after use using esp_rmaker_clean_mqtt_conn_params().
+ */
 esp_rmaker_mqtt_conn_params_t *esp_rmaker_get_mqtt_conn_params();
+
+/** Cleans the MQTT connection parameters
+ *
+ * @param mqtt_conn_params pointer to the MQTT connection parameters, returned by esp_rmaker_get_mqtt_conn_params().
+ */
 void esp_rmaker_clean_mqtt_conn_params(esp_rmaker_mqtt_conn_params_t *mqtt_conn_params);
 
 /** Set LWT data for MQTT connection params
