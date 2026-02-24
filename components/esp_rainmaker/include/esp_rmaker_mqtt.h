@@ -93,6 +93,18 @@ esp_err_t esp_rmaker_mqtt_subscribe(const char *topic, esp_rmaker_mqtt_subscribe
 esp_err_t esp_rmaker_mqtt_unsubscribe(const char *topic);
 esp_err_t esp_rmaker_mqtt_setup(esp_rmaker_mqtt_config_t mqtt_config);
 
+/** Update MQTT config and reconnect
+ *
+ * Updates the MQTT configuration (including LWT) and reconnects to the broker.
+ * This preserves subscriptions across the reconnection.
+ *
+ * @param[in] conn_params The new MQTT connection parameters.
+ *
+ * @return ESP_OK on success.
+ * @return error in case of any error.
+ */
+esp_err_t esp_rmaker_mqtt_update_config(esp_rmaker_mqtt_conn_params_t *conn_params);
+
 /** Creates appropriate MQTT Topic String based on CONFIG_ESP_RMAKER_MQTT_USE_BASIC_INGEST_TOPICS
  * @param[out] buf Buffer to hold topic string
  * @param[in] buf_size Size of buffer
@@ -120,6 +132,7 @@ bool esp_rmaker_mqtt_is_budget_available(void);
  *
  */
 bool esp_rmaker_is_mqtt_connected();
+
 #ifdef __cplusplus
 }
 #endif

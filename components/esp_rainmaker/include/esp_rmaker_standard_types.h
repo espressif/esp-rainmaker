@@ -67,6 +67,7 @@ extern "C"
 #define ESP_RMAKER_PARAM_USER_TOKEN_STATUS     "esp.param.user-token-status"
 #define ESP_RMAKER_PARAM_BASE_URL       "esp.param.base-url"
 #define ESP_RMAKER_PARAM_GROUP_ID       "esp.param.group-id"
+#define ESP_RMAKER_PARAM_CONNECTED      "esp.param.connected"
 
 /********** STANDARD DEVICE TYPES **********/
 
@@ -102,6 +103,7 @@ extern "C"
 #define ESP_RMAKER_SERVICE_USER_AUTH        "esp.service.rmaker-user-auth"
 #define ESP_RMAKER_SERVICE_GROUPS       "esp.service.groups"
 #define ESP_RMAKER_SERVICE_RM_CONTROLLER   "esp.service.rmaker-controller"
+#define ESP_RMAKER_SERVICE_CONNECTIVITY "esp.service.connectivity"
 
 #ifdef __cplusplus
 }

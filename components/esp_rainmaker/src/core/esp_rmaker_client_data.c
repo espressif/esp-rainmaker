@@ -27,15 +27,19 @@
 
 #ifdef CONFIG_ESP_RMAKER_USE_ESP_SECURE_CERT_MGR
     #include "esp_secure_cert_read.h"
-    /*
-     * Since TAG is not used in any other place in this file at the moment,
-     * it has been placed inside this #ifdef to avoid -Werror=unused-variable.
-     */
-    static const char *TAG = "esp_rmaker_client_data";
 #endif
+
+static const char *TAG = "esp_rmaker_client_data";
 
 extern uint8_t mqtt_server_root_ca_pem_start[] asm("_binary_rmaker_mqtt_server_crt_start");
 extern uint8_t mqtt_server_root_ca_pem_end[] asm("_binary_rmaker_mqtt_server_crt_end");
+
+/* LWT storage for conn_params population */
+static struct {
+    char *topic;
+    char *message;
+    size_t message_len;
+} s_lwt_data;
 
 char * esp_rmaker_get_mqtt_host()
 {
@@ -120,7 +124,7 @@ char * esp_rmaker_get_client_csr()
 esp_rmaker_mqtt_conn_params_t *esp_rmaker_get_mqtt_conn_params()
 {
     esp_rmaker_mqtt_conn_params_t *mqtt_conn_params = MEM_CALLOC_EXTRAM(1, sizeof(esp_rmaker_mqtt_conn_params_t));
-    
+
 #if defined(CONFIG_ESP_RMAKER_USE_ESP_SECURE_CERT_MGR) && defined(CONFIG_ESP_SECURE_CERT_DS_PERIPHERAL)
     mqtt_conn_params->ds_data = esp_secure_cert_get_ds_ctx();
     if (mqtt_conn_params->ds_data == NULL) /* Get client key only if ds_data is NULL */
@@ -140,11 +144,61 @@ esp_rmaker_mqtt_conn_params_t *esp_rmaker_get_mqtt_conn_params()
     }
     mqtt_conn_params->server_cert = (char *)mqtt_server_root_ca_pem_start;
     mqtt_conn_params->client_id = esp_rmaker_get_node_id();
+
+    /* Populate LWT if configured */
+    if (s_lwt_data.topic) {
+        mqtt_conn_params->mqtt_last_will_topic = s_lwt_data.topic;
+        mqtt_conn_params->mqtt_last_will_message = s_lwt_data.message;
+        mqtt_conn_params->mqtt_last_will_message_len = s_lwt_data.message_len;
+        ESP_LOGI(TAG, "LWT configured - Topic: %s", s_lwt_data.topic);
+    }
+
     return mqtt_conn_params;
 init_err:
     esp_rmaker_clean_mqtt_conn_params(mqtt_conn_params);
     free(mqtt_conn_params);
     return NULL;
+}
+
+esp_err_t esp_rmaker_set_mqtt_conn_lwt(const char *topic, const char *message, size_t message_len)
+{
+    /* Free existing LWT data */
+    if (s_lwt_data.topic) {
+        free(s_lwt_data.topic);
+        s_lwt_data.topic = NULL;
+    }
+    if (s_lwt_data.message) {
+        free(s_lwt_data.message);
+        s_lwt_data.message = NULL;
+    }
+    s_lwt_data.message_len = 0;
+
+    /* Set new LWT data if both topic and message are provided.
+     * LWT without a message is useless - broker needs something to publish.
+     */
+    if (topic && strlen(topic) > 0 && message && message_len > 0) {
+        s_lwt_data.topic = strdup(topic);
+        if (!s_lwt_data.topic) {
+            ESP_LOGE(TAG, "Failed to allocate memory for LWT topic");
+            return ESP_ERR_NO_MEM;
+        }
+
+        s_lwt_data.message = malloc(message_len);
+        if (!s_lwt_data.message) {
+            free(s_lwt_data.topic);
+            s_lwt_data.topic = NULL;
+            ESP_LOGE(TAG, "Failed to allocate memory for LWT message");
+            return ESP_ERR_NO_MEM;
+        }
+        memcpy(s_lwt_data.message, message, message_len);
+        s_lwt_data.message_len = message_len;
+
+        ESP_LOGI(TAG, "LWT data set - Topic: %s, Message len: %d", topic, (int)message_len);
+    } else {
+        ESP_LOGI(TAG, "LWT data cleared");
+    }
+
+    return ESP_OK;
 }
 
 void esp_rmaker_clean_mqtt_conn_params(esp_rmaker_mqtt_conn_params_t *mqtt_conn_params)

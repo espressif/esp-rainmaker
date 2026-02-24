@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.10.2
+
+### New Features
+
+- Added Connectivity service so that clients can get connected/disconnected status of the node.
+- Connected status is reported on receiving MQTT connected event.
+- Disconnected status is reported via MQTT LWT.
+- Delay for reporting connected status is configurable via `CONFIG_ESP_RMAKER_CONNECTIVITY_REPORT_DELAY`. This is required to handle race condition when a device reboots quickly, the broker may trigger the old connection's LWT (Connected=false) after the new connection reports Connected=true, resulting in incorrect status.
+
 ## 1.10.1
 
 ### Changes

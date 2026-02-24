@@ -195,3 +195,29 @@ esp_err_t esp_rmaker_chal_resp_disable(void);
  * @return ESP_OK on success
  */
 esp_err_t esp_rmaker_chal_resp_enable(void);
+
+/** Reinitialize MQTT with fresh connection parameters
+ *
+ * This is useful when MQTT connection parameters have changed (e.g., LWT)
+ * after the initial MQTT init. It will deinit MQTT, get fresh conn_params,
+ * and reinit MQTT.
+ *
+ * @note This should only be called when MQTT is not connected.
+ *
+ * @return ESP_OK on success
+ * @return error in case of failure
+ */
+esp_err_t esp_rmaker_mqtt_reinit_with_new_params(void);
+
+/** Reconnect MQTT with fresh connection parameters
+ *
+ * This performs a full reconnect cycle: disconnect → reinit → connect.
+ * Useful when MQTT connection parameters have changed (e.g., LWT) and
+ * MQTT is currently connected.
+ *
+ * If MQTT is not connected, it will just reinit and connect.
+ *
+ * @return ESP_OK on success
+ * @return error in case of failure
+ */
+esp_err_t esp_rmaker_mqtt_reconnect(void);

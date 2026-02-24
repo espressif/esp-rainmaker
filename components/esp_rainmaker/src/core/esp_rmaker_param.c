@@ -26,6 +26,7 @@
 #include <esp_rmaker_standard_types.h>
 #include <esp_rmaker_mqtt.h>
 #include <esp_rmaker_utils.h>
+#include <esp_rmaker_connectivity.h>
 #include "esp_rmaker_mqtt_topics.h"
 #include "esp_rmaker_internal.h"
 
@@ -484,7 +485,7 @@ esp_err_t esp_rmaker_register_for_group_params(const char *group_id)
         active_group_id = strdup(group_id);
         if (!active_group_id) {
             ESP_LOGE(TAG, "Failed to allocate memory for group_id, continuing with subscription");
-            // Continue execution - subscription is more critical than storing the ID
+            /* Continue execution - subscription is more critical than storing the ID */
         }
         char subscribe_topic[MQTT_TOPIC_BUFFER_SIZE];
         snprintf(subscribe_topic, sizeof(subscribe_topic), "node/%s/%s/%s",
@@ -495,6 +496,12 @@ esp_err_t esp_rmaker_register_for_group_params(const char *group_id)
             return ESP_FAIL;
         }
     }
+
+    /* Update connectivity service LWT if enabled */
+    if (esp_rmaker_connectivity_is_enabled()) {
+        esp_rmaker_connectivity_update_lwt(group_id);
+    }
+
     return ESP_OK;
 }
 

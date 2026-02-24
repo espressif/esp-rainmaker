@@ -626,6 +626,22 @@ menu "ESP RainMaker Config"
 
     endmenu
 
+    menu "ESP RainMaker Connectivity Service"
+
+        config ESP_RMAKER_CONNECTIVITY_REPORT_DELAY
+            int "Delay before reporting Connected=true (seconds)"
+            default 5
+            range 0 30
+            help
+                Delay in seconds before reporting Connected=true after MQTT connection.
+                This helps avoid race conditions when a device reboots quickly - the broker
+                may trigger the old connection's LWT (Connected=false) after the new
+                connection reports Connected=true, resulting in incorrect status.
+
+                Set to 0 to disable the delay and report immediately.
+
+    endmenu
+
     menu "ESP RainMaker Command-Response"
 
         config ESP_RMAKER_CMD_RESP_ENABLE

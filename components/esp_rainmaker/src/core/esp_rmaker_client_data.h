@@ -29,3 +29,17 @@ char *esp_rmaker_get_client_csr();
 char *esp_rmaker_get_mqtt_host();
 esp_rmaker_mqtt_conn_params_t *esp_rmaker_get_mqtt_conn_params();
 void esp_rmaker_clean_mqtt_conn_params(esp_rmaker_mqtt_conn_params_t *mqtt_conn_params);
+
+/** Set LWT data for MQTT connection params
+ *
+ * This sets the LWT data that will be used when esp_rmaker_get_mqtt_conn_params()
+ * is called. The data is copied internally.
+ *
+ * @param[in] topic The LWT topic. Set to NULL to clear LWT.
+ * @param[in] message The LWT message payload.
+ * @param[in] message_len Length of the LWT message.
+ *
+ * @return ESP_OK on success.
+ * @return ESP_ERR_NO_MEM if memory allocation fails.
+ */
+esp_err_t esp_rmaker_set_mqtt_conn_lwt(const char *topic, const char *message, size_t message_len);
