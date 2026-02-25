@@ -1,0 +1,4 @@
+dependencies:
+  idf: ">=4.4"
+  espressif/rmaker_user_api:
+    override_path: "../../.."

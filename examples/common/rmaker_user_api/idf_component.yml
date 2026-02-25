@@ -1,0 +1,11 @@
+## IDF Component Manager Manifest File
+version: "1.0.0"
+description: The RainMaker User API used for interacting with the ESP RainMaker cloud backend with HTTP REST APIs to establish client to cloud communication.
+url: https://github.com/espressif/esp-rainmaker/tree/master/examples/common/rmaker_user_api
+repository: https://github.com/espressif/esp-rainmaker.git
+issues: https://github.com/espressif/esp-rainmaker/issues
+documentation: https://github.com/espressif/esp-rainmaker/tree/master/examples/common/rmaker_user_api/README.md
+dependencies:
+  ## Required IDF version
+  idf:
+    version: ">=4.4"

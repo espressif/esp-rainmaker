@@ -1,0 +1,27 @@
+menu "Example Configuration"
+
+    config EXAMPLE_BOARD_BUTTON_GPIO
+        int "Boot Button GPIO"
+        default 28 if IDF_TARGET_ESP32C5
+        default 9 if IDF_TARGET_ESP32C3 || IDF_TARGET_ESP32C6 || IDF_TARGET_ESP32C2 || IDF_TARGET_ESP32H2
+        default 0
+        help
+            GPIO number on which the "Boot" button is connected. This is generally used
+            by the application for custom operations like toggling states, resetting to defaults, etc.
+
+    config APP_POP_TYPE
+        int "Proof of Possession Type"
+        default 1
+        range 0 2
+        help
+            0: POP_TYPE_MAC
+            1: POP_TYPE_RANDOM
+            2: POP_TYPE_NONE
+
+    config EXAMPLE_README_URL
+        string "Example README URL"
+        default "https://raw.githubusercontent.com/espressif/esp-rainmaker/master/examples/rainmaker_controller/README.md"
+        help
+            URL pointing to the README documentation for this example.
+            This will be included in the node config if set to a non-empty value.
+endmenu
