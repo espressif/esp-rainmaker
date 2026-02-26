@@ -209,6 +209,13 @@ esp_err_t esp_rmaker_chal_resp_enable(void);
  */
 esp_err_t esp_rmaker_mqtt_reinit_with_new_params(void);
 
+/** Reconfigure connectivity LWT for node ID change (internal)
+ *
+ * Used after assisted claiming succeeds when node_id has changed.
+ * Updates LWT topic with the new node_id.
+ */
+esp_err_t esp_rmaker_connectivity_reconfigure_lwt_for_node_id_change(void);
+
 /** Reconnect MQTT with fresh connection parameters
  *
  * This performs a full reconnect cycle: disconnect → reinit → connect.

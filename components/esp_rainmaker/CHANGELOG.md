@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.10.4
+
+### Bug Fixes
+
+- Fixed MQTT LWT configuration after assisted claiming: When connectivity service is enabled with an unclaimed node,
+  the LWT topic was initialized with the MAC-based node ID. After assisted claiming, the node ID changed but the LWT topic was not updated,
+  causing MQTT connection issues. LWT is now reconfigured with the new node ID when assisted claiming succeeds.
+- Fixed misleading Connectivity `Connected` param reporting: The param default was set from the MQTT connection status
+  at enable time (typically false, since connectivity is enabled before `esp_rmaker_start()`).
+  Params are only reported after MQTT connects, so the cloud received false initially then true after a delay.
+  The default is now true to reflect the actual state when the param gets reported.
+
 ## 1.10.3
 
 ### Bug Fixes
@@ -13,14 +25,18 @@
 - Added Connectivity service so that clients can get connected/disconnected status of the node.
 - Connected status is reported on receiving MQTT connected event.
 - Disconnected status is reported via MQTT LWT.
-- Delay for reporting connected status is configurable via `CONFIG_ESP_RMAKER_CONNECTIVITY_REPORT_DELAY`. This is required to handle race condition when a device reboots quickly, the broker may trigger the old connection's LWT (Connected=false) after the new connection reports Connected=true, resulting in incorrect status.
+- Delay for reporting connected status is configurable via `CONFIG_ESP_RMAKER_CONNECTIVITY_REPORT_DELAY`.
+  This is required to handle race condition when a device reboots quickly, the broker may trigger the
+  old connection's LWT (Connected=false) after the new connection reports Connected=true, resulting in incorrect status.
 
 ## 1.10.1
 
 ### Changes
 
-- Move User Authentication part of RainMaker controller service to an independent service. Components can register to `RMAKER_AUTH_SERVICE_EVENT` event to get the user token and base url updates.
-- Added `esp.param.user-token-status` in the RainMaker User Auth Service to indicate user-token state: 0 = not set; 1 = set but not verified; 2 = set and verified; 3 = set but expired/invalid.
+- Move User Authentication part of RainMaker controller service to an independent service. 
+  Components can register to `RMAKER_AUTH_SERVICE_EVENT` event to get the user token and base url updates.
+- Added `esp.param.user-token-status` in the RainMaker User Auth Service to indicate user-token state:
+  0 = not set; 1 = set but not verified; 2 = set and verified; 3 = set but expired/invalid.
 - Because group_id is not marked `PROP_FLAG_PERSIST`, it must be stored manually in the RainMaker Controller.
 
 ## 1.10.0
