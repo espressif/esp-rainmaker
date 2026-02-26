@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.3.1]
+
+### Fixed
+- POP mismatch event was getting handled even after provisioning ends, causing incorrect prints due to failures coming from local control module.
+
 ## [1.3.0]
 
 ### Added
