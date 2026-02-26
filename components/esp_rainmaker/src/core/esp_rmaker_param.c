@@ -814,8 +814,20 @@ esp_err_t esp_rmaker_param_update(const esp_rmaker_param_t *param, esp_rmaker_pa
             _param->val.val.s = new_val;
             break;
         }
-        case RMAKER_VAL_TYPE_BOOLEAN:
         case RMAKER_VAL_TYPE_INTEGER:
+            int moduo = val.val.i%_param->bounds->step.val.i;
+            if(moduo == 0) {                
+                _param->val.val = val.val;
+            }else{
+                if(moduo <= _param->bounds->step.val.i/2) {
+                    _param->val.val.i = val.val.i - moduo;
+                } else {
+                    _param->val.val.i = val.val.i + _param->bounds->step.val.i-moduo;
+                }                
+                ESP_LOGW(TAG, "Value moduo isn't zero. Setting near value.");
+            }            
+            break;
+        case RMAKER_VAL_TYPE_BOOLEAN:
         case RMAKER_VAL_TYPE_FLOAT:
             _param->val.val = val.val;
             break;
