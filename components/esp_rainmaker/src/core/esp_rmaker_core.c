@@ -34,6 +34,9 @@
 #include "esp_rmaker_mqtt.h"
 #include "esp_rmaker_claim.h"
 #include "esp_rmaker_client_data.h"
+#ifdef CONFIG_ESP_RMAKER_ASSISTED_CLAIM
+#include <esp_rmaker_connectivity.h>
+#endif
 #ifdef CONFIG_ESP_RMAKER_ENABLE_CHALLENGE_RESPONSE
 #include <esp_rmaker_chal_resp.h>
 #endif /* CONFIG_ESP_RMAKER_ENABLE_CHALLENGE_RESPONSE */
@@ -176,6 +179,17 @@ static void claim_event_handler(void* arg, esp_event_base_t event_base,
     if (event_id == RMAKER_EVENT_CLAIM_SUCCESSFUL) {
         esp_rmaker_priv_data->need_claim = false;
         esp_rmaker_priv_data->claim_done = true;
+#ifdef CONFIG_ESP_RMAKER_ASSISTED_CLAIM
+        /* Assisted claiming changes node_id from MAC-based to cloud-assigned;
+         * reconfigure LWT with new node_id and reinit MQTT if needed. Self-claim
+         * does not change node_id, so this is not needed for self-claim. */
+        if (esp_rmaker_connectivity_is_enabled()) {
+            esp_err_t err = esp_rmaker_connectivity_reconfigure_lwt_for_node_id_change();
+            if (err == ESP_OK) {
+                esp_rmaker_mqtt_reinit_with_new_params();
+            }
+        }
+#endif /* CONFIG_ESP_RMAKER_ASSISTED_CLAIM */
         esp_event_handler_unregister(RMAKER_EVENT, RMAKER_EVENT_CLAIM_STARTED, &claim_event_handler);
         esp_event_handler_unregister(RMAKER_EVENT, RMAKER_EVENT_CLAIM_SUCCESSFUL, &claim_event_handler);
         esp_event_handler_unregister(RMAKER_EVENT, RMAKER_EVENT_CLAIM_FAILED, &claim_event_handler);

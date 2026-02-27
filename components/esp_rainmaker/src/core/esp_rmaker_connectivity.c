@@ -233,6 +233,16 @@ bool esp_rmaker_connectivity_is_enabled(void)
     return (connectivity_priv && connectivity_priv->enabled);
 }
 
+esp_err_t esp_rmaker_connectivity_reconfigure_lwt_for_node_id_change(void)
+{
+    if (!connectivity_priv || !connectivity_priv->enabled) {
+        return ESP_ERR_INVALID_STATE;
+    }
+
+    ESP_LOGI(TAG, "Reconfiguring LWT for new node ID");
+    return esp_rmaker_connectivity_configure_lwt(connectivity_priv->current_group_id);
+}
+
 esp_err_t esp_rmaker_connectivity_enable(void)
 {
     if (connectivity_priv) {
@@ -257,13 +267,16 @@ esp_err_t esp_rmaker_connectivity_enable(void)
         return ESP_FAIL;
     }
 
-    /* Check MQTT connection status to initialize Connected parameter with correct value */
-    bool mqtt_connected = esp_rmaker_is_mqtt_connected();
-
-    /* Create the Connected parameter with correct initial value */
+    /* Create the Connected parameter. Default to true because:
+     * - Connectivity is enabled before esp_rmaker_start(), so mqtt_connected is typically false
+     * - Params are reported to cloud only after MQTT connects
+     * - With false as default, we would misleadingly report Connected=false initially, then
+     *   true after the delay; true by default avoids this and reflects the actual state
+     *   when the param gets reported.
+     */
     connectivity_priv->connected_param = esp_rmaker_param_create(CONNECTED_PARAM_NAME,
                                                                   ESP_RMAKER_PARAM_CONNECTED,
-                                                                  esp_rmaker_bool(mqtt_connected),
+                                                                  esp_rmaker_bool(true),
                                                                   PROP_FLAG_READ);
     if (!connectivity_priv->connected_param) {
         ESP_LOGE(TAG, "Failed to create Connected param");
