@@ -18,6 +18,7 @@
 #define ESP_RMAKER_CLIENT_CERT_NVS_KEY   "client_cert"
 #define ESP_RMAKER_CLIENT_KEY_NVS_KEY    "client_key"
 #define ESP_RMAKER_MQTT_HOST_NVS_KEY     "mqtt_host"
+#define ESP_RMAKER_MQTT_CRED_HOST_NVS_KEY "mqtt_cred_host"
 #define ESP_RMAKER_CLIENT_CSR_NVS_KEY    "csr"
 #define ESP_RMAKER_CLIENT_RANDOM_NVS_KEY "random"
 
