@@ -215,6 +215,13 @@ build_thread_br:
     EXAMPLE_TARGETS: "esp32s3"
     EXAMPLES: "thread_br"
 
+build_ethernet_switch:
+  extends: .build_template
+  image: espressif/idf:release-v5.5
+  variables:
+    EXAMPLE_TARGETS: "esp32"
+    EXAMPLES: "ethernet_switch"
+
 build_matter:
   stage: build
   image: espressif/esp-matter:latest_idf_v5.4.1

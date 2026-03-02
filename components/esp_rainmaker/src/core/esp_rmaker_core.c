@@ -47,15 +47,22 @@
 #include <esp_openthread_dns64.h>
 #endif
 
+/* Network connection event bits - can be set independently
+ * Each network type uses a different bit to support multiple networks simultaneously
+ */
 #if defined(CONFIG_ESP_RMAKER_NETWORK_OVER_WIFI)
 static const int WIFI_CONNECTED_EVENT = BIT0;
-#elif defined(CONFIG_ESP_RMAKER_NETWORK_OVER_THREAD)
-static const int THREAD_SET_DNS_SEVER_EVENT = BIT0;
+#endif
+#if defined(CONFIG_ESP_RMAKER_NETWORK_OVER_THREAD)
+static const int THREAD_SET_DNS_SEVER_EVENT = BIT1;
+#endif
+#if defined(CONFIG_ETH_ENABLED)
+static const int ETHERNET_CONNECTED_EVENT = BIT2;
 #endif
 
 #include "esp_mac.h"
 
-static const int MQTT_CONNECTED_EVENT = BIT1;
+static const int MQTT_CONNECTED_EVENT = BIT3;
 static EventGroupHandle_t rmaker_core_event_group;
 
 ESP_EVENT_DEFINE_BASE(RMAKER_EVENT);
@@ -327,8 +334,9 @@ static void esp_rmaker_event_handler(void* arg, esp_event_base_t event_base,
             /* Signal rmaker thread to continue execution */
             xEventGroupSetBits(rmaker_core_event_group, WIFI_CONNECTED_EVENT);
         }
-    } else
-#elif defined(CONFIG_ESP_RMAKER_NETWORK_OVER_THREAD) /* CONFIG_ESP_RMAKER_NETWORK_OVER_WIFI */
+    }
+#endif /* CONFIG_ESP_RMAKER_NETWORK_OVER_WIFI */
+#if defined(CONFIG_ESP_RMAKER_NETWORK_OVER_THREAD)
     if (event_base == OPENTHREAD_EVENT && event_id == OPENTHREAD_EVENT_SET_DNS_SERVER) {
 #ifdef CONFIG_ESP_RMAKER_ASSISTED_CLAIM
         if (esp_rmaker_priv_data->claim_data) {
@@ -352,9 +360,22 @@ static void esp_rmaker_event_handler(void* arg, esp_event_base_t event_base,
                 esp_rmaker_set_network_id(network_id_buf);
             }
         }
-    } else
+    }
 #endif /* CONFIG_ESP_RMAKER_NETWORK_OVER_THREAD */
-     if (event_base == RMAKER_EVENT &&
+#if defined(CONFIG_ETH_ENABLED)
+    if (event_base == IP_EVENT && event_id == IP_EVENT_ETH_GOT_IP) {
+#ifdef CONFIG_ESP_RMAKER_ASSISTED_CLAIM
+        if (esp_rmaker_priv_data->claim_data) {
+            ESP_LOGE(TAG, "Assisted claiming not supported for Ethernet. Cannot proceed to MQTT connection.");
+        }
+#endif
+        if (rmaker_core_event_group) {
+            /* Signal rmaker thread to continue execution */
+            xEventGroupSetBits(rmaker_core_event_group, ETHERNET_CONNECTED_EVENT);
+        }
+    }
+#endif /* CONFIG_ETH_ENABLED */
+    if (event_base == RMAKER_EVENT &&
             (event_id == RMAKER_EVENT_USER_NODE_MAPPING_DONE ||
             event_id == RMAKER_EVENT_USER_NODE_MAPPING_RESET)) {
         esp_event_handler_unregister(RMAKER_EVENT, event_id, &esp_rmaker_event_handler);
@@ -465,18 +486,26 @@ static void esp_rmaker_task(void *data)
 #if defined(CONFIG_ESP_RMAKER_NETWORK_OVER_WIFI)
     err = esp_event_handler_register(IP_EVENT, IP_EVENT_STA_GOT_IP, &esp_rmaker_event_handler, esp_rmaker_priv_data);
     if (err != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to register event handler. Error: %d. Aborting", err);
+        ESP_LOGE(TAG, "Failed to register Wi-Fi event handler. Error: %d. Aborting", err);
         goto rmaker_end;
     }
-#elif defined(CONFIG_ESP_RMAKER_NETWORK_OVER_THREAD)
+#endif
+#if defined(CONFIG_ESP_RMAKER_NETWORK_OVER_THREAD)
     err = esp_event_handler_register(OPENTHREAD_EVENT, OPENTHREAD_EVENT_SET_DNS_SERVER, &esp_rmaker_event_handler, esp_rmaker_priv_data);
     if (err != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to register event handler. Error: %d. Aborting", err);
+        ESP_LOGE(TAG, "Failed to register Thread DNS event handler. Error: %d. Aborting", err);
         goto rmaker_end;
     }
     err = esp_event_handler_register(OPENTHREAD_EVENT, OPENTHREAD_EVENT_ATTACHED, &esp_rmaker_event_handler, esp_rmaker_priv_data);
     if (err != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to register event handler. Error: %d. Aborting", err);
+        ESP_LOGE(TAG, "Failed to register Thread attached event handler. Error: %d. Aborting", err);
+        goto rmaker_end;
+    }
+#endif
+#if defined(CONFIG_ETH_ENABLED)
+    err = esp_event_handler_register(IP_EVENT, IP_EVENT_ETH_GOT_IP, &esp_rmaker_event_handler, esp_rmaker_priv_data);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to register Ethernet event handler. Error: %d. Aborting", err);
         goto rmaker_end;
     }
 #endif
@@ -485,7 +514,7 @@ static void esp_rmaker_task(void *data)
         ESP_LOGE(TAG, "Failed to register event handler. Error: %d. Aborting", err);
         goto rmaker_end;
     }
-    /* Assisted claiming needs to be done before Wi-Fi connection */
+    /* Assisted claiming needs to be done before network connection */
 #ifdef CONFIG_ESP_RMAKER_ASSISTED_CLAIM
     if (esp_rmaker_priv_data->need_claim) {
 #if defined(CONFIG_ESP_RMAKER_NETWORK_OVER_WIFI)
@@ -499,6 +528,9 @@ static void esp_rmaker_task(void *data)
             ESP_LOGE(TAG, "Please update your phone apps and repeat Thread provisioning with BLE transport.");
             esp_event_handler_unregister(OPENTHREAD_EVENT, OPENTHREAD_EVENT_SET_DNS_SERVER, &esp_rmaker_event_handler);
             esp_event_handler_unregister(OPENTHREAD_EVENT, OPENTHREAD_EVENT_ATTACHED, &esp_rmaker_event_handler);
+#elif defined(CONFIG_ETH_ENABLED)
+        /* Ethernet doesn't support assisted claiming via BLE */
+        ESP_LOGW(TAG, "Assisted claiming not supported for Ethernet. Use on-network challenge-response instead.");
 #endif
             err = ESP_FAIL;
             goto rmaker_end;
@@ -508,41 +540,73 @@ static void esp_rmaker_task(void *data)
             ESP_LOGE(TAG, "esp_rmaker_assisted_claim_perform() returned %d. Aborting", err);
 #if defined(CONFIG_ESP_RMAKER_NETWORK_OVER_WIFI)
             esp_event_handler_unregister(IP_EVENT, IP_EVENT_STA_GOT_IP, &esp_rmaker_event_handler);
-#elif defined(CONFIG_ESP_RMAKER_NETWORK_OVER_THREAD)
+#endif
+#if defined(CONFIG_ESP_RMAKER_NETWORK_OVER_THREAD)
             esp_event_handler_unregister(OPENTHREAD_EVENT, OPENTHREAD_EVENT_SET_DNS_SERVER, &esp_rmaker_event_handler);
             esp_event_handler_unregister(OPENTHREAD_EVENT, OPENTHREAD_EVENT_ATTACHED, &esp_rmaker_event_handler);
+#endif
+#if defined(CONFIG_ETH_ENABLED)
+            esp_event_handler_unregister(IP_EVENT, IP_EVENT_ETH_GOT_IP, &esp_rmaker_event_handler);
 #endif
             goto rmaker_end;
         }
         esp_rmaker_priv_data->claim_data = NULL;
     }
 #endif /* CONFIG_ESP_RMAKER_ASSISTED_CLAIM */
+    /* Wait for any available network connection (Wi-Fi, Thread, or Ethernet) */
+    EventBits_t network_bits = 0;
+    bool already_connected = false;
 #if defined(CONFIG_ESP_RMAKER_NETWORK_OVER_WIFI)
     /* Check if already connected to Wi-Fi */
-    if (esp_wifi_sta_get_ap_info(&ap_info) != ESP_OK) {
-        /* Wait for Wi-Fi connection */
-        xEventGroupWaitBits(rmaker_core_event_group, WIFI_CONNECTED_EVENT, false, true, portMAX_DELAY);
+    if (esp_wifi_sta_get_ap_info(&ap_info) == ESP_OK) {
+        already_connected = true;
+        /* Set the bit immediately since we're already connected */
+        if (rmaker_core_event_group) {
+            xEventGroupSetBits(rmaker_core_event_group, WIFI_CONNECTED_EVENT);
+        }
+    } else {
+        network_bits |= WIFI_CONNECTED_EVENT;
     }
-    esp_event_handler_unregister(IP_EVENT, IP_EVENT_STA_GOT_IP, &esp_rmaker_event_handler);
-#elif defined(CONFIG_ESP_RMAKER_NETWORK_OVER_THREAD) /* CONFIG_ESP_RMAKER_NETWORK_OVER_WIFI */
+#endif
+#if defined(CONFIG_ESP_RMAKER_NETWORK_OVER_THREAD)
     esp_openthread_lock_acquire(portMAX_DELAY);
     err = esp_openthread_get_nat64_prefix(&nat64_prefix);
     esp_openthread_lock_release();
-    /* Check if already get nat64 prefix */
-    if (err != ESP_OK) {
-        /* Wait for Thread connection */
-        xEventGroupWaitBits(rmaker_core_event_group, THREAD_SET_DNS_SEVER_EVENT, false, true, portMAX_DELAY);
-        err = ESP_OK;
+    /* Check if already connected to Thread */
+    if (err == ESP_OK) {
+        already_connected = true;
+        /* Set the bit immediately since we're already connected */
+        if (rmaker_core_event_group) {
+            xEventGroupSetBits(rmaker_core_event_group, THREAD_SET_DNS_SEVER_EVENT);
+        }
+    } else {
+        network_bits |= THREAD_SET_DNS_SEVER_EVENT;
     }
-    esp_event_handler_unregister(OPENTHREAD_EVENT, OPENTHREAD_EVENT_SET_DNS_SERVER, &esp_rmaker_event_handler);
-#endif /* CONFIG_ESP_RMAKER_NETWORK_OVER_THREAD */
+#endif
+#if defined(CONFIG_ETH_ENABLED)
+    /* Note: We can't easily check if Ethernet is already connected here,
+     * so we'll wait for the event. If it's already connected, the event
+     * should have been set already by the event handler. */
+    network_bits |= ETHERNET_CONNECTED_EVENT;
+#endif
+    /* Wait for any network to connect (whichever comes first) */
+    if (network_bits != 0 && !already_connected) {
+        xEventGroupWaitBits(rmaker_core_event_group, network_bits, false, false, portMAX_DELAY);
+    }
+    /* Unregister event handlers for networks we're not using */
+#if defined(CONFIG_ESP_RMAKER_NETWORK_OVER_WIFI)
+    esp_event_handler_unregister(IP_EVENT, IP_EVENT_STA_GOT_IP, &esp_rmaker_event_handler);
+#endif
+#if defined(CONFIG_ETH_ENABLED)
+    esp_event_handler_unregister(IP_EVENT, IP_EVENT_ETH_GOT_IP, &esp_rmaker_event_handler);
+#endif
 
     if (esp_rmaker_priv_data->enable_time_sync) {
 #ifdef CONFIG_MBEDTLS_HAVE_TIME_DATE
         esp_rmaker_time_wait_for_sync(portMAX_DELAY);
 #endif
     }
-    /* Self claiming can be done only after Wi-Fi connection */
+    /* Self claiming can be done only after network connection */
 #ifdef CONFIG_ESP_RMAKER_SELF_CLAIM
     if (esp_rmaker_priv_data->need_claim) {
         err = esp_rmaker_self_claim_perform(esp_rmaker_priv_data->claim_data);

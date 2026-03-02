@@ -12,9 +12,15 @@
 #include <protocomm_httpd.h>
 #include <protocomm_security0.h>
 #include <protocomm_security1.h>
-#ifdef CONFIG_ESP_RMAKER_NETWORK_OVER_WIFI
+
+/* Define macro for networks that support mDNS (Wi-Fi and Ethernet) */
+#if defined(CONFIG_ESP_RMAKER_NETWORK_OVER_WIFI) || defined(CONFIG_ETH_ENABLED)
+#define ESP_RMAKER_SUPPORTS_MDNS 1
+#endif
+
+#ifdef ESP_RMAKER_SUPPORTS_MDNS
 #include <mdns.h>
-#endif /* CONFIG_ESP_RMAKER_NETWORK_OVER_WIFI */
+#endif /* ESP_RMAKER_SUPPORTS_MDNS */
 #ifdef CONFIG_ESP_RMAKER_NETWORK_OVER_THREAD
 #include <esp_openthread.h>
 #include <esp_openthread_lock.h>
@@ -144,7 +150,7 @@ static esp_err_t on_network_chal_resp_wrapper(uint32_t session_id, const uint8_t
     return ret;
 }
 
-#ifdef CONFIG_ESP_RMAKER_NETWORK_OVER_WIFI
+#ifdef ESP_RMAKER_SUPPORTS_MDNS
 static esp_err_t announce_mdns_service(const esp_rmaker_on_network_chal_resp_config_t *config)
 {
     esp_err_t err;
@@ -214,7 +220,7 @@ static void remove_mdns_service(void)
         s_state.mdns_instance_name = NULL;
     }
 }
-#endif /* CONFIG_ESP_RMAKER_NETWORK_OVER_WIFI */
+#endif /* ESP_RMAKER_SUPPORTS_MDNS */
 
 #ifdef CONFIG_ESP_RMAKER_NETWORK_OVER_THREAD
 #define SRP_MAX_HOST_NAME_LEN 40
@@ -494,9 +500,9 @@ esp_err_t esp_rmaker_on_network_chal_resp_start(const esp_rmaker_on_network_chal
     s_state.sec_ver = config->sec_ver;
     s_state.mdns_enabled = config->enable_mdns;
     if (config->enable_mdns) {
-#ifdef CONFIG_ESP_RMAKER_NETWORK_OVER_WIFI
+#ifdef ESP_RMAKER_SUPPORTS_MDNS
         err = announce_mdns_service(config);
-#endif /* CONFIG_ESP_RMAKER_NETWORK_OVER_WIFI */
+#endif /* ESP_RMAKER_SUPPORTS_MDNS */
 #ifdef CONFIG_ESP_RMAKER_NETWORK_OVER_THREAD
         err = srp_client_register_service(config);
 #endif /* CONFIG_ESP_RMAKER_NETWORK_OVER_THREAD */
@@ -543,9 +549,9 @@ esp_err_t esp_rmaker_on_network_chal_resp_stop(void)
 
     /* Remove mDNS service */
     if (s_state.mdns_enabled) {
-#ifdef CONFIG_ESP_RMAKER_NETWORK_OVER_WIFI
+#ifdef ESP_RMAKER_SUPPORTS_MDNS
         remove_mdns_service();
-#endif /* CONFIG_ESP_RMAKER_NETWORK_OVER_WIFI */
+#endif /* ESP_RMAKER_SUPPORTS_MDNS */
 #ifdef CONFIG_ESP_RMAKER_NETWORK_OVER_THREAD
         srp_client_clean_up_service();
 #endif /* CONFIG_ESP_RMAKER_NETWORK_OVER_THREAD */
@@ -576,7 +582,7 @@ bool esp_rmaker_on_network_chal_resp_is_running(void)
 }
 
 /* Internal function to re-announce mDNS service using stored state */
-#ifdef CONFIG_ESP_RMAKER_NETWORK_OVER_WIFI
+#ifdef ESP_RMAKER_SUPPORTS_MDNS
 static esp_err_t reannounce_mdns_service(void)
 {
     if (!s_state.mdns_enabled) {
@@ -602,7 +608,7 @@ static esp_err_t reannounce_mdns_service(void)
 
     return announce_mdns_service(&config);
 }
-#endif /* CONFIG_ESP_RMAKER_NETWORK_OVER_WIFI */
+#endif /* ESP_RMAKER_SUPPORTS_MDNS */
 
 #ifdef CONFIG_ESP_RMAKER_NETWORK_OVER_THREAD
 static esp_err_t srp_client_re_register_service(void)
@@ -627,7 +633,7 @@ static esp_err_t srp_client_re_register_service(void)
 
     return srp_client_register_service(&config);
 }
-#endif /* CONFIG_ESP_RMAKER_NETWORK_OVER_WIFI */
+#endif /* CONFIG_ESP_RMAKER_NETWORK_OVER_THREAD */
 
 /* Internal function to do on-network specific cleanup */
 static esp_err_t on_network_chal_resp_do_cleanup(void)
@@ -639,10 +645,10 @@ static esp_err_t on_network_chal_resp_do_cleanup(void)
 
     /* Remove mDNS service on disabling */
     if (s_state.mdns_enabled) {
-#ifdef CONFIG_ESP_RMAKER_NETWORK_OVER_WIFI
+#ifdef ESP_RMAKER_SUPPORTS_MDNS
         remove_mdns_service();
         ESP_LOGI(TAG, "mDNS service removed");
-#endif /* CONFIG_ESP_RMAKER_NETWORK_OVER_WIFI */
+#endif /* ESP_RMAKER_SUPPORTS_MDNS */
 #ifdef CONFIG_ESP_RMAKER_NETWORK_OVER_THREAD
         srp_client_clean_up_service();
         ESP_LOGI(TAG, "SRP service removed");
@@ -688,12 +694,12 @@ esp_err_t esp_rmaker_on_network_chal_resp_enable(void)
     /* Re-announce mDNS service */
     if (s_state.mdns_enabled) {
         esp_err_t err = ESP_OK;
-#ifdef CONFIG_ESP_RMAKER_NETWORK_OVER_WIFI
+#ifdef ESP_RMAKER_SUPPORTS_MDNS
         err = reannounce_mdns_service();
-#endif /* CONFIG_ESP_RMAKER_NETWORK_OVER_WIFI */
+#endif /* ESP_RMAKER_SUPPORTS_MDNS */
 #ifdef CONFIG_ESP_RMAKER_NETWORK_OVER_THREAD
         err = srp_client_re_register_service();
-#endif /* CONFIG_ESP_RMAKER_NETWORK_OVER_WIFI */
+#endif /* CONFIG_ESP_RMAKER_NETWORK_OVER_THREAD */
         if (err != ESP_OK) {
             ESP_LOGW(TAG, "Failed to re-announce mDNS service: %s", esp_err_to_name(err));
             /* Don't fail the entire enable, mDNS is optional */

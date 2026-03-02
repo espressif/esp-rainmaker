@@ -1,0 +1,80 @@
+CONFIG_ESPTOOLPY_FLASHSIZE_4MB=y
+
+#
+# Use partition table which makes use of flash to the fullest
+# Can be used for other platforms as well. But please keep in mind that fctry partition address is
+# different than default, and the new address needs to be specified to `rainmaker.py claim`
+#
+CONFIG_PARTITION_TABLE_CUSTOM=y
+CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions_4mb_optimised.csv"
+
+# To accomodate security features
+CONFIG_PARTITION_TABLE_OFFSET=0xc000
+
+# mbedtls
+CONFIG_MBEDTLS_DYNAMIC_BUFFER=y
+CONFIG_MBEDTLS_DYNAMIC_FREE_PEER_CERT=y
+CONFIG_MBEDTLS_DYNAMIC_FREE_CONFIG_DATA=y
+CONFIG_MBEDTLS_CERTIFICATE_BUNDLE_DEFAULT_CMN=y
+
+# Wi-Fi and Bluetooth configuration
+# Set CONFIG_EXAMPLE_ENABLE_WIFI=y in menuconfig to enable Wi-Fi support
+# When Wi-Fi is enabled, device can be provisioned via Wi-Fi OR use Ethernet
+# Both networks can work simultaneously - RainMaker uses whichever connects first
+CONFIG_BT_ENABLED=n
+# CONFIG_ESP32_WIFI_ENABLED is controlled by EXAMPLE_ENABLE_WIFI Kconfig option
+# CONFIG_ESP_RMAKER_NETWORK_OVER_WIFI is automatically set when Wi-Fi is enabled
+
+# Disable MQTT username (PPI string) to avoid MAC address fetching issues
+CONFIG_ESP_RMAKER_MQTT_SEND_USERNAME=n
+
+# Temporary Fix for Timer Overflows
+CONFIG_FREERTOS_TIMER_TASK_STACK_DEPTH=3120
+
+# Claiming not supported for Ethernet
+CONFIG_ESP_RMAKER_NO_CLAIM=y
+
+# Enable parameter console commands
+CONFIG_ESP_RMAKER_CONSOLE_PARAM_CMDS_ENABLE=y
+
+# Application Rollback
+CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE=y
+
+# Secure Local Control : Will also be used for User-Node Mapping via Challenge - Response
+CONFIG_ESP_RMAKER_LOCAL_CTRL_AUTO_ENABLE=y
+CONFIG_EXAMPLE_LOCAL_CTRL_POP="abcd1234"
+CONFIG_ESP_RMAKER_LOCAL_CTRL_SECURITY_1=y
+CONFIG_ESP_RMAKER_ENABLE_CHALLENGE_RESPONSE=y
+CONFIG_ESP_RMAKER_LOCAL_CTRL_CHAL_RESP_ENABLE=y
+
+
+# Enable Ethernet
+CONFIG_ETH_ENABLED=y
+
+# Enable asynchronous network connection for dual-network support
+# This allows Wi-Fi and Ethernet to connect simultaneously, improving startup time
+CONFIG_APP_NETWORK_ASYNCHRONOUS_CONNECTION=y
+
+# ============================================================================
+# Size Optimization Settings
+# ============================================================================
+# These options help reduce IRAM and binary size while maintaining functionality
+
+# Compiler Optimization - Optimize for size
+CONFIG_COMPILER_OPTIMIZATION_SIZE=y
+
+# Reduce assertion check overhead
+CONFIG_COMPILER_OPTIMIZATION_CHECKS_SILENT=y
+
+# IRAM Optimizations - Safe options that don't affect functionality
+# Move FreeRTOS functions to flash (safe if not used from ISRs)
+CONFIG_FREERTOS_PLACE_FUNCTIONS_INTO_FLASH=y
+
+# Move ring buffer functions to flash (safe if not used from ISRs)
+CONFIG_RINGBUF_PLACE_FUNCTIONS_INTO_FLASH=y
+
+# Move heap functions to flash (safe if SPI_MASTER_ISR_IN_IRAM is disabled)
+CONFIG_HEAP_PLACE_FUNCTION_INTO_FLASH=y
+
+# Disable libc locks in IRAM (safe if no ISRs use libc locks while cache disabled)
+CONFIG_LIBC_LOCKS_PLACE_IN_IRAM=n
