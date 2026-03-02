@@ -278,6 +278,11 @@ static esp_err_t handle_claim_verify_response(esp_rmaker_claim_data_t *claim_dat
                 esp_rmaker_factory_set(ESP_RMAKER_MQTT_HOST_NVS_KEY, value_buf, strlen(value_buf));
                 memset(value_buf, 0, required_len);
             }
+            if (json_obj_get_string(&jctx, "mqtt_cred_host", value_buf, required_len) == 0) {
+                ESP_LOGI(TAG, "Storing received MQTT Cred Host: %s", value_buf);
+                esp_rmaker_factory_set(ESP_RMAKER_MQTT_CRED_HOST_NVS_KEY, value_buf, strlen(value_buf));
+                memset(value_buf, 0, required_len);
+            }
             json_obj_get_string(&jctx, "certificate", value_buf, required_len);
             json_parse_end(&jctx);
             unescape_new_line(value_buf);
