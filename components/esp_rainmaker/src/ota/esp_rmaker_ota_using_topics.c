@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: 2020-2025 Espressif Systems (Shanghai) CO LTD
+ * SPDX-FileCopyrightText: 2020-2026 Espressif Systems (Shanghai) CO LTD
  *
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -631,10 +631,28 @@ static void esp_rmaker_ota_work_fn(void *priv_data)
 #endif /* CONFIG_ESP_RMAKER_OTA_AUTOFETCH */
 }
 
+/* Event handler to queue OTA work function after RainMaker is started */
+static void esp_rmaker_ota_started_handler(void* arg, esp_event_base_t event_base,
+                                           int32_t event_id, void* event_data)
+{
+    esp_rmaker_ota_t *ota = (esp_rmaker_ota_t *)arg;
+    if (event_base == RMAKER_EVENT && event_id == RMAKER_EVENT_STARTED) {
+        esp_event_handler_unregister(RMAKER_EVENT, RMAKER_EVENT_STARTED,
+                                     &esp_rmaker_ota_started_handler);
+        if (esp_rmaker_work_queue_add_task(esp_rmaker_ota_work_fn, ota) != ESP_OK) {
+            ESP_LOGE(TAG, "Failed to queue OTA work function");
+        }
+    }
+}
+
 /* Enable the ESP RainMaker specific OTA */
 esp_err_t esp_rmaker_ota_enable_using_topics(esp_rmaker_ota_t *ota)
 {
-    esp_err_t err = esp_rmaker_work_queue_add_task(esp_rmaker_ota_work_fn, ota);
+    /* Register event handler to queue OTA work after RainMaker is started.
+     * This ensures OTA subscriptions happen only after node config is published.
+     */
+    esp_err_t err = esp_event_handler_register(RMAKER_EVENT, RMAKER_EVENT_STARTED,
+                                               &esp_rmaker_ota_started_handler, ota);
     if (err == ESP_OK) {
         ESP_LOGI(TAG, "OTA enabled with Topics");
     }

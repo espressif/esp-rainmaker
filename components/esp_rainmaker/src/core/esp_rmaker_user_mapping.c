@@ -1,16 +1,8 @@
-// Copyright 2020 Espressif Systems (Shanghai) PTE LTD
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+/*
+ * SPDX-FileCopyrightText: 2020-2026 Espressif Systems (Shanghai) CO LTD
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
 
 #include <string.h>
 #include <esp_log.h>
@@ -215,22 +207,22 @@ static void esp_rmaker_user_mapping_event_handler(void* arg, esp_event_base_t ev
     }
 }
 
-static void esp_rmaker_user_mapping_mqtt_event_handler(void* arg, esp_event_base_t event_base,
-                          int32_t event_id, void* event_data)
+static void esp_rmaker_user_mapping_config_reported_event_handler(void* arg, esp_event_base_t event_base,
+                        int32_t event_id, void* priv_data)
 {
-    if (event_base == RMAKER_COMMON_EVENT && event_id == RMAKER_MQTT_EVENT_CONNECTED) {
-        ESP_LOGI(TAG, "MQTT connected, queuing pending user mapping task.");
+    if (event_base == RMAKER_EVENT && event_id == RMAKER_EVENT_CONFIG_REPORTED) {
+        ESP_LOGI(TAG, "RainMaker config reported, queuing pending user mapping task.");
 
         /* Unregister this event handler as we only need it once */
-        esp_event_handler_unregister(RMAKER_COMMON_EVENT, RMAKER_MQTT_EVENT_CONNECTED,
-                &esp_rmaker_user_mapping_mqtt_event_handler);
+        esp_event_handler_unregister(RMAKER_EVENT, RMAKER_EVENT_CONFIG_REPORTED,
+                &esp_rmaker_user_mapping_config_reported_event_handler);
 
-        /* Queue the user mapping task now that MQTT is connected */
+        /* Queue the user mapping task now that RainMaker config is reported */
         if (esp_rmaker_work_queue_add_task(esp_rmaker_user_mapping_cb, NULL) != ESP_OK) {
-            ESP_LOGW(TAG, "Failed to queue user mapping task after MQTT connection. Starting retry mechanism.");
+            ESP_LOGW(TAG, "Failed to queue user mapping task after RainMaker config reported. Starting retry mechanism.");
             user_mapping_schedule_retry();
         } else {
-            ESP_LOGI(TAG, "Successfully queued user mapping task after MQTT connection.");
+            ESP_LOGI(TAG, "Successfully queued user mapping task after RainMaker config reported.");
         }
     }
 }
@@ -359,23 +351,21 @@ esp_err_t esp_rmaker_start_user_node_mapping(char *user_id, char *secret_key)
         rmaker_user_mapping_state = ESP_RMAKER_USER_MAPPING_DONE;
     }
 
-    /* Try to queue the task immediately regardless of MQTT connection status */
-    if (esp_rmaker_work_queue_add_task(esp_rmaker_user_mapping_cb, NULL) != ESP_OK) {
-        ESP_LOGW(TAG, "Failed to queue user mapping task. Checking MQTT connection status.");
-
-        /* If MQTT is connected but queue failed, use retry mechanism */
-        if (esp_rmaker_is_mqtt_connected()) {
-            ESP_LOGW(TAG, "MQTT connected but queue full. Starting retry mechanism.");
+    /* Try to queue the task immediately if RainMaker config is already reported or started */
+    esp_rmaker_state_t state = esp_rmaker_get_state();
+    if (state == ESP_RMAKER_STATE_CONFIG_REPORTED || state == ESP_RMAKER_STATE_STARTED) {
+        if (esp_rmaker_work_queue_add_task(esp_rmaker_user_mapping_cb, NULL) != ESP_OK) {
+            ESP_LOGW(TAG, "Failed to queue user mapping task. Starting retry mechanism.");
             user_mapping_schedule_retry();
-        } else {
-            /* MQTT not connected, register for MQTT connected event */
-            ESP_LOGI(TAG, "MQTT not connected, waiting for connection before retrying user mapping.");
-            esp_err_t err = esp_event_handler_register(RMAKER_COMMON_EVENT, RMAKER_MQTT_EVENT_CONNECTED,
-                    &esp_rmaker_user_mapping_mqtt_event_handler, NULL);
-            if (err != ESP_OK) {
-                ESP_LOGE(TAG, "Failed to register for MQTT connected event: %d", err);
-                goto user_mapping_error;
-            }
+        }
+    } else {
+        /* RainMaker config is not reported, register for config reported event */
+        ESP_LOGI(TAG, "RainMaker config is not reported, waiting for the event before retrying user mapping.");
+        esp_err_t err = esp_event_handler_register(RMAKER_EVENT, RMAKER_EVENT_CONFIG_REPORTED,
+                                   &esp_rmaker_user_mapping_config_reported_event_handler, NULL);
+        if (err != ESP_OK) {
+            ESP_LOGE(TAG, "Failed to register for config reported event: %d", err);
+            goto user_mapping_error;
         }
     }
     esp_rmaker_user_mapping_prov_deinit();
@@ -509,8 +499,8 @@ esp_err_t esp_rmaker_user_node_mapping_deinit(void)
     user_mapping_retry_cleanup();
 
     /* Unregister any pending MQTT event handlers to prevent resource leak */
-    esp_event_handler_unregister(RMAKER_COMMON_EVENT, RMAKER_MQTT_EVENT_CONNECTED,
-            &esp_rmaker_user_mapping_mqtt_event_handler);
+    esp_event_handler_unregister(RMAKER_EVENT, RMAKER_EVENT_CONFIG_REPORTED,
+            &esp_rmaker_user_mapping_config_reported_event_handler);
 
     if (esp_rmaker_user_mapping_lock) {
         vSemaphoreDelete(esp_rmaker_user_mapping_lock);

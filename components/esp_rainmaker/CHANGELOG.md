@@ -1,5 +1,27 @@
 # Changelog
 
+## 1.11.0
+
+### Changes
+
+- De-couple work queue execution from MQTT connection. With this change, tasks added in work queue
+  using `esp_rmaker_work_queue_add_task()` can execute as soon as the network connects.
+  It won't be blocked for the MQTT connection and subsequent node config reporting.
+  This is a behavioural change, so ensure that your usage of `esp_rmaker_work_queue_add_task()` does
+  not get affected. The internal users of this API (OTA fetch, schedule execution and user-node mapping)
+  have already been fixed to account for this change.
+- Exposed `esp_rmaker_get_state()` as public API.
+- Added `RMAKER_EVENT_STARTED` event and raise the same once node params are reported. Since we have
+  restructured the rmaker_start flow, functions enqueued before MQTT connected may
+  get executed leading to issues. Please wait on this event if required.
+
+## 1.10.6
+
+### Changes
+
+- Store `mqtt_cred_host` from claim verify response if present. Used by camera devices that receive
+  a separate MQTT credentials host from the claiming service.
+
 ## 1.10.5
 
 ### New Features

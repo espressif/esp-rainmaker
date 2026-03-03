@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: 2020-2025 Espressif Systems (Shanghai) CO LTD
+ * SPDX-FileCopyrightText: 2020-2026 Espressif Systems (Shanghai) CO LTD
  *
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -46,8 +46,21 @@ typedef enum {
     /* User reset request successfully sent to ESP RainMaker Cloud */
     RMAKER_EVENT_USER_NODE_MAPPING_RESET,
     /** Local control stopped. */
-    RMAKER_EVENT_LOCAL_CTRL_STOPPED
+    RMAKER_EVENT_LOCAL_CTRL_STOPPED,
+    /** ESP RainMaker Started */
+    RMAKER_EVENT_STARTED,
+    /** ESP RainMaker Config Reported */
+    RMAKER_EVENT_CONFIG_REPORTED,
 } esp_rmaker_event_t;
+
+typedef enum {
+    ESP_RMAKER_STATE_DEINIT = 0,
+    ESP_RMAKER_STATE_INIT_DONE,
+    ESP_RMAKER_STATE_STARTING,
+    ESP_RMAKER_STATE_CONFIG_REPORTED,
+    ESP_RMAKER_STATE_STARTED,
+    ESP_RMAKER_STATE_STOP_REQUESTED,
+} esp_rmaker_state_t;
 
 /** ESP RainMaker Node information */
 typedef struct {
@@ -431,6 +444,13 @@ esp_err_t esp_rmaker_stop(void);
  * @return error in case of failure.
  */
 esp_err_t esp_rmaker_node_deinit(const esp_rmaker_node_t *node);
+
+/**
+ * @brief Get the current state of the ESP RainMaker agent
+ *
+ * @return esp_rmaker_state_t current state of the ESP RainMaker agent
+ */
+esp_rmaker_state_t esp_rmaker_get_state(void);
 
 /** Get a handle to the Node
  *
