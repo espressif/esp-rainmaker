@@ -20,7 +20,7 @@ dependencies:
   espressif/esp_schedule:
     version: "~1.3.2"
   espressif/network_provisioning:
-    version: ">=1.*"
+    version: ">=1.4.0"
     rules:
       - if: "idf_version >= 5.1"
       - if: "target not in [linux]"

@@ -11,6 +11,12 @@
 #include <json_parser.h>
 #include <json_generator.h>
 #include <esp_event.h>
+#include <freertos/FreeRTOS.h>
+#include <freertos/semphr.h>
+#if defined(CONFIG_BT_NIMBLE_ENABLED) || defined(CONFIG_BT_BLUEDROID_ENABLED)
+#include <protocomm_ble.h>
+#define PROV_LOCAL_CTRL_BLE 1
+#endif
 #include "esp_rmaker_prov_local_ctrl.pb-c.h"
 #include "esp_rmaker_internal.h"
 #include <esp_rmaker_core.h>
@@ -37,21 +43,42 @@ typedef struct {
     prov_local_ctrl_data_type_t data_type;
     bool has_timestamp;
     int64_t timestamp;
+    uint32_t session_id;
 } prov_local_ctrl_data_t;
 
 static prov_local_ctrl_data_t *s_local_ctrl_data = NULL;
+static bool s_session_only_mode = false;
 
 /* Reassembly buffer for fragmented set_params. Separate from the get buffer. */
 typedef struct {
     uint8_t *data;
     uint32_t total_len;
     uint32_t received;
+    uint32_t session_id;
 } prov_set_frag_t;
 
 static prov_set_frag_t *s_set_frag = NULL;
 
+/* Guards both transfer buffers between the protocomm handlers and the event handlers. */
+static SemaphoreHandle_t s_data_lock = NULL;
+
+static void prov_data_lock(void)
+{
+    if (s_data_lock) {
+        xSemaphoreTake(s_data_lock, portMAX_DELAY);
+    }
+}
+
+static void prov_data_unlock(void)
+{
+    if (s_data_lock) {
+        xSemaphoreGive(s_data_lock);
+    }
+}
+
 #ifdef CONFIG_ESP_RMAKER_PROV_LOCAL_CTRL_SET_FRAG
-static esp_err_t esp_rmaker_set_params_frag_body(RmakerProvLocalCtrl__RMakerLocalCtrlPayload *msg,
+static esp_err_t esp_rmaker_set_params_frag_body(uint32_t session_id,
+                                                 RmakerProvLocalCtrl__RMakerLocalCtrlPayload *msg,
                                                  uint8_t **outbuf, ssize_t *outlen);
 #endif
 
@@ -107,13 +134,18 @@ static const char *prov_local_ctrl_data_name(prov_local_ctrl_data_type_t data_ty
     return "config";
 }
 
+static void prov_set_frag_free_ptr(prov_set_frag_t *frag)
+{
+    if (frag) {
+        free(frag->data);
+        free(frag);
+    }
+}
+
 static void prov_set_frag_free(void)
 {
-    if (s_set_frag) {
-        free(s_set_frag->data);
-        free(s_set_frag);
-        s_set_frag = NULL;
-    }
+    prov_set_frag_free_ptr(s_set_frag);
+    s_set_frag = NULL;
 }
 
 static esp_err_t create_signed_response(char *data, int64_t timestamp,
@@ -332,7 +364,8 @@ static esp_err_t param_filter_parse(const uint8_t *json, size_t json_len,
 #endif /* CONFIG_ESP_RMAKER_PROV_LOCAL_CTRL_GET_FILTER */
 
 
-static esp_err_t prov_local_ctrl_data_init(prov_local_ctrl_data_type_t data_type, bool has_timestamp, int64_t timestamp,
+static esp_err_t prov_local_ctrl_data_init(uint32_t session_id,
+                                           prov_local_ctrl_data_type_t data_type, bool has_timestamp, int64_t timestamp,
                                            const uint8_t *params_filter, size_t params_filter_len)
 {
     /* Free any existing data */
@@ -348,6 +381,7 @@ static esp_err_t prov_local_ctrl_data_init(prov_local_ctrl_data_type_t data_type
     s_local_ctrl_data->data_type = data_type;
     s_local_ctrl_data->has_timestamp = has_timestamp;
     s_local_ctrl_data->timestamp = timestamp;
+    s_local_ctrl_data->session_id = session_id;
 
     char *raw_data = NULL;
     const char *data_name = prov_local_ctrl_data_name(data_type);
@@ -419,7 +453,7 @@ static esp_err_t prov_local_ctrl_data_init(prov_local_ctrl_data_type_t data_type
  * params_filter is used only for filtered params when requested_offset is 0.
  * reject skips generation and returns reject_status with an empty buffer.
  */
-static esp_err_t esp_rmaker_reply_get_data(uint8_t **outbuf, ssize_t *outlen,
+static esp_err_t esp_rmaker_reply_get_data(uint32_t session_id, uint8_t **outbuf, ssize_t *outlen,
                                            prov_local_ctrl_data_type_t data_type,
                                            bool reject,
                                            RmakerProvLocalCtrl__RMakerLocalCtrlStatus reject_status,
@@ -432,6 +466,7 @@ static esp_err_t esp_rmaker_reply_get_data(uint8_t **outbuf, ssize_t *outlen,
     }
 
     const char *data_name = prov_local_ctrl_data_name(data_type);
+    prov_data_lock();
 
     /* Initialize response */
     RmakerProvLocalCtrl__RMakerLocalCtrlPayload response = RMAKER_PROV_LOCAL_CTRL__RMAKER_LOCAL_CTRL_PAYLOAD__INIT;
@@ -464,7 +499,8 @@ static esp_err_t esp_rmaker_reply_get_data(uint8_t **outbuf, ssize_t *outlen,
 
     /* If offset is 0, initialize/reinitialize the data */
     if (is_first_fragment) {
-        esp_err_t err = prov_local_ctrl_data_init(data_type, has_timestamp, timestamp, params_filter, params_filter_len);
+        esp_err_t err = prov_local_ctrl_data_init(session_id, data_type, has_timestamp, timestamp,
+                                                  params_filter, params_filter_len);
         if (err != ESP_OK) {
             if (err == ESP_ERR_INVALID_ARG) {
                 resp_get_data.status = RMAKER_PROV_LOCAL_CTRL__RMAKER_LOCAL_CTRL_STATUS__InvalidParam;
@@ -523,6 +559,7 @@ send_response:
     uint8_t *resp_buf = MEM_ALLOC_EXTRAM(resp_len);
     if (!resp_buf) {
         ESP_LOGE(TAG, "Failed to allocate memory for response");
+        prov_data_unlock();
         return ESP_ERR_NO_MEM;
     }
 
@@ -536,6 +573,7 @@ send_response:
         ESP_LOGI(TAG, "Get %s completed, data freed", data_name);
     }
 
+    prov_data_unlock();
     return ESP_OK;
 }
 
@@ -543,7 +581,6 @@ static esp_err_t esp_rmaker_get_data_handler(uint32_t session_id, const uint8_t 
                                               uint8_t **outbuf, ssize_t *outlen, void *priv_data,
                                               prov_local_ctrl_data_type_t data_type)
 {
-    (void)session_id;
     (void)priv_data;
     if (!outbuf || !outlen) {
         ESP_LOGE(TAG, "Invalid params");
@@ -579,7 +616,7 @@ static esp_err_t esp_rmaker_get_data_handler(uint32_t session_id, const uint8_t 
         }
     }
 
-    esp_err_t err = esp_rmaker_reply_get_data(outbuf, outlen, data_type, reject,
+    esp_err_t err = esp_rmaker_reply_get_data(session_id, outbuf, outlen, data_type, reject,
                                               RMAKER_PROV_LOCAL_CTRL__RMAKER_LOCAL_CTRL_STATUS__InvalidParam,
                                               requested_offset, has_timestamp, timestamp, NULL, 0);
     if (msg) {
@@ -591,7 +628,6 @@ static esp_err_t esp_rmaker_get_data_handler(uint32_t session_id, const uint8_t 
 static esp_err_t esp_rmaker_get_params_handler(uint32_t session_id, const uint8_t *inbuf, ssize_t inlen,
                                                 uint8_t **outbuf, ssize_t *outlen, void *priv_data)
 {
-    (void)session_id;
     (void)priv_data;
     if (!outbuf || !outlen) {
         ESP_LOGE(TAG, "Invalid params");
@@ -637,7 +673,7 @@ static esp_err_t esp_rmaker_get_params_handler(uint32_t session_id, const uint8_
         }
     }
 
-    esp_err_t err = esp_rmaker_reply_get_data(outbuf, outlen, PROV_LOCAL_CTRL_TYPE_PARAMS, reject,
+    esp_err_t err = esp_rmaker_reply_get_data(session_id, outbuf, outlen, PROV_LOCAL_CTRL_TYPE_PARAMS, reject,
                                               RMAKER_PROV_LOCAL_CTRL__RMAKER_LOCAL_CTRL_STATUS__InvalidParam,
                                               requested_offset, has_timestamp, timestamp,
                                               params_filter, params_filter_len);
@@ -650,7 +686,6 @@ static esp_err_t esp_rmaker_get_params_handler(uint32_t session_id, const uint8_
 static esp_err_t esp_rmaker_set_params_handler(uint32_t session_id, const uint8_t *inbuf, ssize_t inlen,
                                                 uint8_t **outbuf, ssize_t *outlen, void *priv_data)
 {
-    (void)session_id;
     (void)priv_data;
     ESP_LOGI(TAG, "Set params handler invoked");
     if (!inbuf || inlen <= 0 || !outbuf || !outlen) {
@@ -677,7 +712,7 @@ static esp_err_t esp_rmaker_set_params_handler(uint32_t session_id, const uint8_
             ESP_LOGE(TAG, "Failed to unpack set_params fragment request");
             return ESP_ERR_INVALID_ARG;
         }
-        esp_err_t err = esp_rmaker_set_params_frag_body(msg, outbuf, outlen);
+        esp_err_t err = esp_rmaker_set_params_frag_body(session_id, msg, outbuf, outlen);
         rmaker_prov_local_ctrl__rmaker_local_ctrl_payload__free_unpacked(msg, NULL);
         return err;
     }
@@ -744,7 +779,8 @@ static esp_err_t prov_set_frag_send(RmakerProvLocalCtrl__RMakerLocalCtrlStatus s
     *outlen = (ssize_t)resp_len;
     return ESP_OK;
 }
-static esp_err_t esp_rmaker_set_params_frag_body(RmakerProvLocalCtrl__RMakerLocalCtrlPayload *msg,
+static esp_err_t esp_rmaker_set_params_frag_body(uint32_t session_id,
+                                                 RmakerProvLocalCtrl__RMakerLocalCtrlPayload *msg,
                                                  uint8_t **outbuf, ssize_t *outlen)
 {
     esp_err_t send_err = ESP_OK;
@@ -753,6 +789,7 @@ static esp_err_t esp_rmaker_set_params_frag_body(RmakerProvLocalCtrl__RMakerLoca
     uint32_t received_out = 0;
     const uint32_t set_frag_max_total = CONFIG_ESP_RMAKER_PROV_LOCAL_CTRL_SET_FRAG_MAX_LEN;
 
+    prov_data_lock();
     if (msg->payload_case != RMAKER_PROV_LOCAL_CTRL__RMAKER_LOCAL_CTRL_PAYLOAD__PAYLOAD_CMD_SET_DATA ||
             !msg->cmdsetdata || !msg->cmdsetdata->buf) {
         ESP_LOGE(TAG, "set_params fragment request is not CmdSetData");
@@ -789,6 +826,7 @@ static esp_err_t esp_rmaker_set_params_frag_body(RmakerProvLocalCtrl__RMakerLoca
         }
         s_set_frag->total_len = total;
         s_set_frag->received = 0;
+        s_set_frag->session_id = session_id;
     } else if (!s_set_frag || s_set_frag->total_len != total || offset != s_set_frag->received) {
         ESP_LOGE(TAG, "set_params fragment is not contiguous");
         prov_set_frag_free();
@@ -799,11 +837,15 @@ static esp_err_t esp_rmaker_set_params_frag_body(RmakerProvLocalCtrl__RMakerLoca
     s_set_frag->received = offset + (uint32_t)len;
 
     if (s_set_frag->received == s_set_frag->total_len) {
-        uint32_t total_len = s_set_frag->total_len;
-        s_set_frag->data[total_len] = '\0';
-        esp_err_t err = esp_rmaker_handle_set_params((char *)s_set_frag->data, total_len,
+        /* Detach the buffer, so the app callbacks run without the lock. */
+        prov_set_frag_t *done = s_set_frag;
+        s_set_frag = NULL;
+        prov_data_unlock();
+        uint32_t total_len = done->total_len;
+        done->data[total_len] = '\0';
+        esp_err_t err = esp_rmaker_handle_set_params((char *)done->data, total_len,
                                                      ESP_RMAKER_REQ_SRC_BLE_LOCAL);
-        prov_set_frag_free();
+        prov_set_frag_free_ptr(done);
         if (err != ESP_OK) {
             ESP_LOGE(TAG, "Failed to apply fragmented set params");
             status = RMAKER_PROV_LOCAL_CTRL__RMAKER_LOCAL_CTRL_STATUS__Fail;
@@ -813,14 +855,17 @@ static esp_err_t esp_rmaker_set_params_frag_body(RmakerProvLocalCtrl__RMakerLoca
             received_out = total_len;
             ESP_LOGI(TAG, "set_params fragment applied %lu bytes", (unsigned long)total_len);
         }
-    } else {
-        status = RMAKER_PROV_LOCAL_CTRL__RMAKER_LOCAL_CTRL_STATUS__Success;
-        received_out = s_set_frag->received;
-        ESP_LOGD(TAG, "set_params fragment stored %lu/%lu",
-                 (unsigned long)received_out, (unsigned long)s_set_frag->total_len);
+        goto respond_unlocked;
     }
 
+    status = RMAKER_PROV_LOCAL_CTRL__RMAKER_LOCAL_CTRL_STATUS__Success;
+    received_out = s_set_frag->received;
+    ESP_LOGD(TAG, "set_params fragment stored %lu/%lu",
+             (unsigned long)received_out, (unsigned long)s_set_frag->total_len);
+
 respond:
+    prov_data_unlock();
+respond_unlocked:
     send_err = prov_set_frag_send(status, received_out, outbuf, outlen);
     return send_err;
 }
@@ -862,6 +907,8 @@ static void esp_rmaker_prov_local_ctrl_event_handler(void *arg, esp_event_base_t
     if (event_base == NETWORK_PROV_EVENT) {
         switch (event_id) {
             case NETWORK_PROV_INIT: {
+                /* Cache the mode now — prov_ctx will be freed before NETWORK_PROV_DEINIT fires */
+                s_session_only_mode = (network_prov_mgr_get_mode() == NETWORK_PROV_MODE_SESSION_ONLY);
                 /* Note: Capabilities are set by challenge-response code since prov_local_ctrl
                  * depends on challenge-response being enabled */
                 if (esp_rmaker_get_params_endpoint_create() != ESP_OK) {
@@ -890,16 +937,24 @@ static void esp_rmaker_prov_local_ctrl_event_handler(void *arg, esp_event_base_t
                 break;
             }
             case NETWORK_PROV_END: {
-                /* Clean up data, keep handler registered for future provisioning */
-                prov_local_ctrl_data_free();
-                prov_set_frag_free();
-                ESP_LOGI(TAG, "Local ctrl data cleaned up");
+                /* In SESSION_ONLY mode, BLE stays alive after provisioning ends —
+                 * preserve any in-progress transfer so local control keeps working. */
+                if (!s_session_only_mode) {
+                    prov_data_lock();
+                    prov_local_ctrl_data_free();
+                    prov_set_frag_free();
+                    prov_data_unlock();
+                    ESP_LOGI(TAG, "Local ctrl data cleaned up");
+                }
                 break;
             }
             case NETWORK_PROV_DEINIT: {
-                /* Full cleanup since provisioning manager is being torn down */
-                esp_rmaker_prov_local_ctrl_deinit();
-                ESP_LOGI(TAG, "Prov local ctrl deinitialized");
+                /* In SESSION_ONLY mode, the app controls the BLE/local-ctrl lifecycle;
+                 * do not tear down the handler on manager deinit. */
+                if (!s_session_only_mode) {
+                    esp_rmaker_prov_local_ctrl_deinit();
+                    ESP_LOGI(TAG, "Prov local ctrl deinitialized");
+                }
                 break;
             }
             default:
@@ -908,8 +963,51 @@ static void esp_rmaker_prov_local_ctrl_event_handler(void *arg, esp_event_base_t
     }
 }
 
+#ifdef PROV_LOCAL_CTRL_BLE
+/* A new connection closes the sessions of all other clients. A disconnect closes only its own. */
+static bool prov_ble_session_closed(uint32_t owner, uint32_t conn, bool connected)
+{
+    return connected ? (owner != conn) : (owner == conn);
+}
+
+static void esp_rmaker_prov_local_ctrl_ble_event_handler(void *arg, esp_event_base_t event_base,
+                                                         int32_t event_id, void *event_data)
+{
+    if (!event_data || (event_id != PROTOCOMM_TRANSPORT_BLE_CONNECTED &&
+            event_id != PROTOCOMM_TRANSPORT_BLE_DISCONNECTED)) {
+        return;
+    }
+    uint32_t conn = ((protocomm_ble_event_t *)event_data)->conn_handle;
+    bool connected = (event_id == PROTOCOMM_TRANSPORT_BLE_CONNECTED);
+
+    prov_data_lock();
+    if (s_local_ctrl_data && prov_ble_session_closed(s_local_ctrl_data->session_id, conn, connected)) {
+        prov_local_ctrl_data_free();
+        ESP_LOGI(TAG, "Freed get data of a closed BLE session");
+    }
+    if (s_set_frag && prov_ble_session_closed(s_set_frag->session_id, conn, connected)) {
+        prov_set_frag_free();
+        ESP_LOGI(TAG, "Freed set_params fragments of a closed BLE session");
+    }
+    prov_data_unlock();
+}
+#endif
+
 esp_err_t esp_rmaker_prov_local_ctrl_init(void)
 {
+    if (!s_data_lock) {
+        s_data_lock = xSemaphoreCreateMutex();
+        if (!s_data_lock) {
+            return ESP_ERR_NO_MEM;
+        }
+    }
+#ifdef PROV_LOCAL_CTRL_BLE
+    esp_err_t err = esp_event_handler_register(PROTOCOMM_TRANSPORT_BLE_EVENT, ESP_EVENT_ANY_ID,
+                                               &esp_rmaker_prov_local_ctrl_ble_event_handler, NULL);
+    if (err != ESP_OK) {
+        return err;
+    }
+#endif
     /* Register for all Wi-Fi Provisioning events */
     return esp_event_handler_register(NETWORK_PROV_EVENT, ESP_EVENT_ANY_ID,
                                       &esp_rmaker_prov_local_ctrl_event_handler, NULL);
@@ -920,10 +1018,18 @@ esp_err_t esp_rmaker_prov_local_ctrl_deinit(void)
     /* Unregister the event handler */
     esp_event_handler_unregister(NETWORK_PROV_EVENT, ESP_EVENT_ANY_ID,
                                  &esp_rmaker_prov_local_ctrl_event_handler);
+#ifdef PROV_LOCAL_CTRL_BLE
+    esp_event_handler_unregister(PROTOCOMM_TRANSPORT_BLE_EVENT, ESP_EVENT_ANY_ID,
+                                 &esp_rmaker_prov_local_ctrl_ble_event_handler);
+#endif
 
     /* Clean up any remaining data */
+    prov_data_lock();
     prov_local_ctrl_data_free();
     prov_set_frag_free();
+    prov_data_unlock();
+
+    s_session_only_mode = false;
 
     return ESP_OK;
 }

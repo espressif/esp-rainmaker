@@ -273,15 +273,15 @@ menu "ESP RainMaker Config"
             used while WiFi provisioning is active (they use the same protocomm HTTP).
 
     config ESP_RMAKER_ENABLE_PROV_LOCAL_CTRL
-        bool "Enable local control during provisioning (get_params/set_params/get_config)"
+        bool "Enable local control while provisioning is active (get_params/set_params/get_config)"
         depends on ESP_RMAKER_ENABLE_CHALLENGE_RESPONSE
         default n
         help
-            Enable get_params, set_params, and get_config endpoints during provisioning. These
-            endpoints allow direct parameter and configuration access during the provisioning phase,
-            bypassing esp_local_ctrl. This is particularly useful for BLE-only devices where
-            challenge-response is required for user-node mapping, as there is no other way to
-            perform user-node mapping if the device is not provisioned.
+            Enable get_params, set_params, and get_config endpoints while the provisioning session
+            is active. These endpoints allow direct parameter and configuration access while the
+            provisioning session is active, bypassing esp_local_ctrl. This is particularly useful
+            for BLE-only devices where challenge-response is required for user-node mapping, as
+            there is no other way to perform user-node mapping if the device is not provisioned.
 
             Note: This feature requires challenge-response to be enabled.
 
@@ -310,8 +310,9 @@ menu "ESP RainMaker Config"
             range 256 65536
             help
                 Maximum TotalLen, in bytes, for one fragmented set_params transfer.
-                At offset 0 the device allocates this many bytes of heap and holds
-                them until the transfer finishes or provisioning ends.
+                At offset 0 the device allocates this many bytes of heap. It frees them
+                when the transfer finishes, when the BLE client disconnects or a new
+                client connects, or when provisioning ends in a mode that stops the session.
 
     endif
 
