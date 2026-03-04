@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.11.1
+
+### Changes
+
+- Add `ESP_RMAKER_REQ_SRC_BLE_LOCAL` in `esp_rmaker_req_src_t`, so that application code can differentiate
+  between the Wi-Fi based local control (`ESP_RMAKER_REQ_SRC_LOCAL`) and BLE Local Control.
+
 ## 1.11.0
 
 ### Changes
