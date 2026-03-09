@@ -180,6 +180,8 @@ typedef enum {
     ESP_RMAKER_REQ_SRC_CMD_RESP,
     /** Request initiated from firmware/console commands */
     ESP_RMAKER_REQ_SRC_FIRMWARE,
+    /** Request received via BLE Local Control */
+    ESP_RMAKER_REQ_SRC_BLE_LOCAL,
     /** This will always be the last value. Any value equal to or
      * greater than this should be considered invalid.
      */

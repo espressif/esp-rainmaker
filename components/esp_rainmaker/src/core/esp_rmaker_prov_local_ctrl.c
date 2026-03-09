@@ -420,7 +420,7 @@ static esp_err_t esp_rmaker_set_params_handler(uint32_t session_id, const uint8_
     ESP_LOGD(TAG, "Received params data of length: %d", inlen);
 
     /* Handle set params */
-    esp_err_t err = esp_rmaker_handle_set_params((char *)inbuf, inlen, ESP_RMAKER_REQ_SRC_LOCAL);
+    esp_err_t err = esp_rmaker_handle_set_params((char *)inbuf, inlen, ESP_RMAKER_REQ_SRC_BLE_LOCAL);
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "Failed to handle set params: %s", esp_err_to_name(err));
         return send_error_response("failed to set params", outbuf, outlen);
