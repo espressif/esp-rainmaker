@@ -6,6 +6,7 @@
    CONDITIONS OF ANY KIND, either express or implied.
 */
 #include <sdkconfig.h>
+#include <stdlib.h>
 #include <string.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
@@ -13,14 +14,13 @@
 #include <esp_event.h>
 #include <esp_log.h>
 #include <esp_idf_version.h>
-#include <esp_rmaker_utils.h>
 #include <app_network.h>
 
-#ifdef CONFIG_ESP_RMAKER_NETWORK_OVER_WIFI
+#ifdef CONFIG_NETWORK_PROV_NETWORK_TYPE_WIFI
 #include <app_wifi_internal.h>
 #include <esp_netif_types.h>
-#endif /* CONFIG_ESP_RMAKER_NETWORK_OVER_WIFI */
-#ifdef CONFIG_ESP_RMAKER_NETWORK_OVER_THREAD
+#endif /* CONFIG_NETWORK_PROV_NETWORK_TYPE_WIFI */
+#ifdef CONFIG_NETWORK_PROV_NETWORK_TYPE_THREAD
 #include <esp_openthread_types.h>
 #include <app_thread_internal.h>
 #endif
@@ -132,7 +132,7 @@ esp_err_t app_network_set_custom_mfg_data(uint16_t device_type, uint8_t device_s
 {
     int8_t mfg_data[] = {MFG_DATA_HEADER, MGF_DATA_APP_ID, MFG_DATA_VERSION, MFG_DATA_CUSTOMER_ID};
     size_t mfg_data_len = sizeof(mfg_data) + 4; // 4 bytes of device type, subtype, and extra-code
-    custom_mfg_data = (uint8_t *)MEM_ALLOC_EXTRAM(mfg_data_len);
+    custom_mfg_data = (uint8_t *)malloc(mfg_data_len);
     if (custom_mfg_data == NULL) {
         ESP_LOGE(TAG, "Failed to allocate memory to custom mfg data");
         return ESP_ERR_NO_MEM;
@@ -346,7 +346,7 @@ static void network_event_handler(void* arg, esp_event_base_t event_base, int32_
         }
     }
 #endif /* APP_PROV_STOP_ON_CREDS_MISMATCH */
-#ifdef CONFIG_ESP_RMAKER_NETWORK_OVER_WIFI
+#ifdef CONFIG_NETWORK_PROV_NETWORK_TYPE_WIFI
     if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP) {
         ip_event_got_ip_t* event = (ip_event_got_ip_t*) event_data;
         ESP_LOGI(TAG, "Connected with IP Address:" IPSTR, IP2STR(&event->ip_info.ip));
@@ -355,15 +355,15 @@ static void network_event_handler(void* arg, esp_event_base_t event_base, int32_
         xEventGroupSetBits(network_event_group, NETWORK_CONNECTED_EVENT);
 #endif /* CONFIG_APP_NETWORK_ASYNCHRONOUS_CONNECTION */
     }
-#endif /* CONFIG_ESP_RMAKER_NETWORK_OVER_WIFI */
-#ifdef CONFIG_ESP_RMAKER_NETWORK_OVER_THREAD
+#endif /* CONFIG_NETWORK_PROV_NETWORK_TYPE_WIFI */
+#ifdef CONFIG_NETWORK_PROV_NETWORK_TYPE_THREAD
     if (event_base == OPENTHREAD_EVENT && event_id == OPENTHREAD_EVENT_ATTACHED) {
 #if !CONFIG_APP_NETWORK_ASYNCHRONOUS_CONNECTION
         /* Signal main application to continue execution */
         xEventGroupSetBits(network_event_group, NETWORK_CONNECTED_EVENT);
 #endif /* CONFIG_APP_NETWORK_ASYNCHRONOUS_CONNECTION */
     }
-#endif /* CONFIG_ESP_RMAKER_NETWORK_OVER_THREAD */
+#endif /* CONFIG_NETWORK_PROV_NETWORK_TYPE_THREAD */
     if (event_base == NETWORK_PROV_EVENT && event_id == NETWORK_PROV_END) {
         if (prov_stop_timer) {
             esp_timer_stop(prov_stop_timer);
@@ -393,10 +393,10 @@ void app_network_init()
             return;
         }
     }
-#ifdef CONFIG_ESP_RMAKER_NETWORK_OVER_WIFI
+#ifdef CONFIG_NETWORK_PROV_NETWORK_TYPE_WIFI
     ESP_ERROR_CHECK(app_wifi_internal_init());
 #endif
-#ifdef CONFIG_ESP_RMAKER_NETWORK_OVER_THREAD
+#ifdef CONFIG_NETWORK_PROV_NETWORK_TYPE_THREAD
     ESP_ERROR_CHECK(thread_init());
 #endif
 #if !CONFIG_APP_NETWORK_ASYNCHRONOUS_CONNECTION
@@ -405,10 +405,10 @@ void app_network_init()
 #ifdef APP_PROV_STOP_ON_CREDS_MISMATCH
     ESP_ERROR_CHECK(esp_event_handler_register(PROTOCOMM_SECURITY_SESSION_EVENT, ESP_EVENT_ANY_ID, &network_event_handler, NULL));
 #endif
-#ifdef CONFIG_ESP_RMAKER_NETWORK_OVER_WIFI
+#ifdef CONFIG_NETWORK_PROV_NETWORK_TYPE_WIFI
     ESP_ERROR_CHECK(esp_event_handler_register(IP_EVENT, IP_EVENT_STA_GOT_IP, &network_event_handler, NULL));
 #endif
-#ifdef CONFIG_ESP_RMAKER_NETWORK_OVER_THREAD
+#ifdef CONFIG_NETWORK_PROV_NETWORK_TYPE_THREAD
     ESP_ERROR_CHECK(esp_event_handler_register(OPENTHREAD_EVENT, ESP_EVENT_ANY_ID, &network_event_handler, NULL));
 #endif
     ESP_ERROR_CHECK(esp_event_handler_register(NETWORK_PROV_EVENT, NETWORK_PROV_END, &network_event_handler, NULL));
@@ -471,10 +471,10 @@ esp_err_t app_network_start(app_network_pop_type_t pop_type)
     const char *service_key = NULL;
     esp_err_t err = ESP_OK;
     bool provisioned = false;
-#ifdef CONFIG_ESP_RMAKER_NETWORK_OVER_WIFI
+#ifdef CONFIG_NETWORK_PROV_NETWORK_TYPE_WIFI
     err = app_wifi_internal_start(pop, service_name, service_key, custom_mfg_data, custom_mfg_data_len, &provisioned);
 #endif
-#ifdef CONFIG_ESP_RMAKER_NETWORK_OVER_THREAD
+#ifdef CONFIG_NETWORK_PROV_NETWORK_TYPE_THREAD
     err = thread_start(pop, service_name, service_key, custom_mfg_data, custom_mfg_data_len, &provisioned);
 #endif
     if (err != ESP_OK) {

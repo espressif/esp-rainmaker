@@ -1,4 +1,4 @@
-set(priv_req qrcode nvs_flash esp_event rmaker_common vfs network_provisioning openthread)
+set(priv_req qrcode nvs_flash esp_event vfs network_provisioning openthread)
 
 idf_component_register(SRCS "app_wifi_internal.c" "app_network.c" "app_thread_internal.c"
                     INCLUDE_DIRS "."
