@@ -598,8 +598,11 @@ static void esp_rmaker_task(void *data)
             esp_event_handler_unregister(OPENTHREAD_EVENT, OPENTHREAD_EVENT_SET_DNS_SERVER, &esp_rmaker_event_handler);
             esp_event_handler_unregister(OPENTHREAD_EVENT, OPENTHREAD_EVENT_ATTACHED, &esp_rmaker_event_handler);
 #elif defined(CONFIG_ETH_ENABLED)
-        /* Ethernet doesn't support assisted claiming via BLE */
-        ESP_LOGW(TAG, "Assisted claiming not supported for Ethernet. Use on-network challenge-response instead.");
+        {
+            /* Ethernet doesn't support assisted claiming via BLE */
+            ESP_LOGW(TAG, "Assisted claiming not supported for Ethernet. Use on-network challenge-response instead.");
+#else
+        {
 #endif
             err = ESP_FAIL;
             goto rmaker_end;
