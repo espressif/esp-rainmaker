@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.12.0
+
+### Changes
+
+- Move `CONFIG_ESP_RMAKER_NETWORK_OVER_WIFI` and `CONFIG_ESP_RMAKER_NETWORK_OVER_THREAD` from `rmaker_common`
+  to `esp-rainmaker` component.
+
 ## 1.11.1
 
 ### Changes

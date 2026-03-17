@@ -20,8 +20,12 @@
 #include <esp_rmaker_schedule.h>
 #include <esp_rmaker_console.h>
 #include <esp_rmaker_scenes.h>
+#ifdef CONFIG_EXAMPLE_CONNECTIVITY_SERVICE
 #include <esp_rmaker_connectivity.h>
+#endif
+#ifdef CONFIG_EXAMPLE_GROUPS_SERVICE
 #include <esp_rmaker_groups.h>
+#endif
 
 #include <app_network.h>
 #include <app_insights.h>
@@ -194,12 +198,14 @@ void app_main()
     /* Enable Scenes */
     esp_rmaker_scenes_enable();
 
+#ifdef CONFIG_EXAMPLE_CONNECTIVITY_SERVICE
     /* Enable Connectivity service.
      * This creates a "Connectivity" service with a "Connected" parameter.
      * When MQTT connects, it reports Connected=true.
      * LWT is set to publish Connected=false on unexpected disconnect.
      */
     esp_rmaker_connectivity_enable();
+#endif
 
     /* Enable system service */
     esp_rmaker_system_serv_config_t system_serv_config = {
@@ -210,6 +216,7 @@ void app_main()
     };
     esp_rmaker_system_service_enable(&system_serv_config);
 
+#ifdef CONFIG_EXAMPLE_GROUPS_SERVICE
     /* Enable Groups service.
      * This allows setting group_id from the cloud, which will also update
      * the Connectivity service LWT topic to include the group_id.
@@ -220,6 +227,7 @@ void app_main()
         vTaskDelay(5000/portTICK_PERIOD_MS);
         abort();
     }
+#endif
 
     /* Enable Insights. Requires CONFIG_ESP_INSIGHTS_ENABLED=y */
     app_insights_enable();

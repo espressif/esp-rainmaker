@@ -13,10 +13,9 @@
 #include <freertos/FreeRTOS.h>
 #include <freertos/event_groups.h>
 #include <freertos/task.h>
-#include <esp_rmaker_utils.h>
 #include <app_network.h>
 
-#ifdef CONFIG_ESP_RMAKER_NETWORK_OVER_THREAD
+#ifdef CONFIG_NETWORK_PROV_NETWORK_TYPE_THREAD
 #include <app_thread_internal.h>
 #include <esp_vfs_eventfd.h>
 #include <esp_openthread.h>
@@ -112,11 +111,11 @@ static void ot_task_worker(void* aContext)
     esp_vfs_eventfd_unregister();
     vTaskDelete(NULL);
 }
-#endif /* CONFIG_ESP_RMAKER_NETWORK_OVER_THREAD */
+#endif /* CONFIG_NETWORK_PROV_NETWORK_TYPE_THREAD */
 
 esp_err_t thread_init()
 {
-#ifdef CONFIG_ESP_RMAKER_NETWORK_OVER_THREAD
+#ifdef CONFIG_NETWORK_PROV_NETWORK_TYPE_THREAD
     /* Initialize TCP/IP */
     esp_netif_init();
 
@@ -131,13 +130,13 @@ esp_err_t thread_init()
     return ESP_OK;
 #else
     return ESP_ERR_NOT_SUPPORTED;
-#endif /* CONFIG_ESP_RMAKER_NETWORK_OVER_THREAD */
+#endif /* CONFIG_NETWORK_PROV_NETWORK_TYPE_THREAD */
 }
 
 esp_err_t thread_start(const char *pop, const char *service_name, const char *service_key, uint8_t *mfg_data,
                        size_t mfg_data_len, bool *provisioned)
 {
-#ifdef CONFIG_ESP_RMAKER_NETWORK_OVER_THREAD
+#ifdef CONFIG_NETWORK_PROV_NETWORK_TYPE_THREAD
     /* Configuration for the provisioning manager */
     network_prov_mgr_config_t config = {
         .scheme = network_prov_scheme_ble,
@@ -216,5 +215,5 @@ esp_err_t thread_start(const char *pop, const char *service_name, const char *se
     return ESP_OK;
 #else
     return ESP_ERR_NOT_SUPPORTED;
-#endif /* CONFIG_ESP_RMAKER_NETWORK_OVER_THREAD */
+#endif /* CONFIG_NETWORK_PROV_NETWORK_TYPE_THREAD */
 }

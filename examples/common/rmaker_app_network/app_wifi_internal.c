@@ -13,7 +13,6 @@
 #include <esp_event.h>
 #include <esp_log.h>
 #include <esp_idf_version.h>
-#include <esp_rmaker_utils.h>
 #include <app_network.h>
 #include <app_wifi_internal.h>
 #include <esp_netif.h>
@@ -29,7 +28,7 @@
 #include <app_network.h>
 #define APP_PROV_STOP_ON_CREDS_MISMATCH
 
-#ifdef CONFIG_ESP_RMAKER_NETWORK_OVER_WIFI
+#ifdef CONFIG_NETWORK_PROV_NETWORK_TYPE_WIFI
 static const char* TAG = "app_wifi";
 
 /* WiFi event handler for post-provisioning reconnection management.
@@ -101,11 +100,11 @@ static void wifi_init_sta()
     ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
     ESP_ERROR_CHECK(esp_wifi_start());
 }
-#endif // CONFIG_ESP_RMAKER_NETWORK_OVER_WIFI
+#endif // CONFIG_NETWORK_PROV_NETWORK_TYPE_WIFI
 
 esp_err_t app_wifi_internal_init(void)
 {
-#ifdef CONFIG_ESP_RMAKER_NETWORK_OVER_WIFI
+#ifdef CONFIG_NETWORK_PROV_NETWORK_TYPE_WIFI
     /* Initialize TCP/IP */
     esp_netif_init();
     /* Register event handler for Provisioning related events */
@@ -116,16 +115,16 @@ esp_err_t app_wifi_internal_init(void)
     wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
     ESP_ERROR_CHECK(esp_wifi_init(&cfg));
     return ESP_OK;
-#else /* CONFIG_ESP_RMAKER_NETWORK_OVER_THREAD */
+#else /* CONFIG_NETWORK_PROV_NETWORK_TYPE_THREAD */
     return ESP_ERR_NOT_SUPPORTED;
-#endif /* CONFIG_ESP_RMAKER_NETWORK_OVER_WIFI */
+#endif /* CONFIG_NETWORK_PROV_NETWORK_TYPE_WIFI */
 }
 
 esp_err_t app_wifi_internal_start(const char *pop, const char *service_name,
                                   const char *service_key, uint8_t *mfg_data,
                                   size_t mfg_data_len, bool *provisioned)
 {
-#ifdef CONFIG_ESP_RMAKER_NETWORK_OVER_WIFI
+#ifdef CONFIG_NETWORK_PROV_NETWORK_TYPE_WIFI
     /* Configuration for the provisioning manager */
     network_prov_mgr_config_t config = {
 #ifdef CONFIG_APP_NETWORK_RESET_PROV_ON_FAILURE
@@ -222,7 +221,7 @@ esp_err_t app_wifi_internal_start(const char *pop, const char *service_name,
         wifi_init_sta();
     }
     return ESP_OK;
-#else /* CONFIG_ESP_RMAKER_NETWORK_OVER_THREAD */
+#else /* CONFIG_NETWORK_PROV_NETWORK_TYPE_THREAD */
     return ESP_ERR_NOT_SUPPORTED;
-#endif /* CONFIG_ESP_RMAKER_NETWORK_OVER_WIFI */
+#endif /* CONFIG_NETWORK_PROV_NETWORK_TYPE_WIFI */
 }

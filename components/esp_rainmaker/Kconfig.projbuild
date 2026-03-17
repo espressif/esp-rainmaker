@@ -681,4 +681,19 @@ menu "ESP RainMaker Config"
 
         endmenu
 
+    choice ESP_RMAKER_NETWORK_PROTOCOL_TYPE
+        prompt "ESP RainMaker Network Type"
+        default ESP_RMAKER_NETWORK_OVER_WIFI
+        help
+            Network protocol type over which the ESP RainMaker will run.
+
+        config ESP_RMAKER_NETWORK_OVER_WIFI
+            depends on ESP_WIFI_ENABLED || ESP32_WIFI_ENABLED || ESP_WIFI_REMOTE_ENABLED
+            bool "ESP RainMaker over Wi-Fi"
+
+        config ESP_RMAKER_NETWORK_OVER_THREAD
+            depends on OPENTHREAD_ENABLED
+            bool "ESP RainMaker over Thread"
+    endchoice
+
 endmenu

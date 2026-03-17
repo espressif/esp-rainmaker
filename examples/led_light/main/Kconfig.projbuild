@@ -95,6 +95,22 @@ menu "Example Configuration"
             URL pointing to the README documentation for this example.
             This will be included in the node config if set to a non-empty value.
 
+    config EXAMPLE_CONNECTIVITY_SERVICE
+        bool "Enable Connectivity Service"
+        default n
+        help
+            Enable the RainMaker Connectivity service. This creates a "Connectivity" service
+            with a "Connected" parameter. When MQTT connects, it reports Connected=true.
+            LWT is set to publish Connected=false on unexpected disconnect.
+
+    config EXAMPLE_GROUPS_SERVICE
+        bool "Enable Groups Service"
+        default n
+        help
+            Enable the RainMaker Groups service. This allows setting group_id from the cloud.
+            If the Connectivity service is also enabled, the LWT topic will be updated
+            to include the group_id.
+
     config EXAMPLE_DIRECT_MQTT
         bool "Enable Direct MQTT Event Reporting"
         default n

@@ -83,7 +83,7 @@ menu "ESP RainMaker App Wi-Fi Provisioning"
 
     config APP_WIFI_PROV_COMPAT
         bool "Stay compatible with App Wi-Fi component"
-        depends on ESP_RMAKER_NETWORK_OVER_WIFI
+        depends on NETWORK_PROV_NETWORK_TYPE_WIFI
         default y
         help
             Stay compatible with Previous App Wi-Fi component
