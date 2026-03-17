@@ -58,7 +58,6 @@ before_script:
   - tar -zcvf esp-rainmaker-bins-${CI_JOB_ID}.zip esp-rainmaker-bins-${CI_JOB_ID}/
 
 .build_all_examples: &build_all_examples
-  - pip install --upgrade idf-component-manager
   - for EXAMPLE in $EXAMPLES; do
   - cd $CI_PROJECT_DIR/examples/$EXAMPLE
   - echo Building $EXAMPLE
@@ -109,7 +108,6 @@ before_script:
   - tar -zcvf esp-rainmaker-bins-${CI_JOB_ID}.zip esp-rainmaker-bins-${CI_JOB_ID}/
 
 .build_homekit_examples: &build_homekit_examples
-  - pip install --upgrade idf-component-manager
   # Clone esp-homekit-sdk
   - cd $CI_PROJECT_DIR/examples/homekit_switch
   - cd components
