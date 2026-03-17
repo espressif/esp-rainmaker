@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.12.1
+
+### Changes
+
+- Allow `PROP_FLAG_SIMPLE_TIME_SERIES` for object and array type parameters.
+
 ## 1.12.0
 
 ### Changes
