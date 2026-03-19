@@ -622,9 +622,9 @@ esp_rmaker_param_t *esp_rmaker_param_create(const char *param_name, const char *
         ESP_LOGE(TAG, "A paramater cannot have both, PROP_FLAG_TIME_SERIES and PROP_FLAG_SIMPLE_TIME_SERIES.");
         return NULL;
     }
-    if ((properties & PROP_FLAG_TIME_SERIES) || (properties & PROP_FLAG_SIMPLE_TIME_SERIES)) {
+    if (properties & PROP_FLAG_TIME_SERIES) {
         if ((val.type == RMAKER_VAL_TYPE_ARRAY) || (val.type == RMAKER_VAL_TYPE_OBJECT)) {
-            ESP_LOGE(TAG, "PROP_FLAG_TIME_SERIES/PROP_FLAG_SIMPLE_TIME_SERIES not allowed for array/object param types.");
+            ESP_LOGE(TAG, "PROP_FLAG_TIME_SERIES not allowed for array/object param types.");
             return NULL;
         }
     }
