@@ -156,6 +156,13 @@ esp_rmaker_param_t *esp_rmaker_timezone_posix_param_create(const char *param_nam
     return param;
 }
 
+esp_rmaker_param_t *esp_rmaker_timestamp_param_create(const char *param_name, int val)
+{
+    esp_rmaker_param_t *param = esp_rmaker_param_create(param_name, ESP_RMAKER_PARAM_TIMESTAMP,
+            esp_rmaker_int(val), PROP_FLAG_READ | PROP_FLAG_WRITE);
+    return param;
+}
+
 esp_rmaker_param_t *esp_rmaker_schedules_param_create(const char *param_name, int max_schedules)
 {
     esp_rmaker_param_t *param = esp_rmaker_param_create(param_name, ESP_RMAKER_PARAM_SCHEDULES,

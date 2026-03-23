@@ -44,6 +44,7 @@ extern "C"
 #define ESP_RMAKER_DEF_OTA_URL_NAME         "URL"
 #define ESP_RMAKER_DEF_TIMEZONE_NAME        "TZ"
 #define ESP_RMAKER_DEF_TIMEZONE_POSIX_NAME  "TZ-POSIX"
+#define ESP_RMAKER_DEF_TIMESTAMP_NAME       "Timestamp"
 #define ESP_RMAKER_DEF_SCHEDULE_NAME        "Schedules"
 #define ESP_RMAKER_DEF_SCENES_NAME          "Scenes"
 #define ESP_RMAKER_DEF_REBOOT_NAME          "Reboot"
@@ -257,6 +258,20 @@ esp_rmaker_param_t *esp_rmaker_timezone_param_create(const char *param_name, con
  * @return NULL in case of failures.
  */
 esp_rmaker_param_t *esp_rmaker_timezone_posix_param_create(const char *param_name, const char *val);
+
+/**
+ * Create standard Timestamp param
+ *
+ * This will create the standard timestamp parameter.
+ * The app can write an epoch time (seconds since 1970-01-01) to this parameter
+ * to set the device's local RTC. This is useful for devices without internet access.
+ *
+ * @param[in] param_name Name of the parameter
+ *
+ * @return Parameter handle on success.
+ * @return NULL in case of failures.
+ */
+esp_rmaker_param_t *esp_rmaker_timestamp_param_create(const char *param_name, int val);
 
 /**
  * Create standard Schedules param
