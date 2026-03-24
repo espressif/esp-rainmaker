@@ -577,6 +577,19 @@ menu "ESP RainMaker Config"
 
     endmenu
 
+    menu "ESP RainMaker Time Service"
+
+        config ESP_RMAKER_TIME_CURRENT_TIME_PARAM
+            bool "Add Current Time param to Time Service"
+            default n
+            help
+                Enable this to add a 'Current-Time' parameter to the Time Service.
+                The app can write an epoch timestamp (seconds since 1970-01-01) to this
+                parameter to set the device's local RTC. This is useful for devices
+                that do not have internet access and cannot sync time via SNTP.
+
+    endmenu
+
     menu "ESP RainMaker Scheduling"
 
         config ESP_RMAKER_SCHEDULING_MAX_SCHEDULES

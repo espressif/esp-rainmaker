@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.12.2
+
+### Changes
+
+- Add optional `Timestamp` parameter to the Time Service. When enabled via
+  `CONFIG_ESP_RMAKER_TIME_CURRENT_TIME_PARAM`, the app can write an epoch timestamp
+  to set the device's local RTC. This is useful for devices without internet access.
+
 ## 1.12.1
 
 ### Changes

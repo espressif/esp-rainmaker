@@ -15,8 +15,13 @@
 #include <esp_log.h>
 #include <nvs.h>
 #include <esp_rmaker_standard_types.h>
+#include <esp_rmaker_standard_params.h>
 #include <esp_rmaker_standard_services.h>
 #include <esp_rmaker_utils.h>
+#ifdef CONFIG_ESP_RMAKER_TIME_CURRENT_TIME_PARAM
+#include <time.h>
+#include <sys/time.h>
+#endif
 
 static const char *TAG = "esp_rmaker_time_service";
 
@@ -44,6 +49,28 @@ static esp_err_t esp_rmaker_time_service_cb(const esp_rmaker_device_t *device, c
                 val.val.s, esp_rmaker_device_get_name(device), esp_rmaker_param_get_name(param));
         err = esp_rmaker_time_set_timezone_posix(val.val.s);
     }
+#ifdef CONFIG_ESP_RMAKER_TIME_CURRENT_TIME_PARAM
+    else if (strcmp(esp_rmaker_param_get_type(param), ESP_RMAKER_PARAM_TIMESTAMP) == 0) {
+        ESP_LOGI(TAG, "Received value = %d for %s - %s",
+                val.val.i, esp_rmaker_device_get_name(device), esp_rmaker_param_get_name(param));
+        struct timeval tv = {
+            .tv_sec = val.val.i,
+            .tv_usec = 0,
+        };
+        if (settimeofday(&tv, NULL) == 0) {
+            char local_time[64];
+            if (esp_rmaker_get_local_time_str(local_time, sizeof(local_time)) == ESP_OK) {
+                ESP_LOGI(TAG, "Local time set to: %s", local_time);
+            }
+            time_t now;
+            time(&now);
+            esp_rmaker_param_update_and_report(param, esp_rmaker_int((int)now));
+            return ESP_OK;
+        } else {
+            ESP_LOGE(TAG, "Failed to set local time");
+        }
+    }
+#endif
     if (err == ESP_OK) {
         esp_rmaker_param_update_and_report(param, val);
     }
@@ -58,6 +85,9 @@ static esp_err_t esp_rmaker_time_add_service(const char *tz, const char *tz_posi
         return ESP_FAIL;
     }
     esp_rmaker_device_add_cb(service, esp_rmaker_time_service_cb, NULL);
+#ifdef CONFIG_ESP_RMAKER_TIME_CURRENT_TIME_PARAM
+    esp_rmaker_device_add_param(service, esp_rmaker_timestamp_param_create(ESP_RMAKER_DEF_TIMESTAMP_NAME, 0));
+#endif
     esp_err_t err = esp_rmaker_node_add_device(esp_rmaker_get_node(), service);
     if (err == ESP_OK) {
         ESP_LOGI(TAG, "Time service enabled");
