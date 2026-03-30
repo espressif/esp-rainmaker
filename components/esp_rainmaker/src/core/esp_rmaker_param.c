@@ -298,7 +298,7 @@ static esp_err_t esp_rmaker_report_param_internal(uint8_t flags)
     return err;
 }
 
-static esp_err_t esp_rmaker_report_updated_params(void)
+esp_err_t esp_rmaker_report_updated_params(void)
 {
     return esp_rmaker_report_param_internal(RMAKER_PARAM_FLAG_VALUE_CHANGE);
 }
