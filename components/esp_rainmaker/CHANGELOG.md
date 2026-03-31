@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.12.3
+
+### Changes
+
+- Expose `esp_rmaker_report_updated_params()` as a public API so applications can report
+  already-updated parameters to the cloud at any time, without having to call
+  `esp_rmaker_param_update_and_report()` solely to trigger a report.
+
 ## 1.12.2
 
 ### Changes

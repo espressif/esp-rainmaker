@@ -905,7 +905,6 @@ esp_err_t esp_rmaker_param_add_valid_str_list(const esp_rmaker_param_t *param, c
  */
 esp_err_t esp_rmaker_param_add_array_max_count(const esp_rmaker_param_t *param, int count);
 
-
 /* Update a parameter
  *
  * This will just update the value of a parameter with esp rainmaker core, without actually reporting
@@ -921,7 +920,7 @@ esp_err_t esp_rmaker_param_add_array_max_count(const esp_rmaker_param_t *param, 
  * esp_rmaker_param_update(param1, esp_rmaker_float(10.2));
  * esp_rmaker_param_update(param2, esp_rmaker_int(55));
  * esp_rmaker_param_update(param3, esp_rmaker_int(95));
- * esp_rmaker_param_update_and_report(param1, esp_rmaker_bool(true));
+ * esp_rmaker_param_update_and_report(param4, esp_rmaker_bool(true));
  *
  * @param[in] param Parameter handle.
  * @param[in] val New value of the parameter.
@@ -930,6 +929,26 @@ esp_err_t esp_rmaker_param_add_array_max_count(const esp_rmaker_param_t *param, 
  * @return error in case of failure.
  */
 esp_err_t esp_rmaker_param_update(const esp_rmaker_param_t *param, esp_rmaker_param_val_t val);
+
+/** Report updated parameters
+ *
+ * This API will report all updated parameters to ESP RainMaker cloud with one MQTT message.
+ *
+ * @note When you have multiple parameters to update and report, and not know which params is the last one,
+ * you can use this API to report all updated parameters whenever you want.
+ *
+ * Sample:
+ *
+ * esp_rmaker_param_update(param1, esp_rmaker_float(10.2));
+ * esp_rmaker_param_update(param2, esp_rmaker_int(55));
+ * esp_rmaker_param_update(param3, esp_rmaker_int(95));
+ * esp_rmaker_param_update(param4, esp_rmaker_bool(true));
+ * esp_rmaker_report_updated_params();
+ *
+ * @return ESP_OK on success.
+ * @return error in case of failure.
+ */
+esp_err_t esp_rmaker_report_updated_params(void);
 
 /** Update and report a parameter
  *
