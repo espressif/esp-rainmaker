@@ -88,4 +88,25 @@ menu "ESP RainMaker App Wi-Fi Provisioning"
         help
             Stay compatible with Previous App Wi-Fi component
 
+    menu "Factory Data NVS Configuration"
+
+        config APP_NETWORK_FACTORY_NVS_PARTITION_NAME
+            string "Factory: NVS Partition Name"
+            default ESP_RMAKER_FACTORY_PARTITION_NAME
+            help
+                Partition name where the factory data is stored.
+
+        config APP_NETWORK_PROV_DATA_NAMESPACE
+            string "Provisioning: NVS Namespace"
+            default ESP_RMAKER_FACTORY_NAMESPACE
+            help
+                Namespace in the partition where provisioning-related factory data is stored.
+
+        config APP_NETWORK_PROV_RANDOM_NVS_KEY
+            string "Provisioning: Random NVS Key"
+            default "random"
+            help
+                Key in the namespace where the random bytes are stored.
+    endmenu
+
 endmenu

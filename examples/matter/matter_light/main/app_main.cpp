@@ -189,7 +189,7 @@ extern "C" void app_main()
     /* Pre start */
     ESP_ERROR_CHECK(app_matter_rmaker_start());
 #else
-    err = app_network_set_custom_mfg_data(MGF_DATA_DEVICE_TYPE_LIGHT, MFG_DATA_DEVICE_SUBTYPE_LIGHT);
+    err = app_network_set_custom_mfg_data(MFG_DATA_DEVICE_TYPE_LIGHT, MFG_DATA_DEVICE_SUBTYPE_LIGHT);
 
     err = app_network_start(POP_TYPE_MAC);
     if (err != ESP_OK) {
