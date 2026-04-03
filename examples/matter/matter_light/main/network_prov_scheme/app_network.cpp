@@ -81,7 +81,7 @@ static size_t custom_mfg_data_len = 0;
 
 esp_err_t app_network_set_custom_mfg_data(uint16_t device_type, uint8_t device_subtype)
 {
-    int8_t mfg_data[] = {(int8_t)MFG_DATA_HEADER, MGF_DATA_APP_ID, MFG_DATA_VERSION, MFG_DATA_CUSTOMER_ID};
+    int8_t mfg_data[] = {(int8_t)MFG_DATA_HEADER, MFG_DATA_APP_ID, MFG_DATA_VERSION, MFG_DATA_CUSTOMER_ID};
     size_t mfg_data_len = sizeof(mfg_data) + 4; // 4 bytes of device type, subtype, and extra-code
     if (custom_mfg_data) {
         free(custom_mfg_data);

@@ -13,6 +13,7 @@
 #include <freertos/event_groups.h>
 #include <esp_event.h>
 #include <esp_log.h>
+#include <esp_assert.h>
 #include <esp_idf_version.h>
 #include <app_network.h>
 
@@ -47,6 +48,7 @@ ESP_EVENT_DEFINE_BASE(APP_NETWORK_EVENT);
 static const char *TAG = "app_network";
 #if !CONFIG_APP_NETWORK_ASYNCHRONOUS_CONNECTION
 static const int NETWORK_CONNECTED_EVENT = BIT0;
+static const int NETWORK_PROV_ENDED_EVENT = BIT1;
 static EventGroupHandle_t network_event_group;
 #endif /* CONFIG_APP_NETWORK_ASYNCHRONOUS_CONNECTION */
 
@@ -56,8 +58,9 @@ static EventGroupHandle_t network_event_group;
 #define PROV_TRANSPORT_BLE      "ble"
 #define QRCODE_BASE_URL         "https://rainmaker.espressif.com/qrcode.html"
 
-#define CREDENTIALS_NAMESPACE   "rmaker_creds"
-#define RANDOM_NVS_KEY          "random"
+#define RANDOM_NVS_PARTITION_NAME  CONFIG_APP_NETWORK_FACTORY_NVS_PARTITION_NAME
+#define RANDOM_NVS_NAMESPACE       CONFIG_APP_NETWORK_PROV_DATA_NAMESPACE
+#define RANDOM_NVS_KEY             CONFIG_APP_NETWORK_PROV_RANDOM_NVS_KEY
 
 #define POP_STR_SIZE    9
 static esp_timer_handle_t prov_stop_timer;
@@ -125,23 +128,40 @@ static esp_err_t qrcode_display(const char *text)
 }
 #endif
 
+/** Default manufacturing data prefix */
+static app_network_mfg_data_prefix_t g_mfg_data_prefix = {
+    .header = {MFG_DATA_HEADER},
+    .app_id = {MFG_DATA_APP_ID},
+    .version = MFG_DATA_VERSION,
+    .customer_id = {MFG_DATA_CUSTOMER_ID},
+};
 static uint8_t *custom_mfg_data = NULL;
 static size_t custom_mfg_data_len = 0;
 
+esp_err_t app_network_set_custom_mfg_data_prefix(const app_network_mfg_data_prefix_t *mfg_data_prefix)
+{
+    if (!mfg_data_prefix) {
+        return ESP_ERR_INVALID_ARG;
+    }
+    memcpy(&g_mfg_data_prefix, mfg_data_prefix, sizeof(app_network_mfg_data_prefix_t));
+    return ESP_OK;
+}
+
 esp_err_t app_network_set_custom_mfg_data(uint16_t device_type, uint8_t device_subtype)
 {
-    int8_t mfg_data[] = {MFG_DATA_HEADER, MGF_DATA_APP_ID, MFG_DATA_VERSION, MFG_DATA_CUSTOMER_ID};
-    size_t mfg_data_len = sizeof(mfg_data) + 4; // 4 bytes of device type, subtype, and extra-code
+    size_t mfg_data_len = sizeof(g_mfg_data_prefix) + 4; // 4 bytes of device type, subtype, and extra-code
     custom_mfg_data = (uint8_t *)malloc(mfg_data_len);
     if (custom_mfg_data == NULL) {
         ESP_LOGE(TAG, "Failed to allocate memory to custom mfg data");
         return ESP_ERR_NO_MEM;
     }
-    memcpy(custom_mfg_data, mfg_data, sizeof(mfg_data));
+
+    ESP_STATIC_ASSERT(sizeof(app_network_mfg_data_prefix_t) == 8, "g_mfg_data_prefix size is not 8");
+    memcpy(custom_mfg_data, &g_mfg_data_prefix, sizeof(app_network_mfg_data_prefix_t));
     custom_mfg_data[8] = 0xff & (device_type >> 8);
     custom_mfg_data[9] = 0xff & device_type;
     custom_mfg_data[10] = device_subtype;
-    custom_mfg_data[11] = 0;
+    custom_mfg_data[11] = MFG_DATA_DEVICE_EXTRA_CODE;
     custom_mfg_data_len = mfg_data_len;
     ESP_LOG_BUFFER_HEXDUMP("tag", custom_mfg_data, mfg_data_len, 3);
     return ESP_OK;
@@ -178,9 +198,15 @@ static esp_err_t read_random_bytes_from_nvs(uint8_t **random_bytes, size_t *len)
     esp_err_t err;
     *len = 0;
 
-    if ((err = nvs_open_from_partition(CONFIG_ESP_RMAKER_FACTORY_PARTITION_NAME, CREDENTIALS_NAMESPACE,
+    /* Check if the partition details are valid */
+    ESP_STATIC_ASSERT(sizeof(RANDOM_NVS_PARTITION_NAME) > 1, "Factory NVS partition name is not set. Please set it in the project configuration.");
+    ESP_STATIC_ASSERT(sizeof(RANDOM_NVS_NAMESPACE) > 1, "Provisioning NVS namespace is not set. Please set it in the project configuration.");
+    ESP_STATIC_ASSERT(sizeof(RANDOM_NVS_KEY) > 1, "Provisioning Random NVS key is not set. Please set it in the project configuration.");
+
+    /* Open the NVS partition and read the random bytes */
+    if ((err = nvs_open_from_partition(RANDOM_NVS_PARTITION_NAME, RANDOM_NVS_NAMESPACE,
                                 NVS_READONLY, &handle)) != ESP_OK) {
-        ESP_LOGD(TAG, "NVS open for %s %s %s failed with error %d", CONFIG_ESP_RMAKER_FACTORY_PARTITION_NAME, CREDENTIALS_NAMESPACE, RANDOM_NVS_KEY, err);
+        ESP_LOGD(TAG, "NVS open for %s %s %s failed with error %d", RANDOM_NVS_PARTITION_NAME, RANDOM_NVS_NAMESPACE, RANDOM_NVS_KEY, err);
         return ESP_FAIL;
     }
 
@@ -377,6 +403,11 @@ static void network_event_handler(void* arg, esp_event_base_t event_base, int32_
         esp_event_handler_unregister(PROTOCOMM_SECURITY_SESSION_EVENT, ESP_EVENT_ANY_ID, &network_event_handler);
 #endif
         network_prov_mgr_deinit();
+
+#if !CONFIG_APP_NETWORK_ASYNCHRONOUS_CONNECTION
+        /* Signal main application that provisioning has ended */
+        xEventGroupSetBits(network_event_group, NETWORK_PROV_ENDED_EVENT);
+#endif /* !CONFIG_APP_NETWORK_ASYNCHRONOUS_CONNECTION */
     }
 }
 
@@ -502,3 +533,10 @@ esp_err_t app_network_start(app_network_pop_type_t pop_type)
 #endif /* CONFIG_APP_NETWORK_ASYNCHRONOUS_CONNECTION */
     return err;
 }
+
+#if !CONFIG_APP_NETWORK_ASYNCHRONOUS_CONNECTION
+esp_err_t app_network_wait_for_network_prov_ended(void) {
+    EventBits_t bits = xEventGroupWaitBits(network_event_group, NETWORK_PROV_ENDED_EVENT, false, true, portMAX_DELAY);
+    return (bits & NETWORK_PROV_ENDED_EVENT) ? ESP_OK : ESP_ERR_TIMEOUT;
+}
+#endif /* !CONFIG_APP_NETWORK_ASYNCHRONOUS_CONNECTION */

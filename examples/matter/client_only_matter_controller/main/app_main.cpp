@@ -132,7 +132,7 @@ extern "C" void app_main()
     /* Start the ESP RainMaker Agent */
     esp_rmaker_start();
 
-    err = app_wifi_set_custom_mfg_data(MGF_DATA_DEVICE_TYPE_MATTER_CONTROLLER,
+    err = app_wifi_set_custom_mfg_data(MFG_DATA_DEVICE_TYPE_MATTER_CONTROLLER,
                                        MFG_DATA_DEVICE_SUBTYPE_MATTER_CONTROLLER);
     /* Start the Wi-Fi.
      * If the node is provisioned, it will start connection attempts,

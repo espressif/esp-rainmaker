@@ -8,20 +8,28 @@
 #pragma once
 #include <esp_err.h>
 #include <esp_event.h>
+#include <stdint.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
+typedef struct __attribute__((packed)) {
+    uint8_t header[2];
+    uint8_t app_id[3];
+    uint8_t version;
+    uint8_t customer_id[2];
+} app_network_mfg_data_prefix_t;
+
 #define MFG_DATA_HEADER                     0xe5, 0x02
-#define MGF_DATA_APP_ID                     'N', 'o', 'v'
+#define MFG_DATA_APP_ID                     'N', 'o', 'v'
 #define MFG_DATA_VERSION                    'a'
 #define MFG_DATA_CUSTOMER_ID                0x00, 0x01
 
-#define MGF_DATA_DEVICE_TYPE_LIGHT              0x0005
-#define MGF_DATA_DEVICE_TYPE_SWITCH             0x0080
-#define MGF_DATA_DEVICE_TYPE_USER_AUTH          0x0101
-#define MGF_DATA_DEVICE_TYPE_MATTER_CONTROLLER  0xFFF1
+#define MFG_DATA_DEVICE_TYPE_LIGHT              0x0005
+#define MFG_DATA_DEVICE_TYPE_SWITCH             0x0080
+#define MFG_DATA_DEVICE_TYPE_USER_AUTH          0x0101
+#define MFG_DATA_DEVICE_TYPE_MATTER_CONTROLLER  0xFFF1
 
 #define MFG_DATA_DEVICE_SUBTYPE_SWITCH              0x01
 #define MFG_DATA_DEVICE_SUBTYPE_LIGHT               0x01
@@ -78,6 +86,31 @@ void app_network_init();
  * @return error in case of failure.
  */
 esp_err_t app_network_start(app_network_pop_type_t pop_type);
+
+#if !CONFIG_APP_NETWORK_ASYNCHRONOUS_CONNECTION
+/** Wait for network provisioning to end
+ *
+ * This will wait for the network provisioning to end.
+ * This function blocks until the network provisioning resources are released.
+ * This function should be called after app_network_start() has been called.
+ *
+ * @return ESP_OK on success.
+ * @return error in case of failure.
+ */
+esp_err_t app_network_wait_for_network_prov_ended(void);
+#endif /* !CONFIG_APP_NETWORK_ASYNCHRONOUS_CONNECTION */
+
+/** Set manufacturing data prefix
+ *
+ * This can be used to set the manufacturing data prefix.
+ * If not set, the default prefix for ESP RainMaker is used.
+ *
+ * @param[in] mfg_data_prefix Pointer to the manufacturing data prefix.
+ *
+ * @return ESP_OK on success.
+ * @return error in case of failure.
+ */
+esp_err_t app_network_set_custom_mfg_data_prefix(const app_network_mfg_data_prefix_t *mfg_data_prefix);
 
 /** Set custom manufacturing data
  *

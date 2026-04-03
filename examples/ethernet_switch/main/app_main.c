@@ -260,7 +260,7 @@ void app_main()
 
 #ifdef CONFIG_EXAMPLE_ENABLE_WIFI
     /* Set custom manufacturing data for Wi-Fi provisioning */
-    err = app_network_set_custom_mfg_data(MGF_DATA_DEVICE_TYPE_SWITCH, MFG_DATA_DEVICE_SUBTYPE_SWITCH);
+    err = app_network_set_custom_mfg_data(MFG_DATA_DEVICE_TYPE_SWITCH, MFG_DATA_DEVICE_SUBTYPE_SWITCH);
     /* Start Wi-Fi.
      * If the node is provisioned, it will start connection attempts,
      * else, it will start Wi-Fi provisioning. The function will return
