@@ -49,6 +49,7 @@ static const char *TAG = "app_network";
 #if !CONFIG_APP_NETWORK_ASYNCHRONOUS_CONNECTION
 static const int NETWORK_CONNECTED_EVENT = BIT0;
 static const int NETWORK_PROV_ENDED_EVENT = BIT1;
+static const int NETWORK_PROV_STARTED_EVENT = BIT2;
 static EventGroupHandle_t network_event_group;
 #endif /* CONFIG_APP_NETWORK_ASYNCHRONOUS_CONNECTION */
 
@@ -519,6 +520,10 @@ esp_err_t app_network_start(app_network_pop_type_t pop_type)
         app_network_print_qr(service_name, pop, PROV_TRANSPORT_SOFTAP);
 #endif /* CONFIG_APP_NETWORK_PROV_TRANSPORT_BLE */
         app_network_start_timer();
+#if !CONFIG_APP_NETWORK_ASYNCHRONOUS_CONNECTION
+        /* Signal main application that provisioning has started */
+        xEventGroupSetBits(network_event_group, NETWORK_PROV_STARTED_EVENT);
+#endif /* CONFIG_APP_NETWORK_ASYNCHRONOUS_CONNECTION */
     }
     free(pop);
     intro_print(provisioned);
@@ -536,7 +541,18 @@ esp_err_t app_network_start(app_network_pop_type_t pop_type)
 
 #if !CONFIG_APP_NETWORK_ASYNCHRONOUS_CONNECTION
 esp_err_t app_network_wait_for_network_prov_ended(void) {
-    EventBits_t bits = xEventGroupWaitBits(network_event_group, NETWORK_PROV_ENDED_EVENT, false, true, portMAX_DELAY);
-    return (bits & NETWORK_PROV_ENDED_EVENT) ? ESP_OK : ESP_ERR_TIMEOUT;
+    /* Ignore if provisioning has not started */
+    EventBits_t bits = xEventGroupGetBits(network_event_group);
+    if (!(bits & NETWORK_PROV_STARTED_EVENT)) {
+        return ESP_OK;
+    }
+
+    /* Wait for provisioning to end */
+    bits = xEventGroupWaitBits(network_event_group, NETWORK_PROV_ENDED_EVENT, false, true, portMAX_DELAY);
+    bool ended = (bits & NETWORK_PROV_ENDED_EVENT);
+
+    /* Clear bits */
+    xEventGroupClearBits(network_event_group, NETWORK_PROV_STARTED_EVENT | NETWORK_PROV_ENDED_EVENT);
+    return ended ? ESP_OK : ESP_ERR_TIMEOUT;
 }
 #endif /* !CONFIG_APP_NETWORK_ASYNCHRONOUS_CONNECTION */
