@@ -6,6 +6,14 @@ menu "ESP RainMaker App Wi-Fi Provisioning"
         help
             Show the QR code for provisioning.
 
+    config APP_NETWORK_PROV_COMPACT_QR
+        bool "Use compact QR code format"
+        default n
+        depends on APP_NETWORK_PROV_SHOW_QR
+        help
+            Use a compact QR code format (NP:<name>|<pop>|<transport>) instead of the
+            default JSON format. This results in a smaller and easier to scan QR code.
+
     config APP_NETWORK_PROV_MAX_POP_MISMATCH
         int
         default 5

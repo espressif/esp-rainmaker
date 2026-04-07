@@ -175,6 +175,14 @@ static void app_network_print_qr(const char *name, const char *pop, const char *
         return;
     }
     char payload[150];
+#ifdef CONFIG_APP_NETWORK_PROV_COMPACT_QR
+    char transport_char = (strcmp(transport, PROV_TRANSPORT_BLE) == 0) ? 'b' : 's';
+    if (pop) {
+        snprintf(payload, sizeof(payload), "NP:%s|%s|%c", name, pop, transport_char);
+    } else {
+        snprintf(payload, sizeof(payload), "NP:%s||%c", name, transport_char);
+    }
+#else
     if (pop) {
         snprintf(payload, sizeof(payload), "{\"ver\":\"%s\",\"name\":\"%s\"" \
                 ",\"pop\":\"%s\",\"transport\":\"%s\"}",
@@ -184,6 +192,7 @@ static void app_network_print_qr(const char *name, const char *pop, const char *
                 ",\"transport\":\"%s\"}",
                 PROV_QR_VERSION, name, transport);
     }
+#endif /* CONFIG_APP_NETWORK_PROV_COMPACT_QR */
 #ifdef CONFIG_APP_NETWORK_PROV_SHOW_QR
     ESP_LOGI(TAG, "Scan this QR code from the ESP RainMaker phone app for Provisioning.");
     qrcode_display(payload);
