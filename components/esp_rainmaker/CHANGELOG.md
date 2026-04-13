@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.12.7
+
+### Bug Fixes
+
+- Fix HTTPS OTA resume on flash-encrypted devices with IDF < 5.5.3: `esp_https_ota` did not guarantee
+  that bytes written after an interruption were 16-byte aligned. RainMaker now stores resumed written
+  length in KiB (`uint16_t`), so the resume offset passed to `esp_https_ota` is always a multiple of 1024
+  and therefore 16-byte aligned.
+
 ## 1.12.6
 
 ### Bug Fixes
