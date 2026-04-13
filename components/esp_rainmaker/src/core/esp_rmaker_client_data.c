@@ -68,7 +68,7 @@ char * esp_rmaker_get_client_cert()
          * returning that, and the caller is expected to free the returned buffer using free().
          */
 
-        const char *client_cert_buf = MEM_CALLOC_EXTRAM(1, client_cert_len);
+        char *client_cert_buf = MEM_CALLOC_EXTRAM(1, client_cert_len);
         if (client_cert_buf) {
             memcpy(client_cert_buf, client_cert_addr, client_cert_len);
         }
@@ -115,7 +115,7 @@ char * esp_rmaker_get_client_key()
          * returning that, and the caller is expected to free the returned buffer using free().
          */
 
-        const char *client_key_buf = MEM_CALLOC_EXTRAM(1, client_key_len);
+        char *client_key_buf = MEM_CALLOC_EXTRAM(1, client_key_len);
         if (client_key_buf) {
             memcpy(client_key_buf, client_key_addr, client_key_len);
         }
@@ -159,24 +159,59 @@ esp_rmaker_mqtt_conn_params_t *esp_rmaker_get_mqtt_conn_params()
 {
     esp_rmaker_mqtt_conn_params_t *mqtt_conn_params = MEM_CALLOC_EXTRAM(1, sizeof(esp_rmaker_mqtt_conn_params_t));
     if (mqtt_conn_params == NULL) {
+        ESP_LOGE(TAG, "Failed to allocate memory for mqtt_conn_params");
         return NULL;
     }
 
-#if defined(CONFIG_ESP_RMAKER_USE_ESP_SECURE_CERT_MGR) && defined(CONFIG_ESP_SECURE_CERT_DS_PERIPHERAL)
-    mqtt_conn_params->ds_data = esp_secure_cert_get_ds_ctx();
-    if (mqtt_conn_params->ds_data == NULL) /* Get client key only if ds_data is NULL */
-#endif /* (defined(CONFIG_ESP_RMAKER_USE_ESP_SECURE_CERT_MGR) && defined(CONFIG_ESP_SECURE_CERT_DS_PERIPHERAL)) */
-    {
-        if ((mqtt_conn_params->client_key = esp_rmaker_get_client_key()) == NULL) {
-            goto init_err;
-        }
-        mqtt_conn_params->client_key_len = esp_rmaker_get_client_key_len();
-    }
-    if ((mqtt_conn_params->client_cert = esp_rmaker_get_client_cert()) == NULL) {
+#if defined(CONFIG_ESP_RMAKER_USE_ESP_SECURE_CERT_MGR)
+    /* Determine the key type and use ecdsa peripheral if it is supported */
+    esp_secure_cert_key_type_t key_type = ESP_SECURE_CERT_DEFAULT_FORMAT_KEY;
+    esp_err_t esp_ret = esp_secure_cert_get_priv_key_type(&key_type);
+    if (esp_ret != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to obtain the priv key type");
         goto init_err;
     }
-        mqtt_conn_params->client_cert_len = esp_rmaker_get_client_cert_len();
+    if (key_type == ESP_SECURE_CERT_ECDSA_PERIPHERAL_KEY) {
+#if SOC_ECDSA_SUPPORTED
+        ESP_LOGI(TAG, "Setting up the ECDSA key from eFuse");
+        uint8_t efuse_block_id;
+        esp_ret = esp_secure_cert_get_priv_key_efuse_id(&efuse_block_id);
+        if (esp_ret != ESP_OK) {
+            ESP_LOGE(TAG, "Failed to get ECDSA key from eFuse");
+            goto init_err;
+        }
+        mqtt_conn_params->use_ecdsa_peripheral = true;
+        mqtt_conn_params->ecdsa_key_efuse_blk = efuse_block_id;
+#else
+        ESP_LOGE(TAG, "ECDSA peripheral is not supported on this SoC");
+        goto init_err;
+#endif
+    } else {
+#if defined(CONFIG_ESP_SECURE_CERT_DS_PERIPHERAL)
+        mqtt_conn_params->ds_data = esp_secure_cert_get_ds_ctx();
+        if (mqtt_conn_params->ds_data == NULL) /* Get client key only if ds_data is NULL */
+#endif
+        {
+            if ((mqtt_conn_params->client_key = esp_rmaker_get_client_key()) == NULL) {
+                goto init_err;
+            }
+            mqtt_conn_params->client_key_len = esp_rmaker_get_client_key_len();
+        }
+    }
+#else /* !CONFIG_ESP_RMAKER_USE_ESP_SECURE_CERT_MGR */
+    if ((mqtt_conn_params->client_key = esp_rmaker_get_client_key()) == NULL) {
+        goto init_err;
+    }
+    mqtt_conn_params->client_key_len = esp_rmaker_get_client_key_len();
+#endif
+
+    if ((mqtt_conn_params->client_cert = esp_rmaker_get_client_cert()) == NULL) {
+        ESP_LOGE(TAG, "Failed to get client cert");
+        goto init_err;
+    }
+    mqtt_conn_params->client_cert_len = esp_rmaker_get_client_cert_len();
     if ((mqtt_conn_params->mqtt_host = esp_rmaker_get_mqtt_host()) == NULL) {
+        ESP_LOGE(TAG, "Failed to get mqtt host");
         goto init_err;
     }
     mqtt_conn_params->server_cert = (char *)mqtt_server_root_ca_pem_start;
