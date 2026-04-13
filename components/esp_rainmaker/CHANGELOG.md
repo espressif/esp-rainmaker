@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.12.6
+
+### Bug Fixes
+
+- Fix unopened block under specific configs (no Wi-Fi/Thread) causing compile error in `esp_rmaker_core.c`
+- Fix unused variable `service_key` warning in `app_network.c` when neither Wi-Fi nor Thread is enabled
+
 ## 1.12.5
 
 ### Bug Fixes
