@@ -43,16 +43,30 @@ jobs:
 
     runs-on: ubuntu-latest
     container:
-      image: espressif/idf:v5.5.1
+      image: ${{ matrix.idf_image || 'espressif/idf:v5.5.1' }}
     strategy:
       matrix:
         example: [fan, led_light, multi_device, switch, temperature_sensor]
         target: [esp32, esp32c3, esp32c6, esp32s3, esp32c2, esp32h2]
+        include:
+          # Camera standalone requires IDF v5.5.4 and the KVS WebRTC SDK
+          - example: camera/standalone
+            target: esp32s3
+            idf_image: espressif/idf:v5.5.4
+            kvs_sdk_branch: beta-reference-esp-port
 
     steps:
       - uses: actions/checkout@v4
         with:
           submodules: 'recursive'
+
+      - name: Clone KVS WebRTC SDK
+        if: ${{ matrix.kvs_sdk_branch != '' }}
+        run: |
+          git clone --depth 1 --shallow-submodules --recursive \
+            -b ${{ matrix.kvs_sdk_branch }} \
+            https://github.com/awslabs/amazon-kinesis-video-streams-webrtc-sdk-c.git \
+            /opt/kvs-sdk
 
       - run: mkdir -p images
 
@@ -60,6 +74,7 @@ jobs:
         run: |
           . $IDF_PATH/export.sh
           export ESP_RMAKER_PATH=$PWD
+          [ -d /opt/kvs-sdk ] && export KVS_SDK_PATH=/opt/kvs-sdk
           cd examples/${{ matrix.example }}
 
           # Lets use the assisted claim by default for launchpad examples
@@ -74,10 +89,14 @@ jobs:
           OUT_BIN=$ESP_RMAKER_PATH/images/"$TARGET_CHIP"_RainMaker_"$APP_BIN"
           esptool.py --chip $TARGET_CHIP merge_bin -o $OUT_BIN @flash_args
 
+      - name: Set artifact name
+        id: artifact
+        run: echo "name=build-images-${{ matrix.target }}-$(echo '${{ matrix.example }}' | tr '/' '_')" >> $GITHUB_OUTPUT
+
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: build-images-${{ matrix.target }}-${{ matrix.example }}
+          name: ${{ steps.artifact.outputs.name }}
           path: images
 
   deploy:
@@ -122,7 +141,7 @@ jobs:
           echo "" >> build_cfg.md
 
           cat $ESP_RMAKER_PATH/tools/launchpad/app_link_guide.md >> build_cfg.md
-          
+
           if ! command -v tree >/dev/null 2>&1; then
             echo "tree not found, installing..."
             apt-get update && apt-get install -y tree
