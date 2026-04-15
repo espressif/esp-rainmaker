@@ -328,12 +328,17 @@ menu "ESP RainMaker Config"
             bool "sec0"
         config ESP_RMAKER_LOCAL_CTRL_SECURITY_1
             bool "sec1"
+            select ESP_PROTOCOMM_SUPPORT_SECURITY_VERSION_1
+        config ESP_RMAKER_LOCAL_CTRL_SECURITY_2
+            bool "sec2"
+            depends on ESP_PROTOCOMM_SUPPORT_SECURITY_VERSION_2
     endchoice
 
     config ESP_RMAKER_LOCAL_CTRL_SECURITY
         int
         default 0 if ESP_RMAKER_LOCAL_CTRL_SECURITY_0
         default 1 if ESP_RMAKER_LOCAL_CTRL_SECURITY_1
+        default 2 if ESP_RMAKER_LOCAL_CTRL_SECURITY_2
 
     config ESP_RMAKER_LOCAL_CTRL_CHAL_RESP_ENABLE
         bool "Enable Challenge-Response endpoint in Local Control"
