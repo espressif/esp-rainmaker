@@ -17,6 +17,7 @@ menu "ESP RainMaker Config"
         config ESP_RMAKER_SELF_CLAIM
             bool "Use Self Claiming"
             depends on !IDF_TARGET_ESP32 && !IDF_TARGET_ESP32C2
+            select ESP_RMAKER_CLAIM_CSR_SUPPORT
             help
                 Use Self Claiming i.e. get the MQTT credentials
                 directly from the claiming service.
@@ -24,12 +25,22 @@ menu "ESP RainMaker Config"
         config ESP_RMAKER_ASSISTED_CLAIM
             bool "Use Assisted Claiming"
             depends on BT_ENABLED && !IDF_TARGET_ESP32S2
+            select ESP_RMAKER_CLAIM_CSR_SUPPORT
             help
                 Use Assisted Claiming i.e. get the MQTT credentials
                 from the claiming service via assistance from clients,
                 like the phone apps.
 
     endchoice
+
+    config ESP_RMAKER_CLAIM_CSR_SUPPORT
+        bool
+        select MBEDTLS_X509_CREATE_C
+        select MBEDTLS_X509_CSR_WRITE_C
+        help
+            Hidden option selected by the claiming types that generate a CSR
+            on the device. Pulls in the mbedtls X.509 CSR writing support,
+            which is no longer enabled by default from IDF v6.0.
 
     choice ESP_RMAKER_CLAIM_KEY_TYPE
         prompt "Claiming Key Type"
