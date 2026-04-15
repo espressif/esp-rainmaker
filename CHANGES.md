@@ -1,5 +1,11 @@
 # Changes
 
+## 16-Apr-2026: Security Version 2 Support
+
+- Add protocomm security version 2 (SRP6a) support for provisioning and local control.
+  Sec2 is now the default. Check the esp_rainmaker component's
+  [CHANGELOG v1.14.0](components/esp_rainmaker/CHANGELOG.md#1140) for details.
+
 ## Default Claiming Type and User-Node Mapping Changes (Behavioral Changes)
 
 **IMPORTANT BEHAVIORAL CHANGES**: Two significant default behavior changes have been made in ESP RainMaker:
