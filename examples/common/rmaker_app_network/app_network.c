@@ -168,7 +168,118 @@ esp_err_t app_network_set_custom_mfg_data(uint16_t device_type, uint8_t device_s
     return ESP_OK;
 }
 
-static void app_network_print_qr(const char *name, const char *pop, const char *transport)
+#if CONFIG_APP_PROV_SECURITY_VERSION_2
+#include <esp_srp.h>
+#define PROV_SEC2_USERNAME          "wifiprov"
+
+/* The salt-verifier pair is derived at runtime from (PROV_SEC2_USERNAME, PoP)
+ * on first boot and cached in factory NVS. Subsequent boots reuse the cached
+ * pair, since the PoP is stable across boots (derived from factory random bytes
+ * for POP_TYPE_RANDOM, or a user-supplied fixed PoP).
+ *
+ * NOTE: For production cases, the salt-verifier pair may be pre-provisioned into
+ * the factory NVS at manufacturing time. If so, the pre-provisioned pair will be
+ * read and used as-is, and the runtime generation will be skipped.
+ */
+#define SEC2_SALT_KEY               "sec2_salt"
+#define SEC2_VERIFIER_KEY           "sec2_verifier"
+#define SEC2_SALT_LEN               16
+
+static esp_err_t read_sec2_blob_from_nvs(const char *key, uint8_t **bytes, size_t *len)
+{
+    nvs_handle_t handle;
+    esp_err_t err = nvs_open_from_partition(RANDOM_NVS_PARTITION_NAME, RANDOM_NVS_NAMESPACE,
+                                            NVS_READONLY, &handle);
+    if (err != ESP_OK) {
+        return ESP_FAIL;
+    }
+    size_t blob_len = 0;
+    err = nvs_get_blob(handle, key, NULL, &blob_len);
+    if (err != ESP_OK || blob_len == 0) {
+        nvs_close(handle);
+        return ESP_ERR_NOT_FOUND;
+    }
+    uint8_t *buf = calloc(1, blob_len);
+    if (!buf) {
+        nvs_close(handle);
+        return ESP_ERR_NO_MEM;
+    }
+    err = nvs_get_blob(handle, key, buf, &blob_len);
+    nvs_close(handle);
+    if (err != ESP_OK) {
+        free(buf);
+        return err;
+    }
+    *bytes = buf;
+    *len = blob_len;
+    return ESP_OK;
+}
+
+static esp_err_t store_sec2_blob_to_nvs(const char *key, const void *bytes, size_t len)
+{
+    nvs_handle_t handle;
+    esp_err_t err = nvs_open_from_partition(RANDOM_NVS_PARTITION_NAME, RANDOM_NVS_NAMESPACE,
+                                            NVS_READWRITE, &handle);
+    if (err != ESP_OK) {
+        return err;
+    }
+    err = nvs_set_blob(handle, key, bytes, len);
+    if (err == ESP_OK) {
+        err = nvs_commit(handle);
+    }
+    nvs_close(handle);
+    return err;
+}
+
+static esp_err_t get_or_generate_sec2_salt_verifier(const char *username, const char *pop,
+                                                    const char **salt_out, size_t *salt_len_out,
+                                                    const char **verifier_out, size_t *verifier_len_out)
+{
+    uint8_t *salt = NULL;
+    uint8_t *verifier = NULL;
+    size_t salt_len = 0;
+    size_t verifier_len = 0;
+
+    esp_err_t err = read_sec2_blob_from_nvs(SEC2_SALT_KEY, &salt, &salt_len);
+    if (err == ESP_OK) {
+        err = read_sec2_blob_from_nvs(SEC2_VERIFIER_KEY, &verifier, &verifier_len);
+    }
+
+    if (err != ESP_OK) {
+        free(salt); salt = NULL; salt_len = 0;
+        free(verifier); verifier = NULL; verifier_len = 0;
+
+        ESP_LOGI(TAG, "Generating sec2 salt-verifier for username '%s'", username);
+        int gen_verifier_len = 0;
+        esp_err_t ret = esp_srp_gen_salt_verifier(username, strlen(username), pop, strlen(pop),
+                                                  (char **) &salt, SEC2_SALT_LEN,
+                                                  (char **) &verifier, &gen_verifier_len);
+        if (ret != ESP_OK) {
+            ESP_LOGE(TAG, "Failed to generate sec2 salt-verifier: %d", ret);
+            return ret;
+        }
+        salt_len = SEC2_SALT_LEN;
+        verifier_len = (size_t) gen_verifier_len;
+
+        if (store_sec2_blob_to_nvs(SEC2_SALT_KEY, salt, salt_len) != ESP_OK ||
+            store_sec2_blob_to_nvs(SEC2_VERIFIER_KEY, verifier, verifier_len) != ESP_OK) {
+            ESP_LOGW(TAG, "Failed to persist sec2 salt-verifier to NVS; will regenerate next boot");
+        } else {
+            ESP_LOGI(TAG, "Stored sec2 salt-verifier to NVS for later use");
+        }
+    } else {
+        ESP_LOGI(TAG, "Reusing cached sec2 salt-verifier from NVS");
+    }
+
+    *salt_out = (const char *) salt;
+    *salt_len_out = salt_len;
+    *verifier_out = (const char *) verifier;
+    *verifier_len_out = verifier_len;
+    return ESP_OK;
+}
+#endif
+
+static void app_network_print_qr(const char *name, const char *username, const char *pop, const char *transport)
 {
     if (!name || !transport) {
         ESP_LOGW(TAG, "Cannot generate QR code payload. Data missing.");
@@ -184,9 +295,15 @@ static void app_network_print_qr(const char *name, const char *pop, const char *
     }
 #else
     if (pop) {
+#if CONFIG_APP_PROV_SECURITY_VERSION_2
+        snprintf(payload, sizeof(payload), "{\"ver\":\"%s\",\"name\":\"%s\"" \
+                ",\"username\":\"%s\",\"pop\":\"%s\",\"transport\":\"%s\"}",
+                PROV_QR_VERSION, name, username, pop, transport);
+#else
         snprintf(payload, sizeof(payload), "{\"ver\":\"%s\",\"name\":\"%s\"" \
                 ",\"pop\":\"%s\",\"transport\":\"%s\"}",
                 PROV_QR_VERSION, name, pop, transport);
+#endif
     } else {
         snprintf(payload, sizeof(payload), "{\"ver\":\"%s\",\"name\":\"%s\"" \
                 ",\"transport\":\"%s\"}",
@@ -237,12 +354,13 @@ static esp_err_t read_random_bytes_from_nvs(uint8_t **random_bytes, size_t *len)
 }
 
 static char *custom_pop;
-static app_network_pop_type_t s_cached_pop_type = POP_TYPE_NONE;
+/* Initial value is meaningless — s_pop_type_cached guards every read. */
+static app_network_pop_type_t s_cached_pop_type;
 static bool s_pop_type_cached = false;
 
 esp_err_t app_network_set_custom_pop(const char *pop)
 {
-    /* NULL PoP is not allowed here. Use POP_TYPE_NONE instead. */
+    /* NULL is not a valid custom PoP. */
     if (!pop) {
         return ESP_ERR_INVALID_ARG;
     }
@@ -282,9 +400,12 @@ static esp_err_t get_device_service_name(char *service_name, size_t max)
 
 char *app_network_get_device_pop(app_network_pop_type_t pop_type)
 {
+#if CONFIG_APP_PROV_SECURITY_VERSION_1
     if (pop_type == POP_TYPE_NONE) {
         return NULL;
-    } else if (pop_type == POP_TYPE_CUSTOM) {
+    }
+#endif
+    if (pop_type == POP_TYPE_CUSTOM) {
         if (!custom_pop) {
             ESP_LOGE(TAG, "Custom PoP not set. Please use app_wifi_set_custom_pop().");
             return NULL;
@@ -490,14 +611,6 @@ esp_err_t app_network_start(app_network_pop_type_t pop_type)
     s_cached_pop_type = pop_type;
     s_pop_type_cached = true;
 
-    /* Do we want a proof-of-possession (ignored if Security 0 is selected):
-     *      - this should be a string with length > 0
-     *      - NULL if not used
-     */
-    char *pop = app_network_get_device_pop(pop_type);
-    if ((pop_type != POP_TYPE_NONE) && (pop == NULL)) {
-        return ESP_ERR_NO_MEM;
-    }
     /* What is the Device Service Name that we want
      * This translates to :
      *     - device name when scheme is network_prov_scheme_ble/wifi_prov_scheme_ble
@@ -505,6 +618,27 @@ esp_err_t app_network_start(app_network_pop_type_t pop_type)
      */
     char service_name[strlen(CONFIG_APP_NETWORK_PROV_NAME_PREFIX) + 1 + 6 + 1];
     get_device_service_name(service_name, sizeof(service_name));
+
+    char *pop = NULL;
+    /* Do we want a proof-of-possession (ignored if Security 0 is selected):
+     *      - this should be a string with length > 0
+     *      - NULL if not used
+     *
+     * For sec2 (SRP6a), the pop is not sent over the air, but it is still
+     * shown in the QR code so the phone app can derive the salt/verifier
+     * client-side (username + password) to run its SRP session.
+     */
+    pop = app_network_get_device_pop(pop_type);
+#if CONFIG_APP_PROV_SECURITY_VERSION_1
+    if ((pop_type != POP_TYPE_NONE) && (pop == NULL)) {
+        return ESP_ERR_NO_MEM;
+    }
+#else
+    if (pop == NULL) {
+        return ESP_ERR_NO_MEM;
+    }
+#endif
+
     /* What is the service key (Wi-Fi password)
      * NULL = Open network
      * This is ignored when scheme is network_prov_scheme_ble/wifi_prov_scheme_ble
@@ -512,6 +646,35 @@ esp_err_t app_network_start(app_network_pop_type_t pop_type)
     const char *service_key = NULL;
     esp_err_t err = ESP_OK;
     bool provisioned = false;
+
+#if CONFIG_APP_PROV_SECURITY_VERSION_2
+    if (!pop) {
+        ESP_LOGE(TAG, "PoP is required for security version 2");
+        return ESP_ERR_INVALID_ARG;
+    }
+    const char *salt = NULL;
+    const char *verifier = NULL;
+    const char *username = PROV_SEC2_USERNAME;
+    size_t salt_len = 0;
+    size_t verifier_len = 0;
+    esp_err_t sv_err = get_or_generate_sec2_salt_verifier(username, pop,
+                                                          &salt, &salt_len,
+                                                          &verifier, &verifier_len);
+    if (sv_err != ESP_OK) {
+        free(pop);
+        return sv_err;
+    }
+
+#ifdef CONFIG_NETWORK_PROV_NETWORK_TYPE_WIFI
+    app_wifi_internal_set_salt_verifier(salt, salt_len, verifier, verifier_len);
+#endif
+#ifdef CONFIG_NETWORK_PROV_NETWORK_TYPE_THREAD
+    app_thread_internal_set_salt_verifier(salt, salt_len, verifier, verifier_len);
+#endif
+#else
+    const char *username = NULL;
+#endif
+
 #ifdef CONFIG_NETWORK_PROV_NETWORK_TYPE_WIFI
     err = app_wifi_internal_start(pop, service_name, service_key, custom_mfg_data, custom_mfg_data_len, &provisioned);
 #endif
@@ -525,9 +688,9 @@ esp_err_t app_network_start(app_network_pop_type_t pop_type)
     }
     if (!provisioned) {
 #ifdef CONFIG_APP_NETWORK_PROV_TRANSPORT_BLE
-        app_network_print_qr(service_name, pop, PROV_TRANSPORT_BLE);
+        app_network_print_qr(service_name, username, pop, PROV_TRANSPORT_BLE);
 #else /* CONFIG_APP_NETWORK_PROV_TRANSPORT_SOFTAP */
-        app_network_print_qr(service_name, pop, PROV_TRANSPORT_SOFTAP);
+        app_network_print_qr(service_name, username, pop, PROV_TRANSPORT_SOFTAP);
 #endif /* CONFIG_APP_NETWORK_PROV_TRANSPORT_BLE */
         app_network_start_timer();
 #if !CONFIG_APP_NETWORK_ASYNCHRONOUS_CONNECTION

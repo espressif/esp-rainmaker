@@ -24,6 +24,21 @@ menu "ESP RainMaker App Wi-Fi Provisioning"
             Set 0 for the feature to be disabled.
             This safeguards the device from brute-force attempt by limiting the wrong pop allowed.
 
+    choice APP_PROV_SECURITY_VERSION
+        bool "Protocomm security version"
+        default APP_PROV_SECURITY_VERSION_2
+        help
+            Security version 2 (SRP6a) is highly recommended and is the default.
+
+        config APP_PROV_SECURITY_VERSION_1
+            bool "Security version 1"
+            select ESP_PROTOCOMM_SUPPORT_SECURITY_VERSION_1
+
+        config APP_PROV_SECURITY_VERSION_2
+            bool "Security version 2"
+            depends on ESP_PROTOCOMM_SUPPORT_SECURITY_VERSION_2
+    endchoice
+
     choice APP_NETWORK_PROV_TRANSPORT
         bool "Provisioning Transport method"
         default APP_NETWORK_PROV_TRANSPORT_BLE

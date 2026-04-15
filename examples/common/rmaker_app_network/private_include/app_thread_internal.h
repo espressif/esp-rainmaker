@@ -59,6 +59,9 @@ esp_err_t thread_init();
 esp_err_t thread_start(const char *pop, const char *service_name, const char *service_key, uint8_t *mfg_data,
                        size_t mfg_data_len, bool *provisioned);
 
+#if CONFIG_APP_PROV_SECURITY_VERSION_2
+void app_thread_internal_set_salt_verifier(const char *salt, size_t salt_len, const char *verifier, size_t verifier_len);
+#endif
 
 #ifdef __cplusplus
 }
