@@ -84,7 +84,7 @@ esp_err_t esp_rmaker_node_auth_sign_msg(const void *challenge, size_t inlen, voi
 
     /* This flow is for devices supporting ECDSA peripheral */
     if (key_type == ESP_SECURE_CERT_ECDSA_PERIPHERAL_KEY) {
-#if SOC_ECDSA_SUPPORTED
+#if CONFIG_MBEDTLS_HARDWARE_ECDSA_SIGN
         /* Setup ECDSA peripheral */
         uint8_t efuse_block_id;
         err = esp_secure_cert_get_priv_key_efuse_id(&efuse_block_id);
@@ -105,11 +105,11 @@ esp_err_t esp_rmaker_node_auth_sign_msg(const void *challenge, size_t inlen, voi
             err = ESP_FAIL;
             goto cleanup;
         }
-#else /* !SOC_ECDSA_SUPPORTED */
+#else /* !CONFIG_MBEDTLS_HARDWARE_ECDSA_SIGN */
         ESP_LOGE(TAG, "ECDSA peripheral support is not available on this SoC");
         err = ESP_ERR_NOT_SUPPORTED;
         goto cleanup;
-#endif /* SOC_ECDSA_SUPPORTED */
+#endif /* CONFIG_MBEDTLS_HARDWARE_ECDSA_SIGN */
     } else
 #endif /* CONFIG_ESP_RMAKER_USE_ESP_SECURE_CERT_MGR */
     {
