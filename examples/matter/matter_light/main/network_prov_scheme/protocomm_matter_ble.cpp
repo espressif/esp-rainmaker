@@ -544,6 +544,8 @@ esp_err_t protocomm_matter_ble_start(protocomm_t *pc, const protocomm_matter_ble
     s_secondary_resp_fields.name = (const uint8_t *)config->device_name;
     s_secondary_resp_fields.name_len = (uint8_t)strlen(config->device_name);
     s_secondary_resp_fields.name_is_complete = 1;
+    s_secondary_resp_fields.mfg_data = (const uint8_t *)config->manufacturer_data;
+    s_secondary_resp_fields.mfg_data_len = (uint8_t)config->manufacturer_data_len;
     return ESP_OK;
 }
 
