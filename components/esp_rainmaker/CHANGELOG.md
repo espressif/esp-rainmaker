@@ -1,5 +1,24 @@
 # Changelog
 
+## 1.12.5
+
+### Bug Fixes
+
+- Fix ECDSA peripheral preprocessor guard: use `CONFIG_MBEDTLS_HARDWARE_ECDSA_SIGN` instead of
+  `SOC_ECDSA_SUPPORTED` in `esp_rmaker_node_auth.c` and `esp_rmaker_client_data.c`. The previous
+  guard caused build failures on ECDSA-capable SoCs (ESP32-H2, ESP32-C6) when
+  `CONFIG_MBEDTLS_HARDWARE_ECDSA_SIGN` was not explicitly enabled (the default).
+
+## 1.12.4
+
+### Changes
+
+- Add ECDSA peripheral support for MQTT connections and challenge-response node authentication signing
+- Detect private key type from secure cert partition; use ECDSA peripheral with eFuse key block when available
+- Refactor `esp_rmaker_node_auth_sign_msg()`: use `mbedtls_pk_sign()` for both software and hardware-backed keys, fix memory leaks on error paths, use `inlen` instead of `strlen()` for binary challenge data
+- Dynamically determine RSA signature buffer size via `mbedtls_rsa_get_len()` instead of hardcoded 256
+- Bump `espressif/rmaker_common` minimum version to `>=1.7.1`
+
 ## 1.12.3
 
 ### Changes

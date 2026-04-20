@@ -172,7 +172,7 @@ esp_rmaker_mqtt_conn_params_t *esp_rmaker_get_mqtt_conn_params()
         goto init_err;
     }
     if (key_type == ESP_SECURE_CERT_ECDSA_PERIPHERAL_KEY) {
-#if SOC_ECDSA_SUPPORTED
+#if CONFIG_MBEDTLS_HARDWARE_ECDSA_SIGN
         ESP_LOGI(TAG, "Setting up the ECDSA key from eFuse");
         uint8_t efuse_block_id;
         esp_ret = esp_secure_cert_get_priv_key_efuse_id(&efuse_block_id);
@@ -183,7 +183,7 @@ esp_rmaker_mqtt_conn_params_t *esp_rmaker_get_mqtt_conn_params()
         mqtt_conn_params->use_ecdsa_peripheral = true;
         mqtt_conn_params->ecdsa_key_efuse_blk = efuse_block_id;
 #else
-        ESP_LOGE(TAG, "ECDSA peripheral is not supported on this SoC");
+        ESP_LOGE(TAG, "ECDSA signing is not enabled. Enable CONFIG_MBEDTLS_HARDWARE_ECDSA_SIGN");
         goto init_err;
 #endif
     } else {
