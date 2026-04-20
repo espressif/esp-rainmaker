@@ -32,15 +32,16 @@ static void send_command_cb(intptr_t arg)
 {
     send_cmd_format*ptr = (send_cmd_format *)arg;
 
-    if(ptr->cmd_data)
-        ESP_LOGI(TAG,"\ncmd_data: %s\n",ptr->cmd_data);
+    if (ptr->cmd_data) {
+        ESP_LOGI(TAG, "\ncmd_data: %s\n", ptr->cmd_data);
+    }
 
     if (ptr) {
         ESP_LOGI(TAG, "send command to node %llx endpoint %d cluster %d command %d", ptr->node_id, ptr->endpoint_id, ptr->cluster_id, ptr->command_id);
         esp_matter::controller::send_invoke_cluster_command(ptr->node_id, ptr->endpoint_id, ptr->cluster_id, ptr->command_id, ptr->cmd_data);
-    }
-    else
+    } else {
         ESP_LOGE(TAG, "send command with null ptr");
+    }
 
     delete ptr;
 }

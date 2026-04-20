@@ -65,7 +65,7 @@ void on_device_list_update(void)
         }
         return;
     }
-    int dev_count=0;
+    int dev_count = 0;
     while (ptr) {
         if (ptr->reachable) {
             node_id += ptr->node_id;
@@ -101,7 +101,7 @@ void on_device_list_update(void)
     device_node_id = node_id;
     esp_matter::controller::device_mgr::free_device_list(s_device_ptr);
     s_device_ptr = NULL;
-    ESP_LOGI(TAG,"\ngot %d devices from cloud\n",dev_count);
+    ESP_LOGI(TAG, "\ngot %d devices from cloud\n", dev_count);
     read_dev_info();
 }
 
@@ -132,7 +132,7 @@ static void Layer_timer_cb(chip::System::Layer *aLayer, void *appState)
     }
     esp_matter::lock::ScopedChipStackLock lock(portMAX_DELAY);
     CHIP_ERROR chip_err = chip::DeviceLayer::SystemLayer().StartTimer(
-        chip::System::Clock::Seconds32(device_update_timer), Layer_timer_cb, nullptr);
+                              chip::System::Clock::Seconds32(device_update_timer), Layer_timer_cb, nullptr);
     if (chip_err != CHIP_NO_ERROR) {
         ESP_LOGE(TAG, "update timer start failed");
     }
@@ -143,7 +143,7 @@ esp_err_t update_device_refresh_ui_init()
     esp_err_t esp_log = ESP_OK;
     esp_matter::lock::ScopedChipStackLock lock(portMAX_DELAY);
     CHIP_ERROR chip_err = chip::DeviceLayer::SystemLayer().StartTimer(
-        chip::System::Clock::Seconds32(device_update_timer), Layer_timer_cb, nullptr);
+                              chip::System::Clock::Seconds32(device_update_timer), Layer_timer_cb, nullptr);
     if (chip_err != CHIP_NO_ERROR) {
         esp_log = ESP_FAIL;
         ESP_LOGE(TAG, "update timer start failed!");

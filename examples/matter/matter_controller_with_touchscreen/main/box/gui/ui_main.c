@@ -134,8 +134,8 @@ LV_IMG_DECLARE(icon_matter_ctrl)
 LV_IMG_DECLARE(icon_about_us)
 
 static item_desc_t item[] = {
-    {.name = "Matter Controller", .img_src = (void *)&icon_matter_ctrl},
-    {.name = "About Us", .img_src = (void *)&icon_about_us},
+    {.name = "Matter Controller", .img_src = (void *) &icon_matter_ctrl},
+    {.name = "About Us", .img_src = (void *) &icon_about_us},
 };
 
 static lv_obj_t *g_img_btn, *g_img_item = NULL;
@@ -277,7 +277,7 @@ static void ui_main_menu(int32_t index_id)
         g_page_menu = lv_obj_create(lv_scr_act());
         lv_obj_set_size(g_page_menu, lv_obj_get_width(lv_obj_get_parent(g_page_menu)),
                         lv_obj_get_height(lv_obj_get_parent(g_page_menu)) -
-                            lv_obj_get_height(ui_main_get_status_bar()));
+                        lv_obj_get_height(ui_main_get_status_bar()));
         lv_obj_set_style_border_width(g_page_menu, 0, LV_PART_MAIN);
         lv_obj_set_style_bg_color(g_page_menu, lv_obj_get_style_bg_color(lv_scr_act(), LV_STATE_DEFAULT), LV_PART_MAIN);
         lv_obj_clear_flag(g_page_menu, LV_OBJ_FLAG_SCROLLABLE);
