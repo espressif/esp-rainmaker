@@ -518,6 +518,7 @@ esp_err_t app_network_start(app_network_pop_type_t pop_type)
 #ifdef CONFIG_NETWORK_PROV_NETWORK_TYPE_THREAD
     err = thread_start(pop, service_name, service_key, custom_mfg_data, custom_mfg_data_len, &provisioned);
 #endif
+    (void) service_key;
     if (err != ESP_OK) {
         free(pop);
         return err;
