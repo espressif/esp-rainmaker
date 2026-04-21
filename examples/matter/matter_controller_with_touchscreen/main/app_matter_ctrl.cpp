@@ -12,7 +12,6 @@
 
 #include <commands/clusters/DataModelLogger.h>
 #include <app_matter.h>
-#include <device.h>
 #include <esp_check.h>
 #include <esp_matter.h>
 #include <esp_matter_controller_cluster_command.h>
@@ -21,7 +20,6 @@
 #include <esp_matter_core.h>
 #include <esp_rmaker_core.h>
 #include <esp_rmaker_standard_params.h>
-#include <led_driver.h>
 #include <matter_controller_device_mgr.h>
 
 #include "app_matter_ctrl.h"
@@ -406,11 +404,11 @@ esp_err_t matter_ctrl_get_device(void *dev_list)
                 case ESP_MATTER_EXTENDED_COLOR_LIGHT_DEVICE_TYPE_ID:
                     type = CONTROL_LIGHT_DEVICE;
                     break;
-                case ESP_MATTER_ON_OFF_PLUGIN_UNIT_DEVICE_TYPE_ID:
-                case ESP_MATTER_DIMMABLE_PLUGIN_UNIT_DEVICE_TYPE_ID:
+                case ESP_MATTER_ON_OFF_PLUG_IN_UNIT_DEVICE_TYPE_ID:
+                case ESP_MATTER_DIMMABLE_PLUG_IN_UNIT_DEVICE_TYPE_ID:
                     type = CONTROL_PLUG_DEVICE;
                     break;
-                case ESP_MATTER_ON_OFF_SWITCH_DEVICE_TYPE_ID:
+                case ESP_MATTER_ON_OFF_LIGHT_SWITCH_DEVICE_TYPE_ID:
                 case ESP_MATTER_DIMMER_SWITCH_DEVICE_TYPE_ID:
                 case ESP_MATTER_COLOR_DIMMER_SWITCH_DEVICE_TYPE_ID:
                 case ESP_MATTER_GENERIC_SWITCH_DEVICE_TYPE_ID:

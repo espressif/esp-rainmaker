@@ -6,10 +6,10 @@
    CONDITIONS OF ANY KIND, either express or implied.
 */
 
-#include <app/server/OnboardingCodesUtil.h>
 #include <crypto/CHIPCryptoPAL.h>
 #include <platform/DeviceInstanceInfoProvider.h>
 #include <protocols/secure_channel/PASESession.h>
+#include <setup_payload/OnboardingCodesUtil.h>
 #include <setup_payload/SetupPayload.h>
 
 #include "dynamic_qrcode.h"

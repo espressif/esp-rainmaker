@@ -2,21 +2,14 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include <device.h>
 #include <esp_check.h>
 #include <esp_matter.h>
-#include <led_driver.h>
 #include <esp_rmaker_core.h>
-#include <esp_rmaker_standard_params.h>
-#include <app_matter.h>
 #include <matter_controller_device_mgr.h>
 #include <esp_matter_controller_cluster_command.h>
 #include <esp_matter_controller_read_command.h>
-#include <esp_matter_controller_subscribe_command.h>
 #include <commands/clusters/DataModelLogger.h>
 #include <esp_matter_core.h>
-
-#include "app_matter_ctrl.h"
 
 #include <iostream>
 #include <read_node_info.h>
@@ -419,7 +412,7 @@ static void parse_cb_response(cb_data* _data)
         }
 
 
-    } else if (_data->attr_path.mEndpointId != 0x0 && _data->attr_path.mAttributeId == Globals::Attributes::EventList::Id) {
+    } else if (_data->attr_path.mEndpointId != 0x0 && _data->attr_path.mAttributeId == 0xFFFA) {
         chip::app::DataModel::DecodableList<chip::EventId> value;
         CHIP_ERROR err = chip::app::DataModel::Decode(*_data->tlv_data, value);
         if (err != CHIP_NO_ERROR) {
@@ -589,7 +582,4 @@ void read_node_info(std::vector<uint64_t> nodeid_list)
     nodeid_list.clear();
     dev_data* dev_info = get_dev_ptr[node_id_list[node_id_list_index]];
     chip::DeviceLayer::PlatformMgr().ScheduleWork(_read_node_info, (intptr_t)dev_info);
-
-
-
 }

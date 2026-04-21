@@ -3,7 +3,6 @@
 #include <freertos/task.h>
 #include <nvs_flash.h>
 #include <string.h>
-#include <led_driver.h>
 #include <esp_matter_rainmaker.h>
 #include <platform/ESP32/route_hook/ESP32RouteHook.h>
 #include <esp_matter_console.h>

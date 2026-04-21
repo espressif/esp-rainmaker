@@ -9,6 +9,7 @@
 #include <stdbool.h>
 #include "esp_err.h"
 #include "box_main.h"
+#include "box_platform.h"
 #include "lvgl.h"
 
 #ifdef __cplusplus
@@ -21,15 +22,6 @@ typedef struct {
     lv_style_t style_focus;
     lv_style_t style_pr;
 } button_style_t;
-
-#ifdef CONFIG_BSP_BOARD_ESP32_S3_LCD_EV_BOARD
-#include "bsp/esp32_s3_lcd_ev_board.h"
-#define UI_SCALING(x) (x * 2)
-#define UI_PAGE_H_RES (uint16_t)(BSP_LCD_H_RES * 0.375)
-#else
-#define UI_SCALING(x) (x * 1)
-#define UI_PAGE_H_RES 290
-#endif
 
 esp_err_t ui_main_start(void);
 void ui_acquire(void);

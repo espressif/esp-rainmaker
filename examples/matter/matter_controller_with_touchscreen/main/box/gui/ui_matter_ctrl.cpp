@@ -32,18 +32,14 @@ static lv_obj_t *g_hint_label = NULL;
 static lv_obj_t *QRcode = NULL;
 static void (*g_dev_ctrl_end_cb)(void) = NULL;
 
-static uint8_t qrcode_width = UI_SCALING(108);
-static uint8_t qrcode_align_y = UI_SCALING(8);
-static uint8_t btn_return_width = UI_SCALING(24);
-static uint8_t hint_align_y = UI_SCALING(60);
+static uint8_t qrcode_width = 108;
+static uint8_t qrcode_align_y = 8;
+static uint8_t btn_return_width = 24;
+static uint8_t hint_align_y = 60;
 static uint8_t control_button_width = 80;
 static uint8_t control_button_height = 100;
 static uint8_t control_button_x_interval = 90;
-#if CONFIG_BSP_BOARD_ESP32_S3_LCD_EV_BOARD
-static uint8_t control_button_first_row = UI_SCALING(60);
-#else
-static uint8_t control_button_first_row = UI_SCALING(40);
-#endif
+static uint8_t control_button_first_row = 40;
 static int8_t image_align_y = -20;
 static uint8_t name_align_y = 15;
 static uint8_t online_align_y = 35;
@@ -249,9 +245,6 @@ void clean_screen_with_button(void)
     lv_obj_add_style(btn_return, &ui_button_styles()->style_focus, LV_STATE_FOCUSED);
     lv_obj_align(btn_return, LV_ALIGN_TOP_LEFT, 0, 0);
     lv_obj_t *lab_btn_text = lv_label_create(btn_return);
-#if CONFIG_BSP_BOARD_ESP32_S3_LCD_EV_BOARD
-    lv_obj_set_style_text_font(lab_btn_text, &lv_font_montserrat_24, LV_PART_MAIN);
-#endif
     lv_label_set_text_static(lab_btn_text, LV_SYMBOL_LEFT);
     lv_obj_set_style_text_color(lab_btn_text, lv_color_make(158, 158, 158), LV_STATE_DEFAULT);
     lv_obj_center(lab_btn_text);
@@ -267,9 +260,10 @@ void clean_screen_with_button(void)
 void ui_matter_ctrl_start(void (*fn)(void))
 {
     g_dev_ctrl_end_cb = fn;
+    control_button_first_row = 40;
 
     g_page = lv_obj_create(lv_scr_act());
-    lv_obj_set_size(g_page, UI_SCALING(UI_PAGE_H_RES), UI_SCALING(174));
+    lv_obj_set_size(g_page, 290, 174);
     lv_obj_set_style_radius(g_page, 15, LV_STATE_DEFAULT);
     lv_obj_set_style_border_width(g_page, 0, LV_PART_MAIN);
     lv_obj_set_style_shadow_width(g_page, 20, LV_PART_MAIN);
@@ -284,9 +278,6 @@ void ui_matter_ctrl_start(void (*fn)(void))
     lv_obj_add_style(btn_return, &ui_button_styles()->style_focus, LV_STATE_FOCUSED);
     lv_obj_align(btn_return, LV_ALIGN_TOP_LEFT, 0, 0);
     lv_obj_t *lab_btn_text = lv_label_create(btn_return);
-#if CONFIG_BSP_BOARD_ESP32_S3_LCD_EV_BOARD
-    lv_obj_set_style_text_font(lab_btn_text, &lv_font_montserrat_24, LV_PART_MAIN);
-#endif
     lv_label_set_text_static(lab_btn_text, LV_SYMBOL_LEFT);
     lv_obj_set_style_text_color(lab_btn_text, lv_color_make(158, 158, 158), LV_STATE_DEFAULT);
     lv_obj_center(lab_btn_text);

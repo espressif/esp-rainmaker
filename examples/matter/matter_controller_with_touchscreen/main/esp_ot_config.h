@@ -18,6 +18,18 @@
 #if CONFIG_OPENTHREAD_BORDER_ROUTER
 #include "esp_openthread_types.h"
 
+#if CONFIG_ESP_BOARD_M5STACK_CORES3
+#define PIN_TO_RCP_RESET 7
+#define PIN_TO_RCP_BOOT 18
+#define PIN_TO_RCP_TX 10
+#define PIN_TO_RCP_RX 17
+#else
+#define PIN_TO_RCP_RESET 42
+#define PIN_TO_RCP_BOOT 40
+#define PIN_TO_RCP_TX 38
+#define PIN_TO_RCP_RX 41
+#endif
+
 #if CONFIG_OPENTHREAD_RADIO_NATIVE
 #define ESP_OPENTHREAD_DEFAULT_RADIO_CONFIG() \
     {                                         \
@@ -25,24 +37,24 @@
     }
 #elif CONFIG_OPENTHREAD_RADIO_SPINEL_UART
 
-#define ESP_OPENTHREAD_DEFAULT_RADIO_CONFIG()                        \
-    {                                                                \
-        .radio_mode = RADIO_MODE_UART_RCP,                           \
-        .radio_uart_config = {                                       \
-            .port = UART_NUM_1,                                      \
-            .uart_config =                                           \
-                {                                                    \
-                    .baud_rate = 460800,                             \
-                    .data_bits = UART_DATA_8_BITS,                   \
-                    .parity = UART_PARITY_DISABLE,                   \
-                    .stop_bits = UART_STOP_BITS_1,                   \
-                    .flow_ctrl = UART_HW_FLOWCTRL_DISABLE,           \
-                    .rx_flow_ctrl_thresh = 0,                        \
-                    .source_clk = UART_SCLK_DEFAULT,                 \
-                },                                                   \
-            .rx_pin = static_cast<gpio_num_t>(CONFIG_PIN_TO_RCP_TX), \
-            .tx_pin = static_cast<gpio_num_t>(CONFIG_PIN_TO_RCP_RX), \
-        },                                                           \
+#define ESP_OPENTHREAD_DEFAULT_RADIO_CONFIG()                 \
+    {                                                         \
+        .radio_mode = RADIO_MODE_UART_RCP,                    \
+        .radio_uart_config = {                                \
+            .port = UART_NUM_1,                               \
+            .uart_config =                                    \
+                {                                             \
+                    .baud_rate = 460800,                      \
+                    .data_bits = UART_DATA_8_BITS,            \
+                    .parity = UART_PARITY_DISABLE,            \
+                    .stop_bits = UART_STOP_BITS_1,            \
+                    .flow_ctrl = UART_HW_FLOWCTRL_DISABLE,    \
+                    .rx_flow_ctrl_thresh = 0,                 \
+                    .source_clk = UART_SCLK_DEFAULT,          \
+                },                                            \
+            .rx_pin = static_cast<gpio_num_t>(PIN_TO_RCP_TX), \
+            .tx_pin = static_cast<gpio_num_t>(PIN_TO_RCP_RX), \
+        },                                                    \
     }
 #else
 #define ESP_OPENTHREAD_DEFAULT_RADIO_CONFIG()      \
@@ -85,11 +97,11 @@
 #endif // CONFIG_OPENTHREAD_BORDER_ROUTER
 
 #if CONFIG_AUTO_UPDATE_RCP
-#define ESP_OPENTHREAD_RCP_UPDATE_CONFIG()                                                                           \
-    {                                                                                                                \
-        .rcp_type = RCP_TYPE_ESP32H2_UART, .uart_rx_pin = CONFIG_PIN_TO_RCP_TX, .uart_tx_pin = CONFIG_PIN_TO_RCP_RX, \
-        .uart_port = UART_NUM_1, .uart_baudrate = 115200, .reset_pin = CONFIG_PIN_TO_RCP_RESET,                      \
-        .boot_pin = CONFIG_PIN_TO_RCP_BOOT, .update_baudrate = 460800, .firmware_dir = "/rcp_fw/ot_rcp",             \
-        .target_chip = ESP32H2_CHIP,                                                                                 \
+#define ESP_OPENTHREAD_RCP_UPDATE_CONFIG()                                                             \
+    {                                                                                                  \
+        .rcp_type = RCP_TYPE_ESP32H2_UART, .uart_rx_pin = PIN_TO_RCP_TX, .uart_tx_pin = PIN_TO_RCP_RX, \
+        .uart_port = UART_NUM_1, .uart_baudrate = 115200, .reset_pin = PIN_TO_RCP_RESET,               \
+        .boot_pin = PIN_TO_RCP_BOOT, .update_baudrate = 460800, .firmware_dir = "/rcp_fw/ot_rcp",      \
+        .target_chip = ESP32H2_CHIP,                                                                   \
     }
 #endif
