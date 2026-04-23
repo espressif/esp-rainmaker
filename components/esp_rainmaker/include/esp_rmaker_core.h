@@ -10,6 +10,7 @@
 #include <stdbool.h>
 #include <esp_err.h>
 #include <esp_event.h>
+#include <esp_rmaker_cmd_resp.h>
 
 #ifdef __cplusplus
 extern "C"
@@ -1234,6 +1235,24 @@ esp_err_t esp_rmaker_param_report_simple_ts_data(const esp_rmaker_param_t *param
  * @return ESP_OK on success, appropriate error on failure.
  */
 esp_err_t esp_rmaker_cmd_response_publish(void *output, size_t output_len);
+
+/** Send an asynchronous command response to the cloud.
+ *
+ * Convenience wrapper for handlers that returned ESP_ERR_NOT_FINISHED from the cmd_resp dispatcher.
+ * Builds the TLV with esp_rmaker_cmd_prepare_payload() using the saved context, and publishes it
+ * via esp_rmaker_cmd_response_publish() (which takes ownership of the allocated buffer).
+ *
+ * @param[in] ctx          Command context saved (copied) when the command was received.
+ * @param[in] status       ESP_RMAKER_CMD_STATUS_* value.
+ * @param[in] response     Optional DATA TLV payload (may be NULL if @p response_len is 0).
+ * @param[in] response_len Length of @p response.
+ *
+ * @return ESP_OK on success.
+ * @return ESP_ERR_INVALID_ARG if @p ctx is NULL.
+ * @return error from the underlying build/publish call on failure.
+ */
+esp_err_t esp_rmaker_cmd_async_response_send(const esp_rmaker_cmd_ctx_t *ctx, uint8_t status,
+                                             const void *response, size_t response_len);
 
 /**
  * @brief Structure to hold AWS temporary credentials.

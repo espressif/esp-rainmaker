@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.12.8
+
+### New Features
+
+- Add `esp_rmaker_cmd_async_response_send()` helper for handlers that deferred the response by
+  returning `ESP_ERR_NOT_FINISHED`. Wraps payload preparation and publish in a single call.
+- Bump `espressif/rmaker_common` minimum version to `>=1.8.2` (provides `esp_rmaker_cmd_prepare_payload`
+  and the `ESP_ERR_NOT_FINISHED` defer path).
+
 ## 1.12.7
 
 ### Bug Fixes
