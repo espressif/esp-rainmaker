@@ -57,17 +57,17 @@ const char *ESP_RMAKER_OTA_DEFAULT_SERVER_CERT = esp_rmaker_ota_def_cert;
 #endif
 
 #ifdef RMAKER_OTA_HTTP_OTA_RESUMPTION
-#define RMAKER_OTA_WRITTEN_LENGTH_NVS_NAME  "ota_writen"
+#define RMAKER_OTA_WRITTEN_LENGTH_NVS_NAME  "ota_written"
 #define RMAKER_OTA_FILE_MD5_NVS_NAME  "ota_file_md5"
-static esp_err_t esp_rmaker_https_ota_get_len_and_md5_from_nvs(uint32_t *written_len, char **file_md5)
+static esp_err_t esp_rmaker_https_ota_get_len_and_md5_from_nvs(uint16_t *written_len, char **file_md5)
 {
     *written_len = 0;
     *file_md5 = NULL;
     nvs_handle handle;
     esp_err_t err = nvs_open_from_partition(ESP_RMAKER_NVS_PART_NAME, RMAKER_OTA_NVS_NAMESPACE, NVS_READWRITE, &handle);
     if (err == ESP_OK) {
-        uint32_t len = 0;
-        err = nvs_get_u32(handle, RMAKER_OTA_WRITTEN_LENGTH_NVS_NAME, &len);
+        uint16_t len = 0;
+        err = nvs_get_u16(handle, RMAKER_OTA_WRITTEN_LENGTH_NVS_NAME, &len);
         if (err == ESP_OK) {
             *written_len = len;
             size_t file_md5_len = 0;
@@ -92,12 +92,12 @@ static esp_err_t esp_rmaker_https_ota_get_len_and_md5_from_nvs(uint32_t *written
     return err;
 }
 
-static esp_err_t esp_rmaker_https_ota_set_len_and_md5_to_nvs(uint32_t written_len, char *file_md5)
+static esp_err_t esp_rmaker_https_ota_set_len_and_md5_to_nvs(uint16_t written_len, char *file_md5)
 {
     nvs_handle handle;
     esp_err_t err = nvs_open_from_partition(ESP_RMAKER_NVS_PART_NAME, RMAKER_OTA_NVS_NAMESPACE, NVS_READWRITE, &handle);
     if (err == ESP_OK) {
-        err = nvs_set_u32(handle, RMAKER_OTA_WRITTEN_LENGTH_NVS_NAME, written_len);
+        err = nvs_set_u16(handle, RMAKER_OTA_WRITTEN_LENGTH_NVS_NAME, written_len);
         if (err == ESP_OK) {
             if (file_md5) {
                 err = nvs_set_str(handle, RMAKER_OTA_FILE_MD5_NVS_NAME, file_md5);
@@ -164,7 +164,7 @@ static esp_err_t esp_rmaker_ota_use_https(esp_rmaker_ota_handle_t ota_handle, es
     otherwise, start from the beginning and set the written length 0 and file md5 to NVS */
     if (ota_data->file_md5) {
         char *file_md5 = NULL;
-        uint32_t written_len = 0;
+        uint16_t written_len = 0;
         bool resume_ota = false;
         if (esp_rmaker_https_ota_get_len_and_md5_from_nvs(&written_len, &file_md5) == ESP_OK) {
             if (strncmp(file_md5, ota_data->file_md5, strlen(ota_data->file_md5)) != 0) {
@@ -172,7 +172,8 @@ static esp_err_t esp_rmaker_ota_use_https(esp_rmaker_ota_handle_t ota_handle, es
             } else {
                 resume_ota = true;
                 ota_config.ota_resumption = true;
-                ota_config.ota_image_bytes_written = written_len;
+                /* written_len unit is KB and need to convert to bytes */
+                ota_config.ota_image_bytes_written = (uint32_t)written_len * 1024;
             }
             free(file_md5);
         }
@@ -263,7 +264,9 @@ static esp_err_t esp_rmaker_ota_use_https(esp_rmaker_ota_handle_t ota_handle, es
         /* if file md5 is present, save the written length to NVS */
         if (ota_data->file_md5) {
             /* file md5 is present, only set the written length to NVS */
-            if (esp_rmaker_https_ota_set_len_and_md5_to_nvs(esp_https_ota_get_image_len_read(https_ota_handle), NULL) != ESP_OK) {
+            /* written_len unit is KB to make size 16-byte alignment */
+            uint16_t written_len = esp_https_ota_get_image_len_read(https_ota_handle) / 1024;
+            if (esp_rmaker_https_ota_set_len_and_md5_to_nvs(written_len, NULL) != ESP_OK) {
                 ESP_LOGE(TAG, "Failed to save OTA written length to NVS");
             }
         }
