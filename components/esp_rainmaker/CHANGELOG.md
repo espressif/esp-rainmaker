@@ -1,5 +1,19 @@
 # Changelog
 
+## 1.12.9
+
+### Bug Fixes
+
+- Fix `CONFIG_ESP_RMAKER_OTA_AUTOFETCH_PERIOD` timer overflow: `pdMS_TO_TICKS(hours * 3600 * 1000)`
+  overflowed `uint32_t` for periods >= ~12 h at the default 100 Hz tick rate, so a configured 24 h
+  period actually fired every ~8 minutes. The autofetch interval is now computed directly in 64-bit
+  ticks and is accurate for the entire Kconfig range (1–168 h).
+- Fix OTA fetch retry exponential backoff: `retry_count` was being reset on every retry call,
+  which pinned the backoff at its first step and made the `OTA_FETCH_MAX_RETRIES` cap unreachable.
+  The counter is now preserved across retries and is reset to 0 only when a fetch succeeds.
+- Fix `TimerHandle_t` leak in the OTA fetch PUBACK timeout callback: the one-shot timer was not
+  deleted before the next attempt overwrote the handle. Only triggers on rare PUBACK timeouts.
+
 ## 1.12.8
 
 ### New Features
