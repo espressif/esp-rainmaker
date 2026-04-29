@@ -31,8 +31,11 @@
 static TimerHandle_t ota_autofetch_timer;
 /* Autofetch period in hours */
 #define OTA_AUTOFETCH_PERIOD   CONFIG_ESP_RMAKER_OTA_AUTOFETCH_PERIOD
-/* Convert hours to milliseconds for FreeRTOS timer */
-#define OTA_AUTOFETCH_PERIOD_MS (OTA_AUTOFETCH_PERIOD * 60 * 60 * 1000)
+/* Convert hours directly to ticks in 64-bit. Going through pdMS_TO_TICKS()
+ * overflows uint32_t for periods >= ~12 h at a 100 Hz tick rate.
+ */
+#define OTA_AUTOFETCH_PERIOD_TICKS \
+    ((TickType_t)((uint64_t)OTA_AUTOFETCH_PERIOD * 3600ULL * configTICK_RATE_HZ))
 #endif /* CONFIG_ESP_RMAKER_OTA_AUTOFETCH */
 
 static const char *TAG = "esp_rmaker_ota_using_topics";
@@ -85,6 +88,14 @@ static void ota_fetch_timeout_timer_cb(TimerHandle_t xTimer)
     /* Timeout case: No PUBACK received within timeout period */
     ESP_LOGW(TAG, "OTA fetch timeout - no PUBACK received");
     g_ota_fetch_state.fetch_in_progress = false;
+
+    /* Delete the one-shot timer that just fired; otherwise the next attempt's
+     * xTimerCreate() in __esp_rmaker_ota_fetch() leaks this handle.
+     */
+    if (g_ota_fetch_state.timeout_timer) {
+        xTimerDelete(g_ota_fetch_state.timeout_timer, 0);
+        g_ota_fetch_state.timeout_timer = NULL;
+    }
 
     /* Clean up current attempt */
     if (g_ota_fetch_state.published_handler_instance) {
@@ -400,9 +411,12 @@ static esp_err_t __esp_rmaker_ota_fetch(void)
         return ESP_FAIL;
     }
 
-    /* Initialize state for this fetch */
+    /* Initialize per-attempt state. retry_count is owned by
+     * ota_fetch_schedule_retry() (incremented on failure) and reset by
+     * ota_fetch_cleanup() on success — do not touch it here, or the
+     * exponential backoff resets to 1 on every retry.
+     */
     g_ota_fetch_state.expected_msg_id = -1;
-    g_ota_fetch_state.retry_count = 1;
 
     char publish_payload[150];
     json_gen_str_t jstr;
@@ -498,9 +512,11 @@ esp_err_t esp_rmaker_ota_fetch(void)
     if (err != ESP_OK) {
         ESP_LOGW(TAG, "OTA fetch attempt failed: %s", esp_err_to_name(err));
 
-        /* Initialize state for retry tracking */
+        /* Reset transient publish state. retry_count is preserved so the
+         * backoff in ota_fetch_schedule_retry() keeps growing across
+         * consecutive publish failures.
+         */
         g_ota_fetch_state.expected_msg_id = -1;
-        g_ota_fetch_state.retry_count = 0; /* Start from 0 since this is the first failure */
         g_ota_fetch_state.fetch_in_progress = false;
 
         /* Schedule retry with exponential backoff */
@@ -620,7 +636,7 @@ static void esp_rmaker_ota_work_fn(void *priv_data)
         esp_rmaker_ota_autofetch_cleanup();
 
         ota_autofetch_timer = xTimerCreate("ota_autofetch_tm",
-                                         pdMS_TO_TICKS(OTA_AUTOFETCH_PERIOD_MS),
+                                         OTA_AUTOFETCH_PERIOD_TICKS,
                                          pdFALSE, NULL, esp_rmaker_ota_autofetch_timer_cb);
         if (ota_autofetch_timer == NULL) {
             ESP_LOGE(TAG, "Failed to create OTA Autofetch timer");
@@ -667,7 +683,15 @@ static void esp_rmaker_ota_fetch_timer_cb(TimerHandle_t xTimer)
 
 esp_err_t esp_rmaker_ota_fetch_with_delay(int time)
 {
-    TimerHandle_t timer = xTimerCreate(NULL, (time * 1000) / portTICK_PERIOD_MS, pdFALSE, NULL, esp_rmaker_ota_fetch_timer_cb);
+    /* Compute seconds -> ticks in 64-bit. We deliberately do not use
+     * pdMS_TO_TICKS() here: it casts the input to TickType_t (uint32_t)
+     * internally and does the multiply in 32-bit, so widening the input
+     * on the outside has no effect. Doing the multiply directly in
+     * uint64_t keeps it safe for any int input (matches the autofetch
+     * period handling).
+     */
+    TickType_t timer_ticks_to_wait = (TickType_t)((uint64_t)time * configTICK_RATE_HZ);
+    TimerHandle_t timer = xTimerCreate(NULL, timer_ticks_to_wait, pdFALSE, NULL, esp_rmaker_ota_fetch_timer_cb);
     if (timer == NULL) {
         return ESP_ERR_NO_MEM;
     } else {
