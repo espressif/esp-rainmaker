@@ -9,6 +9,8 @@ variables:
   GIT_SUBMODULE_STRATEGY: recursive
   ESP_DOCS_ENV_IMAGE: "$CI_DOCKER_REGISTRY/esp-idf-doc-env-v5.4:1-1"
   ESP_DOCS_PATH: "$CI_PROJECT_DIR"
+  # KVS WebRTC SDK clone settings (used by camera example builds)
+  KVS_SDK_PATH: "$CI_PROJECT_DIR/amazon-kinesis-video-streams-webrtc-sdk-c"
 
 before_script:
    # add gitlab ssh key
@@ -83,11 +85,11 @@ before_script:
   - tar -zcvf esp-rainmaker-bins-${CI_JOB_ID}.zip esp-rainmaker-bins-${CI_JOB_ID}/
 
 .build_camera_examples: &build_camera_examples
-  # Clone KVS WebRTC SDK
+  # Clone KVS WebRTC SDK pinned at $KVS_GIT_COMMIT
   - cd $CI_PROJECT_DIR
-  - echo Cloning amazon-kinesis-video-streams-webrtc-sdk-c
-  - git clone --recursive --depth 1 -b beta-reference-esp-port https://github.com/awslabs/amazon-kinesis-video-streams-webrtc-sdk-c.git
-  - export KVS_SDK_PATH=$CI_PROJECT_DIR/amazon-kinesis-video-streams-webrtc-sdk-c
+  - git clone $KVS_GITHUB_PATH $KVS_SDK_PATH
+  - git -C $KVS_SDK_PATH checkout $KVS_GIT_COMMIT
+  - git -C $KVS_SDK_PATH submodule update --init --recursive --depth 1
   # start building examples
   - for EXAMPLE in $EXAMPLES; do
   - cd $CI_PROJECT_DIR/examples/$EXAMPLE
