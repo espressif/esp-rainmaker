@@ -27,7 +27,7 @@ endif()
 
 set(priv_req protobuf-c json_parser json_generator
              nvs_flash esp_http_client app_update esp-tls mbedtls esp_https_ota
-             console esp_local_ctrl esp_https_server mdns esp_schedule esp_daylight efuse driver rmaker_common)
+             console esp_local_ctrl esp_https_server mdns esp_schedule esp_daylight efuse driver rmaker_common esp_netif)
 
 if (CONFIG_ESP_RMAKER_CMD_RESP_ENABLE)
     list(APPEND core_srcs "src/core/esp_rmaker_cmd_resp_manager.c")

@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.13.0
+
+### Changes
+
+- When starting RainMaker, treat the device as already on-network only if the active interface has a
+  non-zero IPv4 address via `esp_netif`, matching `IP_EVENT_*_GOT_IP` and DHCP completion—not merely
+  link or association ready: for Wi-Fi STA, require IPv4 on `WIFI_STA_DEF` (not only
+  `esp_wifi_sta_get_ap_info`); for Ethernet (`CONFIG_ETH_ENABLED`), require IPv4 on `ETH_DEF`,
+  consistent with `ETHERNET_CONNECTED_EVENT`. This avoids continuing startup before DHCP assigns an
+  address
+
 ## 1.12.9
 
 ### Bug Fixes

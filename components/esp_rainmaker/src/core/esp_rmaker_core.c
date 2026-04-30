@@ -12,6 +12,9 @@
 #include <freertos/event_groups.h>
 #include <esp_log.h>
 #include <esp_wifi.h>
+#if defined(CONFIG_ESP_RMAKER_NETWORK_OVER_WIFI) || defined(CONFIG_ETH_ENABLED)
+#include <esp_netif.h>
+#endif
 #include <esp_event.h>
 #include <esp_bit_defs.h>
 
@@ -51,6 +54,21 @@ static const int THREAD_SET_DNS_SEVER_EVENT = BIT1;
 #endif
 #if defined(CONFIG_ETH_ENABLED)
 static const int ETHERNET_CONNECTED_EVENT = BIT2;
+#endif
+
+#if defined(CONFIG_ESP_RMAKER_NETWORK_OVER_WIFI) || defined(CONFIG_ETH_ENABLED)
+static bool rmaker_has_ipv4(const char *ifkey)
+{
+    esp_netif_t *netif = esp_netif_get_handle_from_ifkey(ifkey);
+    if (!netif) {
+        return false;
+    }
+    esp_netif_ip_info_t ip_info;
+    if (esp_netif_get_ip_info(netif, &ip_info) != ESP_OK) {
+        return false;
+    }
+    return ip_info.ip.addr != 0;
+}
 #endif
 
 #include "esp_mac.h"
@@ -629,8 +647,8 @@ static void esp_rmaker_task(void *data)
     EventBits_t network_bits = 0;
     bool already_connected = false;
 #if defined(CONFIG_ESP_RMAKER_NETWORK_OVER_WIFI)
-    /* Check if already connected to Wi-Fi */
-    if (esp_wifi_sta_get_ap_info(&ap_info) == ESP_OK) {
+    /* Check if already connected to Wi-Fi and have IPv4 (same as IP_EVENT_STA_GOT_IP) */
+    if (esp_wifi_sta_get_ap_info(&ap_info) == ESP_OK && rmaker_has_ipv4("WIFI_STA_DEF")) {
         already_connected = true;
         /* Set the bit immediately since we're already connected */
         if (rmaker_core_event_group) {
@@ -656,10 +674,16 @@ static void esp_rmaker_task(void *data)
     }
 #endif
 #if defined(CONFIG_ETH_ENABLED)
-    /* Note: We can't easily check if Ethernet is already connected here,
-     * so we'll wait for the event. If it's already connected, the event
-     * should have been set already by the event handler. */
-    network_bits |= ETHERNET_CONNECTED_EVENT;
+    /* Check if Ethernet is already connected and has IPv4 address */
+    if (rmaker_has_ipv4("ETH_DEF")) {
+        already_connected = true;
+        /* Set the bit immediately since we're already connected */
+        if (rmaker_core_event_group) {
+            xEventGroupSetBits(rmaker_core_event_group, ETHERNET_CONNECTED_EVENT);
+        }
+    } else {
+        network_bits |= ETHERNET_CONNECTED_EVENT;
+    }
 #endif
     /* Wait for any network to connect (whichever comes first) */
     if (network_bits != 0 && !already_connected) {
