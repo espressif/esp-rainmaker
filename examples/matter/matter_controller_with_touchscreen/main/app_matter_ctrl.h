@@ -21,7 +21,7 @@ typedef enum {
     SUBSCRIBE_RAINMAKER_DEVICE,
 } subscribe_device_type_t;
 
-typedef enum{
+typedef enum {
     CONTROL_LIGHT_DEVICE = 0,
     CONTROL_PLUG_DEVICE,
     CONTROL_SWITCH_DEVICE,

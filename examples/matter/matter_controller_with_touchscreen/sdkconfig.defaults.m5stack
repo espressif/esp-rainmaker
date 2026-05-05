@@ -1,2 +1,0 @@
-# M5Stack-CoreS3 use QUAD mode spiram
-CONFIG_SPIRAM_MODE_QUAD=y

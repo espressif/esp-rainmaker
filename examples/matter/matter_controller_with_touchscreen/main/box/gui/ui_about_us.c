@@ -5,27 +5,12 @@
  */
 
 #include "esp_log.h"
-#include "bsp/esp-bsp.h"
+#include "esp_idf_version.h"
+#include "box_platform.h"
 #include "lvgl.h"
 #include "ui_main.h"
 #include "ui_about_us.h"
 #include "app_matter_ctrl.h"
-
-static const char * boards_info = {
-#if CONFIG_BSP_BOARD_ESP32_S3_BOX_3
-    "S3_BOX_3"
-#elif CONFIG_BSP_BOARD_ESP32_S3_BOX
-    "S3_BOX"
-#elif CONFIG_BSP_BOARD_ESP32_S3_BOX_Lite
-    "S3_BOX_LITE"
-#elif CONFIG_BSP_BOARD_ESP32_S3_LCD_EV_BOARD
-    "S3_LCD_EV_BOARD"
-#elif CONFIG_BSP_BOARD_M5STACK_CORES3
-    "M5STACK_CORES3"
-#else
-    "Unknown board"
-#endif
-};
 
 #define LV_SYMBOL_EXTRA_SYNC "\xef\x80\xA1"
 static bool perform_factory_reset = false;
@@ -93,7 +78,7 @@ void ui_about_us_start(void (*fn)(void))
     g_about_us_end_cb = fn;
 
     lv_obj_t *page = lv_obj_create(lv_scr_act());
-    lv_obj_set_size(page, UI_SCALING(UI_PAGE_H_RES), UI_SCALING(174));
+    lv_obj_set_size(page, 290, 174);
     lv_obj_clear_flag(page, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_set_style_radius(page, 15, LV_STATE_DEFAULT);
     lv_obj_set_style_border_width(page, 0, LV_STATE_DEFAULT);
@@ -102,16 +87,13 @@ void ui_about_us_start(void (*fn)(void))
     lv_obj_align_to(page, ui_main_get_status_bar(), LV_ALIGN_OUT_BOTTOM_MID, 0, 0);
 
     lv_obj_t *btn_return = lv_btn_create(page);
-    lv_obj_set_size(btn_return, UI_SCALING(24), UI_SCALING(24));
+    lv_obj_set_size(btn_return, 24, 24);
     lv_obj_add_style(btn_return, &ui_button_styles()->style, 0);
     lv_obj_add_style(btn_return, &ui_button_styles()->style_pr, LV_STATE_PRESSED);
     lv_obj_add_style(btn_return, &ui_button_styles()->style_focus, LV_STATE_FOCUS_KEY);
     lv_obj_add_style(btn_return, &ui_button_styles()->style_focus, LV_STATE_FOCUSED);
     lv_obj_align(btn_return, LV_ALIGN_TOP_LEFT, 0, 0);
     lv_obj_t *lab_btn_text = lv_label_create(btn_return);
-#if CONFIG_BSP_BOARD_ESP32_S3_LCD_EV_BOARD
-    lv_obj_set_style_text_font(lab_btn_text, &lv_font_montserrat_24, LV_PART_MAIN);
-#endif
     lv_label_set_text_static(lab_btn_text, LV_SYMBOL_LEFT);
     lv_obj_set_style_text_color(lab_btn_text, lv_color_make(158, 158, 158), LV_STATE_DEFAULT);
     lv_obj_center(lab_btn_text);
@@ -122,13 +104,9 @@ void ui_about_us_start(void (*fn)(void))
     }
 
     lv_obj_t *img = lv_img_create(page);
-    lv_obj_align(img, LV_ALIGN_TOP_MID, 0, UI_SCALING(20));
+    lv_obj_align(img, LV_ALIGN_TOP_MID, 0, 20);
     LV_IMG_DECLARE(icon_box);
     lv_img_set_src(img, &icon_box);
-
-#if CONFIG_BSP_BOARD_ESP32_S3_LCD_EV_BOARD
-    lv_img_set_zoom(img, 512);
-#endif
 
     char msg[256] = {0};
     snprintf(msg, sizeof(msg),
@@ -137,7 +115,7 @@ void ui_about_us_start(void (*fn)(void))
              "#000000 Board: # "         "#888888 %s#",
              BOX_DEMO_VERSION_MAJOR, BOX_DEMO_VERSION_MINOR, BOX_DEMO_VERSION_PATCH,
              esp_get_idf_version(),
-             boards_info);
+             box_platform_get_name());
 
     lv_obj_t *lab = lv_label_create(page);
     lv_label_set_recolor(lab, true);
@@ -150,7 +128,7 @@ void ui_about_us_start(void (*fn)(void))
     lv_obj_set_style_border_width(reset_button, 1, LV_PART_MAIN);
     lv_obj_set_style_border_color(reset_button, lv_palette_main(LV_PALETTE_GREY), LV_PART_MAIN);
     lv_obj_align(reset_button, LV_ALIGN_TOP_RIGHT, 0, 0);
-    lv_obj_set_size(reset_button, UI_SCALING(40), UI_SCALING(40));
+    lv_obj_set_size(reset_button, 40, 40);
     lv_obj_t *reset_label = lv_label_create(page);
     lv_label_set_text_static(reset_label, LV_SYMBOL_EXTRA_SYNC);
     lv_obj_align_to(reset_label, reset_button, LV_ALIGN_CENTER, 0, 0);

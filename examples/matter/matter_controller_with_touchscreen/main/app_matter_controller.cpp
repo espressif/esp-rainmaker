@@ -70,14 +70,14 @@ static esp_rmaker_param_val_t app_matter_get_rmaker_val(esp_matter_attr_val_t *v
 }
 
 esp_err_t app_identification_cb(identification::callback_type_t type, uint16_t endpoint_id, uint8_t effect_id,
-                                       uint8_t effect_variant, void *priv_data)
+                                uint8_t effect_variant, void *priv_data)
 {
     ESP_LOGI(TAG, "Identification callback: type: %d, effect: %d", type, effect_id);
     return ESP_OK;
 }
 
 esp_err_t app_attribute_update_cb(attribute::callback_type_t type, uint16_t endpoint_id, uint32_t cluster_id,
-                                         uint32_t attribute_id, esp_matter_attr_val_t *val, void *priv_data)
+                                  uint32_t attribute_id, esp_matter_attr_val_t *val, void *priv_data)
 {
     esp_err_t err = ESP_OK;
 
@@ -126,7 +126,7 @@ void app_event_cb(const ChipDeviceEvent *event, intptr_t arg)
         break;
     case chip::DeviceLayer::DeviceEventType::kESPSystemEvent:
         if (event->Platform.ESPSystemEvent.Base == IP_EVENT &&
-            event->Platform.ESPSystemEvent.Id == IP_EVENT_STA_GOT_IP) {
+                event->Platform.ESPSystemEvent.Id == IP_EVENT_STA_GOT_IP) {
 #ifdef CONFIG_OPENTHREAD_BORDER_ROUTER
             static bool sThreadBRInitialized = false;
             if (!sThreadBRInitialized) {

@@ -18,7 +18,6 @@
 #include <esp_matter_controller_cluster_command.h>
 #include <esp_rmaker_core.h>
 #include <esp_rmaker_standard_params.h>
-#include <led_driver.h>
 #include <matter_controller_device_mgr.h>
 #include <system/SystemClock.h>
 #include <system/SystemLayerImplFreeRTOS.h>
@@ -65,7 +64,7 @@ void on_device_list_update(void)
         }
         return;
     }
-    int dev_count=0;
+    int dev_count = 0;
     while (ptr) {
         if (ptr->reachable) {
             node_id += ptr->node_id;
@@ -101,15 +100,21 @@ void on_device_list_update(void)
     device_node_id = node_id;
     esp_matter::controller::device_mgr::free_device_list(s_device_ptr);
     s_device_ptr = NULL;
-    ESP_LOGI(TAG,"\ngot %d devices from cloud\n",dev_count);
+    ESP_LOGI(TAG, "\ngot %d devices from cloud\n", dev_count);
     read_dev_info();
 }
 
 app_driver_handle_t app_driver_button_init(void *user_data)
 {
-    /* Initialize button */
-    button_config_t config = button_driver_get_config();
-    button_handle_t handle = iot_button_create(&config);
+    (void)user_data;
+    button_config_t btn_cfg = {};
+    button_gpio_config_t gpio_cfg = button_driver_get_config();
+    button_handle_t handle = nullptr;
+    esp_err_t err = iot_button_new_gpio_device(&btn_cfg, &gpio_cfg, &handle);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "iot_button_new_gpio_device failed: %s", esp_err_to_name(err));
+        return nullptr;
+    }
     return (app_driver_handle_t)handle;
 }
 
@@ -132,7 +137,7 @@ static void Layer_timer_cb(chip::System::Layer *aLayer, void *appState)
     }
     esp_matter::lock::ScopedChipStackLock lock(portMAX_DELAY);
     CHIP_ERROR chip_err = chip::DeviceLayer::SystemLayer().StartTimer(
-        chip::System::Clock::Seconds32(device_update_timer), Layer_timer_cb, nullptr);
+                              chip::System::Clock::Seconds32(device_update_timer), Layer_timer_cb, nullptr);
     if (chip_err != CHIP_NO_ERROR) {
         ESP_LOGE(TAG, "update timer start failed");
     }
@@ -140,12 +145,12 @@ static void Layer_timer_cb(chip::System::Layer *aLayer, void *appState)
 
 esp_err_t update_device_refresh_ui_init()
 {
-    esp_err_t esp_log = ESP_OK;
+    esp_err_t ret = ESP_OK;
     esp_matter::lock::ScopedChipStackLock lock(portMAX_DELAY);
     CHIP_ERROR chip_err = chip::DeviceLayer::SystemLayer().StartTimer(
-        chip::System::Clock::Seconds32(device_update_timer), Layer_timer_cb, nullptr);
+                              chip::System::Clock::Seconds32(device_update_timer), Layer_timer_cb, nullptr);
     if (chip_err != CHIP_NO_ERROR) {
-        esp_log = ESP_FAIL;
+        ret = ESP_FAIL;
         ESP_LOGE(TAG, "update timer start failed!");
     }
 
@@ -154,5 +159,5 @@ esp_err_t update_device_refresh_ui_init()
         ESP_LOGE(TAG, "creat task for refresh ui failed!");
     }
     configASSERT(xRefresh_Ui_Handle);
-    return esp_log;
+    return ret;
 }

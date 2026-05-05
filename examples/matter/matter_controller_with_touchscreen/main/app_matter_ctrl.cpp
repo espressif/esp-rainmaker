@@ -12,7 +12,6 @@
 
 #include <commands/clusters/DataModelLogger.h>
 #include <app_matter.h>
-#include <device.h>
 #include <esp_check.h>
 #include <esp_matter.h>
 #include <esp_matter_controller_cluster_command.h>
@@ -21,7 +20,6 @@
 #include <esp_matter_core.h>
 #include <esp_rmaker_core.h>
 #include <esp_rmaker_standard_params.h>
-#include <led_driver.h>
 #include <matter_controller_device_mgr.h>
 
 #include "app_matter_ctrl.h"
@@ -77,8 +75,9 @@ public:
 
 static node_endpoint_id_list_t *get_tail_device(node_endpoint_id_list_t *dev_list)
 {
-    if (!dev_list)
+    if (!dev_list) {
         return NULL;
+    }
     node_endpoint_id_list_t *tail = dev_list;
     while (tail->next) {
         tail = tail->next;
@@ -119,7 +118,7 @@ static void attribute_data_cb(uint64_t remote_node_id, const chip::app::Concrete
                     }
                     dev_ptr->OnOff = value;
                     esp_matter_attr_val_t update_val = esp_matter_bool(value);
-                    change_data_model_attribute(remote_node_id, path.mEndpointId,path.mClusterId, path.mAttributeId,&update_val);
+                    change_data_model_attribute(remote_node_id, path.mEndpointId, path.mClusterId, path.mAttributeId, &update_val);
                     ESP_LOGI(TAG, "%llx OnOff attribute change %d", remote_node_id, value);
                     return;
                 }
@@ -152,7 +151,7 @@ static void subscribe_failed_cb(void *subscribe_cmd)
             node_endpoint_id_list_t *dev_ptr = device_to_control.dev_list;
             while (dev_ptr) {
                 if (!dev_ptr->is_Rainmaker_device && dev_ptr->node_id == sub_ptr->node_id &&
-                    dev_ptr->endpoint_id == sub_ptr->endpoint_id && dev_ptr->is_online) {
+                        dev_ptr->endpoint_id == sub_ptr->endpoint_id && dev_ptr->is_online) {
                     --device_to_control.online_num;
                     dev_ptr->is_online = false;
                     if (xRefresh_Ui_Handle) {
@@ -195,9 +194,9 @@ static void subscribe_done_cb(uint64_t remote_node_id, uint32_t subscription_id)
                     if (!ptr->is_Rainmaker_device && ptr->is_online) {
                         /* after subscribe timeout, re-send subscribe to check state */
                         sub_ptr->subscribe_ptr = chip::Platform::New<subscribe_command>(
-                            sub_ptr->node_id, sub_ptr->endpoint_id, cluster_id, attribute_id, SUBSCRIBE_ATTRIBUTE,
-                            min_interval, max_interval,true, attribute_data_cb, nullptr, subscribe_done_cb,
-                            subscribe_failed_cb);
+                                                     sub_ptr->node_id, sub_ptr->endpoint_id, cluster_id, attribute_id, SUBSCRIBE_ATTRIBUTE,
+                                                     min_interval, max_interval, true, attribute_data_cb, nullptr, subscribe_done_cb,
+                                                     subscribe_failed_cb);
 
                         if (!sub_ptr->subscribe_ptr) {
                             ESP_LOGE(TAG, "Failed to alloc memory for subscribe-local-device command");
@@ -242,8 +241,8 @@ static void _subscribe_rainmaker_device_state(intptr_t arg)
     }
 
     esp_matter::controller::subscribe_command *cmd = chip::Platform::New<subscribe_command>(
-        ptr->node_id, ptr->endpoint_id, cluster_id, attribute_id, SUBSCRIBE_ATTRIBUTE, min_interval, max_interval, true,
-        attribute_data_cb, nullptr, nullptr, nullptr);
+                                                         ptr->node_id, ptr->endpoint_id, cluster_id, attribute_id, SUBSCRIBE_ATTRIBUTE, min_interval, max_interval, true,
+                                                         attribute_data_cb, nullptr, nullptr, nullptr);
 
     if (!cmd) {
         ESP_LOGE(TAG, "Failed to alloc memory for subscribe-rainmaker-device command");
@@ -272,8 +271,8 @@ void matter_ctrl_subscribe_device_state(subscribe_device_type_t sub_type)
         while (sub_ptr) {
             if (!sub_ptr->subscribe_ptr) {
                 sub_ptr->subscribe_ptr = chip::Platform::New<subscribe_command>(
-                    sub_ptr->node_id, sub_ptr->endpoint_id, cluster_id, attribute_id, SUBSCRIBE_ATTRIBUTE, min_interval,
-                    max_interval, true,attribute_data_cb, nullptr, subscribe_done_cb, subscribe_failed_cb);
+                                             sub_ptr->node_id, sub_ptr->endpoint_id, cluster_id, attribute_id, SUBSCRIBE_ATTRIBUTE, min_interval,
+                                             max_interval, true, attribute_data_cb, nullptr, subscribe_done_cb, subscribe_failed_cb);
             }
             if (!sub_ptr->subscribe_ptr) {
                 ESP_LOGE(TAG, "Failed to alloc memory for subscribe-local-device command");
@@ -297,8 +296,9 @@ static void send_command_cb(intptr_t arg)
     if (ptr) {
         ESP_LOGI(TAG, "send command to node %llx endpoint %d", ptr->node_id, ptr->endpoint_id);
         esp_matter::controller::send_invoke_cluster_command(ptr->node_id, ptr->endpoint_id, OnOff::Id, OnOff::Commands::Toggle::Id, NULL);
-    } else
+    } else {
         ESP_LOGE(TAG, "send command with null ptr");
+    }
 }
 
 void matter_ctrl_change_state(intptr_t arg)
@@ -367,8 +367,9 @@ esp_err_t matter_ctrl_get_device(void *dev_list)
 {
     m_device_ptr = (matter_device_t *)dev_list;
 
-    if (!device_list_mutex)
+    if (!device_list_mutex) {
         device_list_mutex = xSemaphoreCreateRecursiveMutex();
+    }
     matter_device_t *dev = m_device_ptr;
     node_endpoint_id_list_t *ptr = NULL;
     node_endpoint_id_list_t *pre_ptr = NULL;
@@ -403,11 +404,11 @@ esp_err_t matter_ctrl_get_device(void *dev_list)
                 case ESP_MATTER_EXTENDED_COLOR_LIGHT_DEVICE_TYPE_ID:
                     type = CONTROL_LIGHT_DEVICE;
                     break;
-                case ESP_MATTER_ON_OFF_PLUGIN_UNIT_DEVICE_TYPE_ID:
-                case ESP_MATTER_DIMMABLE_PLUGIN_UNIT_DEVICE_TYPE_ID:
+                case ESP_MATTER_ON_OFF_PLUG_IN_UNIT_DEVICE_TYPE_ID:
+                case ESP_MATTER_DIMMABLE_PLUG_IN_UNIT_DEVICE_TYPE_ID:
                     type = CONTROL_PLUG_DEVICE;
                     break;
-                case ESP_MATTER_ON_OFF_SWITCH_DEVICE_TYPE_ID:
+                case ESP_MATTER_ON_OFF_LIGHT_SWITCH_DEVICE_TYPE_ID:
                 case ESP_MATTER_DIMMER_SWITCH_DEVICE_TYPE_ID:
                 case ESP_MATTER_COLOR_DIMMER_SWITCH_DEVICE_TYPE_ID:
                 case ESP_MATTER_GENERIC_SWITCH_DEVICE_TYPE_ID:
@@ -453,10 +454,11 @@ esp_err_t matter_ctrl_get_device(void *dev_list)
 
                 /* insert in tail */
                 node_endpoint_id_list_t *tail = get_tail_device(device_to_control.dev_list);
-                if (tail)
+                if (tail) {
                     tail->next = new_ptr;
-                else
+                } else {
                     device_to_control.dev_list = new_ptr;
+                }
                 ++device_to_control.device_num;
             } else {
                 local_device_subscribe_list_t *s_ptr = local_subscribe_list;
@@ -477,8 +479,9 @@ esp_err_t matter_ctrl_get_device(void *dev_list)
     pre_ptr = NULL;
     while (ptr) {
         if (!ptr->is_searched) {
-            if (ptr->is_online)
+            if (ptr->is_online) {
                 --device_to_control.online_num;
+            }
             ESP_LOGE(TAG, "node-endpoint removed!");
             if (ptr == device_to_control.dev_list) {
                 device_to_control.dev_list = ptr->next;
@@ -531,23 +534,18 @@ void read_dev_info(void)
     device_list_lock my_device_lock;
     std::vector<uint64_t> nid_list;
     node_endpoint_id_list_t *dev_ptr = device_to_control.dev_list;
-    while (dev_ptr)
-    {
-        if(dev_ptr->is_online)
-        {
+    while (dev_ptr) {
+        if (dev_ptr->is_online) {
             nid_list.push_back(dev_ptr->node_id);
         }
-        ESP_LOGI(TAG,"nodeid-> %llx is %d",dev_ptr->node_id,dev_ptr->is_online);
+        ESP_LOGI(TAG, "nodeid-> %llx is %d", dev_ptr->node_id, dev_ptr->is_online);
         dev_ptr = dev_ptr->next;
     }
 
 
-    if(nid_list.size()>0)
-    {
+    if (nid_list.size() > 0) {
         read_node_info(nid_list);
-    }
-    else
-    {
+    } else {
         ESP_LOGE(TAG, "No devices online!");
     }
 

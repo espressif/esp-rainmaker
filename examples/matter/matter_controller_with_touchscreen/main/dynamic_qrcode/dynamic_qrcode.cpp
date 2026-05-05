@@ -6,10 +6,10 @@
    CONDITIONS OF ANY KIND, either express or implied.
 */
 
-#include <app/server/OnboardingCodesUtil.h>
 #include <crypto/CHIPCryptoPAL.h>
 #include <platform/DeviceInstanceInfoProvider.h>
 #include <protocols/secure_channel/PASESession.h>
+#include <setup_payload/OnboardingCodesUtil.h>
 #include <setup_payload/SetupPayload.h>
 
 #include "dynamic_qrcode.h"
@@ -30,7 +30,7 @@ CHIP_ERROR DynamicPasscodeCommissionableDataProvider::GetSetupDiscriminator(uint
 CHIP_ERROR DynamicPasscodeCommissionableDataProvider::GetSpake2pIterationCount(uint32_t &iterationCount)
 {
     return chip::DeviceLayer::Internal::ESP32Config::ReadConfigValue(
-        chip::DeviceLayer::Internal::ESP32Config::kConfigKey_Spake2pIterationCount, iterationCount);
+               chip::DeviceLayer::Internal::ESP32Config::kConfigKey_Spake2pIterationCount, iterationCount);
 }
 
 CHIP_ERROR DynamicPasscodeCommissionableDataProvider::GetSpake2pSalt(chip::MutableByteSpan &saltBuf)
@@ -41,7 +41,7 @@ CHIP_ERROR DynamicPasscodeCommissionableDataProvider::GetSpake2pSalt(chip::Mutab
     char saltB64[kSpake2pSalt_MaxBase64Len] = {0};
     size_t saltB64Len = 0;
     err = chip::DeviceLayer::Internal::ESP32Config::ReadConfigValueStr(
-        chip::DeviceLayer::Internal::ESP32Config::kConfigKey_Spake2pSalt, saltB64, sizeof(saltB64), saltB64Len);
+              chip::DeviceLayer::Internal::ESP32Config::kConfigKey_Spake2pSalt, saltB64, sizeof(saltB64), saltB64Len);
     ReturnErrorOnFailure(err);
     size_t saltLen = chip::Base64Decode32(saltB64, saltB64Len, reinterpret_cast<uint8_t *>(saltB64));
     VerifyOrReturnValue(saltLen <= saltBuf.size(), CHIP_ERROR_BUFFER_TOO_SMALL);

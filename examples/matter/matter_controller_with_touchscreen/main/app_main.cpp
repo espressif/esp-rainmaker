@@ -110,8 +110,7 @@ extern "C" void app_main()
     esp_vfs_spiffs_conf_t rcp_fw_conf = {
         .base_path = "/rcp_fw", .partition_label = "rcp_fw", .max_files = 10, .format_if_mount_failed = false
     };
-    if (ESP_OK != esp_vfs_spiffs_register(&rcp_fw_conf))
-    {
+    if (ESP_OK != esp_vfs_spiffs_register(&rcp_fw_conf)) {
         ESP_LOGE(TAG, "Failed to mount rcp firmware storage");
         return;
     }

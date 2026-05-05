@@ -13,7 +13,7 @@
 #include "ui_boot_animate.h"
 #include "ui_matter_ctrl.h"
 #include <sys/time.h>
-#include "bsp/esp-bsp.h"
+#include "esp_lvgl_port.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
 #include "freertos/task.h"
@@ -38,12 +38,12 @@ static void ui_led_set_visible(bool visible);
 
 void ui_acquire(void)
 {
-    bsp_display_lock(0);
+    lvgl_port_lock(0);
 }
 
 void ui_release(void)
 {
-    bsp_display_unlock();
+    lvgl_port_unlock();
 }
 
 static void ui_button_style_init(void)
@@ -134,8 +134,8 @@ LV_IMG_DECLARE(icon_matter_ctrl)
 LV_IMG_DECLARE(icon_about_us)
 
 static item_desc_t item[] = {
-    {.name = "Matter Controller", .img_src = (void *)&icon_matter_ctrl},
-    {.name = "About Us", .img_src = (void *)&icon_about_us},
+    {.name = "Matter Controller", .img_src = (void *) &icon_matter_ctrl},
+    {.name = "About Us", .img_src = (void *) &icon_about_us},
 };
 
 static lv_obj_t *g_img_btn, *g_img_item = NULL;
@@ -277,7 +277,7 @@ static void ui_main_menu(int32_t index_id)
         g_page_menu = lv_obj_create(lv_scr_act());
         lv_obj_set_size(g_page_menu, lv_obj_get_width(lv_obj_get_parent(g_page_menu)),
                         lv_obj_get_height(lv_obj_get_parent(g_page_menu)) -
-                            lv_obj_get_height(ui_main_get_status_bar()));
+                        lv_obj_get_height(ui_main_get_status_bar()));
         lv_obj_set_style_border_width(g_page_menu, 0, LV_PART_MAIN);
         lv_obj_set_style_bg_color(g_page_menu, lv_obj_get_style_bg_color(lv_scr_act(), LV_STATE_DEFAULT), LV_PART_MAIN);
         lv_obj_clear_flag(g_page_menu, LV_OBJ_FLAG_SCROLLABLE);
@@ -286,7 +286,7 @@ static void ui_main_menu(int32_t index_id)
     ui_status_bar_set_visible(true);
 
     lv_obj_t *obj = lv_obj_create(g_page_menu);
-    lv_obj_set_size(obj, UI_SCALING(UI_PAGE_H_RES), UI_SCALING(174));
+    lv_obj_set_size(obj, 290, 174);
     lv_obj_clear_flag(obj, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_set_style_radius(obj, 15, LV_STATE_DEFAULT);
     lv_obj_set_style_border_width(obj, 0, LV_STATE_DEFAULT);
@@ -295,7 +295,7 @@ static void ui_main_menu(int32_t index_id)
     lv_obj_align_to(obj, ui_main_get_status_bar(), LV_ALIGN_OUT_BOTTOM_MID, 0, 0);
 
     g_img_btn = lv_btn_create(obj);
-    lv_obj_set_size(g_img_btn, UI_SCALING(80), UI_SCALING(80));
+    lv_obj_set_size(g_img_btn, 80, 80);
     lv_obj_add_style(g_img_btn, &ui_button_styles()->style_pr, LV_STATE_PRESSED);
     lv_obj_add_style(g_img_btn, &ui_button_styles()->style_focus_no_outline, LV_STATE_FOCUS_KEY);
     lv_obj_add_style(g_img_btn, &ui_button_styles()->style_focus_no_outline, LV_STATE_FOCUSED);
@@ -305,15 +305,12 @@ static void ui_main_menu(int32_t index_id)
     lv_obj_set_style_shadow_ofs_x(g_img_btn, 0, LV_PART_MAIN);
     lv_obj_set_style_shadow_ofs_y(g_img_btn, 0, LV_PART_MAIN);
     lv_obj_set_style_shadow_opa(g_img_btn, LV_OPA_50, LV_PART_MAIN);
-    lv_obj_set_style_radius(g_img_btn, UI_SCALING(40), LV_PART_MAIN);
+    lv_obj_set_style_radius(g_img_btn, 40, LV_PART_MAIN);
     lv_obj_align(g_img_btn, LV_ALIGN_CENTER, 0, -20);
     lv_obj_add_event_cb(g_img_btn, menu_enter_cb, LV_EVENT_ALL, g_img_btn);
 
     g_img_item = lv_img_create(g_img_btn);
     lv_img_set_src(g_img_item, item[index_id].img_src);
-#if CONFIG_BSP_BOARD_ESP32_S3_LCD_EV_BOARD
-    lv_img_set_zoom(g_img_item, 512);
-#endif
     lv_obj_center(g_img_item);
 
     g_lab_item = lv_label_create(obj);
@@ -329,8 +326,8 @@ static void ui_main_menu(int32_t index_id)
             lv_obj_clear_flag(g_led_item[i], LV_OBJ_FLAG_HIDDEN);
         }
         lv_led_off(g_led_item[i]);
-        lv_obj_set_size(g_led_item[i], UI_SCALING(5), UI_SCALING(5));
-        lv_obj_align_to(g_led_item[i], g_page_menu, LV_ALIGN_BOTTOM_MID, UI_SCALING(2 * gap * i - 2 * gap + 10), 0);
+        lv_obj_set_size(g_led_item[i], 5, 5);
+        lv_obj_align_to(g_led_item[i], g_page_menu, LV_ALIGN_BOTTOM_MID, (2 * gap * i - 2 * gap + 10), 0);
     }
     lv_led_on(g_led_item[index_id]);
 
@@ -339,19 +336,16 @@ static void ui_main_menu(int32_t index_id)
     lv_obj_add_style(btn_prev, &ui_button_styles()->style_focus_no_outline, LV_STATE_FOCUS_KEY);
     lv_obj_add_style(btn_prev, &ui_button_styles()->style_focus_no_outline, LV_STATE_FOCUSED);
 
-    lv_obj_set_size(btn_prev, UI_SCALING(40), UI_SCALING(40));
+    lv_obj_set_size(btn_prev, 40, 40);
     lv_obj_set_style_bg_color(btn_prev, lv_color_white(), LV_PART_MAIN);
     lv_obj_set_style_shadow_color(btn_prev, lv_color_make(0, 0, 0), LV_PART_MAIN);
     lv_obj_set_style_shadow_width(btn_prev, 15, LV_PART_MAIN);
     lv_obj_set_style_shadow_opa(btn_prev, LV_OPA_50, LV_PART_MAIN);
     lv_obj_set_style_shadow_ofs_x(btn_prev, 0, LV_PART_MAIN);
     lv_obj_set_style_shadow_ofs_y(btn_prev, 0, LV_PART_MAIN);
-    lv_obj_set_style_radius(btn_prev, UI_SCALING(20), LV_PART_MAIN);
+    lv_obj_set_style_radius(btn_prev, 20, LV_PART_MAIN);
     lv_obj_align_to(btn_prev, obj, LV_ALIGN_LEFT_MID, 0, 0);
     lv_obj_t *label = lv_label_create(btn_prev);
-#if CONFIG_BSP_BOARD_ESP32_S3_LCD_EV_BOARD
-    lv_obj_set_style_text_font(label, &lv_font_montserrat_32, LV_PART_MAIN);
-#endif
     lv_label_set_text_static(label, LV_SYMBOL_LEFT);
     lv_obj_set_style_text_color(label, lv_color_make(5, 5, 5), LV_PART_MAIN);
     lv_obj_center(label);
@@ -362,19 +356,16 @@ static void ui_main_menu(int32_t index_id)
     lv_obj_add_style(btn_next, &ui_button_styles()->style_focus_no_outline, LV_STATE_FOCUS_KEY);
     lv_obj_add_style(btn_next, &ui_button_styles()->style_focus_no_outline, LV_STATE_FOCUSED);
 
-    lv_obj_set_size(btn_next, UI_SCALING(40), UI_SCALING(40));
+    lv_obj_set_size(btn_next, 40, 40);
     lv_obj_set_style_bg_color(btn_next, lv_color_white(), LV_PART_MAIN);
     lv_obj_set_style_shadow_color(btn_next, lv_color_make(0, 0, 0), LV_PART_MAIN);
     lv_obj_set_style_shadow_width(btn_next, 15, LV_PART_MAIN);
     lv_obj_set_style_shadow_opa(btn_next, LV_OPA_50, LV_PART_MAIN);
     lv_obj_set_style_shadow_ofs_x(btn_next, 0, LV_PART_MAIN);
     lv_obj_set_style_shadow_ofs_y(btn_next, 0, LV_PART_MAIN);
-    lv_obj_set_style_radius(btn_next, UI_SCALING(20), LV_PART_MAIN);
+    lv_obj_set_style_radius(btn_next, 20, LV_PART_MAIN);
     lv_obj_align_to(btn_next, obj, LV_ALIGN_RIGHT_MID, 0, 0);
     label = lv_label_create(btn_next);
-#if CONFIG_BSP_BOARD_ESP32_S3_LCD_EV_BOARD
-    lv_obj_set_style_text_font(label, &lv_font_montserrat_32, LV_PART_MAIN);
-#endif
     lv_label_set_text_static(label, LV_SYMBOL_RIGHT);
     lv_obj_set_style_text_color(label, lv_color_make(5, 5, 5), LV_PART_MAIN);
     lv_obj_center(label);
@@ -416,7 +407,7 @@ esp_err_t ui_main_start(void)
 
     // Create status bar
     g_status_bar = lv_obj_create(lv_scr_act());
-    lv_obj_set_size(g_status_bar, lv_obj_get_width(lv_obj_get_parent(g_status_bar)), UI_SCALING(36));
+    lv_obj_set_size(g_status_bar, lv_obj_get_width(lv_obj_get_parent(g_status_bar)), 36);
     lv_obj_clear_flag(g_status_bar, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_set_style_radius(g_status_bar, 0, LV_STATE_DEFAULT);
     lv_obj_set_style_bg_color(g_status_bar, lv_obj_get_style_bg_color(lv_scr_act(), LV_STATE_DEFAULT), LV_PART_MAIN);
@@ -427,17 +418,11 @@ esp_err_t ui_main_start(void)
     lv_obj_t *lab_time = lv_label_create(g_status_bar);
     lv_label_set_text_static(lab_time, "23:59");
     lv_obj_align(lab_time, LV_ALIGN_LEFT_MID, 0, 0);
-#if CONFIG_BSP_BOARD_ESP32_S3_LCD_EV_BOARD
-    lv_obj_set_style_text_font(lab_time, &lv_font_montserrat_24, LV_PART_MAIN);
-#endif
     lv_timer_t *timer = lv_timer_create(clock_run_cb, 1000, (void *)lab_time);
     clock_run_cb(timer);
 
     g_lab_wifi = lv_label_create(g_status_bar);
-#if CONFIG_BSP_BOARD_ESP32_S3_LCD_EV_BOARD
-    lv_obj_set_style_text_font(g_lab_wifi, &lv_font_montserrat_24, LV_PART_MAIN);
-#endif
-    lv_obj_align_to(g_lab_wifi, lab_time, LV_ALIGN_OUT_RIGHT_MID, UI_SCALING(10), 0);
+    lv_obj_align_to(g_lab_wifi, lab_time, LV_ALIGN_OUT_RIGHT_MID, 10, 0);
 
     ui_status_bar_set_visible(0);
 

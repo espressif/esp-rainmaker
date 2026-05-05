@@ -69,6 +69,7 @@ dkms.conf
 # Application project files
 **/sdkconfig
 **/sdkconfig.old
+**/sdkconfig.bmgr_board.old
 **/build
 **/cloud_cfg/*.key
 **/cloud_cfg/*.crt
