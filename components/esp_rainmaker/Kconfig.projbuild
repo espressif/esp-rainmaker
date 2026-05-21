@@ -555,21 +555,32 @@ menu "ESP RainMaker Config"
 
         config ESP_RMAKER_MQTT_OTA_BLOCK_SIZE
                 int "MQTT OTA Block Length"
-                default 3072
+                default 4096
                 depends on ESP_RMAKER_OTA_USE_MQTT
                 range 256 131072
                 help
                     The block size to fetch in a MQTT OTA publish message.
                     Note that number of blocks * block size should not exceed 128KB.
 
+                    4096 is the default as it aligns with the ESP32 flash sector
+                    size for cleaner OTA writes. Keeping the encoded message under
+                    5KB is also cost-efficient on metered MQTT brokers.
+
         config ESP_RMAKER_MQTT_OTA_NO_OF_BLOCKS
                 int "MQTT OTA No. of Blocks"
-                default 42
+                default 16
                 depends on ESP_RMAKER_OTA_USE_MQTT
                 range 1 512
                 help
                     The number of blocks of file to fetch in a MQTT OTA publish message.
                     Note that number of blocks * block size should not exceed 128KB.
+
+                    Resume state is persisted only at batch boundaries (intra-batch
+                    blocks can arrive out of order under the request-bitmap fix), so
+                    this also sets the resume checkpoint granularity. A smaller value
+                    bounds the worst-case re-fetch on attempt-failure or mid-OTA
+                    reboot; a larger value reduces total round-trips on the happy
+                    path.
 
         config ESP_RMAKER_MQTT_OTA_MAX_RETRIES
                 int "MQTT OTA Maximum Number of Retries"
@@ -578,6 +589,17 @@ menu "ESP RainMaker Config"
                 range 1 255
                 help
                     The number of times we should resend request for fetching file blocks, in case we do not get any response.
+
+        config ESP_RMAKER_MQTT_OTA_BLOCK_WAIT_SEC
+                int "MQTT OTA per-block wait timeout (seconds)"
+                default 10
+                depends on ESP_RMAKER_OTA_USE_MQTT
+                range 5 300
+                help
+                    How long to wait for the broker to deliver the next block before
+                    declaring a timeout and re-requesting. On steady streams blocks
+                    arrive every few hundred milliseconds, so this only fires under
+                    network jitter or broker back-pressure.
 
 
     endmenu
