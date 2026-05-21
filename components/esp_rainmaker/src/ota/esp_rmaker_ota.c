@@ -34,6 +34,11 @@
 /* Forward declarations for static functions */
 static esp_err_t esp_rmaker_ota_handle_metadata_common(esp_rmaker_ota_handle_t ota_handle, esp_rmaker_ota_data_t *ota_data);
 static esp_err_t esp_rmaker_ota_success_reboot_sequence(esp_rmaker_ota_handle_t ota_handle, const char *protocol_name, int attempt_count);
+#ifdef CONFIG_ESP_RMAKER_OTA_TEST_ROLLBACK
+/* Needed by the inlined mark-valid block in esp_rmaker_ota_test_handle_post_mqtt(); both are defined later in this file. */
+static void event_handler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data);
+static esp_err_t esp_rmaker_erase_rollback_flag(void);
+#endif
 
 
 #ifdef CONFIG_ESP_RMAKER_USE_CERT_BUNDLE
@@ -464,6 +469,161 @@ esp_err_t esp_rmaker_ota_default_cb(esp_rmaker_ota_handle_t ota_handle, esp_rmak
 #endif
 }
 
+#ifdef CONFIG_ESP_RMAKER_OTA_TEST_ROLLBACK
+#warning "CONFIG_ESP_RMAKER_OTA_TEST_ROLLBACK is enabled: this firmware will report 'failed' and roll back on every successful OTA until CONFIG_ESP_RMAKER_OTA_TEST_ROLLBACK_COUNT cycles complete (0 = indefinite). Use only for OTA pipeline testing — do not ship."
+
+/* NVS keys for the per-job test-rollback cycle counter. Stored separately from
+ * the regular OTA bookkeeping so they survive the cleanup performed on each
+ * failed-and-rollback iteration. */
+#define RMAKER_OTA_TEST_CNT_NVS_NAME    "ota_test_cnt"
+#define RMAKER_OTA_TEST_JID_NVS_NAME    "ota_test_jid"
+
+/* Decide which test cycle this iteration represents: increment if the current
+ * OTA job_id (read from NVS, set by the previous firmware) matches what was
+ * stored last time, reset to 1 otherwise (new job or first run). Persists the
+ * new (job_id, count) pair so the next cycle sees it.
+ *
+ * Both 64-byte job_id buffers are kept inside this helper's stack frame so
+ * they are freed before the caller invokes the deep MQTT-publish chain in
+ * esp_rmaker_ota_report_status — sys_evt's stack is tight. */
+static uint32_t esp_rmaker_ota_test_advance_cycle(void)
+{
+    char current_job_id[64] = {0};
+    char stored_job_id[64] = {0};
+    bool have_current = false;
+    uint32_t count = 0;
+
+    nvs_handle handle;
+    if (nvs_open_from_partition(ESP_RMAKER_NVS_PART_NAME, RMAKER_OTA_NVS_NAMESPACE,
+                                NVS_READONLY, &handle) == ESP_OK) {
+        size_t len = sizeof(current_job_id) - 1;
+        if (nvs_get_blob(handle, RMAKER_OTA_JOB_ID_NVS_NAME, current_job_id, &len) == ESP_OK) {
+            have_current = true;
+        }
+        len = sizeof(stored_job_id) - 1;
+        nvs_get_blob(handle, RMAKER_OTA_TEST_JID_NVS_NAME, stored_job_id, &len);
+        nvs_get_u32(handle, RMAKER_OTA_TEST_CNT_NVS_NAME, &count);
+        nvs_close(handle);
+    }
+    bool same_job = have_current && stored_job_id[0] &&
+                    (strcmp(current_job_id, stored_job_id) == 0);
+    count = same_job ? count + 1 : 1;
+
+    if (nvs_open_from_partition(ESP_RMAKER_NVS_PART_NAME, RMAKER_OTA_NVS_NAMESPACE,
+                                NVS_READWRITE, &handle) == ESP_OK) {
+        nvs_set_u32(handle, RMAKER_OTA_TEST_CNT_NVS_NAME, count);
+        if (have_current) {
+            nvs_set_blob(handle, RMAKER_OTA_TEST_JID_NVS_NAME,
+                         current_job_id, strlen(current_job_id));
+        }
+        nvs_commit(handle);
+        nvs_close(handle);
+    }
+    return count;
+}
+
+static void esp_rmaker_ota_test_clear_cycle_state(void)
+{
+    nvs_handle handle;
+    if (nvs_open_from_partition(ESP_RMAKER_NVS_PART_NAME, RMAKER_OTA_NVS_NAMESPACE,
+                                NVS_READWRITE, &handle) == ESP_OK) {
+        nvs_erase_key(handle, RMAKER_OTA_TEST_CNT_NVS_NAME);
+        nvs_erase_key(handle, RMAKER_OTA_TEST_JID_NVS_NAME);
+        nvs_commit(handle);
+        nvs_close(handle);
+    }
+}
+
+/* Test-only: drive one iteration of the repeat-OTA test loop. Increments the
+ * per-job cycle count in NVS and returns true if the caller should continue
+ * the loop (rollback after reporting 'failed'), or false if the configured
+ * max has been reached and the partition has already been marked valid by
+ * this function (with a SUCCESS report carrying TEST_ROLLBACK_END info).
+ *
+ * On the rollback path: stops the rollback watchdog timer, reports 'failed'
+ * with cycle info while MQTT is connected (so the cloud records it before
+ * reboot), and erases the regular OTA bookkeeping that would otherwise drive
+ * a post-rollback report on the previous firmware. The cycle count itself is
+ * kept in separate NVS keys so it survives this cleanup.
+ *
+ * Independent of CONFIG_ESP_RMAKER_OTA_ROLLBACK_REPORT_FAILED — that flag
+ * activates only through the rollback-timer path (esp_ota_rollback), which
+ * we stop here. */
+static bool esp_rmaker_ota_test_handle_post_mqtt(esp_rmaker_ota_t *ota)
+{
+    uint32_t count = esp_rmaker_ota_test_advance_cycle();
+    uint32_t max_count = CONFIG_ESP_RMAKER_OTA_TEST_ROLLBACK_COUNT;
+
+    /* Static so it doesn't sit on sys_evt's stack across the deep MQTT/TLS
+     * publish chain in esp_rmaker_ota_report_status. Safe because event_handler
+     * (and therefore this helper) only runs on the single sys_evt task. */
+    static char info[80];
+    if (max_count != 0 && count >= max_count) {
+        snprintf(info, sizeof(info),
+                 "TEST_ROLLBACK_END: %u/%u cycles complete; marking valid",
+                 (unsigned)count, (unsigned)max_count);
+        ESP_LOGW(TAG, "%s", info);
+        esp_rmaker_ota_test_clear_cycle_state();
+        /* Equivalent to esp_rmaker_ota_mark_valid(), but with our custom
+         * additional_info on the SUCCESS report so the cloud-side filter can
+         * recognise the end of a test run. Kept as inline duplicated logic
+         * (rather than a shared helper) so the production mark_valid path is
+         * untouched by this test-only feature. */
+        const esp_partition_t *running = esp_ota_get_running_partition();
+        esp_ota_img_states_t ota_state;
+        if (esp_ota_get_state_partition(running, &ota_state) == ESP_OK &&
+            ota_state == ESP_OTA_IMG_PENDING_VERIFY) {
+            esp_event_handler_unregister(RMAKER_COMMON_EVENT, RMAKER_MQTT_EVENT_CONNECTED, &event_handler);
+            esp_ota_mark_app_valid_cancel_rollback();
+            esp_rmaker_erase_rollback_flag();
+            ota->ota_in_progress = false;
+            if (ota->rollback_timer) {
+                xTimerStop(ota->rollback_timer, portMAX_DELAY);
+                xTimerDelete(ota->rollback_timer, portMAX_DELAY);
+                ota->rollback_timer = NULL;
+            }
+            esp_rmaker_ota_report_status((esp_rmaker_ota_handle_t)ota, OTA_STATUS_SUCCESS, info);
+            if (ota->type == OTA_USING_TOPICS) {
+                if (esp_rmaker_ota_fetch_with_delay(RMAKER_OTA_FETCH_DELAY) != ESP_OK) {
+                    ESP_LOGE(TAG, "Failed to create OTA Fetch timer.");
+                }
+            }
+        } else {
+            ESP_LOGW(TAG, "TEST_ROLLBACK end reached but partition not in PENDING_VERIFY; nothing to do.");
+        }
+        return false;
+    }
+
+    if (max_count == 0) {
+        snprintf(info, sizeof(info),
+                 "TEST_ROLLBACK: forced failure to re-trigger OTA (cycle %u, indefinite)",
+                 (unsigned)count);
+    } else {
+        snprintf(info, sizeof(info),
+                 "TEST_ROLLBACK: forced failure to re-trigger OTA (cycle %u/%u)",
+                 (unsigned)count, (unsigned)max_count);
+    }
+    ESP_LOGE(TAG, "%s", info);
+    if (ota->rollback_timer) {
+        xTimerStop(ota->rollback_timer, portMAX_DELAY);
+        xTimerDelete(ota->rollback_timer, portMAX_DELAY);
+        ota->rollback_timer = NULL;
+    }
+    esp_rmaker_ota_report_status((esp_rmaker_ota_handle_t)ota, OTA_STATUS_FAILED, info);
+    nvs_handle handle;
+    if (nvs_open_from_partition(ESP_RMAKER_NVS_PART_NAME, RMAKER_OTA_NVS_NAMESPACE,
+                                NVS_READWRITE, &handle) == ESP_OK) {
+        nvs_erase_key(handle, RMAKER_OTA_UPDATE_FLAG_NVS_NAME);
+        nvs_erase_key(handle, RMAKER_OTA_JOB_ID_NVS_NAME);
+        nvs_erase_key(handle, RMAKER_OTA_FAIL_REASON_NVS_NAME);
+        nvs_erase_key(handle, RMAKER_OTA_FAIL_JOB_ID_NVS_NAME);
+        nvs_commit(handle);
+        nvs_close(handle);
+    }
+    return true;
+}
+#endif /* CONFIG_ESP_RMAKER_OTA_TEST_ROLLBACK */
+
 static void event_handler(void *arg, esp_event_base_t event_base,
                            int32_t event_id, void *event_data)
 {
@@ -477,7 +637,14 @@ static void event_handler(void *arg, esp_event_base_t event_base,
         diag_status = ota->ota_diag(&ota_diag_priv, ota->priv);
     }
     if (diag_status == OTA_DIAG_STATUS_SUCCESS) {
+#ifdef CONFIG_ESP_RMAKER_OTA_TEST_ROLLBACK
+        if (esp_rmaker_ota_test_handle_post_mqtt(ota)) {
+            esp_rmaker_ota_mark_invalid();
+        }
+        /* If false, the helper already marked the partition valid (test loop ended). */
+#else
         esp_rmaker_ota_mark_valid();
+#endif
     } else if (diag_status == OTA_DIAG_STATUS_FAIL) {
         ESP_LOGE(TAG, "Diagnostics failed! Start rollback to the previous version ...");
         esp_rmaker_ota_mark_invalid();
@@ -673,6 +840,13 @@ static const esp_rmaker_ota_config_t ota_default_config = {
 /* Enable the ESP RainMaker specific OTA */
 esp_err_t esp_rmaker_ota_enable(esp_rmaker_ota_config_t *ota_config, esp_rmaker_ota_type_t type)
 {
+#ifdef CONFIG_ESP_RMAKER_OTA_TEST_ROLLBACK
+    ESP_LOGE(TAG, "*** TEST ROLLBACK MODE ENABLED ***");
+    ESP_LOGE(TAG, "*** This firmware was built with CONFIG_ESP_RMAKER_OTA_TEST_ROLLBACK. ***");
+    ESP_LOGE(TAG, "*** It will report FAILED and roll back even on a successful OTA, ***");
+    ESP_LOGE(TAG, "*** so the same job is re-served and the OTA cycle repeats. ***");
+    ESP_LOGE(TAG, "*** Do NOT ship a firmware that has this option enabled. ***");
+#endif
     if (ota_config == NULL) {
         ota_config = (esp_rmaker_ota_config_t *)&ota_default_config;
     }

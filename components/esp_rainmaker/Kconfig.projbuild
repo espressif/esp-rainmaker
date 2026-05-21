@@ -478,6 +478,31 @@ menu "ESP RainMaker Config"
                 firmware versions indefinitely (new firmware boots → MQTT fails → rollback → OTA retry →
                 new firmware boots again).
 
+        config ESP_RMAKER_OTA_TEST_ROLLBACK
+            bool "Test-only: report 'failed' and roll back even on a successful OTA"
+            default n
+            depends on BOOTLOADER_APP_ROLLBACK_ENABLE
+            help
+                FOR TESTING ONLY. Do not ship a firmware that has this enabled.
+
+                When enabled, the firmware reports 'failed' and rolls back even on
+                a successful OTA, so the cloud re-serves the same job and the OTA
+                pipeline can be exercised repeatedly from a single push.
+
+        config ESP_RMAKER_OTA_TEST_ROLLBACK_COUNT
+            int "Number of test-rollback cycles before reporting success"
+            depends on ESP_RMAKER_OTA_TEST_ROLLBACK
+            range 0 100000
+            default 100
+            help
+                Maximum number of forced fail-and-rollback cycles per OTA job. When the
+                Nth cycle for a given job_id completes, instead of reporting 'failed' the
+                firmware reports 'success' (with additional_info "TEST_ROLLBACK_END: ...")
+                so the cloud closes the job and the loop stops.
+
+                Set to 0 to run indefinitely (never auto-stop). The count is tracked
+                per-job in NVS and resets to 1 when a different job_id is observed.
+
         config ESP_RMAKER_OTA_DISABLE_AUTO_REBOOT
             bool "Disable auto reboot"
             default n
