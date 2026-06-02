@@ -35,6 +35,21 @@
 
 
 
+#if CONFIG_APP_PROV_SECURITY_VERSION_2
+static const char *sec_salt = NULL;
+static const char *sec_verifier = NULL;
+static size_t sec_salt_len = 0;
+static size_t sec_verifier_len = 0;
+
+void app_thread_internal_set_salt_verifier(const char *salt, size_t salt_len, const char *verifier, size_t verifier_len)
+{
+    sec_salt = salt;
+    sec_salt_len = salt_len;
+    sec_verifier = verifier;
+    sec_verifier_len = verifier_len;
+}
+#endif
+
 static const char* TAG = "app_thread";
 /* Event handler for catching system events */
 static void event_handler(void* arg, esp_event_base_t event_base,
@@ -161,13 +176,26 @@ esp_err_t thread_start(const char *pop, const char *service_name, const char *se
     if (!(*provisioned)) {
         ESP_LOGI(TAG, "Starting provisioning");
 
-        /* What is the security level that we want (0 or 1):
+        /* What is the security level that we want (0, 1, or 2):
          *      - NETWORK_PROV_SECURITY_0 is simply plain text communication.
          *      - NETWORK_PROV_SECURITY_1 is secure communication which consists of secure handshake
          *          using X25519 key exchange and proof of possession (pop) and AES-CTR
          *          for encryption/decryption of messages.
+         *      - NETWORK_PROV_SECURITY_2 is SRP6a based authentication and key exchange
+         *        + AES-GCM encryption/decryption of messages
          */
+#if CONFIG_APP_PROV_SECURITY_VERSION_2
+        network_prov_security_t security = NETWORK_PROV_SECURITY_2;
+        network_prov_security2_params_t sec2_params = {};
+        sec2_params.salt = sec_salt;
+        sec2_params.salt_len = sec_salt_len;
+        sec2_params.verifier = sec_verifier;
+        sec2_params.verifier_len = sec_verifier_len;
+        network_prov_security2_params_t *sec_params = &sec2_params;
+#else
         network_prov_security_t security = NETWORK_PROV_SECURITY_1;
+        network_prov_security1_params_t *sec_params = pop;
+#endif
 
         /* This step is only useful when scheme is network_prov_scheme_ble. This will
          * set a custom 128 bit UUID which will be included in the BLE advertisement
@@ -199,7 +227,7 @@ esp_err_t thread_start(const char *pop, const char *service_name, const char *se
         }
 
         /* Start provisioning service */
-        ESP_ERROR_CHECK(network_prov_mgr_start_provisioning(security, pop, service_name, service_key));
+        ESP_ERROR_CHECK(network_prov_mgr_start_provisioning(security, (const void *) sec_params, service_name, service_key));
     } else {
         ESP_LOGI(TAG, "Already provisioned, enabling netif and starting Thread");
         /* We don't need the manager as device is already provisioned,

@@ -46,6 +46,17 @@ esp_err_t app_wifi_internal_start(const char *pop, const char *service_name,
                                   const char *service_key, uint8_t *mfg_data,
                                   size_t mfg_data_len, bool *provisioned);
 
+#if CONFIG_APP_PROV_SECURITY_VERSION_2
+/** Set the salt and verifier for Security 2
+ *
+ * @param[in] salt The salt
+ * @param[in] salt_len The salt length
+ * @param[in] verifier The verifier
+ * @param[in] verifier_len The verifier length
+ */
+void app_wifi_internal_set_salt_verifier(const char *salt, size_t salt_len, const char *verifier, size_t verifier_len);
+#endif
+
 #ifdef __cplusplus
 }
 #endif

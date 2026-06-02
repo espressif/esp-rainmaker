@@ -59,10 +59,12 @@ typedef enum {
     POP_TYPE_MAC,
     /** Use random stream generated and stored in fctry partition during claiming process as PoP */
     POP_TYPE_RANDOM,
+#if CONFIG_APP_PROV_SECURITY_VERSION_1
     /** Do not use any PoP.
      * Use this option with caution. Consider using `CONFIG_APP_NETWORK_PROV_TIMEOUT_PERIOD` with this.
      */
     POP_TYPE_NONE,
+#endif
     /** Use a custom PoP.
      * Set a custom PoP using app_network_set_custom_pop() first.
      */
@@ -146,7 +148,7 @@ esp_err_t app_network_set_custom_pop(const char *pop);
  * @param[in] pop_type The type of PoP to generate
  *
  * @return Pointer to the allocated PoP string on success (caller must free).
- * @return NULL on failure or if pop_type is POP_TYPE_NONE.
+ * @return NULL on failure.
  */
 char *app_network_get_device_pop(app_network_pop_type_t pop_type);
 

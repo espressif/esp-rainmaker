@@ -1,16 +1,8 @@
-// Copyright 2020 Espressif Systems (Shanghai) PTE LTD
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+/*
+ * SPDX-FileCopyrightText: 2020-2026 Espressif Systems (Shanghai) CO LTD
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
 
 #include <stdlib.h>
 #include <inttypes.h>
@@ -50,6 +42,21 @@
 #endif
 
 #define ESP_RMAKER_LOCAL_CTRL_SECURITY_TYPE CONFIG_ESP_RMAKER_LOCAL_CTRL_SECURITY
+
+#if ESP_RMAKER_LOCAL_CTRL_SECURITY_TYPE == 2
+#include <esp_srp.h>
+static const char *sec2_username = "wifiprov";
+#define SEC2_SALT_KEY           "sec2_salt"
+#define SEC2_VERIFIER_KEY       "sec2_verifier"
+static void invalidate_sec2_salt_verifier(void);
+
+/* protocomm's sec2 holds only the pointers we hand it (security2.c stores
+ * sv->salt and sv->verifier into the per-session struct, no deep copy);
+ * the buffers must outlive every local-control session. Cache them here
+ * at file scope and release any previous allocation on re-init. */
+static uint8_t *s_sec2_salt;
+static uint8_t *s_sec2_verifier;
+#endif
 
 static const char * TAG = "esp_rmaker_local";
 
@@ -165,7 +172,7 @@ static esp_err_t set_property_values(size_t props_count,
     return ret;
 }
 
-static char *__esp_rmaker_local_ctrl_get_nvs(const char *key)
+static char *__esp_rmaker_local_ctrl_get_nvs(const char *key, size_t *len)
 {
     char *val = NULL;
     nvs_handle handle;
@@ -173,26 +180,24 @@ static char *__esp_rmaker_local_ctrl_get_nvs(const char *key)
     if (err != ESP_OK) {
         return NULL;
     }
-    size_t len = 0;
-    if ((err = nvs_get_blob(handle, key, NULL, &len)) == ESP_OK) {
-        val = MEM_CALLOC_EXTRAM(1, len + 1); /* +1 for NULL termination */
+    if ((err = nvs_get_blob(handle, key, NULL, len)) == ESP_OK) {
+        val = MEM_CALLOC_EXTRAM(1, *len + 1); /* +1 for NULL termination */
         if (val) {
-            nvs_get_blob(handle, key, val, &len);
+            nvs_get_blob(handle, key, val, len);
         }
     }
     nvs_close(handle);
     return val;
-
 }
 
-static esp_err_t __esp_rmaker_local_ctrl_set_nvs(const char *key, const char *val)
+static esp_err_t __esp_rmaker_local_ctrl_set_nvs(const char *key, const char *val, size_t len)
 {
     nvs_handle handle;
     esp_err_t err = nvs_open_from_partition(ESP_RMAKER_NVS_PART_NAME, ESP_RMAKER_NVS_LOCAL_CTRL_NAMESPACE, NVS_READWRITE, &handle);
     if (err != ESP_OK) {
         return err;
     }
-    err = nvs_set_blob(handle, key, val, strlen(val));
+    err = nvs_set_blob(handle, key, val, len);
     nvs_commit(handle);
     nvs_close(handle);
     return err;
@@ -206,7 +211,8 @@ static const char *esp_rmaker_local_ctrl_get_pop()
     }
 
     /* Try to get PoP from NVS */
-    char *pop = __esp_rmaker_local_ctrl_get_nvs(ESP_RMAKER_NVS_LOCAL_CTRL_POP);
+    size_t pop_len = 0;
+    char *pop = __esp_rmaker_local_ctrl_get_nvs(ESP_RMAKER_NVS_LOCAL_CTRL_POP, &pop_len);
     if (pop) {
         /* Copy to static storage (NVS-allocated memory will be freed by caller) */
         s_local_ctrl_pop = strdup(pop);
@@ -229,9 +235,81 @@ static const char *esp_rmaker_local_ctrl_get_pop()
     esp_fill_random(&random_bytes, sizeof(random_bytes));
     snprintf(s_local_ctrl_pop, ESP_RMAKER_POP_LEN, "%02x%02x%02x%02x", random_bytes[0], random_bytes[1], random_bytes[2], random_bytes[3]);
 
-    __esp_rmaker_local_ctrl_set_nvs(ESP_RMAKER_NVS_LOCAL_CTRL_POP, s_local_ctrl_pop);
+    __esp_rmaker_local_ctrl_set_nvs(ESP_RMAKER_NVS_LOCAL_CTRL_POP, s_local_ctrl_pop, ESP_RMAKER_POP_LEN);
+
+#if ESP_RMAKER_LOCAL_CTRL_SECURITY_TYPE == 2
+    /* Fresh PoP → any cached salt+verifier is stale; drop it so we
+     * re-derive against the new PoP on the next service start. */
+    invalidate_sec2_salt_verifier();
+#endif
+
     return s_local_ctrl_pop;
 }
+
+#if ESP_RMAKER_LOCAL_CTRL_SECURITY_TYPE == 2
+static esp_err_t read_salt_bytes_from_nvs(uint8_t **bytes, size_t *len)
+{
+    char *salt = __esp_rmaker_local_ctrl_get_nvs(SEC2_SALT_KEY, len);
+    if (!salt) {
+        return ESP_FAIL;
+    }
+    *bytes = (uint8_t *)salt;
+    return ESP_OK;
+}
+
+static esp_err_t read_verifier_bytes_from_nvs(uint8_t **bytes, size_t *len)
+{
+    char *verifier = __esp_rmaker_local_ctrl_get_nvs(SEC2_VERIFIER_KEY, len);
+    if (!verifier) {
+        return ESP_FAIL;
+    }
+    *bytes = (uint8_t *)verifier;
+    return ESP_OK;
+}
+
+static esp_err_t store_salt_bytes_to_nvs(const char *bytes, size_t len)
+{
+    return __esp_rmaker_local_ctrl_set_nvs(SEC2_SALT_KEY, (const char *)bytes, len);
+}
+
+static esp_err_t store_verifier_bytes_to_nvs(const char *bytes, size_t len)
+{
+    return __esp_rmaker_local_ctrl_set_nvs(SEC2_VERIFIER_KEY, (const char *)bytes, len);
+}
+
+static esp_err_t get_sec2_salt_verifier(uint8_t **salt, size_t *salt_len, uint8_t **verifier, size_t *verifier_len)
+{
+    if (read_salt_bytes_from_nvs(salt, salt_len) != ESP_OK) {
+        *salt = NULL;
+        return ESP_FAIL;
+    }
+    if (read_verifier_bytes_from_nvs(verifier, verifier_len) != ESP_OK) {
+        free(*salt);
+        *salt = NULL;
+        *verifier = NULL;
+        return ESP_FAIL;
+    }
+    return ESP_OK;
+}
+
+/* Invalidate the cached SRP6a derivation. Must be called whenever the PoP
+ * changes so the next session re-derives salt+verifier from the new PoP
+ * (otherwise client and device would compute different verifiers and
+ * authentication would silently fail). */
+static void invalidate_sec2_salt_verifier(void)
+{
+    nvs_handle_t handle;
+    if (nvs_open_from_partition(ESP_RMAKER_NVS_PART_NAME,
+                                ESP_RMAKER_NVS_LOCAL_CTRL_NAMESPACE,
+                                NVS_READWRITE, &handle) != ESP_OK) {
+        return;
+    }
+    nvs_erase_key(handle, SEC2_SALT_KEY);
+    nvs_erase_key(handle, SEC2_VERIFIER_KEY);
+    nvs_commit(handle);
+    nvs_close(handle);
+}
+#endif
 
 esp_err_t esp_rmaker_local_ctrl_set_pop(const char *pop)
 {
@@ -259,6 +337,12 @@ esp_err_t esp_rmaker_local_ctrl_set_pop(const char *pop)
         ESP_LOGE(TAG, "Failed to allocate memory for custom PoP");
         return ESP_ERR_NO_MEM;
     }
+
+#if ESP_RMAKER_LOCAL_CTRL_SECURITY_TYPE == 2
+    /* PoP changed → drop the cached SRP6a derivation so it gets re-generated
+     * against the new PoP on the next service start. */
+    invalidate_sec2_salt_verifier();
+#endif
 
     ESP_LOGI(TAG, "Custom PoP set for local control");
     return ESP_OK;
@@ -615,30 +699,74 @@ static esp_err_t __esp_rmaker_start_local_ctrl_service(const char *serv_name)
         .max_properties = 10
     };
 
-    /* If sec1, add security type details to the config */
-#define PROTOCOMM_SEC_DATA protocomm_security1_params_t
-    PROTOCOMM_SEC_DATA *pop = NULL;
 #if ESP_RMAKER_LOCAL_CTRL_SECURITY_TYPE == 1
-        const char *pop_str = esp_rmaker_local_ctrl_get_pop();
-        /* Note: pop_str points to s_local_ctrl_pop.
-         * The pointer remains valid until esp_rmaker_local_ctrl_set_pop() is called,
-         * which is acceptable as PoP is typically only ~9 bytes. */
+    /* If sec1, add security type details to the config */
+    protocomm_security1_params_t *pop = NULL;
+    const char *pop_str = esp_rmaker_local_ctrl_get_pop();
+    int sec_ver = esp_rmaker_local_ctrl_get_security_type();
 
-        int sec_ver = esp_rmaker_local_ctrl_get_security_type();
-
-        if (sec_ver != 0 && pop_str) {
-            pop = (PROTOCOMM_SEC_DATA *)MEM_CALLOC_EXTRAM(1, sizeof(PROTOCOMM_SEC_DATA));
-            if (!pop) {
-                ESP_LOGE(TAG, "Failed to allocate pop");
-                return ESP_ERR_NO_MEM;
-            }
-            pop->data = (uint8_t *)pop_str;
-            pop->len = strlen(pop_str);
+    if (sec_ver != 0 && pop_str) {
+        pop = (protocomm_security1_params_t *)MEM_CALLOC_EXTRAM(1, sizeof(protocomm_security1_params_t));
+        if (!pop) {
+            ESP_LOGE(TAG, "Failed to allocate pop");
+            return ESP_ERR_NO_MEM;
         }
+        pop->data = (uint8_t *)pop_str;
+        pop->len = strlen(pop_str);
+    }
 
-        config.proto_sec.version = sec_ver;
-        config.proto_sec.custom_handle = NULL;
-        config.proto_sec.sec_params = pop;
+    config.proto_sec.version = sec_ver;
+    config.proto_sec.custom_handle = NULL;
+    config.proto_sec.sec_params = pop;
+#elif ESP_RMAKER_LOCAL_CTRL_SECURITY_TYPE == 2
+    const char *pop_str = esp_rmaker_local_ctrl_get_pop();
+    int sec_ver = esp_rmaker_local_ctrl_get_security_type();
+
+    /* Drop any salt/verifier from a previous call before regenerating. */
+    if (s_sec2_salt) {
+        free(s_sec2_salt);
+        s_sec2_salt = NULL;
+    }
+    if (s_sec2_verifier) {
+        free(s_sec2_verifier);
+        s_sec2_verifier = NULL;
+    }
+
+    size_t salt_len = 16;
+    size_t verifier_len = 0;
+    esp_err_t err = get_sec2_salt_verifier(&s_sec2_salt, &salt_len,
+                                           &s_sec2_verifier, &verifier_len);
+    if (err != ESP_OK) {
+        ESP_LOGW(TAG, "salt-verifier pair not found in NVS! Generating a new one...");
+        if (!pop_str) {
+            ESP_LOGE(TAG, "PoP is required to generate sec2 salt-verifier");
+            return ESP_FAIL;
+        }
+        int gen_verifier_len = 0;
+        esp_err_t ret = esp_srp_gen_salt_verifier(sec2_username, strlen(sec2_username), (const char *) pop_str, strlen(pop_str),
+                                                (char **) &s_sec2_salt, (int) salt_len,
+                                                (char **) &s_sec2_verifier, &gen_verifier_len);
+        if (ret != ESP_OK) {
+            ESP_LOGE(TAG, "Failed to generate salt-verifier pair");
+            return ESP_FAIL;
+        }
+        verifier_len = (size_t) gen_verifier_len;
+        store_salt_bytes_to_nvs((const char *) s_sec2_salt, salt_len);
+        store_verifier_bytes_to_nvs((const char *) s_sec2_verifier, verifier_len);
+    }
+
+    /* sec2_params is consumed by protocomm via a shallow memcpy of the
+     * struct; salt/verifier pointers must remain valid for the lifetime
+     * of every protocomm sec2 session — hence the file-scope statics. */
+    static protocomm_security2_params_t sec2_params;
+    sec2_params.salt = (const char *) s_sec2_salt;
+    sec2_params.salt_len = (uint16_t) salt_len;
+    sec2_params.verifier = (const char *) s_sec2_verifier;
+    sec2_params.verifier_len = (uint16_t) verifier_len;
+
+    config.proto_sec.version = sec_ver;
+    config.proto_sec.custom_handle = NULL;
+    config.proto_sec.sec_params = &sec2_params;
 #endif
 
     /* Start esp_local_ctrl service */
@@ -656,9 +784,16 @@ static esp_err_t __esp_rmaker_start_local_ctrl_service(const char *serv_name)
     srp_client_add_local_ctrl_service(serv_name);
 #endif
 
+#if ESP_RMAKER_LOCAL_CTRL_SECURITY_TYPE == 1
     if (pop) {
         free(pop);
     }
+#endif
+    /* sec2 path: salt/verifier are held in file-scope statics; protocomm
+     * dereferences them on every new session, so they are intentionally
+     * not freed here. invalidate_sec2_salt_verifier() drops the NVS
+     * cache; the next call to this function replaces the in-memory
+     * pointers. */
 
     ESP_LOGI(TAG, "esp_local_ctrl service started with name : %s", serv_name);
 
@@ -743,7 +878,7 @@ esp_err_t esp_rmaker_init_local_ctrl_service(void)
 
 esp_err_t esp_rmaker_start_local_ctrl_service(const char *serv_name)
 {
-    if (ESP_RMAKER_LOCAL_CTRL_SECURITY_TYPE == 1) {
+    if (ESP_RMAKER_LOCAL_CTRL_SECURITY_TYPE == 1 || ESP_RMAKER_LOCAL_CTRL_SECURITY_TYPE == 2) {
         esp_rmaker_local_ctrl_service_enable();
     }
 
@@ -795,7 +930,7 @@ esp_err_t esp_rmaker_local_ctrl_disable(void)
     if (err != ESP_OK) {
         return err;
     }
-    if (ESP_RMAKER_LOCAL_CTRL_SECURITY_TYPE == 1) {
+    if (ESP_RMAKER_LOCAL_CTRL_SECURITY_TYPE == 1 || ESP_RMAKER_LOCAL_CTRL_SECURITY_TYPE == 2) {
         err = esp_rmaker_local_ctrl_service_disable();
         if (err != ESP_OK) {
             return err;

@@ -1,5 +1,20 @@
 # Changelog
 
+## 1.14.0
+
+### Changes
+
+- Sec2 is now the default protocomm security version for provisioning.
+- Add protocomm security version 2 (SRP6a) support for Wi-Fi/Thread provisioning
+  - Kconfig choice for security version 1 (PoP-less option) or 2
+  - Salt/verifier handling in provisioning and local control flows; cached
+    in factory NVS, regenerated when PoP changes
+  - QR code generation includes username for sec2
+- Add security version 2 support for local control service
+  - Salt-verifier generated from PoP if not found in factory NVS
+  - Local control Kconfig default remains sec1; examples opt into sec2
+    via sdkconfig.defaults
+
 ## 1.13.0
 
 ### Changes
