@@ -1,5 +1,23 @@
 # Changelog
 
+## 1.15.0
+
+### Changes
+
+- MQTT OTA reliability and recovery
+  - Validate image header completeness; verify ESP_APP_DESC magic word
+    (fixes spurious "Project Name mismatch" rejections)
+  - Per-request block bitmap so retries only fetch missing blocks
+  - Fast-abort current attempt on MQTT disconnect; gate next attempt on reconnect
+  - Resume across reboots via (file_md5, block_offset) NVS state (IDF >= 5.5.0)
+  - Fix teardown race by flipping state to INVALID_STATE before unsubscribe
+- MQTT OTA Kconfig defaults
+  - `ESP_RMAKER_MQTT_OTA_BLOCK_SIZE` 3072 → 4096 (flash-sector aligned)
+  - `ESP_RMAKER_MQTT_OTA_NO_OF_BLOCKS` 42 → 16 (finer resume-checkpoint cadence)
+  - New `ESP_RMAKER_MQTT_OTA_BLOCK_WAIT_SEC` (default 10s)
+- Add `CONFIG_ESP_RMAKER_OTA_TEST_ROLLBACK` (test-only) for repeat-testing
+  the OTA pipeline from a single image push
+
 ## 1.14.0
 
 ### Changes

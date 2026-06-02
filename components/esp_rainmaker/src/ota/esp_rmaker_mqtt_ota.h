@@ -36,6 +36,11 @@ typedef struct {
     uint32_t block_length;
     uint16_t blocks_per_request;
     uint8_t max_retry_count;
+    char *file_md5;                 /*!< If set and CONFIG_ESP_RMAKER_MQTT_OTA_RESUMPTION is enabled,
+                                         OTA progress is persisted to NVS for resume across reboots. */
+    uint32_t resume_offset_blocks;  /*!< If non-zero, resume from this block index. Caller is
+                                         responsible for verifying file_md5 matches the persisted
+                                         value before passing a non-zero offset. */
 } esp_rmaker_mqtt_ota_config_t;
 
 typedef void *esp_rmaker_mqtt_ota_handle_t;
