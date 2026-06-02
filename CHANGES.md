@@ -1,5 +1,12 @@
 # Changes
 
+## 02-Jun-2026: MQTT OTA Reliability Improvements
+
+- MQTT OTA gains resume-across-reboots, fast-abort on disconnect, a per-block timeout
+  knob, and tuned block-size/count defaults. ESP32-C2 examples now default to MQTT OTA.
+  Check the esp_rainmaker component's
+  [CHANGELOG v1.15.0](components/esp_rainmaker/CHANGELOG.md#1150) for details.
+
 ## 16-Apr-2026: Security Version 2 Support
 
 - Add protocomm security version 2 (SRP6a) support for provisioning and local control.
