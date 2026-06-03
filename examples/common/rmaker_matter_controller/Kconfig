@@ -1,0 +1,15 @@
+menu "ESP Rainmaker Controller"
+
+    config RAINMAKER_MATTER_CONTROLLER_TASK_STACK
+        int "ESP Rainmaker Matter Controller Task Stack Size"
+        default 7168
+        help
+            Set the stack size of ESP Rainmaker Matter Controller task.
+
+    config RAINMAKER_MATTER_CONTROLLER_MAX_ENDPOINT_COUNT_PER_DEVICE
+        int "ESP Rainmaker Matter Controller Max Endpoint Count Per Device"
+        default 4
+        help
+            Set the maximum endpoint count per device for ESP Rainmaker Matter Controller.
+
+endmenu
