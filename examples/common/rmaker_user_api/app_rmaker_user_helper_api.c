@@ -389,6 +389,7 @@ esp_err_t app_rmaker_user_helper_api_set_node_params(const char *node_id, const 
     }
     app_rmaker_user_api_request_config_t request_config = {
         .reuse_session = true,
+        .payload_is_json = true,
         .api_type = APP_RMAKER_USER_API_TYPE_PUT,
         .api_name = app_rmaker_user_api_nodes_params_url,
         .api_query_params = strlen(query_params) > 0 ? query_params : NULL,
@@ -482,6 +483,7 @@ esp_err_t app_rmaker_user_helper_api_create_group(const char *group_payload, cha
 
     app_rmaker_user_api_request_config_t request_config = {
         .reuse_session = true,
+        .payload_is_json = true,
         .api_type = APP_RMAKER_USER_API_TYPE_POST,
         .api_name = app_rmaker_user_api_nodes_group_url,
         .api_query_params = NULL,
@@ -529,6 +531,7 @@ esp_err_t app_rmaker_user_helper_api_operate_node_to_group(const char *group_id,
     snprintf(query_params, sizeof(query_params), "group_id=%s", group_id);
     app_rmaker_user_api_request_config_t request_config = {
         .reuse_session = true,
+        .payload_is_json = true,
         .api_type = APP_RMAKER_USER_API_TYPE_PUT,
         .api_name = app_rmaker_user_api_nodes_group_url,
         .api_query_params = query_params,
@@ -565,6 +568,7 @@ esp_err_t app_rmaker_user_helper_api_set_node_mapping(const char *secret_key, co
 
     app_rmaker_user_api_request_config_t request_config = {
         .reuse_session = true,
+        .payload_is_json = true,
         .api_type = APP_RMAKER_USER_API_TYPE_PUT,
         .api_name = app_rmaker_user_api_nodes_mapping_url,
         .api_query_params = NULL,

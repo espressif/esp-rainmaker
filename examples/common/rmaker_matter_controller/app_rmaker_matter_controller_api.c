@@ -465,6 +465,7 @@ esp_err_t app_rmaker_api_issue_noc(const uint8_t *csr_der, size_t csr_der_len, c
 #else
         .reuse_session = false,
 #endif
+        .payload_is_json = true,
         .api_type = APP_RMAKER_USER_API_TYPE_PUT,
         .api_name = "user/node_group",
         .api_version = NULL,
@@ -531,6 +532,7 @@ esp_err_t app_rmaker_api_create_matter_controller(const char *rainmaker_node_id,
 #else
         .reuse_session = false,
 #endif
+        .payload_is_json = true,
         .api_type = APP_RMAKER_USER_API_TYPE_PUT,
         .api_name = "user/node_group",
         .api_version = NULL,

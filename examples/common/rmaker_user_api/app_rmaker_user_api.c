@@ -488,6 +488,7 @@ esp_err_t app_rmaker_user_api_login(void)
     app_rmaker_user_api_request_config_t request_config = {
         .reuse_session = true,
         .no_need_authorize = true,
+        .payload_is_json = true,
         .api_type = APP_RMAKER_USER_API_TYPE_POST,
         .api_name = rmaker_user_api_login_url,
         .api_version = g_rmaker_user_api_ctx.api_version,
