@@ -1,4 +1,4 @@
-version: "1.0.0"
+version: "1.0.1"
 description: ESP RainMaker Matter Controller
 url: https://github.com/espressif/esp-rainmaker/tree/master/examples/common/rmaker_matter_controller
 repository: https://github.com/espressif/esp-rainmaker.git

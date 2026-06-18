@@ -89,6 +89,7 @@ esp_err_t rainmaker_cli_handler_remove_node(const char *node_id, char **response
     snprintf(payload, sizeof(payload), "{\"node_id\":\"%s\",\"operation\":\"remove\"}", node_id);
     app_rmaker_user_api_request_config_t request_config = {
         .reuse_session = true,
+        .payload_is_json = true,
         .api_type = APP_RMAKER_USER_API_TYPE_PUT,
         .api_name = "user/nodes/mapping",
         .api_version = "v1",
