@@ -92,3 +92,10 @@ docs/docusaurus/website/node_modules
 *.rej
 *.orig
 
+
+# esp_rainmaker test_app local unit-test runner artifacts (run_unit_tests_local.sh)
+/resource-pool-cli.py
+/.resource_id
+/.job_id
+/.rainmaker_claim/
+components/esp_rainmaker/test_app/result.txt

@@ -32,11 +32,11 @@ INPUT = \
     $(PROJECT_PATH)/components/esp_rainmaker/include/esp_rmaker_ota.h \
     $(PROJECT_PATH)/components/esp_rainmaker/include/esp_rmaker_mqtt.h \
     $(PROJECT_PATH)/components/esp_rainmaker/include/esp_rmaker_console.h \
-    $(PROJECT_PATH)/components/rmaker_common/include/esp_rmaker_common_events.h \
+    $(PROJECT_PATH)/components/rmaker_common/components/rmaker_common_events/include/esp_rmaker_common_events.h \
     $(PROJECT_PATH)/components/rmaker_common/include/esp_rmaker_factory.h \
-    $(PROJECT_PATH)/components/rmaker_common/include/esp_rmaker_work_queue.h \
+    $(PROJECT_PATH)/components/rmaker_common/components/rmaker_work_queue/include/esp_rmaker_work_queue.h \
     $(PROJECT_PATH)/components/rmaker_common/include/esp_rmaker_utils.h \
-    $(PROJECT_PATH)/components/rmaker_common/include/esp_rmaker_cmd_resp.h \
+    $(PROJECT_PATH)/components/rmaker_common/components/rmaker_cmd_resp/include/esp_rmaker_cmd_resp.h \
     $(PROJECT_PATH)/components/rmaker_common/include/esp_rmaker_mqtt_glue.h
 
 ## Get warnings for functions that have no documentation for their parameters or return value
