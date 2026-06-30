@@ -85,6 +85,14 @@ before_script:
   - idf.py set-target $TARGET
   - idf.py build
 
+# Cap ninja -j (see tools/ci/ninja_shim/ninja) so the heavy connectedhomeip C++
+# build does not spawn cpu_cores+2 compiles and OOM-kill the job. Override with
+# the NINJA_JOBS job variable.
+.setup_ninja_shim: &setup_ninja_shim
+  - export NINJA_JOBS="${NINJA_JOBS:-6}"
+  - export REAL_NINJA="$(command -v ninja)"
+  - export PATH="$CI_PROJECT_DIR/tools/ci/ninja_shim:$PATH"
+
 .build_matter_examples: &build_matter_examples
   # start building examples
   - for EXAMPLE in $EXAMPLES; do
@@ -325,6 +333,7 @@ build_matter:
     EXAMPLES: "matter/matter_light matter/matter_switch"
     CONTROLLER_EXAMPLE_TARGET: "esp32s3"
   script:
+    - *setup_ninja_shim
     - *build_matter_examples
     - *build_matter_controller_example
 
