@@ -41,6 +41,24 @@ dependencies:
     version: "*"
     rules:
       - if: "target in [esp32p4]"
+  # Use the local P4-EYE BSP from the KVS SDK: it does the board-specific
+  # camera bring-up (XCLK allocate/start, sensor reset + enable pins) that the
+  # stock registry BSP omits — without it the OV2710 gets no master clock and
+  # never ACKs on SCCB ("Get sensor ID failed" -> session comes up audio-only).
+  espressif/esp32_p4_eye:
+    version: "*"
+    override_path: ${KVS_SDK_PATH}/examples/common_components/esp32_p4_eye
+    matches:
+      - if: $CONFIG{ESP32_P4_EYE} == 1 && $CONFIG{BSP_SELECT_GLIB_SEL} == 1
+
+  # Host-side flasher for the on-board co-processor (C6/C5). Enabled by the
+  # P4 board overlays (p4_eye / p4x_eye / p4_c5_core_board) that ship the
+  # slave image in a 'slave' SPIFFS partition; a no-op when disabled.
+  slave_flasher:
+    path: ${KVS_SDK_PATH}/components/slave_flasher
+    version: "*"
+    rules:
+      - if: "target in [esp32p4]"
 
   # Local components
   rmaker_camera:

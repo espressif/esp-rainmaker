@@ -9,6 +9,8 @@
 #include "esp_err.h"
 #include "esp_log.h"
 #include "nvs_flash.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
 
 #include <esp_rmaker_core.h>
 #include <esp_rmaker_standard_types.h>
@@ -24,6 +26,26 @@
 #include "esp_cli.h"
 #include "kvs_peer_connection.h"
 #include "media_stream.h"
+
+#if CONFIG_ESP_HOSTED_ENABLE_BT_NIMBLE
+/* On P4 the BLE controller lives on the C6 co-processor and is driven over the
+ * esp_hosted VHCI transport; it must be explicitly brought up before BLE
+ * provisioning (NimBLE cannot init a local controller on the P4). */
+#include "esp_hosted.h"
+#endif
+
+#ifdef CONFIG_SLAVE_FLASHER_ENABLE
+#include "slave_flasher.h"
+static vprintf_like_t s_original_vprintf = NULL;
+
+/* Prefix co-processor flashing logs with [HOST] so they're easy to tell apart
+ * from the slave's own output that slave_flasher streams back over UART. */
+static int custom_vprintf(const char *fmt, va_list args)
+{
+    printf("\033[1;36m[HOST]\033[0m ");
+    return s_original_vprintf ? s_original_vprintf(fmt, args) : vprintf(fmt, args);
+}
+#endif
 
 static const char *TAG = "app_main";
 
@@ -175,6 +197,10 @@ static void initialize_reset_button(void)
     }
 }
 
+/* Boot-time co-processor flash: retry a few times to ride out a transient
+ * UART glitch before giving up (each attempt is a no-op unless the MD5 differs). */
+#define SLAVE_FLASH_MAX_ATTEMPTS 3
+
 void app_main(void)
 {
     /* Initialize NVS */
@@ -186,6 +212,29 @@ void app_main(void)
     ESP_ERROR_CHECK(ret);
 
     ESP_LOGI(TAG, "ESP32 WebRTC Camera Example");
+
+#ifdef CONFIG_SLAVE_FLASHER_ENABLE
+    /* On single-PCB P4 boards (e.g. P4-EYE) the on-board C6/C5 co-processor is
+     * flashed in-system: write the embedded network_adapter image over UART
+     * before bringing up the hosted SDIO link. Must run before app_network_init(). */
+    s_original_vprintf = esp_log_set_vprintf(custom_vprintf);
+    /* flash_slave() re-flashes only on MD5 mismatch, so a warm reboot is a no-op. */
+    for (int attempt = 1; attempt <= SLAVE_FLASH_MAX_ATTEMPTS; attempt++) {
+        ret = flash_slave();
+        if (ret == ESP_OK) {
+            break;
+        }
+        ESP_LOGW(TAG, "Co-processor flash attempt %d/%d failed: %s",
+                 attempt, SLAVE_FLASH_MAX_ATTEMPTS, esp_err_to_name(ret));
+        vTaskDelay(pdMS_TO_TICKS(100));
+    }
+    esp_log_set_vprintf(s_original_vprintf);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to flash co-processor after %d attempts: %s",
+                 SLAVE_FLASH_MAX_ATTEMPTS, esp_err_to_name(ret));
+        return;
+    }
+#endif
 
     /* Initialize ESP CLI */
     esp_cli_start();
@@ -215,6 +264,21 @@ void app_main(void)
 
     /* Initialize reset button */
     initialize_reset_button();
+
+#if CONFIG_ESP_HOSTED_ENABLE_BT_NIMBLE
+    /* On P4 the BLE controller lives on the C6 co-processor and is reached over
+     * the esp_hosted VHCI transport. Bring it up here (at the example layer,
+     * before BLE provisioning starts) since NimBLE cannot init a local
+     * controller on the P4. It is left up after provisioning: the only safe
+     * teardown signal (NimBLE fully stopped) isn't exposed by app_network, and
+     * deinit'ing earlier races the NimBLE host shutdown. */
+    if (esp_hosted_bt_controller_init() != ESP_OK) {
+        ESP_LOGW(TAG, "Failed to init co-processor BT controller");
+    }
+    if (esp_hosted_bt_controller_enable() != ESP_OK) {
+        ESP_LOGW(TAG, "Failed to enable co-processor BT controller");
+    }
+#endif
 
     /* Start the Wi-Fi and wait for connection */
     ESP_LOGI(TAG, "Starting Wi-Fi provisioning or connection...");

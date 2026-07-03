@@ -53,6 +53,32 @@ Go to the example directory and follow the steps below:
     idf.py set-target [esp32p4/esp32s3/esp32]
 ```
 
+### Board-specific builds (ESP32-P4)
+
+The P4 build ships per-board overlays that layer on top of `sdkconfig.defaults`
++ `sdkconfig.defaults.esp32p4`. Pass the overlay chain in the **same**
+`set-target` invocation — otherwise the board's choice symbols lose to the
+already-generated `sdkconfig`:
+
+| Board | Overlay | Co-processor |
+|-------|---------|--------------|
+| ESP32-P4-EYE (pre-v3 silicon) | `sdkconfig.defaults.p4_eye.esp32p4` | on-board C6, flashed in-system |
+| ESP32-P4-EYE (v3+ / P4X) | `sdkconfig.defaults.p4x_eye.esp32p4` | on-board C6, flashed in-system |
+| ESP32-P4-Function-EV v1.2 | `sdkconfig.defaults.p4_function_ev_board_v12.esp32p4` | external C6 (ESP-Prog) |
+| ESP32-P4-Function-EV v1.6 | `sdkconfig.defaults.p4_function_ev_board_v16.esp32p4` | external C6 (ESP-Prog) |
+| ESP32-P4 + C5 core board | `sdkconfig.defaults.p4_c5_core_board.esp32p4` | on-board C5, flashed in-system |
+
+```bash
+    # e.g. ESP32-P4-EYE
+    idf.py -D 'SDKCONFIG_DEFAULTS=sdkconfig.defaults;sdkconfig.defaults.esp32p4;sdkconfig.defaults.p4_eye.esp32p4' set-target esp32p4 build
+```
+
+On the `p4_eye` / `p4x_eye` / `p4_c5_core_board` boards the on-board
+co-processor is flashed automatically from the P4 image via `slave_flasher`.
+Drop the C6/C5 `network_adapter` binaries into `target-firmware/` first — see
+`target-firmware/README.md`. The Function-EV boards flash their external C6
+directly over ESP-Prog (see below).
+
 - Different Development boards have different options for CONSOLE and LOGs
 - You may want to do menuconfig and change it as per your board
 

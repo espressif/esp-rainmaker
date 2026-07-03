@@ -1,0 +1,73 @@
+#
+# ESP32-P4-EYE (P4X) board build config for the RainMaker standalone camera
+# example. Same board as p4_eye, but built for NEWER ESP32-P4 silicon
+# (chip revision > v3 / ECO5+). The ONLY delta vs p4_eye is the chip-revision
+# selection; everything else (16 MB flash, OV2710, ST7789 byte-swap,
+# slave_flasher embedding the C6 network_adapter) is identical.
+#
+# Build with:
+#   idf.py -D 'SDKCONFIG_DEFAULTS=sdkconfig.defaults;sdkconfig.defaults.esp32p4;sdkconfig.defaults.p4x_eye.esp32p4' set-target esp32p4 build
+#
+CONFIG_PARTITION_TABLE_CUSTOM=y
+
+#
+# Chip revision - P4X = newer ESP32-P4 silicon (rev > v3, ECO5+). Leave
+# ESP32P4_SELECTS_REV_LESS_V3 OFF so the bootloader/cache use v3+ timing.
+#
+# CONFIG_ESP32P4_SELECTS_REV_LESS_V3 is not set
+
+#
+# Board variant selection (see p4_eye overlay for details).
+#
+CONFIG_BSP_SELECT_ESP32_P4_EYE=y
+CONFIG_ESP32P4_EYE_C6_BOARD=y
+
+#
+# Flash - 16 MB, app + C6 slave firmware in the 'slave' SPIFFS partition.
+#
+# CONFIG_ESPTOOLPY_FLASHSIZE_8MB is not set
+CONFIG_ESPTOOLPY_FLASHSIZE_16MB=y
+CONFIG_ESPTOOLPY_FLASHSIZE="16MB"
+CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions.16mb.csv"
+CONFIG_PARTITION_TABLE_FILENAME="partitions.16mb.csv"
+
+#
+# Slave flasher - addresses match the network_adapter C6 layout: partition
+# table at 0x8000, first app slot at 0x10000 (component defaults would brick
+# the C6 boot chain).
+#
+CONFIG_SLAVE_FLASHER_ENABLE=y
+CONFIG_SLAVE_PARTITION_TABLE_ADDRESS=0x8000
+CONFIG_SLAVE_APPLICATION_ADDRESS=0x10000
+CONFIG_SLAVE_UART_RX_PIN=36
+CONFIG_SLAVE_UART_TX_PIN=35
+CONFIG_SLAVE_GPIO0_TRIGGER_PIN=33
+
+#
+# Camera sensor: OV2710 on MIPI-CSI, 1080p @ 25fps.
+#
+CONFIG_CAMERA_OV2710=y
+CONFIG_CAMERA_OV2710_AUTO_DETECT_MIPI_INTERFACE_SENSOR=y
+CONFIG_CAMERA_OV2710_MIPI_RAW10_1920X1080_25FPS=y
+CONFIG_CAMERA_OV2710_STATS_UPDATE_INTERVAL=500
+
+#
+# Console on native USB Serial/JTAG (P4 USB-C port directly).
+#
+CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG=y
+CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG_ENABLED=y
+CONFIG_ESP_CONSOLE_SECONDARY_NONE=y
+
+#
+# Video player (receive path) - canvas pinned to the 240x240 P4-EYE LCD.
+#
+CONFIG_MEDIA_STREAM_PLAYER_MAX_WIDTH=240
+CONFIG_MEDIA_STREAM_PLAYER_MAX_HEIGHT=240
+
+#
+# LVGL: ST7789 SPI panel byte order needs LV_COLOR_16_SWAP=y on P4-EYE.
+#
+CONFIG_LV_DISP_DEF_REFR_PERIOD=200
+CONFIG_BSP_DISPLAY_LVGL_MAX_SLEEP=100
+CONFIG_ESP_TASK_WDT_TIMEOUT_S=15
+CONFIG_LV_COLOR_16_SWAP=y
