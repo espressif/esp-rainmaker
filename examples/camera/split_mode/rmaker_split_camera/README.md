@@ -4,6 +4,8 @@ This example demonstrates the **signaling-only** part of the ESP RainMaker Camer
 
 The **media_adapter** firmware (from `split_mode/media_adapter/`) must be flashed on ESP32-P4 to handle the media streaming part.
 
+> **Note — no OTA in split mode:** the C6 app is ~2.2 MB and the C6 also carries the hosted-slave firmware, so two OTA slots no longer fit in its 4 MB flash. The C6 uses a single `factory` app partition, and RainMaker OTA is unavailable for the split camera. Update the C6 by re-flashing over serial.
+
 ## Prerequisites
 
 - IDF version: release/v5.5 (v5.5.x)
@@ -43,10 +45,21 @@ More comprehensive documentation for setup:
   1. Confirm that you cloned the default branch
   2. If you missed the `--recursive` option during cloning, run `git submodule update --init --recursive`
 
-- Go to the example directory and follow the steps below:
+- Go to the example directory:
 ```bash
-cd esp-rainmaker/examples/camera/split_mode/rmaker_camera
-idf.py set-target esp32c6
+cd esp-rainmaker/examples/camera/split_mode/rmaker_split_camera
+```
+
+- Build the C6 firmware with the pair overlay for your host board. Pass the
+  overlay chain in the **same** `set-target` invocation, otherwise the board's
+  choice symbols lose to the already-generated sdkconfig:
+
+```bash
+# ESP32-P4-EYE (on-board C6):
+idf.py -D 'SDKCONFIG_DEFAULTS=sdkconfig.defaults;sdkconfig.defaults.esp32c6;sdkconfig.defaults.p4_eye_pair.esp32c6' set-target esp32c6 build
+
+# ESP32-P4 Function EV Board (C6 on the EV header):
+idf.py -D 'SDKCONFIG_DEFAULTS=sdkconfig.defaults;sdkconfig.defaults.esp32c6;sdkconfig.defaults.evboard_pair.esp32c6' set-target esp32c6 build
 ```
 
 *__NOTE__*:
@@ -61,16 +74,18 @@ idf.py set-target esp32c6
 | EN       | EN       |
 | GND      | GND      |
 
-- Build and flash the example
+- Flash and monitor:
 ```bash
-idf.py build
 idf.py -p [PORT] flash monitor
 ```
 
-- Build and flash the streaming_only example from KVS SDK on ESP32-P4:
+- Build and flash the streaming_only example from the KVS SDK on ESP32-P4,
+  using the board overlay for your P4 board (see that example for the full
+  board list). Pass the overlay chain in the same `set-target` invocation:
 ```bash
   cd ${KVS_SDK_PATH}/examples/streaming_only
-  idf.py set-target esp32p4
+  # e.g. ESP32-P4-EYE:
+  idf.py -D 'SDKCONFIG_DEFAULTS=sdkconfig.defaults;sdkconfig.defaults.esp32p4;sdkconfig.defaults.p4_eye.esp32p4' set-target esp32p4
 ```
 
 - For ESP32-P4, different versions of the Dev boards have different options for CONSOLE and LOGs

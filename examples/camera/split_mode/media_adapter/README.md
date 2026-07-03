@@ -27,19 +27,13 @@ This is not a separate ESP RainMaker example - it's the standard KVS SDK streami
 
 ## Build and Flash
 
-⚠️ **Important**: Flash `rmaker_camera` firmware on ESP32-C6 first (see [rmaker_camera README](../rmaker_camera/README.md)).
+⚠️ **Important**: Flash `rmaker_camera` firmware on ESP32-C6 first (see [rmaker_camera README](../rmaker_split_camera/README.md)).
 
 ```bash
 cd ${KVS_SDK_PATH}/examples/streaming_only
-idf.py set-target esp32p4
-
-# Configure console output (required for different board versions)
-idf.py menuconfig
-# Go to Component config -> ESP System Settings -> Channel for console output
-# (X) USB Serial/JTAG Controller # For ESP32-P4 Function_EV_Board V1.2 OR V1.5
-# (X) Default: UART0 # For ESP32-P4 Function_EV_Board V1.4
-
-idf.py build
+# Build for your P4 board using its overlay, chained in the same set-target
+# invocation so the board's console/sensor/flash settings apply (e.g. P4-EYE):
+idf.py -D 'SDKCONFIG_DEFAULTS=sdkconfig.defaults;sdkconfig.defaults.esp32p4;sdkconfig.defaults.p4_eye.esp32p4' set-target esp32p4 build
 idf.py -p [PORT] flash monitor
 ```
 
@@ -53,6 +47,6 @@ idf.py -p [PORT] flash monitor
 
 ## Related Documentation
 
-- [rmaker_camera README](../rmaker_camera/README.md) - Partner device documentation
+- [rmaker_camera README](../rmaker_split_camera/README.md) - Partner device documentation
 - [Split Mode Overview](../README.md) - Complete split mode architecture
 - [streaming_only README](../../../../esp-port-for-amazon-kvs-sdk/examples/streaming_only/README.md) - Full documentation of the streaming_only example

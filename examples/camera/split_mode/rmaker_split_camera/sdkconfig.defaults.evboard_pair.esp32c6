@@ -1,0 +1,18 @@
+#
+# rmaker_split_camera C6 build config when pairing with the ESP32-P4 Function
+# EV Board (the C6 module sits on the EV board's C6 header). Layered on top of
+# sdkconfig.defaults + sdkconfig.defaults.esp32c6.
+#
+# Build with:
+#   idf.py -D 'SDKCONFIG_DEFAULTS=sdkconfig.defaults;sdkconfig.defaults.esp32c6;sdkconfig.defaults.evboard_pair.esp32c6' set-target esp32c6 build
+#
+
+#
+# esp_hosted board variant - the EV / Function dev board uses the stock C6
+# SDIO slave pinout (the slave-side ESP_HOST_DEV_BOARD_P4_FUNC_BOARD choice).
+# Make sure the P4-EYE-specific pin overrides are NOT applied.
+#
+# CONFIG_ESP32P4_EYE_C6_BOARD is not set
+# CONFIG_ESP_HOST_DEV_BOARD_NONE is not set
+CONFIG_ESP_HOST_DEV_BOARD_P4_FUNC_BOARD=y
+# CONFIG_ESP_HOST_DEV_BOARD_P4_C6_CORE is not set
