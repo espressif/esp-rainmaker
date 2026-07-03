@@ -141,3 +141,11 @@ CONFIG_ESP_RMAKER_ASSISTED_CLAIM=y
 # RainMaker Camera Mode Configuration
 #
 CONFIG_ENABLE_SIGNALLING_ONLY=y
+
+# ESP-Hosted network coprocessor (this C6 IS the SDIO slave firmware on the new
+# SDK). Build the slave sources, carry Wi-Fi only, own app_main.
+CONFIG_NETWORK_COPROCESSOR_BUILD_FIRMWARE=y
+CONFIG_ESP_HOSTED_CP_WIFI=y
+CONFIG_ESP_HOSTED_CP_BT=n
+CONFIG_ESP_HOSTED_NETWORK_SPLIT_ENABLED=y
+CONFIG_ESP_HOSTED_COPROCESSOR_APP_MAIN=n

@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.5)
 
 # Set KVS_SDK_PATH if not already set in environment
 if(NOT DEFINED ENV{KVS_SDK_PATH})
-    message(FATAL_ERROR "KVS_SDK_PATH not set in environment. Please set KVS_SDK_PATH to your local clone of amazon-kinesis-video-streams-webrtc-sdk-c")
+    message(FATAL_ERROR "KVS_SDK_PATH not set in environment. Please set KVS_SDK_PATH to your local clone of esp-port-for-amazon-kvs-sdk")
 endif()
 
 # Enable signaling only mode (This lets webrtc_bridge to what role to play)

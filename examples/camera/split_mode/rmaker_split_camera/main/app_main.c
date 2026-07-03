@@ -24,7 +24,7 @@
 
 #include "rmaker_camera.h"
 #include "esp_cli.h"
-#include "network_coprocessor.h"
+#include "esp_hosted_coprocessor.h"
 #include "bridge_peer_connection.h"
 #include "esp_work_queue.h"
 #include "sleep_command.h"
@@ -234,11 +234,11 @@ void app_main(void)
     /* Initialize ESP CLI */
     esp_cli_start();
 
-    /* Initialize Wi-Fi - must be called before network_coprocessor_init */
+    /* Initialize Wi-Fi - must be called before esp_hosted_coprocessor_init */
     app_network_init();
 
     /* Initialize the network coprocessor */
-    network_coprocessor_init();
+    esp_hosted_coprocessor_init();
 
     /* Register an event handler to catch RainMaker common events */
     ESP_ERROR_CHECK(esp_event_handler_register(RMAKER_COMMON_EVENT, ESP_EVENT_ANY_ID,

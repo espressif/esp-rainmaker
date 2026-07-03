@@ -5,6 +5,11 @@ CONFIG_IDF_EXPERIMENTAL_FEATURES=y
 CONFIG_BT_NIMBLE_ENABLED=y
 CONFIG_BT_NIMBLE_TRANSPORT_UART=n
 CONFIG_ESP_ENABLE_BT=y
+# Route NimBLE over the hosted co-processor. The new SDK's esp_hosted provides
+# the NimBLE HCI/VHCI transport (ble_transport_to_ll_* etc.); required so the
+# NimBLE host links + talks to the C6 BLE controller.
+CONFIG_ESP_HOSTED_ENABLE_BT_NIMBLE=y
+CONFIG_ESP_HOSTED_NIMBLE_HCI_VHCI=y
 
 #
 # Serial flasher config

@@ -7,37 +7,37 @@ dependencies:
 
   # Common dependencies
   esp_webrtc_utils:
-    path: ${KVS_SDK_PATH}/esp_port/components/esp_webrtc_utils
+    path: ${KVS_SDK_PATH}/components/esp_webrtc_utils
     version: "*"
 
   app_webrtc:
-    path: ${KVS_SDK_PATH}/esp_port/components/app_webrtc
+    path: ${KVS_SDK_PATH}/components/app_webrtc
     version: "*"
 
   kvs_signaling:
-    path: ${KVS_SDK_PATH}/esp_port/components/kvs_signaling
+    path: ${KVS_SDK_PATH}/components/signaling/kvs_signaling
     version: "*"
 
   # Split mode dependencies
   network_coprocessor:
-    path: ${KVS_SDK_PATH}/esp_port/components/network_coprocessor
+    path: ${KVS_SDK_PATH}/components/network_coprocessor
     version: "*"
     rules:
       - if: "target in [esp32c6]"
 
   signaling_bridge_adapter:
-    path: ${KVS_SDK_PATH}/esp_port/examples/signaling_only/components/signaling_bridge_adapter
+    path: ${KVS_SDK_PATH}/components/signaling_bridge_adapter
     version: "*"
     rules:
       - if: "target in [esp32c6]"
 
   # Standalone mode dependencies
   kvs_webrtc:
-    path: ${KVS_SDK_PATH}/esp_port/components/kvs_webrtc
+    path: ${KVS_SDK_PATH}/components/kvs_webrtc
     version: "*"
     rules:
       - if: "target not in [esp32c6]"
 
   media_stream:
-    path: ${KVS_SDK_PATH}/esp_port/components/media_stream
+    path: ${KVS_SDK_PATH}/components/media_stream
     version: "*"

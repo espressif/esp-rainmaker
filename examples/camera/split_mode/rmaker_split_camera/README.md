@@ -8,7 +8,7 @@ The **media_adapter** firmware (from `split_mode/media_adapter/`) must be flashe
 
 - IDF version: release/v5.5 (v5.5.x)
 - [ESP32-P4-Function Ev Board](https://docs.espressif.com/projects/esp-dev-kits/en/latest/esp32p4/esp32-p4-function-ev-board/user_guide.html)
-- Amazon Kinesis Video Streams WebRTC SDK C repository: Please clone the `beta-reference-esp-port` branch of https://github.com/awslabs/amazon-kinesis-video-streams-webrtc-sdk-c/tree/beta-reference-esp-port
+- Amazon Kinesis Video Streams WebRTC SDK C repository: Please clone https://github.com/espressif/esp-port-for-amazon-kvs-sdk
 - ESP RainMaker App (iOS/Android) with KVS streaming
 
 ## Setup ESP-IDF
@@ -32,15 +32,15 @@ More comprehensive documentation for setup:
 
 ## BUILD
 
-- Set up the KVS_SDK_PATH environment variable with clone of the Amazon KVS WebRTC SDK from [here](https://github.com/awslabs/amazon-kinesis-video-streams-webrtc-sdk-c/tree/beta-reference-esp-port) with `--recursive` option:
+- Set up the KVS_SDK_PATH environment variable with clone of the Amazon KVS WebRTC SDK from [here](https://github.com/espressif/esp-port-for-amazon-kvs-sdk) with `--recursive` option:
 
 ```bash
-    git clone --recursive --single-branch --branch beta-reference-esp-port git@github.com:awslabs/amazon-kinesis-video-streams-webrtc-sdk-c.git amazon-kinesis-video-streams-webrtc-sdk-c
-    export KVS_SDK_PATH=/path/to/amazon-kinesis-video-streams-webrtc-sdk-c
+    git clone --recursive git@github.com:espressif/esp-port-for-amazon-kvs-sdk.git esp-port-for-amazon-kvs-sdk
+    export KVS_SDK_PATH=/path/to/esp-port-for-amazon-kvs-sdk
 ```
 
 **__NOTE__**:
-  1. Confirm that you cloned the `beta-reference-esp-port` branch
+  1. Confirm that you cloned the default branch
   2. If you missed the `--recursive` option during cloning, run `git submodule update --init --recursive`
 
 - Go to the example directory and follow the steps below:
@@ -69,7 +69,7 @@ idf.py -p [PORT] flash monitor
 
 - Build and flash the streaming_only example from KVS SDK on ESP32-P4:
 ```bash
-  cd ${KVS_SDK_PATH}/esp_port/examples/streaming_only
+  cd ${KVS_SDK_PATH}/examples/streaming_only
   idf.py set-target esp32p4
 ```
 

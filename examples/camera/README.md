@@ -1,6 +1,6 @@
 # ESP RainMaker Camera Examples
 
-This directory contains ESP RainMaker camera examples that demonstrate building smart cameras using ESP chipsets with [AWS Kinesis Video Streams](https://docs.aws.amazon.com/kinesisvideostreams-webrtc-dg/latest/devguide/what-is-kvswebrtc.html) (KVS) [WebRTC SDK](https://github.com/awslabs/amazon-kinesis-video-streams-webrtc-sdk-c/tree/beta-reference-esp-port) integration and ESP RainMaker for device management.
+This directory contains ESP RainMaker camera examples that demonstrate building smart cameras using ESP chipsets with [AWS Kinesis Video Streams](https://docs.aws.amazon.com/kinesisvideostreams-webrtc-dg/latest/devguide/what-is-kvswebrtc.html) (KVS) [WebRTC SDK](https://github.com/espressif/esp-port-for-amazon-kvs-sdk) integration and ESP RainMaker for device management.
 
 **Key Features of the RainMaker Camera:**
 - Complete WebRTC stack with STUN and TURN capabilities
@@ -55,11 +55,11 @@ The mode is set via each example's `sdkconfig.defaults` files, so no manual conf
 ## Prerequisites
 
 - **IDF version**: release/v5.5 (v5.5.x)
-- **Amazon Kinesis Video Streams WebRTC SDK**: Clone the `beta-reference-esp-port` branch
+- **Amazon Kinesis Video Streams WebRTC SDK**: Clone the default branch
 
   ```bash
-  git clone -b beta-reference-esp-port git@github.com:awslabs/amazon-kinesis-video-streams-webrtc-sdk-c.git
-  export KVS_SDK_PATH=/path/to/amazon-kinesis-video-streams-webrtc-sdk-c
+  git clone --recursive git@github.com:espressif/esp-port-for-amazon-kvs-sdk.git
+  export KVS_SDK_PATH=/path/to/esp-port-for-amazon-kvs-sdk
   ```
 - **ESP RainMaker App**: Latest iOS/Android apps with Camera support
   - Android: v3.9.2 or later

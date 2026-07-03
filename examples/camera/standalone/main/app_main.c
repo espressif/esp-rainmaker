@@ -118,19 +118,6 @@ static void rainmaker_event_handler(void *arg, esp_event_base_t event_base,
     }
 }
 
-#if CONFIG_IDF_TARGET_ESP32P4
-/* Work-around for BLE transport when using hosted on ESP32P4 */
-void ble_transport_ll_init(void)
-{
-    /* No-op for hosted workaround */
-}
-
-void ble_transport_ll_deinit(void)
-{
-    /* No-op for hosted workaround */
-}
-#endif
-
 /* Initialize the RainMaker node and camera device */
 static esp_err_t initialize_rainmaker_device(void)
 {
