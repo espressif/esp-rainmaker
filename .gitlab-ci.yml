@@ -174,10 +174,10 @@ before_script:
   - done
 
 .build_camera_examples: &build_camera_examples
-  # Clone KVS WebRTC SDK pinned at $KVS_GIT_COMMIT
+  # Clone the esp-port KVS WebRTC SDK (the repo the camera examples migrated to).
   - cd $CI_PROJECT_DIR
-  - git clone $KVS_GITHUB_PATH $KVS_SDK_PATH
-  - git -C $KVS_SDK_PATH checkout $KVS_GIT_COMMIT
+  - git clone https://github.com/espressif/esp-port-for-amazon-kvs-sdk.git $KVS_SDK_PATH
+  - git -C $KVS_SDK_PATH checkout main
   - git -C $KVS_SDK_PATH submodule update --init --recursive --depth 1
   # start building examples
   - for EXAMPLE in $EXAMPLES; do
@@ -299,9 +299,10 @@ build_idf_v6.0:
 
 build_standalone_camera:
   extends: .build_template
-  image: espressif/idf:v5.5.1
+  image: espressif/idf:v5.5.4
   variables:
-    PEDANTIC_FLAGS: "-Werror -Werror=deprecated-declarations -Wno-error=cpp -Wno-error=int-to-pointer-cast -Wno-error=pointer-to-int-cast"
+    # deprecated-declarations demoted: only hit is third-party esp_lvgl_port 2.8.0 (revisit).
+    PEDANTIC_FLAGS: "-Werror -Wno-error=deprecated-declarations -Wno-error=cpp -Wno-error=int-to-pointer-cast -Wno-error=pointer-to-int-cast"
     EXAMPLE_TARGETS: "esp32p4 esp32s3 esp32"
     EXAMPLES: "camera/standalone"
   script:
@@ -309,9 +310,10 @@ build_standalone_camera:
 
 build_split_camera:
   extends: .build_template
-  image: espressif/idf:v5.5.1
+  image: espressif/idf:v5.5.4
   variables:
-    PEDANTIC_FLAGS: "-Werror -Werror=deprecated-declarations -Wno-error=cpp -Wno-error=int-to-pointer-cast -Wno-error=pointer-to-int-cast"
+    # deprecated-declarations demoted: only hit is third-party esp_lvgl_port 2.8.0 (revisit).
+    PEDANTIC_FLAGS: "-Werror -Wno-error=deprecated-declarations -Wno-error=cpp -Wno-error=int-to-pointer-cast -Wno-error=pointer-to-int-cast"
     EXAMPLE_TARGETS: "esp32c6"
     EXAMPLES: "camera/split_mode/rmaker_split_camera"
   script:
