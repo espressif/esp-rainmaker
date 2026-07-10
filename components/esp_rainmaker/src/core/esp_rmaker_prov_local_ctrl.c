@@ -673,8 +673,9 @@ static esp_err_t esp_rmaker_set_params_handler(uint32_t session_id, const uint8_
         RmakerProvLocalCtrl__RMakerLocalCtrlPayload *msg =
             rmaker_prov_local_ctrl__rmaker_local_ctrl_payload__unpack(NULL, (size_t)inlen, inbuf);
         if (!msg) {
+            /* An error with no response lets the transport detect a security 1 desync. */
             ESP_LOGE(TAG, "Failed to unpack set_params fragment request");
-            return send_error_response("invalid request", outbuf, outlen);
+            return ESP_ERR_INVALID_ARG;
         }
         esp_err_t err = esp_rmaker_set_params_frag_body(msg, outbuf, outlen);
         rmaker_prov_local_ctrl__rmaker_local_ctrl_payload__free_unpacked(msg, NULL);
@@ -682,7 +683,8 @@ static esp_err_t esp_rmaker_set_params_handler(uint32_t session_id, const uint8_
     }
 #else
     if (body_len <= 0 || body[0] != '{') {
-        return send_error_response("invalid request", outbuf, outlen);
+        ESP_LOGE(TAG, "set_params request is not JSON");
+        return ESP_ERR_INVALID_ARG;
     }
 #endif
 
@@ -690,7 +692,7 @@ static esp_err_t esp_rmaker_set_params_handler(uint32_t session_id, const uint8_
     esp_err_t err = esp_rmaker_handle_set_params((char *)inbuf, (size_t)inlen, ESP_RMAKER_REQ_SRC_BLE_LOCAL);
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "Failed to handle set params: %s", esp_err_to_name(err));
-        return send_error_response("failed to set params", outbuf, outlen);
+        return err;
     }
 
     const char *success_msg = "{\"status\":\"success\"}";

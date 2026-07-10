@@ -634,7 +634,7 @@ esp_err_t esp_rmaker_handle_set_params(char *data, size_t data_len, esp_rmaker_r
     ESP_LOGI(TAG, "Received params: %.*s", (int) data_len, data);
     jparse_ctx_t jctx;
     if (json_parse_start(&jctx, data, data_len) != 0) {
-        return ESP_FAIL;
+        return ESP_ERR_INVALID_ARG;
     }
     _esp_rmaker_device_t *device = esp_rmaker_node_get_first_device(esp_rmaker_get_node());
     while (device) {
