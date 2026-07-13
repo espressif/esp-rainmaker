@@ -1,0 +1,31 @@
+# CI-only overlay: compile the esp_secure_cert_mgr code path.
+#
+# Default example builds use self/assisted-claim and never compile the
+# CONFIG_ESP_RMAKER_USE_ESP_SECURE_CERT_MGR branches in esp_rmaker_client_data.c.
+# NO_CLAIM makes the PKI-access-method choice selectable; USE_ESP_SECURE_CERT_MGR
+# is the branch we want compiled. Build this on a DS-less target (esp32) and a
+# DS-capable one (esp32c3) to cover both sides of the DS_PERIPHERAL split.
+CONFIG_ESP_RMAKER_NO_CLAIM=y
+CONFIG_ESP_RMAKER_USE_ESP_SECURE_CERT_MGR=y
+
+# Pre-provisioned modules don't carry the MQTT host / node id in the factory
+# partition (the normal RainMaker flow ships them there), so both must come
+# from elsewhere: the host from config, the node id from the device
+# certificate's Common Name. Set here so CI also compiles those paths.
+CONFIG_ESP_RMAKER_READ_MQTT_HOST_FROM_CONFIG=y
+CONFIG_ESP_RMAKER_READ_NODE_ID_FROM_CERT_CN=y
+
+# Challenge-response on DS-provisioned modules signs RSA-PSS; the PSS encoder
+# inside esp_ds_rsa_sign() is compiled only when TLS 1.3 is enabled, so a DS
+# deployment needs this. Set in CI so the intended config is what gets compiled.
+CONFIG_MBEDTLS_SSL_PROTO_TLS1_3=y
+
+# NOTE: this overlay is enough to BUILD the code paths, not to RUN a real
+# pre-provisioned module. A real deployment additionally needs:
+#
+#   CONFIG_ESP_RMAKER_MQTT_HOST="<customer-deployment-mqtt-host>"
+#     (the actual host for your deployment)
+#
+#   CONFIG_APP_PROV_SECURITY_VERSION_1=y
+#     Provisioning security version 1; POP type can be 'mac' or 'none'
+#     ('none' for testing).
