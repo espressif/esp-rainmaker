@@ -70,13 +70,60 @@ esp_err_t esp_rmaker_node_auth_sign_msg(const void *challenge, size_t inlen, voi
     mbedtls_pk_init(&pk_ctx);
 
 #if CONFIG_ESP_RMAKER_USE_ESP_SECURE_CERT_MGR
-    esp_secure_cert_key_type_t key_type;
+#if defined(CONFIG_ESP_SECURE_CERT_DS_PERIPHERAL)
+    /* DS-provisioned partitions carry no priv-key TLV — the key exists only as DS
+     * ciphertext — so check for a DS context first instead of probing for a key
+     * type that cannot exist there, and sign the hash through the DS peripheral.
+     *
+     * Padding: RSA-PSS (PKCS#1 v2.1), matching the software-key RSA path below —
+     * the cloud verifies RSA challenge signatures with PSS only. esp_ds_rsa_sign()
+     * picks the padding from the passed RSA context (NULL would mean the legacy
+     * PKCS#1 v1.5 default, which the backend rejects). The PSS encoder inside
+     * esp_ds_rsa_sign is compiled only with CONFIG_MBEDTLS_SSL_PROTO_TLS1_3=y;
+     * without it the call fails cleanly at runtime with a clear log.
+     */
+    esp_ds_data_ctx_t *ds_ctx = esp_secure_cert_get_ds_ctx();
+    if (ds_ctx) {
+        err = esp_ds_init_data_ctx(ds_ctx);
+        if (err != ESP_OK) {
+            ESP_LOGE(TAG, "Failed to initialise DS data context, err:%d", err);
+            esp_ds_deinit_data_ctx();
+            esp_secure_cert_free_ds_ctx(ds_ctx);
+            goto cleanup;
+        }
+        mbedtls_rsa_context ds_pad_ctx;
+        mbedtls_rsa_init(&ds_pad_ctx);
+        mbedtls_rsa_set_padding(&ds_pad_ctx, MBEDTLS_RSA_PKCS_V21, MBEDTLS_MD_SHA256);
+        slen = esp_ds_get_keylen(NULL);
+        signature = (uint8_t *)MEM_CALLOC_EXTRAM(1, slen);
+        if (!signature) {
+            ESP_LOGE(TAG, "Failed to allocate memory for RSA signature.");
+            err = ESP_ERR_NO_MEM;
+        } else if ((ret = esp_ds_rsa_sign(&ds_pad_ctx, myrand, NULL, MBEDTLS_MD_SHA256, sizeof(hash), hash, signature)) != 0) {
+            ESP_LOGE(TAG, "Error in writing DS RSA signature (PSS). err = %d", ret);
+            err = ESP_FAIL;
+        }
+        mbedtls_rsa_free(&ds_pad_ctx);
+        esp_ds_deinit_data_ctx();
+        esp_secure_cert_free_ds_ctx(ds_ctx);
+        if (err != ESP_OK) {
+            goto cleanup;
+        }
+        ESP_LOGI(TAG, "Signed challenge using DS peripheral, signature length %u", (unsigned) slen);
+        goto sign_done;
+    }
+#endif /* CONFIG_ESP_SECURE_CERT_DS_PERIPHERAL */
+    /* No DS data, so a key (plaintext or ECDSA-peripheral) must be present */
+    esp_secure_cert_key_type_t key_type = ESP_SECURE_CERT_DEFAULT_FORMAT_KEY;
     err = esp_secure_cert_get_priv_key_type(&key_type);
     if (err != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to get the type of private key from secure cert partition, err:%d", err);
-        goto cleanup;
-    }
-    if (key_type == ESP_SECURE_CERT_INVALID_KEY) {
+        /* Legacy-format partitions carry no TLVs at all, so this lookup failing is
+         * expected there. Fall through with the default key type; the plain-key
+         * flow below picks up the key.
+         */
+        key_type = ESP_SECURE_CERT_DEFAULT_FORMAT_KEY;
+        err = ESP_OK;
+    } else if (key_type == ESP_SECURE_CERT_INVALID_KEY) {
         ESP_LOGE(TAG, "Private key type in secure cert partition is invalid");
         err = ESP_FAIL;
         goto cleanup;
@@ -229,6 +276,9 @@ esp_err_t esp_rmaker_node_auth_sign_msg(const void *challenge, size_t inlen, voi
     }
 #endif /* TEST_SIGNATURE_VERIFICATION */
 
+#if defined(CONFIG_ESP_RMAKER_USE_ESP_SECURE_CERT_MGR) && defined(CONFIG_ESP_SECURE_CERT_DS_PERIPHERAL)
+sign_done:
+#endif
     /* Convert hex stream to bytes */
 #define BYTE_ENCODED_SIGNATURE_LEN ((2 * slen) + 1) /* +1 for null character */
     char_signature = (char *)MEM_ALLOC_EXTRAM(BYTE_ENCODED_SIGNATURE_LEN);

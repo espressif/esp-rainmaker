@@ -105,7 +105,12 @@ size_t esp_rmaker_get_client_cert_len()
 
 char * esp_rmaker_get_client_key()
 {
-#ifdef CONFIG_ESP_RMAKER_USE_ESP_SECURE_CERT_MGR
+/* esp_secure_cert_get_priv_key()/esp_secure_cert_free_priv_key() are only declared by
+ * esp_secure_cert_mgr when CONFIG_ESP_SECURE_CERT_DS_PERIPHERAL is disabled. With the DS
+ * peripheral enabled (default on DS-capable SoCs) the private key lives inside the DS context,
+ * so there is no plain-buffer priv key to read and we simply fall back to NVS.
+ */
+#if defined(CONFIG_ESP_RMAKER_USE_ESP_SECURE_CERT_MGR) && !defined(CONFIG_ESP_SECURE_CERT_DS_PERIPHERAL)
     uint32_t client_key_len = 0;
     char *client_key_addr = NULL;
     if (esp_secure_cert_get_priv_key(&client_key_addr, &client_key_len) == ESP_OK) {
@@ -130,13 +135,13 @@ char * esp_rmaker_get_client_key()
         ESP_LOGE(TAG, "Failed to obtain flash address of private_key");
         ESP_LOGI(TAG, "Attempting to fetch key from NVS");
     }
-#endif /* CONFIG_ESP_RMAKER_USE_ESP_SECURE_CERT_MGR */
+#endif /* CONFIG_ESP_RMAKER_USE_ESP_SECURE_CERT_MGR && !CONFIG_ESP_SECURE_CERT_DS_PERIPHERAL */
     return esp_rmaker_factory_get(ESP_RMAKER_CLIENT_KEY_NVS_KEY);
 }
 
 size_t esp_rmaker_get_client_key_len()
 {
-#ifdef CONFIG_ESP_RMAKER_USE_ESP_SECURE_CERT_MGR
+#if defined(CONFIG_ESP_RMAKER_USE_ESP_SECURE_CERT_MGR) && !defined(CONFIG_ESP_SECURE_CERT_DS_PERIPHERAL)
     uint32_t client_key_len = 0;
     char *client_key_addr = NULL;
     if (esp_secure_cert_get_priv_key(&client_key_addr, &client_key_len) == ESP_OK) {
@@ -146,7 +151,7 @@ size_t esp_rmaker_get_client_key_len()
         ESP_LOGE(TAG, "Failed to obtain flash address of private_key");
         ESP_LOGI(TAG, "Attempting to fetch key from NVS");
     }
-#endif /* CONFIG_ESP_RMAKER_USE_ESP_SECURE_CERT_MGR */
+#endif /* CONFIG_ESP_RMAKER_USE_ESP_SECURE_CERT_MGR && !CONFIG_ESP_SECURE_CERT_DS_PERIPHERAL */
     return esp_rmaker_factory_get_size(ESP_RMAKER_CLIENT_KEY_NVS_KEY) + 1; /* +1 for NULL terminating byte */
 }
 
@@ -164,34 +169,41 @@ esp_rmaker_mqtt_conn_params_t *esp_rmaker_get_mqtt_conn_params()
     }
 
 #if defined(CONFIG_ESP_RMAKER_USE_ESP_SECURE_CERT_MGR)
-    /* Determine the key type and use ecdsa peripheral if it is supported */
-    esp_secure_cert_key_type_t key_type = ESP_SECURE_CERT_DEFAULT_FORMAT_KEY;
-    esp_err_t esp_ret = esp_secure_cert_get_priv_key_type(&key_type);
-    if (esp_ret != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to obtain the priv key type");
-        goto init_err;
-    }
-    if (key_type == ESP_SECURE_CERT_ECDSA_PERIPHERAL_KEY) {
-#if CONFIG_MBEDTLS_HARDWARE_ECDSA_SIGN
-        ESP_LOGI(TAG, "Setting up the ECDSA key from eFuse");
-        uint8_t efuse_block_id;
-        esp_ret = esp_secure_cert_get_priv_key_efuse_id(&efuse_block_id);
-        if (esp_ret != ESP_OK) {
-            ESP_LOGE(TAG, "Failed to get ECDSA key from eFuse");
-            goto init_err;
-        }
-        mqtt_conn_params->use_ecdsa_peripheral = true;
-        mqtt_conn_params->ecdsa_key_efuse_blk = efuse_block_id;
-#else
-        ESP_LOGE(TAG, "ECDSA signing is not enabled. Enable CONFIG_MBEDTLS_HARDWARE_ECDSA_SIGN");
-        goto init_err;
-#endif
-    } else {
 #if defined(CONFIG_ESP_SECURE_CERT_DS_PERIPHERAL)
-        mqtt_conn_params->ds_data = esp_secure_cert_get_ds_ctx();
-        if (mqtt_conn_params->ds_data == NULL) /* Get client key only if ds_data is NULL */
+    /* DS-provisioned partitions carry no priv-key TLV (the key exists only as DS
+     * ciphertext), so check for a DS context first instead of probing for a key
+     * type that cannot exist there.
+     */
+    mqtt_conn_params->ds_data = esp_secure_cert_get_ds_ctx();
+    if (mqtt_conn_params->ds_data == NULL) /* Look for a key only if there is no DS data */
 #endif
-        {
+    {
+        /* Determine the key type and use ecdsa peripheral if it is supported */
+        esp_secure_cert_key_type_t key_type = ESP_SECURE_CERT_DEFAULT_FORMAT_KEY;
+        esp_err_t esp_ret = esp_secure_cert_get_priv_key_type(&key_type);
+        if (esp_ret != ESP_OK) {
+            /* Legacy-format partitions carry no TLVs at all, so this lookup failing
+             * is expected there. Fall through with the default key type and read
+             * the key below.
+             */
+            key_type = ESP_SECURE_CERT_DEFAULT_FORMAT_KEY;
+        }
+        if (key_type == ESP_SECURE_CERT_ECDSA_PERIPHERAL_KEY) {
+#if CONFIG_MBEDTLS_HARDWARE_ECDSA_SIGN
+            ESP_LOGI(TAG, "Setting up the ECDSA key from eFuse");
+            uint8_t efuse_block_id;
+            esp_ret = esp_secure_cert_get_priv_key_efuse_id(&efuse_block_id);
+            if (esp_ret != ESP_OK) {
+                ESP_LOGE(TAG, "Failed to get ECDSA key from eFuse");
+                goto init_err;
+            }
+            mqtt_conn_params->use_ecdsa_peripheral = true;
+            mqtt_conn_params->ecdsa_key_efuse_blk = efuse_block_id;
+#else
+            ESP_LOGE(TAG, "ECDSA signing is not enabled. Enable CONFIG_MBEDTLS_HARDWARE_ECDSA_SIGN");
+            goto init_err;
+#endif
+        } else {
             if ((mqtt_conn_params->client_key = esp_rmaker_get_client_key()) == NULL) {
                 goto init_err;
             }

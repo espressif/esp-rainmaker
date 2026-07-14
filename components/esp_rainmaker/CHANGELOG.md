@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.15.1
+
+### Bug Fixes
+
+- Fix MQTT init and challenge-response on DS-peripheral pre-provisioned modules: use the
+  DS context directly instead of expecting a priv-key TLV (absent on DS partitions).
+  Challenge signing via the DS peripheral uses RSA-PSS and needs
+  `CONFIG_MBEDTLS_SSL_PROTO_TLS1_3=y`.
+- Fix build break with esp_secure_cert_mgr when the DS peripheral is enabled (priv-key
+  read APIs are not declared there; calls now guarded to match).
+
 ## 1.15.0
 
 ### Changes

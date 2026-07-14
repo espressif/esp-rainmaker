@@ -146,6 +146,25 @@ before_script:
   - echo Generating zip file for binaries generated
   - tar -zcvf esp-rainmaker-bins-${CI_JOB_ID}.zip esp-rainmaker-bins-${CI_JOB_ID}/
 
+.build_secure_cert_configs: &build_secure_cert_configs
+  # Build with the no-claim + esp_secure_cert_mgr overlay. Default builds use
+  # self/assisted-claim and never compile the CONFIG_ESP_RMAKER_USE_ESP_SECURE_CERT_MGR
+  # paths in esp_rmaker_client_data.c. Running across esp32 (no DS peripheral,
+  # DS_PERIPHERAL off) and esp32c3 (DS peripheral, DS_PERIPHERAL on) compiles both
+  # sides of the CONFIG_ESP_SECURE_CERT_DS_PERIPHERAL split.
+  - for EXAMPLE in $EXAMPLES; do
+  - cd $CI_PROJECT_DIR/examples/$EXAMPLE
+  - echo Building $EXAMPLE with esp_secure_cert_mgr config
+  - for TARGET in $EXAMPLE_TARGETS; do
+  - echo Building for $TARGET
+  - rm -rf managed_components dependencies.lock build sdkconfig sdkconfig.old
+  - export SDKCONFIG_DEFAULTS="sdkconfig.defaults;$CI_PROJECT_DIR/ci/sdkconfig.secure_cert"
+  - idf.py set-target $TARGET
+  - idf.py build
+  - done
+  - echo Build Complete for $EXAMPLE
+  - done
+
 .build_camera_examples: &build_camera_examples
   # Clone KVS WebRTC SDK pinned at $KVS_GIT_COMMIT
   - cd $CI_PROJECT_DIR
@@ -240,6 +259,17 @@ build_idf_v5.5:
   image: espressif/idf:release-v5.5
   variables:
     EXAMPLE_TARGETS: "esp32 esp32s2 esp32c3 esp32s3 esp32c6 esp32c2 esp32h2 esp32c5"
+
+# Compile-cover the no-claim + esp_secure_cert_mgr config.
+# esp32 => DS_PERIPHERAL off, esp32c3 => DS_PERIPHERAL on.
+build_secure_cert_v5.5:
+  extends: .build_template
+  image: espressif/idf:release-v5.5
+  variables:
+    EXAMPLE_TARGETS: "esp32 esp32c3"
+    EXAMPLES: "led_light"
+  script:
+    - *build_secure_cert_configs
 
 build_standalone_camera:
   extends: .build_template
