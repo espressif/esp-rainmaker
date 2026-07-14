@@ -279,6 +279,24 @@ build_secure_cert_v5.5:
   script:
     - *build_secure_cert_configs
 
+build_secure_cert_v6.0:
+  extends: .build_template
+  image: espressif/idf:release-v6.0
+  variables:
+    EXAMPLE_TARGETS: "esp32 esp32c3"
+    EXAMPLES: "led_light"
+  script:
+    - *build_secure_cert_configs
+
+build_idf_v6.0:
+  extends: .build_template
+  image: espressif/idf:release-v6.0
+  variables:
+    # esp32c2 dropped on v6.0: esp_diag_data_store uses unconditional RTC_NOINIT_ATTR,
+    # which is a hard error on esp32c2 (no RTC retention RAM) under IDF v6.0. Re-add
+    # once esp_insights ships the SOC-guarded macro fix.
+    EXAMPLE_TARGETS: "esp32 esp32s2 esp32c3 esp32s3 esp32c6 esp32h2 esp32c5"
+
 build_standalone_camera:
   extends: .build_template
   image: espressif/idf:v5.5.1
@@ -356,6 +374,9 @@ build_rainmaker_controller:
   stage: test
   tags: ["idf_unit_test_runner"]
   needs: []
+  # From-scratch test_app build + claim + flash + run does not fit the default
+  # 1h job timeout (both unit-test jobs hit it in pipeline 1441252).
+  timeout: 2h
   before_script:
     - *generate_rainmaker_claim_data
     - *setup_hardware
@@ -382,6 +403,15 @@ build_rainmaker_controller:
 
 unit_test_esp32c3:
   extends: .unit_test_with_claiming_template
+  variables:
+    TARGET: "esp32c3"
+    MAC_ADDR: "ABCDABCDABCD"
+
+# Run the same unit tests on IDF v6.0 so the PSA-crypto migration paths
+# (node_auth signing, etc.) are exercised on hardware, not just compiled.
+unit_test_esp32c3_idf_v6.0:
+  extends: .unit_test_with_claiming_template
+  image: espressif/idf:release-v6.0
   variables:
     TARGET: "esp32c3"
     MAC_ADDR: "ABCDABCDABCD"

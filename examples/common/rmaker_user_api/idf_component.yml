@@ -9,3 +9,5 @@ dependencies:
   ## Required IDF version
   idf:
     version: ">=4.4"
+  ## cJSON moved out of core IDF in v6.0; pull it from the registry.
+  espressif/cjson: "*"

@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.16.0
+
+### Changes
+
+- Add ESP-IDF v6.0 (mbedtls v4.0) compatibility
+  - Migrate `esp_rmaker_node_auth` signing and key-type detection to PSA APIs (`mbedtls_pk_get_psa_attributes`, `mbedtls_pk_sign_ext`); SHA-256 stays on `esp_sha()`
+  - Port the hardware ECDSA peripheral signing path to a PSA opaque key (`esp_ecdsa_set_pk_context` was removed in mbedtls 4.0)
+  - Migrate `esp_rmaker_claim` to PSA key generation (`psa_generate_key`) and the PSA one-shot MAC for HMAC challenges
+  - Replace removed `ESP_IF_WIFI_STA` with `WIFI_IF_STA`
+  - Kconfig: select `MBEDTLS_X509_CREATE_C` / `MBEDTLS_X509_CSR_WRITE_C` when claiming is enabled
+  - All changes guarded with `ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(6, 0, 0)` so older IDFs keep working
+
 ## 1.15.1
 
 ### Bug Fixes
