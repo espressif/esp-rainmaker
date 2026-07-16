@@ -6,26 +6,63 @@
 
 #include <string.h>
 #include <esp_log.h>
+#include <esp_idf_version.h>
 #include "mbedtls/platform.h"
 #include "mbedtls/pk.h"
+#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(6, 0, 0)
+#include "mbedtls/md.h"
+#include "psa/crypto.h"
+#ifdef CONFIG_MBEDTLS_HARDWARE_ECDSA_SIGN
+/* Opaque hardware-ECDSA key import, replaces the removed esp_ecdsa_set_pk_context() API */
+#include "psa_crypto_driver_esp_ecdsa.h"
+#endif
+#ifdef CONFIG_ESP_SECURE_CERT_DS_PERIPHERAL
+/* Opaque RSA-DS key import, replaces the removed rsa_sign_alt DS API */
+#include "psa_crypto_driver_esp_rsa_ds.h"
+#endif
+#else
 #include "mbedtls/sha256.h"
 #include "mbedtls/ecdsa.h"
-#include "sha/sha_parallel_engine.h"
 #include "ecdsa/ecdsa_alt.h"
+#endif
+/* esp_sha() lives in the mbedtls port on all IDF versions, but its public header
+ * was renamed: sha_core.h on v6.0, sha_parallel_engine.h on older IDF. */
+#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(6, 0, 0)
+#include "sha/sha_core.h"
+#else
+#include "sha/sha_parallel_engine.h"
+#endif
 #include "soc/soc_caps.h"
+
+/* The TEST_SIGNATURE_VERIFICATION debug aid still uses mbedtls_pk_get_type() and
+ * the RSASSA-PSS options type, both removed/made-private in mbedtls 4.0. It has
+ * not been ported, so force it off on IDF v6.0+ to avoid a broken build if it is
+ * ever enabled there. */
+#if defined(TEST_SIGNATURE_VERIFICATION) && TEST_SIGNATURE_VERIFICATION && (ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(6, 0, 0))
+#warning "TEST_SIGNATURE_VERIFICATION is not ported to mbedtls 4.0 (IDF v6.0+); forcing it off"
+#undef TEST_SIGNATURE_VERIFICATION
+#define TEST_SIGNATURE_VERIFICATION 0
+#endif
 
 #include "esp_secure_cert_read.h"
 #include "esp_rmaker_utils.h"
 #include "esp_rmaker_client_data.h"
+#include "esp_rmaker_pk_utils.h"
 #include "mbedtls/x509_crt.h"
 
 static const char *TAG = "esp_rmaker_user_node_auth";
 
+#if ESP_IDF_VERSION < ESP_IDF_VERSION_VAL(6, 0, 0)
+/* RNG callback for the pre-v6.0 mbedtls signing API. The v6.0 path uses
+ * mbedtls_pk_sign / mbedtls_pk_sign_ext which take their RNG from PSA
+ * internally, so this helper is unused there and would trip
+ * -Werror=unused-function. */
 static int myrand(void *rng_state, unsigned char *output, size_t len)
 {
     esp_fill_random(output, len);
     return 0;
 }
+#endif
 
 static inline uint8_t to_hex_digit(unsigned val)
 {
@@ -51,6 +88,16 @@ esp_err_t esp_rmaker_node_auth_sign_msg(const void *challenge, size_t inlen, voi
     char *char_signature = NULL;
     size_t slen = 0;
     mbedtls_pk_context pk_ctx;
+#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(6, 0, 0)
+    /* True when pk_ctx wraps the hardware-ECDSA opaque PSA key, whose type is EC
+     * by construction (see the key-type detection block below). */
+    bool is_hw_ecdsa = false;
+#endif
+#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(6, 0, 0) && defined(CONFIG_ESP_RMAKER_USE_ESP_SECURE_CERT_MGR) && defined(CONFIG_MBEDTLS_HARDWARE_ECDSA_SIGN)
+    /* Opaque PSA key wrapping the hardware ECDSA peripheral. mbedtls_pk_wrap_psa()
+     * does NOT take ownership, so it is destroyed explicitly in cleanup. */
+    psa_key_id_t ecdsa_opaque_key_id = 0;
+#endif
 #if TEST_SIGNATURE_VERIFICATION
     char *cert = NULL;
     mbedtls_x509_crt crt;
@@ -62,7 +109,8 @@ esp_err_t esp_rmaker_node_auth_sign_msg(const void *challenge, size_t inlen, voi
         return ESP_ERR_INVALID_ARG;
     }
 
-    /* Calculate SHA of challenge - common for both paths */
+    /* Calculate SHA-256 of challenge. esp_sha() is available on all supported
+     * IDF versions (mbedtls port), so no version split is needed here. */
     uint8_t hash[32] = {0};
     esp_sha(SHA2_256, (const unsigned char *)challenge, inlen, hash);
 
@@ -84,6 +132,44 @@ esp_err_t esp_rmaker_node_auth_sign_msg(const void *challenge, size_t inlen, voi
      */
     esp_ds_data_ctx_t *ds_ctx = esp_secure_cert_get_ds_ctx();
     if (ds_ctx) {
+#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(6, 0, 0)
+        /* mbedtls 4.0 removed the rsa_sign_alt DS API; go through the PSA opaque
+         * DS driver instead (same flow as esp-tls on v6.0). RSA-PSS, as on <v6.0;
+         * the driver's PSS path is likewise gated on CONFIG_MBEDTLS_SSL_PROTO_TLS1_3. */
+        esp_rsa_ds_opaque_key_t rsa_ds_opaque_key = {0};
+        rsa_ds_opaque_key.ds_data_ctx = ds_ctx;
+        psa_key_attributes_t ds_attrs = PSA_KEY_ATTRIBUTES_INIT;
+        psa_set_key_type(&ds_attrs, PSA_KEY_TYPE_RSA_KEY_PAIR);
+        psa_set_key_bits(&ds_attrs, ds_ctx->rsa_length_bits);
+        psa_set_key_usage_flags(&ds_attrs, PSA_KEY_USAGE_SIGN_HASH);
+        psa_set_key_algorithm(&ds_attrs, PSA_ALG_RSA_PSS(PSA_ALG_SHA_256));
+        psa_set_key_lifetime(&ds_attrs, PSA_KEY_LIFETIME_ESP_RSA_DS_VOLATILE);
+        psa_key_id_t ds_key_id = 0;
+        psa_status_t ds_status = psa_import_key(&ds_attrs, (const uint8_t *)&rsa_ds_opaque_key,
+                                                sizeof(rsa_ds_opaque_key), &ds_key_id);
+        psa_reset_key_attributes(&ds_attrs);
+        if (ds_status != PSA_SUCCESS) {
+            ESP_LOGE(TAG, "Failed to import DS key to PSA, status:%d", (int) ds_status);
+            esp_secure_cert_free_ds_ctx(ds_ctx);
+            err = ESP_FAIL;
+            goto cleanup;
+        }
+        size_t ds_sig_size = ds_ctx->rsa_length_bits / 8;
+        signature = (uint8_t *)MEM_CALLOC_EXTRAM(1, ds_sig_size);
+        if (!signature) {
+            ESP_LOGE(TAG, "Failed to allocate memory for RSA signature.");
+            err = ESP_ERR_NO_MEM;
+        } else {
+            ds_status = psa_sign_hash(ds_key_id, PSA_ALG_RSA_PSS(PSA_ALG_SHA_256),
+                                      hash, sizeof(hash), signature, ds_sig_size, &slen);
+            if (ds_status != PSA_SUCCESS) {
+                ESP_LOGE(TAG, "Error in writing DS RSA signature, status:%d", (int) ds_status);
+                err = ESP_FAIL;
+            }
+        }
+        psa_destroy_key(ds_key_id);
+        esp_secure_cert_free_ds_ctx(ds_ctx);
+#else /* ESP_IDF_VERSION < 6.0.0 */
         err = esp_ds_init_data_ctx(ds_ctx);
         if (err != ESP_OK) {
             ESP_LOGE(TAG, "Failed to initialise DS data context, err:%d", err);
@@ -106,6 +192,7 @@ esp_err_t esp_rmaker_node_auth_sign_msg(const void *challenge, size_t inlen, voi
         mbedtls_rsa_free(&ds_pad_ctx);
         esp_ds_deinit_data_ctx();
         esp_secure_cert_free_ds_ctx(ds_ctx);
+#endif /* ESP_IDF_VERSION */
         if (err != ESP_OK) {
             goto cleanup;
         }
@@ -141,6 +228,39 @@ esp_err_t esp_rmaker_node_auth_sign_msg(const void *challenge, size_t inlen, voi
         }
 
         ESP_LOGD(TAG, "Using key from eFuse block %d for ECDSA key", efuse_block_id);
+#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(6, 0, 0)
+        /* mbedtls v4.0 (IDF v6.0) removed esp_ecdsa_set_pk_context(). Import the
+         * hardware-backed key as a PSA opaque key and wrap it into the pk context,
+         * per the IDF v6.0 security migration guide. */
+        psa_key_attributes_t key_attr = PSA_KEY_ATTRIBUTES_INIT;
+        psa_set_key_type(&key_attr, PSA_KEY_TYPE_ECC_KEY_PAIR(PSA_ECC_FAMILY_SECP_R1));
+        psa_set_key_bits(&key_attr, 256);
+        psa_set_key_usage_flags(&key_attr, PSA_KEY_USAGE_SIGN_HASH);
+        psa_set_key_algorithm(&key_attr, PSA_ALG_ECDSA(PSA_ALG_SHA_256));
+        psa_set_key_lifetime(&key_attr, PSA_KEY_LIFETIME_ESP_ECDSA_VOLATILE);
+
+        esp_ecdsa_opaque_key_t opaque_key = {
+            .curve = ESP_ECDSA_CURVE_SECP256R1,
+            .efuse_block = efuse_block_id,
+#if SOC_KEY_MANAGER_SUPPORTED
+            .key_recovery_info = NULL,
+#endif
+        };
+        psa_status_t status = psa_import_key(&key_attr, (const uint8_t *)&opaque_key, sizeof(opaque_key), &ecdsa_opaque_key_id);
+        psa_reset_key_attributes(&key_attr);
+        if (status != PSA_SUCCESS) {
+            ESP_LOGE(TAG, "Failed to import opaque ECDSA key, status:%d", (int)status);
+            err = ESP_FAIL;
+            goto cleanup;
+        }
+        ret = mbedtls_pk_wrap_psa(&pk_ctx, ecdsa_opaque_key_id);
+        if (ret != 0) {
+            ESP_LOGE(TAG, "Failed to wrap opaque ECDSA key, ret:-0x%04x", -ret);
+            err = ESP_FAIL;
+            goto cleanup;
+        }
+        is_hw_ecdsa = true;
+#else
         esp_ecdsa_pk_conf_t pk_conf = {
             .grp_id = MBEDTLS_ECP_DP_SECP256R1,
             .efuse_block = efuse_block_id,
@@ -152,6 +272,7 @@ esp_err_t esp_rmaker_node_auth_sign_msg(const void *challenge, size_t inlen, voi
             err = ESP_FAIL;
             goto cleanup;
         }
+#endif
 #else /* !CONFIG_MBEDTLS_HARDWARE_ECDSA_SIGN */
         ESP_LOGE(TAG, "ECDSA peripheral support is not available on this SoC");
         err = ESP_ERR_NOT_SUPPORTED;
@@ -170,11 +291,13 @@ esp_err_t esp_rmaker_node_auth_sign_msg(const void *challenge, size_t inlen, voi
             goto cleanup;
         }
 
-#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 0, 0)
+#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 0, 0) && ESP_IDF_VERSION < ESP_IDF_VERSION_VAL(6, 0, 0)
+        /* Only mbedtls 3.x (IDF v5.x) takes an RNG callback pair here; the 2.x
+         * and 4.x signatures are identical. */
         ret = mbedtls_pk_parse_key(&pk_ctx, (uint8_t *)priv_key, priv_key_len, NULL, 0, NULL, 0);
-#else /* !(ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 0, 0)) */
+#else
         ret = mbedtls_pk_parse_key(&pk_ctx, (uint8_t *)priv_key, priv_key_len, NULL, 0);
-#endif /* ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 0, 0) */
+#endif
 
         if (ret != 0) {
             ESP_LOGE(TAG, "Error parsing private key, err:%d", ret);
@@ -183,6 +306,53 @@ esp_err_t esp_rmaker_node_auth_sign_msg(const void *challenge, size_t inlen, voi
         }
     }
 
+#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(6, 0, 0)
+    int is_rsa = 0, is_ec = 0;
+    if (is_hw_ecdsa) {
+        /* The hardware-ECDSA opaque key was imported as ECC_KEY_PAIR(SECP_R1), so
+         * its type is EC by construction. Assert it directly rather than relying
+         * on mbedtls_pk_get_psa_attributes() round-tripping a wrapped/opaque key.
+         * NOTE: this branch is compile-tested only — the hardware ECDSA sign path
+         * has not yet been exercised on a device with an efuse key burned. */
+        is_ec = 1;
+    } else {
+        esp_rmaker_pk_detect_type(&pk_ctx, &is_ec, &is_rsa);
+    }
+
+    /* Allocate signature buffer */
+    signature = (uint8_t *)MEM_CALLOC_EXTRAM(1, MBEDTLS_PK_SIGNATURE_MAX_SIZE);
+    if (!signature) {
+        ESP_LOGE(TAG, "Failed to allocate memory for signature.");
+        err = ESP_ERR_NO_MEM;
+        goto cleanup;
+    }
+
+    if (is_ec) {
+        ESP_LOGI(TAG, "ECDSA key found");
+        ret = mbedtls_pk_sign(&pk_ctx, MBEDTLS_MD_SHA256, hash, sizeof(hash),
+                              signature, MBEDTLS_PK_SIGNATURE_MAX_SIZE, &slen);
+        if (ret != 0) {
+            ESP_LOGE(TAG, "Error in ECDSA signing. err = -0x%04x", -ret);
+            err = ESP_FAIL;
+            goto cleanup;
+        }
+    } else if (is_rsa) {
+        ESP_LOGI(TAG, "RSA key found");
+        ret = mbedtls_pk_sign_ext(MBEDTLS_PK_SIGALG_RSA_PSS, &pk_ctx, MBEDTLS_MD_SHA256,
+                                  hash, sizeof(hash),
+                                  signature, MBEDTLS_PK_SIGNATURE_MAX_SIZE, &slen);
+        if (ret != 0) {
+            ESP_LOGE(TAG, "Error in RSA-PSS signing. err = -0x%04x", -ret);
+            err = ESP_FAIL;
+            goto cleanup;
+        }
+        ESP_LOGI(TAG, "Signature length %d", slen);
+    } else {
+        ESP_LOGE(TAG, "Unsupported key type for signing");
+        err = ESP_FAIL;
+        goto cleanup;
+    }
+#else
     /* Allocate signature buffer based on key type */
     if (mbedtls_pk_get_type(&pk_ctx) == MBEDTLS_PK_RSA) {
         ESP_LOGI(TAG, "RSA key found");
@@ -238,6 +408,7 @@ esp_err_t esp_rmaker_node_auth_sign_msg(const void *challenge, size_t inlen, voi
         slen = mbedtls_rsa_get_len(rsa_ctx);
         ESP_LOGI(TAG, "Signature length %d", slen);
     }
+#endif
 
 #if TEST_SIGNATURE_VERIFICATION
     cert = esp_rmaker_get_client_cert();
@@ -302,6 +473,11 @@ cleanup:
         free(char_signature);
     }
     mbedtls_pk_free(&pk_ctx);
+#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(6, 0, 0) && defined(CONFIG_ESP_RMAKER_USE_ESP_SECURE_CERT_MGR) && defined(CONFIG_MBEDTLS_HARDWARE_ECDSA_SIGN)
+    if (ecdsa_opaque_key_id) {
+        psa_destroy_key(ecdsa_opaque_key_id);
+    }
+#endif
 #if TEST_SIGNATURE_VERIFICATION
     if (cert) {
         free(cert);

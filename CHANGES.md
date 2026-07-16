@@ -1,5 +1,12 @@
 # Changes
 
+## 29-Jun-2026: ESP-IDF v6.0 Support
+
+- Add ESP-IDF v6.0 (mbedtls v4.0) compatibility: PSA crypto migration for node auth and
+  claiming, `WIFI_IF_STA` rename, and claiming Kconfig selects for X509 create/CSR-write.
+  All guarded by IDF version so older IDFs are unaffected. Check the esp_rainmaker
+  component's [CHANGELOG v1.16.0](components/esp_rainmaker/CHANGELOG.md#1160) for details.
+
 ## 02-Jun-2026: MQTT OTA Reliability Improvements
 
 - MQTT OTA gains resume-across-reboots, fast-abort on disconnect, a per-block timeout

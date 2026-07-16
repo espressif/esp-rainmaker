@@ -7,4 +7,4 @@ endif()
 idf_component_register(SRCS ${srcs}
                        INCLUDE_DIRS "include"
                        PRIV_INCLUDE_DIRS "private_include"
-                       REQUIRES esp_http_client json mbedtls)
+                       REQUIRES esp_http_client mbedtls)
