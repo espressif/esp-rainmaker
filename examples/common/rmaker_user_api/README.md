@@ -12,7 +12,7 @@ C client for the [Espressif RainMaker](https://rainmaker.espressif.com/) cloud A
 - **Authentication**: Refresh token or username/password. Access token is obtained automatically; 401 triggers re-login when possible.
 - **API version**: Optional in config; if not set, the component fetches the supported version from the cloud.
 - **Request execution**: GET, POST, PUT, DELETE with configurable URL, query params, and JSON or form payload.
-- **Optional persistent connection**: Reuse a single HTTP connection for multiple requests (configurable per request).
+- **Optional persistent connection**: Reuse a single HTTP connection for multiple requests on all supported ESP-IDF versions when enabled in Kconfig and per request. A dropped connection is reopened automatically.
 - **Login callbacks**: Optional success/failure callbacks for login (e.g. for UI or logging).
 - **Helper API** (optional): User ID, nodes list/count, node config, get/set node params, get/create/delete group, add/remove nodes to group, node mapping (add/remove, get status), node connection status.
 

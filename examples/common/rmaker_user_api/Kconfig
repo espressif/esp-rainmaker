@@ -7,7 +7,6 @@ menu "RainMaker User API Configuration"
             Option to make User API reuse previous HTTP connection.
             This retains the User HTTP session with backend so that TLS handshake is not repeated.
             This speeds up operations, but has an impact on heap memory as the session will stay allocated.
-            It need ESP-IDF version >= 5.4.
 
     config ENABLE_RM_USER_HELPER_API
         bool "Enable helper RainMaker User API"
