@@ -17,14 +17,6 @@
 #include "app_rmaker_user_api.h"
 #include "app_rmaker_user_api_util.h"
 
-#ifdef CONFIG_RM_USER_SUPPORT_REUSE_HTTP_SESSION
-#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 4, 0)
-#define RM_USER_API_REUSE_HTTP_SESSION
-#else
-#warning "Reuse HTTP session, needs IDF version >= 5.4.0, please update your IDF version"
-#endif
-#endif
-
 /**
  * @brief RainMaker User API context structure
  */
@@ -147,29 +139,14 @@ static void app_rmaker_user_api_set_http_headers(esp_http_client_handle_t client
 /**
  * @brief Make HTTP request
  */
-static esp_err_t app_rmaker_user_api_make_http_request(esp_http_client_handle_t client, const char *post_data, bool reuse_connection)
+static esp_err_t app_rmaker_user_api_make_http_request(esp_http_client_handle_t client, const char *post_data)
 {
     if (!client) {
         ESP_LOGE(TAG, "Client is NULL");
         return ESP_ERR_INVALID_ARG;
     }
 
-    esp_err_t err = ESP_OK;
-    if (reuse_connection) {
-#ifdef RM_USER_API_REUSE_HTTP_SESSION
-        err = esp_http_client_prepare(client);
-        if (err != ESP_OK) {
-            ESP_LOGE(TAG, "Failed to prepare HTTP client: %s", esp_err_to_name(err));
-            return err;
-        }
-        err = esp_http_client_request_send(client, post_data ? strlen(post_data) : 0);
-#else
-        ESP_LOGE(TAG, "Reuse HTTP session is not supported, please update your ESP-IDF version to >= 5.4.0");
-        return ESP_ERR_NOT_SUPPORTED;
-#endif
-    } else {
-        err = esp_http_client_open(client, post_data ? strlen(post_data) : 0);
-    }
+    esp_err_t err = esp_http_client_open(client, post_data ? strlen(post_data) : 0);
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "Failed to open HTTP connection: %s", esp_err_to_name(err));
         return err;
@@ -681,13 +658,18 @@ esp_err_t app_rmaker_user_api_generic(app_rmaker_user_api_request_config_t *requ
     }
 
     /* Initialize HTTP client */
+#ifdef CONFIG_RM_USER_SUPPORT_REUSE_HTTP_SESSION
+    bool reuse_session = request_config->reuse_session;
+#else /* !CONFIG_RM_USER_SUPPORT_REUSE_HTTP_SESSION */
+    bool reuse_session = false;
+#endif /* CONFIG_RM_USER_SUPPORT_REUSE_HTTP_SESSION */
     bool reuse_connection = false;
     esp_http_client_handle_t client = NULL;
     esp_http_client_config_t config = {
         .buffer_size_tx = APP_RMAKER_USER_API_HTTP_TX_BUFFER_SIZE,
         .crt_bundle_attach = esp_crt_bundle_attach,
     };
-    if (request_config->reuse_session) {
+    if (reuse_session) {
         if (g_rmaker_user_api_ctx.http_client) {
             ESP_LOGD(TAG, "Using persistent connection");
             reuse_connection = true;
@@ -726,9 +708,9 @@ esp_err_t app_rmaker_user_api_generic(app_rmaker_user_api_request_config_t *requ
     /* Make HTTP request */
     if (request_config->api_type == APP_RMAKER_USER_API_TYPE_POST
         || request_config->api_type == APP_RMAKER_USER_API_TYPE_PUT) {
-        err = app_rmaker_user_api_make_http_request(client, request_config->api_payload, reuse_connection);
+        err = app_rmaker_user_api_make_http_request(client, request_config->api_payload);
     } else {
-        err = app_rmaker_user_api_make_http_request(client, NULL, reuse_connection);
+        err = app_rmaker_user_api_make_http_request(client, NULL);
     }
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "Failed to make HTTP request");
@@ -749,7 +731,7 @@ esp_err_t app_rmaker_user_api_generic(app_rmaker_user_api_request_config_t *requ
         goto exit;
     }
 
-    if (!request_config->reuse_session) {
+    if (!reuse_session) {
         esp_http_client_cleanup(client);
     } else {
         /* No need to cleanup, reuse the connection */
