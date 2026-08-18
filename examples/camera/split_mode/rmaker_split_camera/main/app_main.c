@@ -24,7 +24,7 @@
 
 #include "rmaker_camera.h"
 #include "esp_cli.h"
-#include "network_coprocessor.h"
+#include "esp_hosted_coprocessor.h"
 #include "bridge_peer_connection.h"
 #include "esp_work_queue.h"
 #include "sleep_command.h"
@@ -178,9 +178,10 @@ static int split_mode_init_callback(void *user_data)
 {
     (void)user_data;
 
-    /* Initialize work queue in advance with lower (than default) stack size */
+    /* 12 KB overflowed by ~640 B in the SDP-answer / signaling handler on
+     * esp_workq_task (stack-protection fault at streaming start). */
     esp_work_queue_config_t work_queue_config = ESP_WORK_QUEUE_CONFIG_DEFAULT();
-    work_queue_config.stack_size = 12 * 1024;
+    work_queue_config.stack_size = 16 * 1024;
     if (esp_work_queue_init_with_config(&work_queue_config) != ESP_OK) {
         ESP_LOGE(TAG, "Failed to initialize work queue");
         return -1;
@@ -234,11 +235,11 @@ void app_main(void)
     /* Initialize ESP CLI */
     esp_cli_start();
 
-    /* Initialize Wi-Fi - must be called before network_coprocessor_init */
+    /* Initialize Wi-Fi - must be called before esp_hosted_coprocessor_init */
     app_network_init();
 
     /* Initialize the network coprocessor */
-    network_coprocessor_init();
+    esp_hosted_coprocessor_init();
 
     /* Register an event handler to catch RainMaker common events */
     ESP_ERROR_CHECK(esp_event_handler_register(RMAKER_COMMON_EVENT, ESP_EVENT_ANY_ID,

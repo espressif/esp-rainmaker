@@ -13,7 +13,7 @@ This example demonstrates how to build a smart camera using ESP chipsets with AW
 - Tested on the following Dev boards:
     1. [ESP32-P4-Function Ev Board](https://docs.espressif.com/projects/esp-dev-kits/en/latest/esp32p4/esp32-p4-function-ev-board/user_guide.html)
     2. [ESP-S3-EYE](https://github.com/espressif/esp-who/blob/master/docs/en/get-started/ESP32-S3-EYE_Getting_Started_Guide.md)
-- Amazon Kinesis Video Streams WebRTC SDK C repository: Please clone the `beta-reference-esp-port` branch of https://github.com/awslabs/amazon-kinesis-video-streams-webrtc-sdk-c/tree/beta-reference-esp-port
+- Amazon Kinesis Video Streams WebRTC SDK C repository: Please clone https://github.com/espressif/esp-port-for-amazon-kvs-sdk
 - ESP RainMaker App (iOS/Android) with KVS streaming
 
 ## Setup ESP-IDF
@@ -36,15 +36,15 @@ More comprehensive documentation for setup:
 
 ## BUILD
 
-- Set up the KVS_SDK_PATH environment variable with clone of the Amazon KVS WebRTC SDK from [here](https://github.com/awslabs/amazon-kinesis-video-streams-webrtc-sdk-c/tree/beta-reference-esp-port) with `--recursive` option:
+- Set up the KVS_SDK_PATH environment variable with clone of the Amazon KVS WebRTC SDK from [here](https://github.com/espressif/esp-port-for-amazon-kvs-sdk) with `--recursive` option:
 
 ```bash
-    git clone --recursive --single-branch --branch beta-reference-esp-port git@github.com:awslabs/amazon-kinesis-video-streams-webrtc-sdk-c.git amazon-kinesis-video-streams-webrtc-sdk-c
-    export KVS_SDK_PATH=/path/to/amazon-kinesis-video-streams-webrtc-sdk-c
+    git clone --recursive git@github.com:espressif/esp-port-for-amazon-kvs-sdk.git esp-port-for-amazon-kvs-sdk
+    export KVS_SDK_PATH=/path/to/esp-port-for-amazon-kvs-sdk
 ```
 
 *__NOTE__*:
-  1. Confirm that you cloned the `beta-reference-esp-port` branch
+  1. Confirm that you cloned the default branch
   2. If you missed the `--recursive` option during cloning, run `git submodule update --init --recursive`
 
 Go to the example directory and follow the steps below:
@@ -52,6 +52,32 @@ Go to the example directory and follow the steps below:
     cd esp-rainmaker/examples/camera/standalone
     idf.py set-target [esp32p4/esp32s3/esp32]
 ```
+
+### Board-specific builds (ESP32-P4)
+
+The P4 build ships per-board overlays that layer on top of `sdkconfig.defaults`
++ `sdkconfig.defaults.esp32p4`. Pass the overlay chain in the **same**
+`set-target` invocation — otherwise the board's choice symbols lose to the
+already-generated `sdkconfig`:
+
+| Board | Overlay | Co-processor |
+|-------|---------|--------------|
+| ESP32-P4-EYE (pre-v3 silicon) | `sdkconfig.defaults.p4_eye.esp32p4` | on-board C6, flashed in-system |
+| ESP32-P4-EYE (v3+ / P4X) | `sdkconfig.defaults.p4x_eye.esp32p4` | on-board C6, flashed in-system |
+| ESP32-P4-Function-EV v1.2 | `sdkconfig.defaults.p4_function_ev_board_v12.esp32p4` | external C6 (ESP-Prog) |
+| ESP32-P4-Function-EV v1.6 | `sdkconfig.defaults.p4_function_ev_board_v16.esp32p4` | external C6 (ESP-Prog) |
+| ESP32-P4 + C5 core board | `sdkconfig.defaults.p4_c5_core_board.esp32p4` | on-board C5, flashed in-system |
+
+```bash
+    # e.g. ESP32-P4-EYE
+    idf.py -D 'SDKCONFIG_DEFAULTS=sdkconfig.defaults;sdkconfig.defaults.esp32p4;sdkconfig.defaults.p4_eye.esp32p4' set-target esp32p4 build
+```
+
+On the `p4_eye` / `p4x_eye` / `p4_c5_core_board` boards the on-board
+co-processor is flashed automatically from the P4 image via `slave_flasher`.
+Drop the C6/C5 `network_adapter` binaries into `target-firmware/` first — see
+`target-firmware/README.md`. The Function-EV boards flash their external C6
+directly over ESP-Prog (see below).
 
 - Different Development boards have different options for CONSOLE and LOGs
 - You may want to do menuconfig and change it as per your board
@@ -72,7 +98,7 @@ Go to the example directory and follow the steps below:
 ```
 
 *__NOTE__*:
-- While using P4+C6 setup, please build and flash the network_adapter example from `${KVS_SDK_PATH}/esp_port/examples/network_adapter` on ESP32-C6.
+- While using P4+C6 setup, please build and flash the network_adapter example from `${KVS_SDK_PATH}/examples/network_adapter` on ESP32-C6.
 - ESP32-C6 does not have an onboard UART port. You will need to use [ESP-Prog](https://docs.espressif.com/projects/esp-iot-solution/en/latest/hw-reference/ESP-Prog_guide.html) board or any other JTAG.
 - Use following Pin Connections:
 
@@ -85,7 +111,7 @@ Go to the example directory and follow the steps below:
 | GND      | GND      |
 
 ```bash
-    cd ${KVS_SDK_PATH}/esp_port/examples/network_adapter
+    cd ${KVS_SDK_PATH}/examples/network_adapter
     idf.py set-target esp32c6
     idf.py build
     idf.py -p [ESP32-C6-PORT] flash monitor

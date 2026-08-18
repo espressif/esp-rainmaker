@@ -5,11 +5,25 @@ CONFIG_IDF_EXPERIMENTAL_FEATURES=y
 CONFIG_BT_NIMBLE_ENABLED=y
 CONFIG_BT_NIMBLE_TRANSPORT_UART=n
 CONFIG_ESP_ENABLE_BT=y
+# Route NimBLE over the hosted co-processor. The new SDK's esp_hosted provides
+# the NimBLE HCI/VHCI transport (ble_transport_to_ll_* etc.); required so the
+# NimBLE host links + talks to the C6 BLE controller.
+CONFIG_ESP_HOSTED_ENABLE_BT_NIMBLE=y
+CONFIG_ESP_HOSTED_NIMBLE_HCI_VHCI=y
 
 #
 # Serial flasher config
 #
 CONFIG_ESPTOOLPY_FLASHSIZE_8MB=y
+
+#
+# Partition table - P4 uses the 8 MB dual-OTA layout by default. Board
+# overlays that enable slave_flasher (p4_eye / p4x_eye / p4_c5_core_board)
+# switch to partitions.16mb.csv, which adds the 'slave' SPIFFS partition
+# for the on-board co-processor image. esp32/esp32s3 keep partitions.csv.
+#
+CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions.8mb.csv"
+CONFIG_PARTITION_TABLE_FILENAME="partitions.8mb.csv"
 
 #
 # ESP System Settings
@@ -100,3 +114,6 @@ CONFIG_CAMERA_SC2336_MIPI_RAW8_1920x1080_30FPS=y
 # CONFIG_CAMERA_OV5647_AUTO_DETECT=y
 # CONFIG_CAMERA_OV5647_MIPI_RAW10_1920x1080_30FPS=y
 # CONFIG_CAMERA_OV5647_AUTO_DETECT_MIPI_INTERFACE_SENSOR=y
+
+# esp_hosted SDIO mempool allocated from PSRAM (avoids internal-DMA pool exhaustion on P4)
+CONFIG_ESP_HOSTED_MEMPOOL_PREFER_SPIRAM=y

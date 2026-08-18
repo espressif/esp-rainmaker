@@ -53,7 +53,7 @@ jobs:
           - example: camera/standalone
             target: esp32s3
             idf_image: espressif/idf:v5.5.4
-            kvs_sdk_branch: beta-reference-esp-port
+            kvs_sdk_branch: main
 
     steps:
       - uses: actions/checkout@v4
@@ -65,7 +65,7 @@ jobs:
         run: |
           git clone --depth 1 --shallow-submodules --recursive \
             -b ${{ matrix.kvs_sdk_branch }} \
-            https://github.com/awslabs/amazon-kinesis-video-streams-webrtc-sdk-c.git \
+            https://github.com/espressif/esp-port-for-amazon-kvs-sdk.git \
             /opt/kvs-sdk
 
       - run: mkdir -p images

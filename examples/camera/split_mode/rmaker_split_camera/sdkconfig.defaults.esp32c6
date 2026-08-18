@@ -50,5 +50,8 @@ CONFIG_LWIP_TCPIP_RECVMBOX_SIZE=64
 #
 # ESP-Hosted - Network coprocessor
 #
+# RainMaker already creates the STA netif, so have the co-processor reuse
+# WIFI_STA_DEF; otherwise create_slave_sta_netif asserts and the C6 boot-loops.
+CONFIG_ESP_HOSTED_REUSE_WIFI_STA_DEF_NETIF_INSTANCE=y
 CONFIG_SLAVE_LWIP_ENABLED=y
 CONFIG_ESP_SDIO_RX_Q_SIZE=10

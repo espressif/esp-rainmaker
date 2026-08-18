@@ -16,7 +16,7 @@ The split mode consists of two separate firmware images:
 
 ### 2. **media_adapter** (ESP32-P4)
 - **Role**: Media streaming device
-- **Implementation**: Uses the `streaming_only` example from `${KVS_SDK_PATH}/esp_port/examples/streaming_only`
+- **Implementation**: Uses the `streaming_only` example from `${KVS_SDK_PATH}/examples/streaming_only`
 - **Responsibilities**:
   - Video/audio capture and encoding
   - WebRTC media streaming
@@ -58,11 +58,11 @@ The split mode consists of two separate firmware images:
 
 - IDF version: release/v5.5 (v5.5.x)
 - [ESP32-P4 Function EV Board](https://docs.espressif.com/projects/esp-dev-kits/en/latest/esp32p4/esp32-p4-function-ev-board/user_guide.html)
-- Amazon Kinesis Video Streams WebRTC SDK repository: Clone the `beta-reference-esp-port` branch
+- Amazon Kinesis Video Streams WebRTC SDK repository: Clone the default branch
 
   ```bash
-  git clone --recursive --single-branch --branch beta-reference-esp-port git@github.com:awslabs/amazon-kinesis-video-streams-webrtc-sdk-c.git amazon-kinesis-video-streams-webrtc-sdk-c
-  export KVS_SDK_PATH=/path/to/amazon-kinesis-video-streams-webrtc-sdk-c
+  git clone --recursive git@github.com:espressif/esp-port-for-amazon-kvs-sdk.git esp-port-for-amazon-kvs-sdk
+  export KVS_SDK_PATH=/path/to/esp-port-for-amazon-kvs-sdk
   ```
 
 - ESP RainMaker App (iOS/Android) with KVS streaming
@@ -89,7 +89,7 @@ idf.py -p [PORT] flash monitor
 This handles video/audio streaming. The firmware is the `streaming_only` example from the KVS SDK.
 
 ```bash
-cd ${KVS_SDK_PATH}/esp_port/examples/streaming_only
+cd ${KVS_SDK_PATH}/examples/streaming_only
 idf.py set-target esp32p4
 idf.py menuconfig
 # Go to Component config -> ESP System Settings -> Channel for console output
@@ -127,7 +127,7 @@ split_mode/
 │   └── ...
 └── media_adapter/            # Documentation for ESP32-P4 firmware
     └── README.md             # Instructions pointing to streaming_only example
-                              # Actual firmware: ${KVS_SDK_PATH}/esp_port/examples/streaming_only
+                              # Actual firmware: ${KVS_SDK_PATH}/examples/streaming_only
 ```
 
 ## Related Documentation

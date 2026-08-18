@@ -1,0 +1,84 @@
+#
+# ESP32-P4-EYE board build config for the RainMaker standalone camera
+# example. Layered on top of sdkconfig.defaults + sdkconfig.defaults.esp32p4;
+# override only the board-specific deltas here.
+#
+# Build with:
+#   idf.py -D 'SDKCONFIG_DEFAULTS=sdkconfig.defaults;sdkconfig.defaults.esp32p4;sdkconfig.defaults.p4_eye.esp32p4' set-target esp32p4 build
+#
+CONFIG_PARTITION_TABLE_CUSTOM=y
+
+#
+# Chip revision - P4-EYE engineering samples ship with pre-v3 P4 silicon.
+# Must be y so the bootloader/cache avoid v3-only timing; without it the
+# bootloader rejects the chip with "requires chip revision in range v3.1-v3.99".
+#
+CONFIG_ESP32P4_SELECTS_REV_LESS_V3=y
+CONFIG_ESP32P4_REV_MIN_0=y
+
+#
+# Board variant selection
+# - BSP_SELECT_ESP32_P4_EYE pulls the espressif/esp32_p4_eye BSP.
+# - ESP32P4_EYE_C6_BOARD (esp_hosted) auto-configures the P4-EYE SDIO pin
+#   set for the on-board C6 co-processor.
+#
+CONFIG_BSP_SELECT_ESP32_P4_EYE=y
+CONFIG_ESP32P4_EYE_C6_BOARD=y
+
+#
+# Flash - P4-EYE v1.2 ships with 16 MB flash; needed to fit the app binary
+# alongside the C6 slave firmware in the 'slave' SPIFFS partition.
+#
+# CONFIG_ESPTOOLPY_FLASHSIZE_8MB is not set
+CONFIG_ESPTOOLPY_FLASHSIZE_16MB=y
+CONFIG_ESPTOOLPY_FLASHSIZE="16MB"
+CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions.16mb.csv"
+CONFIG_PARTITION_TABLE_FILENAME="partitions.16mb.csv"
+
+#
+# Slave flasher - P4-EYE ships with the C6 on the same PCB, so the P4 image
+# carries the C6 network_adapter binaries in the slave SPIFFS partition and
+# flashes them on boot over UART. Addresses MUST match the network_adapter C6
+# partition layout (table at 0x8000, first app slot at 0x10000); the component
+# defaults (0xC000 / 0x20000) target a different layout and brick the C6 boot
+# chain. EV / Function dev boards use ESP-Prog on the C6 instead; overlays off.
+#
+CONFIG_SLAVE_FLASHER_ENABLE=y
+CONFIG_SLAVE_PARTITION_TABLE_ADDRESS=0x8000
+CONFIG_SLAVE_APPLICATION_ADDRESS=0x10000
+CONFIG_SLAVE_UART_RX_PIN=36
+CONFIG_SLAVE_UART_TX_PIN=35
+CONFIG_SLAVE_GPIO0_TRIGGER_PIN=33
+
+#
+# Camera sensor: OV2710 on MIPI-CSI, 1080p @ 25fps. AE stats polling at
+# 500 ms (default 120 ms) to lower I2C transaction rate / contention with
+# the audio codec when audio RX is active.
+#
+CONFIG_CAMERA_OV2710=y
+CONFIG_CAMERA_OV2710_AUTO_DETECT_MIPI_INTERFACE_SENSOR=y
+CONFIG_CAMERA_OV2710_MIPI_RAW10_1920X1080_25FPS=y
+CONFIG_CAMERA_OV2710_STATS_UPDATE_INTERVAL=500
+
+#
+# Console on native USB Serial/JTAG (P4 USB-C port directly).
+#
+CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG=y
+CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG_ENABLED=y
+CONFIG_ESP_CONSOLE_SECONDARY_NONE=y
+
+#
+# Video player (receive path) - canvas pinned to the 240x240 P4-EYE LCD.
+#
+CONFIG_MEDIA_STREAM_PLAYER_MAX_WIDTH=240
+CONFIG_MEDIA_STREAM_PLAYER_MAX_HEIGHT=240
+
+#
+# LVGL: relax refresh rate (~6 fps canvas updates) + bigger WDT.
+# LV_COLOR_16_SWAP=y is required for the ST7789 SPI panel byte order on
+# P4-EYE. EV-board MIPI-DSI panels keep LV_COLOR_16_SWAP=n via their overlay.
+#
+CONFIG_LV_DISP_DEF_REFR_PERIOD=200
+CONFIG_BSP_DISPLAY_LVGL_MAX_SLEEP=100
+CONFIG_ESP_TASK_WDT_TIMEOUT_S=15
+CONFIG_LV_COLOR_16_SWAP=y

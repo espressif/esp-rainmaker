@@ -1,0 +1,2 @@
+# Co-processor images are built from the network_adapter example, not tracked.
+*.bin

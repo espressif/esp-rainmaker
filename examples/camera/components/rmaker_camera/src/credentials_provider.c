@@ -6,6 +6,7 @@
 
 #include <string.h>
 #include <stdlib.h>
+#include <stdatomic.h>
 #include "credentials_provider.h"
 #include "esp_log.h"
 #include <esp_rmaker_core.h>
@@ -22,12 +23,44 @@ static esp_rmaker_aws_credentials_t *g_current_credentials = NULL;
 /* Timeout for work queue operations (milliseconds) */
 #define SECURITY_TOKEN_TIMEOUT_MS 10000
 
-/* Context structure for get_aws_security_token work queue operation */
+/* Context for the get_aws_security_token work-queue operation.
+ *
+ * Lifetime is refcounted (init 2): the caller and the work fn each hold one
+ * reference and drop it via security_token_ctx_release() when done; whoever
+ * drops the last reference frees ctx + the semaphore. This closes the timeout
+ * race — if the caller times out and returns while the work fn is still
+ * queued/running, ctx (and the semaphore the work fn will xSemaphoreGive)
+ * stays alive until the work fn also finishes, so the work fn never writes
+ * ctx->result / gives a freed semaphore. On success the caller transfers
+ * result ownership (sets result = NULL) before releasing. */
 typedef struct {
     const char *role_alias;
     esp_rmaker_aws_credentials_t *result;
     SemaphoreHandle_t semaphore;
+    atomic_int refcount;
 } security_token_ctx_t;
+
+/* Drop one reference; the party dropping the last one frees ctx, its (orphan)
+ * result, and the semaphore. atomic_fetch_sub returns the pre-decrement value,
+ * so == 1 means we were the last holder. */
+static void security_token_ctx_release(security_token_ctx_t *ctx)
+{
+    if (!ctx) {
+        return;
+    }
+    if (atomic_fetch_sub(&ctx->refcount, 1) != 1) {
+        return;   /* another holder remains */
+    }
+    if (ctx->result) {
+        esp_rmaker_free_aws_credentials(ctx->result);
+        ctx->result = NULL;
+    }
+    if (ctx->semaphore) {
+        vSemaphoreDelete(ctx->semaphore);
+        ctx->semaphore = NULL;
+    }
+    free(ctx);
+}
 
 /* Work function to perform get_aws_security_token in work queue context */
 static void get_security_token_work_fn(void *priv_data)
@@ -37,13 +70,15 @@ static void get_security_token_work_fn(void *priv_data)
         return;
     }
 
-    /* Perform get_aws_security_token in work queue context (runs in internal RAM) */
+    /* Blocking HTTP call; may outlive the caller's wait — ctx stays alive
+     * because we hold a reference. */
     ctx->result = esp_rmaker_get_aws_security_token(ctx->role_alias);
 
-    /* Signal completion */
-    if (ctx->semaphore) {
-        xSemaphoreGive(ctx->semaphore);
-    }
+    /* Wake the caller if still waiting (harmless if it already timed out). */
+    xSemaphoreGive(ctx->semaphore);
+
+    /* Drop our reference; frees ctx iff the caller already dropped its. */
+    security_token_ctx_release(ctx);
 }
 
 /* Wrapper function to get AWS security token using work queue */
@@ -71,29 +106,33 @@ static esp_rmaker_aws_credentials_t *esp_rmaker_get_aws_security_token_safe(cons
     ctx->role_alias = role_alias;
     ctx->result = NULL;
     ctx->semaphore = semaphore;
+    atomic_init(&ctx->refcount, 2);   /* one ref for us, one for the work fn */
 
     /* Try to submit work to queue - if queue is not initialized, fall back to direct call */
     esp_err_t err = esp_rmaker_work_queue_add_task(get_security_token_work_fn, ctx);
     if (err != ESP_OK) {
-        /* Work queue not available, fall back to direct call */
+        /* Work fn will never run (so never takes its ref); caller owns
+         * everything. Free directly and fall back to a direct call. */
         ESP_LOGW(TAG, "Work queue not available (err: %d), using direct get_aws_security_token", err);
-        free(ctx);
         vSemaphoreDelete(semaphore);
+        free(ctx);
         return esp_rmaker_get_aws_security_token(role_alias);
     }
 
-    /* Wait for completion */
-    if (xSemaphoreTake(semaphore, pdMS_TO_TICKS(SECURITY_TOKEN_TIMEOUT_MS)) != pdTRUE) {
+    esp_rmaker_aws_credentials_t *result = NULL;
+    if (xSemaphoreTake(semaphore, pdMS_TO_TICKS(SECURITY_TOKEN_TIMEOUT_MS)) == pdTRUE) {
+        /* Work fn completed and handed us the result; take ownership so the
+         * final release does not free it. */
+        result = ctx->result;
+        ctx->result = NULL;
+    } else {
+        /* Timed out. Do NOT free anything — the work fn is still running and
+         * holds its own reference; whichever of us finishes last frees ctx
+         * (and any result the work fn eventually produces). */
         ESP_LOGE(TAG, "Timeout waiting for get_aws_security_token to complete");
-        free(ctx);
-        vSemaphoreDelete(semaphore);
-        return NULL;
     }
 
-    /* Get result and cleanup */
-    esp_rmaker_aws_credentials_t *result = ctx->result;
-    free(ctx);
-    vSemaphoreDelete(semaphore);
+    security_token_ctx_release(ctx);   /* drop the caller's reference */
     return result;
 }
 
