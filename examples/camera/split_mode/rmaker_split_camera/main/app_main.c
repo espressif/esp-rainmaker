@@ -178,9 +178,10 @@ static int split_mode_init_callback(void *user_data)
 {
     (void)user_data;
 
-    /* Initialize work queue in advance with lower (than default) stack size */
+    /* 12 KB overflowed by ~640 B in the SDP-answer / signaling handler on
+     * esp_workq_task (stack-protection fault at streaming start). */
     esp_work_queue_config_t work_queue_config = ESP_WORK_QUEUE_CONFIG_DEFAULT();
-    work_queue_config.stack_size = 12 * 1024;
+    work_queue_config.stack_size = 16 * 1024;
     if (esp_work_queue_init_with_config(&work_queue_config) != ESP_OK) {
         ESP_LOGE(TAG, "Failed to initialize work queue");
         return -1;
