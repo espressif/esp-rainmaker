@@ -7,13 +7,12 @@
 #include "ui_main.h"
 #include "esp_check.h"
 #include "esp_log.h"
-#include "lv_symbol_extra_def.h"
 #include "lvgl.h"
 #include "ui_about_us.h"
 #include "ui_boot_animate.h"
 #include "ui_matter_ctrl.h"
 #include <sys/time.h>
-#include "esp_lvgl_port.h"
+#include "esp_lv_adapter.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
 #include "freertos/task.h"
@@ -38,12 +37,12 @@ static void ui_led_set_visible(bool visible);
 
 void ui_acquire(void)
 {
-    lvgl_port_lock(0);
+    esp_lv_adapter_lock(-1);
 }
 
 void ui_release(void)
 {
-    lvgl_port_unlock();
+    esp_lv_adapter_unlock();
 }
 
 static void ui_button_style_init(void)
@@ -108,8 +107,15 @@ lv_obj_t *ui_main_get_status_bar(void)
 
 void ui_main_status_bar_set_wifi(bool is_connected)
 {
+    wifi_connected = is_connected;
     if (g_lab_wifi) {
-        lv_label_set_text_static(g_lab_wifi, is_connected ? LV_SYMBOL_WIFI : LV_SYMBOL_EXTRA_WIFI_OFF);
+        if (!is_connected) {
+            lv_obj_add_flag(g_lab_wifi, LV_OBJ_FLAG_HIDDEN);
+            return;
+        }
+        lv_obj_clear_flag(g_lab_wifi, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_set_style_text_color(g_lab_wifi, lv_color_make(40, 40, 40), LV_PART_MAIN);
+        lv_label_set_text_static(g_lab_wifi, LV_SYMBOL_WIFI);
     }
 }
 
@@ -379,7 +385,7 @@ static void ui_after_boot(void)
 
 static void clock_run_cb(lv_timer_t *timer)
 {
-    lv_obj_t *lab_time = (lv_obj_t *)timer->user_data;
+    lv_obj_t *lab_time = (lv_obj_t *)lv_timer_get_user_data(timer);
     time_t now;
     struct tm timeinfo;
     time(&now);
@@ -422,7 +428,9 @@ esp_err_t ui_main_start(void)
     clock_run_cb(timer);
 
     g_lab_wifi = lv_label_create(g_status_bar);
+    lv_obj_set_style_text_font(g_lab_wifi, &lv_font_montserrat_14, LV_PART_MAIN);
     lv_obj_align_to(g_lab_wifi, lab_time, LV_ALIGN_OUT_RIGHT_MID, 10, 0);
+    ui_main_status_bar_set_wifi(wifi_connected);
 
     ui_status_bar_set_visible(0);
 

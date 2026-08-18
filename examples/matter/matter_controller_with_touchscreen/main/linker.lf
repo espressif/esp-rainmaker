@@ -1,23 +1,31 @@
 [mapping:CHIP]
 archive: libCHIP.a
 entries:
-  if ESP_ALLOW_BSS_SEG_EXTERNAL_MEMORY = y:
+  if SPIRAM_ALLOW_BSS_SEG_EXTERNAL_MEMORY = y:
     * (extram_bss)
   else:
     * (default)
 
-[mapping:lvgl__lvgl]
+[mapping:lvgl]
 archive: liblvgl__lvgl.a
 entries:
-  if ESP_ALLOW_BSS_SEG_EXTERNAL_MEMORY = y:
+  if SPIRAM_ALLOW_BSS_SEG_EXTERNAL_MEMORY = y:
     * (extram_bss)
   else:
     * (default)
 
 [mapping:esp_matter]
-archive: libesp_matter.a
+archive: libespressif__esp_matter.a
 entries:
-  if ESP_ALLOW_BSS_SEG_EXTERNAL_MEMORY = y:
+  if SPIRAM_ALLOW_BSS_SEG_EXTERNAL_MEMORY = y:
+    * (extram_bss)
+  else:
+    * (default)
+
+[mapping:app_controller]
+archive: libapp_controller.a
+entries:
+  if SPIRAM_ALLOW_BSS_SEG_EXTERNAL_MEMORY = y:
     * (extram_bss)
   else:
     * (default)
@@ -25,15 +33,15 @@ entries:
 [mapping:stdcpp]
 archive: libstdc++.a
 entries:
-  if ESP_ALLOW_BSS_SEG_EXTERNAL_MEMORY = y:
+  if SPIRAM_ALLOW_BSS_SEG_EXTERNAL_MEMORY = y:
     * (extram_bss)
   else:
     * (default)
 
-[mapping:openthread_bss]
+[mapping:_openthread]
 archive: libopenthread.a
 entries:
-  if ESP_ALLOW_BSS_SEG_EXTERNAL_MEMORY = y:
+  if SPIRAM_ALLOW_BSS_SEG_EXTERNAL_MEMORY = y:
     * (extram_bss)
   else:
     * (default)
@@ -41,7 +49,7 @@ entries:
 [mapping:openthread_br]
 archive: libopenthread_br.a
 entries:
-  if ESP_ALLOW_BSS_SEG_EXTERNAL_MEMORY = y:
+  if SPIRAM_ALLOW_BSS_SEG_EXTERNAL_MEMORY = y:
     * (extram_bss)
   else:
     * (default)

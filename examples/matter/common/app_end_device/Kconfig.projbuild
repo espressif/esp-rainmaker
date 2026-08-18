@@ -1,0 +1,46 @@
+menu "RainMaker Matter End Device"
+
+config APP_END_DEVICE_BOARD_BUTTON_GPIO
+    int "Boot Button GPIO"
+    default 28 if IDF_TARGET_ESP32C5
+    default 9 if IDF_TARGET_ESP32C3 || IDF_TARGET_ESP32C6 || IDF_TARGET_ESP32C2 || IDF_TARGET_ESP32H2
+    default 0
+    help
+        GPIO number on which the "Boot" button is connected.
+
+choice APP_END_DEVICE_LED_TYPE
+    prompt "LED Type"
+    default APP_END_DEVICE_LED_TYPE_RGB if IDF_TARGET_ESP32C2
+    default APP_END_DEVICE_LED_TYPE_GPIO if IDF_TARGET_ESP32
+    default APP_END_DEVICE_LED_TYPE_WS2812
+
+    config APP_END_DEVICE_LED_TYPE_GPIO
+        bool "Single GPIO LED"
+
+    config APP_END_DEVICE_LED_TYPE_RGB
+        bool "Three-channel RGB LED"
+        depends on IDF_TARGET_ESP32C2
+
+    config APP_END_DEVICE_LED_TYPE_WS2812
+        bool "WS2812 LED"
+
+    config APP_END_DEVICE_LED_TYPE_NONE
+        bool "No LED"
+endchoice
+
+config APP_END_DEVICE_LED_GPIO
+    int "LED GPIO"
+    default 5 if IDF_TARGET_ESP32
+    default 38 if IDF_TARGET_ESP32S3
+    default 8
+    depends on APP_END_DEVICE_LED_TYPE_GPIO
+
+config APP_END_DEVICE_WS2812_LED_GPIO
+    int "WS2812 LED GPIO"
+    default 27 if IDF_TARGET_ESP32C5
+    default 8 if IDF_TARGET_ESP32C2 || IDF_TARGET_ESP32C3 || IDF_TARGET_ESP32C6 || IDF_TARGET_ESP32H2
+    default 48 if IDF_TARGET_ESP32S3
+    default 18
+    depends on APP_END_DEVICE_LED_TYPE_WS2812
+
+endmenu

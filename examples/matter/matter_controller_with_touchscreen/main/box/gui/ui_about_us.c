@@ -10,11 +10,16 @@
 #include "lvgl.h"
 #include "ui_main.h"
 #include "ui_about_us.h"
-#include "app_matter_ctrl.h"
+#include <string.h>
 
-#define LV_SYMBOL_EXTRA_SYNC "\xef\x80\xA1"
-static bool perform_factory_reset = false;
 static void (*g_about_us_end_cb)(void) = NULL;
+
+static void factory_reset_timer_cb(lv_timer_t *timer)
+{
+    (void)timer;
+    ESP_LOGI("BOX", "Factory reset triggered");
+    box_platform_factory_reset();
+}
 
 static void ui_about_us_page_return_click_cb(lv_event_t *e)
 {
@@ -30,30 +35,27 @@ static void ui_about_us_page_return_click_cb(lv_event_t *e)
     }
 }
 
-static void timer_cb(struct _lv_timer_t *)
-{
-    matter_factory_reset();
-}
-
 static void msgbox_event_cb(lv_event_t *e)
 {
     lv_event_code_t code = lv_event_get_code(e);
-    lv_obj_t *msgbox = lv_event_get_current_target(e);
 
-    if (code == LV_EVENT_VALUE_CHANGED) {
-        const char *txt = lv_msgbox_get_active_btn_text(msgbox);
-        if (strcmp(txt, "Ok") == 0) {
-            if (!perform_factory_reset) {
-                lv_obj_t *text = lv_msgbox_get_text(msgbox);
-                lv_label_set_text_fmt(text, "Do factory reset");
-                lv_obj_set_style_text_color(text, lv_color_make(255, 0, 0), LV_STATE_DEFAULT);
-                ESP_LOGI("BOX", "Factory reset triggered. Release the button to start factory reset.");
-                perform_factory_reset = true;
-                lv_timer_create(timer_cb, 2000, NULL);
-            }
-        } else {
-            lv_msgbox_close(msgbox);
-        }
+    if (code == LV_EVENT_CLICKED) {
+        lv_obj_t *btn = lv_event_get_current_target(e);
+        lv_obj_t *msgbox = lv_obj_get_parent(lv_obj_get_parent(btn));
+        lv_obj_t *text = lv_event_get_user_data(e);
+        lv_label_set_text_static(text, "Resetting controller...\nDisplay will restart shortly.");
+        lv_obj_add_state(lv_msgbox_get_footer(msgbox), LV_STATE_DISABLED | LV_STATE_PRESSED);
+        lv_obj_invalidate(msgbox);
+
+        lv_timer_t *timer = lv_timer_create(factory_reset_timer_cb, 150, NULL);
+        lv_timer_set_repeat_count(timer, 1);
+    }
+}
+
+static void msgbox_close_event_cb(lv_event_t *e)
+{
+    if (lv_event_get_code(e) == LV_EVENT_CLICKED) {
+        lv_msgbox_close(lv_event_get_user_data(e));
     }
 }
 
@@ -61,11 +63,15 @@ static void btn_event_cb(lv_event_t *e)
 {
     lv_event_code_t code = lv_event_get_code(e);
     if (code == LV_EVENT_CLICKED) {
-        static const char *btns[] = {"Ok", "Cancel", ""};
-        lv_obj_t *mbox = lv_msgbox_create(NULL, "Setting", "Are you sure to reset Controller", btns, true);
-        lv_obj_add_event_cb(mbox, msgbox_event_cb, LV_EVENT_ALL, NULL);
-        lv_group_focus_obj(lv_msgbox_get_btns(mbox));
-        lv_obj_add_state(lv_msgbox_get_btns(mbox), LV_STATE_FOCUS_KEY);
+        lv_obj_t *mbox = lv_msgbox_create(NULL);
+        lv_msgbox_add_title(mbox, "Setting");
+        lv_obj_t *text = lv_msgbox_add_text(mbox, "Are you sure to reset Controller");
+        lv_obj_t *ok_btn = lv_msgbox_add_footer_button(mbox, "Ok");
+        lv_obj_t *cancel_btn = lv_msgbox_add_footer_button(mbox, "Cancel");
+        lv_obj_add_event_cb(ok_btn, msgbox_event_cb, LV_EVENT_CLICKED, text);
+        lv_obj_add_event_cb(cancel_btn, msgbox_close_event_cb, LV_EVENT_CLICKED, mbox);
+        lv_group_focus_obj(ok_btn);
+        lv_obj_add_state(ok_btn, LV_STATE_FOCUS_KEY);
         lv_obj_align(mbox, LV_ALIGN_CENTER, 0, 0);
         lv_obj_t *bg = lv_obj_get_parent(mbox);
         lv_obj_set_style_bg_opa(bg, LV_OPA_70, 0);
@@ -123,15 +129,17 @@ void ui_about_us_start(void (*fn)(void))
     lv_obj_align(lab, LV_ALIGN_BOTTOM_LEFT, 0, -10);
 
     lv_obj_t *reset_button = lv_btn_create(page);
-    lv_obj_set_style_bg_color(reset_button, lv_color_white(), LV_STATE_DEFAULT);
-    lv_obj_set_style_bg_color(reset_button, lv_palette_lighten(LV_PALETTE_RED, 1), LV_STATE_PRESSED);
+    lv_obj_set_style_bg_color(reset_button, lv_palette_main(LV_PALETTE_RED), LV_STATE_DEFAULT);
+    lv_obj_set_style_bg_color(reset_button, lv_palette_darken(LV_PALETTE_RED, 2), LV_STATE_PRESSED);
     lv_obj_set_style_border_width(reset_button, 1, LV_PART_MAIN);
-    lv_obj_set_style_border_color(reset_button, lv_palette_main(LV_PALETTE_GREY), LV_PART_MAIN);
+    lv_obj_set_style_border_color(reset_button, lv_palette_darken(LV_PALETTE_RED, 3), LV_PART_MAIN);
     lv_obj_align(reset_button, LV_ALIGN_TOP_RIGHT, 0, 0);
-    lv_obj_set_size(reset_button, 40, 40);
-    lv_obj_t *reset_label = lv_label_create(page);
-    lv_label_set_text_static(reset_label, LV_SYMBOL_EXTRA_SYNC);
-    lv_obj_align_to(reset_label, reset_button, LV_ALIGN_CENTER, 0, 0);
+    lv_obj_set_size(reset_button, 58, 28);
+    lv_obj_t *reset_label = lv_label_create(reset_button);
+    lv_label_set_text_static(reset_label, "Reset");
+    lv_obj_set_style_text_color(reset_label, lv_color_white(), LV_STATE_DEFAULT);
+    lv_obj_set_style_text_font(reset_label, &lv_font_montserrat_14, LV_STATE_DEFAULT);
+    lv_obj_center(reset_label);
     lv_obj_add_event_cb(reset_button, btn_event_cb, LV_EVENT_CLICKED, NULL);
 
 }

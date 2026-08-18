@@ -18,13 +18,19 @@
 #include "app_rmaker_matter_controller_api.h"
 #include "app_rmaker_matter_controller_internal.h"
 #include "app_rmaker_matter_controller_service.h"
+#include "app_rmaker_matter_report_json.h"
 #include "app_rmaker_user_api.h"
+
+#if !CONFIG_RMAKER_MTCTL_MEMORY_ALLOCATION_PREFER_SPIRAM
+#warning "RMAKER_MTCTL_MEMORY_ALLOCATION_PREFER_SPIRAM is disabled; internal heap exhaustion may occur. Enabling PSRAM-preferred allocation is strongly recommended."
+#endif
 
 #define TAG "rmaker_matter_controller"
 
 static matter_controller_handle_t *s_matter_controller_handle = NULL;
 static esp_err_t invoke_internal_callback(matter_controller_handle_t *handle, matter_controller_event_type_t type);
 static esp_err_t update_device_list();
+static esp_err_t app_rmaker_matter_controller_handle_update();
 
 static void safe_free(char **ptr)
 {
@@ -38,6 +44,52 @@ static bool check_handle_state()
 {
     return s_matter_controller_handle && s_matter_controller_handle->is_authorized &&
         s_matter_controller_handle->rmaker_group_id;
+}
+
+static bool controller_can_update(const matter_controller_handle_t *handle)
+{
+    return handle && handle->base_url && handle->user_token && handle->rmaker_group_id;
+}
+
+static bool controller_is_ready(const matter_controller_handle_t *handle)
+{
+    return controller_can_update(handle) && handle->is_authorized && handle->is_controller_setup;
+}
+
+static esp_err_t refresh_auth_service_state(void)
+{
+    if (!s_matter_controller_handle) {
+        return ESP_ERR_INVALID_STATE;
+    }
+
+    char *user_token = NULL;
+    char *base_url = NULL;
+    esp_err_t ret = esp_rmaker_auth_service_get_user_token(&user_token);
+    if (ret != ESP_OK) {
+        goto exit;
+    }
+    ret = esp_rmaker_auth_service_get_base_url(&base_url);
+    if (ret != ESP_OK) {
+        goto exit;
+    }
+
+    safe_free(&s_matter_controller_handle->user_token);
+    safe_free(&s_matter_controller_handle->base_url);
+    s_matter_controller_handle->user_token = user_token;
+    s_matter_controller_handle->base_url = base_url;
+    return ESP_OK;
+
+exit:
+    free(user_token);
+    free(base_url);
+    return ret;
+}
+
+static void request_handle_update_if_possible(void)
+{
+    if (controller_can_update(s_matter_controller_handle) && !controller_is_ready(s_matter_controller_handle)) {
+        app_rmaker_matter_controller_handle_update();
+    }
 }
 
 static esp_err_t send_event_to_matter_ctl_task(matter_controller_event_type_t event_type)
@@ -131,8 +183,8 @@ static esp_err_t matter_controller_update_noc(matter_controller_handle_t *handle
 
 static esp_err_t matter_controller_update_handle(matter_controller_handle_t *handle)
 {
+    esp_err_t err = ESP_OK;
     if (handle->base_url && handle->user_token) {
-        esp_err_t err = ESP_OK;
         if (!handle->is_authorized) {
             // Authorize Matter controller
             err = invoke_internal_callback(handle, MATTER_CONTROLLER_EVENT_TYPE_AUTHORIZE);
@@ -149,7 +201,11 @@ static esp_err_t matter_controller_update_handle(matter_controller_handle_t *han
             }
         }
     }
-    return report_matter_controller_status(handle);
+    esp_err_t report_err = report_matter_controller_status(handle);
+    if (report_err != ESP_OK) {
+        ESP_LOGW(TAG, "Failed to report controller status: %s", esp_err_to_name(report_err));
+    }
+    return err != ESP_OK ? err : report_err;
 }
 
 static esp_err_t invoke_internal_callback(matter_controller_handle_t *handle, matter_controller_event_type_t type)
@@ -168,7 +224,15 @@ static esp_err_t invoke_internal_callback(matter_controller_handle_t *handle, ma
         return update_device_list();
     }
     case MATTER_CONTROLLER_EVENT_TYPE_UPDATE_HANDLE: {
-        return matter_controller_update_handle(handle);
+        esp_err_t ret = matter_controller_update_handle(handle);
+        if (controller_is_ready(handle) && !handle->initial_device_list_update_done) {
+            ESP_LOGI(TAG, "Starting initial Matter device-list update");
+            esp_err_t err = update_device_list();
+            if (err != ESP_OK) {
+                ESP_LOGW(TAG, "Initial device list update failed: %s", esp_err_to_name(err));
+            }
+        }
+        return ret;
     }
     default:
         break;
@@ -189,6 +253,15 @@ static void event_task_handler(void *pvParameters)
 static esp_err_t update_rmaker_group_id(const char *rmaker_group_id, const esp_rmaker_device_t *service,
                                         esp_rmaker_write_ctx_t *ctx)
 {
+    if (ctx->src != ESP_RMAKER_REQ_SRC_INIT && s_matter_controller_handle->rmaker_group_id &&
+        s_matter_controller_handle->rmaker_group_id[0] != '\0') {
+        if (!rmaker_group_id || strcmp(s_matter_controller_handle->rmaker_group_id, rmaker_group_id) != 0) {
+            ESP_LOGW(TAG, "RMakerGroupID is already set and cannot be changed");
+            return ESP_ERR_INVALID_STATE;
+        }
+        return ESP_OK;
+    }
+
     safe_free(&s_matter_controller_handle->rmaker_group_id);
 
     size_t size_to_copy = 0;
@@ -255,7 +328,9 @@ static esp_err_t bulk_write_cb(const esp_rmaker_device_t *device, const esp_rmak
         }
     }
 
-    if (ctx->src != ESP_RMAKER_REQ_SRC_INIT) {
+    if (ctx->src == ESP_RMAKER_REQ_SRC_INIT) {
+        request_handle_update_if_possible();
+    } else {
         // If not initializing, update the controller handle and report the status.
         return app_rmaker_matter_controller_handle_update();
     }
@@ -338,37 +413,51 @@ esp_err_t app_rmaker_matter_controller_get_stored_rcac(uint8_t *rcac_der, size_t
     return rmaker_matter_controller_get_nvs(MATTER_CTL_NVS_KEY_RCAC, rcac_der, rcac_der_len);
 }
 
-esp_err_t app_rmaker_matter_controller_handle_update()
+static esp_err_t app_rmaker_matter_controller_handle_update()
 {
     return send_event_to_matter_ctl_task(MATTER_CONTROLLER_EVENT_TYPE_UPDATE_HANDLE);
 }
 
-esp_err_t app_rmaker_update_matter_device_list()
+bool app_rmaker_matter_device_list_updatable(void)
+{
+    return check_handle_state() && s_matter_controller_handle->is_controller_setup;
+}
+
+esp_err_t app_rmaker_matter_device_list_update(void)
 {
     return send_event_to_matter_ctl_task(MATTER_CONTROLLER_EVENT_TYPE_UPDATE_DEVICE_LIST);
 }
 
 static esp_err_t update_device_list()
 {
-    matter_device_t *tmp = NULL;
+    matter_device_t *dev_list = NULL;
     esp_err_t ret = ESP_OK;
-    ESP_GOTO_ON_FALSE(check_handle_state(), ESP_ERR_INVALID_STATE, exit, TAG, "Controller not authorized or not setup");
-    ESP_GOTO_ON_ERROR(app_rmaker_api_get_matter_device_list(s_matter_controller_handle->rmaker_group_id, &tmp), exit,
-                      TAG, "Failed to get matter device list");
-    xSemaphoreTakeRecursive(s_matter_controller_handle->dev_list_mutex, portMAX_DELAY);
-    if (s_matter_controller_handle->dev_list) {
-        app_rmaker_free_matter_device_list(s_matter_controller_handle->dev_list);
+    if (!controller_is_ready(s_matter_controller_handle) && controller_can_update(s_matter_controller_handle)) {
+        ESP_GOTO_ON_ERROR(matter_controller_update_handle(s_matter_controller_handle), exit, TAG,
+                          "Failed to update controller readiness before device-list update");
     }
-    s_matter_controller_handle->dev_list = tmp;
-    xSemaphoreGiveRecursive(s_matter_controller_handle->dev_list_mutex);
+    ESP_GOTO_ON_FALSE(check_handle_state(), ESP_ERR_INVALID_STATE, exit, TAG, "Controller not authorized or not setup");
+    ESP_GOTO_ON_FALSE(s_matter_controller_handle->is_controller_setup, ESP_ERR_INVALID_STATE, exit, TAG,
+                      "Controller setup is not ready");
+    ESP_GOTO_ON_ERROR(app_rmaker_api_get_matter_device_list(s_matter_controller_handle->rmaker_group_id, &dev_list), exit,
+                      TAG, "Failed to get matter device list");
 exit:
     if (s_matter_controller_handle->dev_list_update_cb) {
-        s_matter_controller_handle->dev_list_update_cb(ret);
+        s_matter_controller_handle->dev_list_update_cb(ret, ret == ESP_OK ? dev_list : NULL);
     }
+    if (ret == ESP_OK) {
+        ret = app_rmaker_matter_report_on_device_list_update(dev_list);
+        if (ret == ESP_OK) {
+            s_matter_controller_handle->initial_device_list_update_done = true;
+        } else {
+            ESP_LOGW(TAG, "Failed to update report device list: %s", esp_err_to_name(ret));
+        }
+    }
+    app_rmaker_device_list_copy_destroy(dev_list);
     return ret;
 }
 
-void app_rmaker_free_matter_device_list(matter_device_t *dev_list)
+void app_rmaker_device_list_copy_destroy(matter_device_t *dev_list)
 {
     matter_device_t *current = dev_list;
     while (current) {
@@ -378,7 +467,7 @@ void app_rmaker_free_matter_device_list(matter_device_t *dev_list)
     }
 }
 
-void app_rmaker_print_matter_device_list(matter_device_t *dev_list)
+void app_rmaker_device_list_print(const matter_device_t *dev_list)
 {
     uint16_t dev_index = 0;
     while (dev_list) {
@@ -386,58 +475,44 @@ void app_rmaker_print_matter_device_list(matter_device_t *dev_list)
         ESP_LOGI(TAG, "    rainmaker_node_id: %s,", dev_list->rainmaker_node_id);
         ESP_LOGI(TAG, "    matter_node_id: 0x%" PRIx32 "%" PRIx32 ",", (uint32_t)(dev_list->node_id >> 32),
                  (uint32_t)(dev_list->node_id & 0xFFFFFFFF));
-        if (dev_list->is_metadata_fetched) {
-            ESP_LOGI(TAG, "    is_rainmaker_device: %s,", dev_list->is_rainmaker_device ? "true" : "false");
-            ESP_LOGI(TAG, "    is_online: %s,", dev_list->reachable ? "true" : "false");
-            ESP_LOGI(TAG, "    endpoints : [");
-            for (size_t i = 0; i < dev_list->endpoint_count; ++i) {
-                ESP_LOGI(TAG, "        {");
-                ESP_LOGI(TAG, "           endpoint_id: %d,", dev_list->endpoints[i].endpoint_id);
-                ESP_LOGI(TAG, "           device_type_id: 0x%" PRIx32 ",", dev_list->endpoints[i].device_type_id);
-                ESP_LOGI(TAG, "           device_name: %s,", dev_list->endpoints[i].device_name);
-                ESP_LOGI(TAG, "        },");
+        ESP_LOGI(TAG, "    is_rainmaker_device: %s,", dev_list->is_rainmaker_device ? "true" : "false");
+        ESP_LOGI(TAG, "    device_name: %s,", dev_list->device_name);
+        ESP_LOGI(TAG, "    endpoints : [");
+        for (size_t i = 0; i < dev_list->endpoint_count; ++i) {
+            ESP_LOGI(TAG, "        {");
+            ESP_LOGI(TAG, "           endpoint_id: %d,", dev_list->endpoints[i].endpoint_id);
+            ESP_LOGI(TAG, "           device_type_list: [");
+            for (size_t j = 0; j < dev_list->endpoints[i].device_type_count; ++j) {
+                ESP_LOGI(TAG, "               0x%" PRIx32 ",", dev_list->endpoints[i].device_type_list[j]);
             }
-            ESP_LOGI(TAG, "    ]");
+            ESP_LOGI(TAG, "           ]");
+            ESP_LOGI(TAG, "        },");
         }
+        ESP_LOGI(TAG, "    ]");
         ESP_LOGI(TAG, "}");
         dev_list = dev_list->next;
         dev_index++;
     }
 }
 
-static matter_device_t *clone_dev_info(matter_device_t *dev)
-{
-    matter_device_t *ret = (matter_device_t *)MEM_CALLOC_EXTRAM(1, sizeof(matter_device_t));
-    if (!ret) {
-        ESP_LOGE(TAG, "Failed to allocate memory for matter device struct");
-        return NULL;
-    }
-    memcpy(ret, dev, sizeof(matter_device_t));
-    ret->next = NULL;
-    return ret;
-}
-
-matter_device_t *app_rmaker_get_matter_device_list()
+matter_device_t *app_rmaker_device_list_copy_create(const matter_device_t *src_dev_list)
 {
     matter_device_t *ret = NULL;
-    if (!s_matter_controller_handle || !s_matter_controller_handle->dev_list_mutex) {
-        ESP_LOGE(TAG, "Not initialized, call app_rmaker_matter_controller_enable first");
-        return NULL;
-    }
-    xSemaphoreTakeRecursive(s_matter_controller_handle->dev_list_mutex, portMAX_DELAY);
-    matter_device_t *current = s_matter_controller_handle->dev_list;
+    const matter_device_t *current = src_dev_list;
+    matter_device_t **tail = &ret;
     while (current) {
-        matter_device_t *tmp = clone_dev_info(current);
+        matter_device_t *tmp = (matter_device_t *)MEM_CALLOC_EXTRAM(1, sizeof(matter_device_t));
         if (!tmp) {
-            app_rmaker_free_matter_device_list(ret);
-            xSemaphoreGiveRecursive(s_matter_controller_handle->dev_list_mutex);
+            ESP_LOGE(TAG, "Failed to allocate memory for matter device struct");
+            app_rmaker_device_list_copy_destroy(ret);
             return NULL;
         }
-        tmp->next = ret;
-        ret = tmp;
+        memcpy(tmp, current, sizeof(matter_device_t));
+        tmp->next = NULL;
+        *tail = tmp;
+        tail = &tmp->next;
         current = current->next;
     }
-    xSemaphoreGiveRecursive(s_matter_controller_handle->dev_list_mutex);
     return ret;
 }
 
@@ -459,27 +534,16 @@ static void matter_ctl_auth_event_handler(void *arg, esp_event_base_t event_base
     if (event_base == RMAKER_AUTH_SERVICE_EVENT) {
         switch (event_id) {
         case RMAKER_AUTH_SERVICE_EVENT_ENABLED:
-            safe_free(&s_matter_controller_handle->user_token);
-            esp_rmaker_auth_service_get_user_token(&s_matter_controller_handle->user_token);
-            safe_free(&s_matter_controller_handle->base_url);
-            if (esp_rmaker_auth_service_get_base_url(&s_matter_controller_handle->base_url) != ESP_OK) {
-                /* If failed to get base url, free the user token */
-                safe_free(&s_matter_controller_handle->user_token);
-            }
+            refresh_auth_service_state();
+            request_handle_update_if_possible();
             break;
         case RMAKER_AUTH_SERVICE_EVENT_TOKEN_RECEIVED:
-            safe_free(&s_matter_controller_handle->user_token);
-            esp_rmaker_auth_service_get_user_token(&s_matter_controller_handle->user_token);
-            if (s_matter_controller_handle->user_token && s_matter_controller_handle->base_url) {
-                app_rmaker_matter_controller_handle_update();
-            }
+            refresh_auth_service_state();
+            request_handle_update_if_possible();
             break;
         case RMAKER_AUTH_SERVICE_EVENT_BASE_URL_RECEIVED:
-            safe_free(&s_matter_controller_handle->base_url);
-            esp_rmaker_auth_service_get_base_url(&s_matter_controller_handle->base_url);
-            if (s_matter_controller_handle->user_token && s_matter_controller_handle->base_url) {
-                app_rmaker_matter_controller_handle_update();
-            }
+            refresh_auth_service_state();
+            request_handle_update_if_possible();
             break;
         case RMAKER_AUTH_SERVICE_EVENT_DISABLED:
             break;
@@ -487,6 +551,16 @@ static void matter_ctl_auth_event_handler(void *arg, esp_event_base_t event_base
             break;
         }
     }
+}
+
+static void matter_ctl_rmaker_event_handler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data)
+{
+    if (!s_matter_controller_handle || event_base != RMAKER_EVENT || event_id != RMAKER_EVENT_STARTED) {
+        return;
+    }
+
+    refresh_auth_service_state();
+    request_handle_update_if_possible();
 }
 
 esp_err_t app_rmaker_matter_controller_enable(matter_controller_config_t *config)
@@ -507,6 +581,9 @@ esp_err_t app_rmaker_matter_controller_enable(matter_controller_config_t *config
     ESP_GOTO_ON_ERROR(
         esp_event_handler_register(RMAKER_AUTH_SERVICE_EVENT, ESP_EVENT_ANY_ID, &matter_ctl_auth_event_handler, NULL),
         exit, TAG, "Failed to register auth service event handler");
+    ESP_GOTO_ON_ERROR(esp_event_handler_register(RMAKER_EVENT, RMAKER_EVENT_STARTED, &matter_ctl_rmaker_event_handler,
+                                                 NULL),
+                      exit, TAG, "Failed to register RainMaker event handler");
     // Ignore the return values of app_rmaker_user_api_xxx APIs, may be invoked in other places.
     app_rmaker_user_api_config_t api_config = {0};
     app_rmaker_user_api_init(&api_config);
@@ -533,14 +610,20 @@ esp_err_t app_rmaker_matter_controller_enable(matter_controller_config_t *config
                       "Failed to create controller update task queue");
 
     // Without espressif/esp_flash_dispatcher, Tasks in SPIRAM should not call `esp_flash_xxx` functions.
-    xTaskCreate(event_task_handler, "matter_ctl_task", CONFIG_RAINMAKER_MATTER_CONTROLLER_TASK_STACK, NULL, 1,
+    xTaskCreate(event_task_handler, "matter_ctl_task", CONFIG_RMAKER_MTCTL_TASK_STACK_SIZE, NULL, 1,
                 &s_matter_controller_handle->event_task_handle);
     ESP_GOTO_ON_FALSE(s_matter_controller_handle->event_task_handle, ESP_FAIL, exit, TAG,
                       "Failed to create matter controller task");
 
-    s_matter_controller_handle->dev_list_mutex = xSemaphoreCreateRecursiveMutex();
-    ESP_GOTO_ON_FALSE(s_matter_controller_handle->dev_list_mutex, ESP_FAIL, exit, TAG,
-                      "Failed to create device list mutex");
+    s_matter_controller_handle->matter_devices_param = esp_rmaker_device_get_param_by_type(
+        s_matter_controller_handle->service, ESP_RMAKER_PARAM_MATTER_DEVICES);
+    ESP_GOTO_ON_FALSE(s_matter_controller_handle->matter_devices_param, ESP_ERR_INVALID_STATE, exit, TAG,
+                      "MTDevices param not created");
+    app_rmaker_matter_report_set_param(s_matter_controller_handle->matter_devices_param);
+    ESP_GOTO_ON_ERROR(app_rmaker_matter_cmd_resp_enable(), exit, TAG,
+                      "Failed to enable command response");
+    ESP_GOTO_ON_ERROR(app_rmaker_matter_controller_handle_update(), exit, TAG,
+                      "Failed to schedule Matter controller handle update");
 
     return ESP_OK;
 exit:
@@ -552,12 +635,12 @@ exit:
         vQueueDelete(s_matter_controller_handle->event_task_queue);
         s_matter_controller_handle->event_task_queue = NULL;
     }
-    if (s_matter_controller_handle->dev_list_mutex) {
-        vSemaphoreDelete(s_matter_controller_handle->dev_list_mutex);
-        s_matter_controller_handle->dev_list_mutex = NULL;
-    }
+    safe_free(&s_matter_controller_handle->base_url);
+    safe_free(&s_matter_controller_handle->user_token);
+    safe_free(&s_matter_controller_handle->rmaker_group_id);
     free(s_matter_controller_handle);
     s_matter_controller_handle = NULL;
     esp_event_handler_unregister(RMAKER_AUTH_SERVICE_EVENT, ESP_EVENT_ANY_ID, &matter_ctl_auth_event_handler);
+    esp_event_handler_unregister(RMAKER_EVENT, RMAKER_EVENT_STARTED, &matter_ctl_rmaker_event_handler);
     return ret;
 }

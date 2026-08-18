@@ -6,10 +6,9 @@
 
 #pragma once
 
-#include "app_matter_ctrl.h"
-#include "esp_err.h"
-#include "ui_main.h"
+#include <ui_main.h>
 #include <stdbool.h>
+#include <stdint.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -17,6 +16,7 @@ extern "C" {
 
 typedef enum {
     UI_MATTER_EVT_LOADING,
+    UI_MATTER_EVT_PROVISIONING,
     UI_MATTER_EVT_START_COMMISSION,
     UI_MATTER_EVT_COMMISSIONCOMPLETE,
     UI_MATTER_EVT_FAILED_COMMISSION,
@@ -25,8 +25,7 @@ typedef enum {
 
 void ui_matter_ctrl_start(void (*fn)(void));
 void ui_matter_config_update_cb(ui_matter_state_t state);
-void clean_screen_with_button();
-void ui_set_onoff_state(lv_obj_t *g_func_btn, size_t size_type, bool state);
+void ui_matter_device_state_update(uint64_t node_id, uint16_t endpoint_id);
 
 #ifdef __cplusplus
 }

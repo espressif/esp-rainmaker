@@ -1,61 +1,24 @@
-/*
-   This example code is in the Public Domain (or CC0 licensed, at your option.)
-
-   Unless required by applicable law or agreed to in writing, this
-   software is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
-   CONDITIONS OF ANY KIND, either express or implied.
-*/
-
 #pragma once
 
-#include "lvgl.h"
-#include "esp_err.h"
+#include <app_rmaker_matter_device_list.h>
+#include <app_rmaker_matter_report.h>
+#include <esp_err.h>
+
+#include <stdbool.h>
+#include <stdint.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-typedef enum {
-    SUBSCRIBE_ALL_DEVICE = 0,
-    SUBSCRIBE_LOCAL_DEVICE,
-    SUBSCRIBE_RAINMAKER_DEVICE,
-} subscribe_device_type_t;
-
-typedef enum {
-    CONTROL_LIGHT_DEVICE = 0,
-    CONTROL_PLUG_DEVICE,
-    CONTROL_SWITCH_DEVICE,
-    CONTROL_UNKNOWN_DEVICE,
-} control_device_type;
-
-typedef struct node_endpoint_id_list {
-    uint64_t node_id;
-    bool is_searched;
-    bool OnOff;
-    volatile bool is_online;
-    bool is_Rainmaker_device;
-    uint16_t endpoint_id;
-    size_t device_type;
-    lv_obj_t *lv_obj;
-    struct node_endpoint_id_list *next;
-} node_endpoint_id_list_t;
-
-typedef struct device_to_control_list {
-    size_t device_num;
-    size_t online_num;
-    node_endpoint_id_list_t *dev_list;
-} device_to_control_t;
-
-void matter_factory_reset();
-void matter_device_list_lock();
-void matter_device_list_unlock();
-void matter_ctrl_lv_obj_clear();
-void matter_ctrl_change_state(intptr_t arg);
-void matter_ctrl_read_device_state();
-esp_err_t matter_ctrl_get_device(void *dev_list);
-void matter_ctrl_subscribe_device_state(subscribe_device_type_t sub_type);
-
-void read_dev_info(void);
+void matter_ctrl_primary_action(uint64_t node_id, uint16_t endpoint_id);
+void matter_ctrl_on_device_list_update(esp_err_t err, const matter_device_t *dev_list);
+void matter_ctl_on_matter_report(const app_rmaker_matter_report_t *report, void *priv_data);
+esp_err_t matter_ctrl_ui_init(void);
+const char *matter_ctrl_get_qr_payload(void);
+void matter_ctrl_set_qr_payload(const char *payload);
+void matter_ctrl_set_provisioned(bool provisioned);
+bool matter_ctrl_is_provisioned(void);
 
 #ifdef __cplusplus
 }

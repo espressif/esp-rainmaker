@@ -9,9 +9,7 @@
 #include <esp_log.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
-#include <nvs_flash.h>
 #include <string.h>
-#include <led_driver.h>
 #include <esp_matter_rainmaker.h>
 #include <platform/ESP32/route_hook/ESP32RouteHook.h>
 #include <esp_matter_console.h>
@@ -21,7 +19,7 @@
 #include <esp_matter_client.h>
 #include <esp_matter.h>
 #include <lib/core/Optional.h>
-#include <app_matter.h>
+#include <app_end_device.h>
 #include <app_priv.h>
 
 
@@ -51,14 +49,14 @@ esp_err_t app_matter_send_command_binding(bool power)
 }
 
 esp_err_t app_identification_cb(identification::callback_type_t type, uint16_t endpoint_id, uint8_t effect_id,
-                                       uint8_t effect_variant, void *priv_data)
+                                uint8_t effect_variant, void *priv_data)
 {
     ESP_LOGI(TAG, "Identification callback: type: %d, effect: %d", type, effect_id);
     return ESP_OK;
 }
 
 esp_err_t app_attribute_update_cb(attribute::callback_type_t type, uint16_t endpoint_id, uint32_t cluster_id,
-                                         uint32_t attribute_id, esp_matter_attr_val_t *val, void *priv_data)
+                                  uint32_t attribute_id, esp_matter_attr_val_t *val, void *priv_data)
 {
     return ESP_OK;
 }
@@ -103,7 +101,7 @@ void app_matter_client_command_callback(client::peer_device_t *peer_device, clie
     }
     char command_data_str[32];
     if (req_handle->command_path.mClusterId == OnOff::Id) {
-                /* RainMaker update */
+        /* RainMaker update */
         strcpy(command_data_str, "{}");
         const esp_rmaker_node_t *node = esp_rmaker_get_node();
         esp_rmaker_device_t *device = esp_rmaker_node_get_device_by_name(node, SWITCH_DEVICE_NAME);
@@ -124,19 +122,19 @@ void app_matter_client_command_callback(client::peer_device_t *peer_device, clie
     } else if (req_handle->command_path.mClusterId == Identify::Id) {
         if (req_handle->command_path.mCommandId == Identify::Commands::Identify::Id) {
             if (((char *)req_handle->request_data)[0] != 1) {
-                    ESP_LOGE(TAG, "Number of parameters error");
-                    return;
-                }
-                sprintf(command_data_str, "{\"0:U16\": %ld}",
-                        strtoul((const char *)(req_handle->request_data) + 1, NULL, 16));
-        }else {
-                ESP_LOGE(TAG, "Unsupported command");
+                ESP_LOGE(TAG, "Number of parameters error");
                 return;
             }
-        }else {
-            ESP_LOGE(TAG, "Unsupported cluster");
+            sprintf(command_data_str, "{\"0:U16\": %ld}",
+                    strtoul((const char *)(req_handle->request_data) + 1, NULL, 16));
+        } else {
+            ESP_LOGE(TAG, "Unsupported command");
             return;
         }
+    } else {
+        ESP_LOGE(TAG, "Unsupported cluster");
+        return;
+    }
 
     client::interaction::invoke::send_request(NULL, peer_device, req_handle->command_path, command_data_str,
                                               send_command_success_callback, send_command_failure_callback,

@@ -1,15 +1,139 @@
-menu "ESP Rainmaker Controller"
+menu "ESP RainMaker Matter Controller"
 
-    config RAINMAKER_MATTER_CONTROLLER_TASK_STACK
+    config RMAKER_MTCTL_TASK_STACK_SIZE
         int "ESP Rainmaker Matter Controller Task Stack Size"
         default 7168
         help
             Set the stack size of ESP Rainmaker Matter Controller task.
 
-    config RAINMAKER_MATTER_CONTROLLER_MAX_ENDPOINT_COUNT_PER_DEVICE
+    config RMAKER_MTCTL_API_URL_LEN
+        int "ESP Rainmaker Matter Controller API URL Buffer Length"
+        default 256
+        help
+            Set the local buffer length used to build RainMaker Matter Controller API query strings.
+
+    menu "Memory"
+
+        config RMAKER_MTCTL_MEMORY_ALLOCATION_PREFER_SPIRAM
+            bool "Prefer PSRAM for Matter controller allocations"
+            depends on SPIRAM && (SPIRAM_USE_CAPS_ALLOC || SPIRAM_USE_MALLOC)
+            default y
+            help
+                Prefer PSRAM for Matter controller buffers when possible. This saves internal heap.
+
+        config RMAKER_MTCTL_MEMORY_REPORT_TASK_CREATE_FROM_SPIRAM
+            bool "Create Matter controller report task stack from PSRAM"
+            depends on SPIRAM && (SPIRAM_USE_CAPS_ALLOC || SPIRAM_USE_MALLOC) && FREERTOS_TASK_CREATE_ALLOW_EXT_MEM
+            default y
+            help
+                Allocate the Matter controller report task stack from PSRAM.
+
+    endmenu
+
+    config RMAKER_MTCTL_MAX_DEVICE_COUNT
+        int "ESP Rainmaker Matter Controller Max Device Count"
+        default 32
+        help
+            Set the maximum number of Matter devices fetched from RainMaker cloud per device-list update.
+
+    config RMAKER_MTCTL_FETCH_RETRY_COUNT
+        int "ESP Rainmaker Matter Controller Fetch Retry Count"
+        default 3
+        help
+            Set the number of retries after a Matter controller cloud API fetch failure. Set to 0 to disable retries.
+
+    config RMAKER_MTCTL_FETCH_RETRY_BACKOFF_SEC
+        int "ESP Rainmaker Matter Controller Fetch Retry Backoff (seconds)"
+        default 5
+        help
+            Set the backoff between Matter controller cloud API fetch retries. Set to 0 to retry immediately.
+
+    config RMAKER_MTCTL_MAX_ENDPOINT_COUNT_PER_DEVICE
         int "ESP Rainmaker Matter Controller Max Endpoint Count Per Device"
+        range 1 16
         default 4
         help
             Set the maximum endpoint count per device for ESP Rainmaker Matter Controller.
+
+    config RMAKER_MTCTL_MAX_DEVICE_TYPE_COUNT_PER_ENDPOINT
+        int "ESP Rainmaker Matter Controller Max Device Type Count Per Endpoint"
+        range 1 16
+        default 4
+        help
+            Set the maximum device type count per endpoint for ESP Rainmaker Matter Controller.
+
+    config RMAKER_MTCTL_DEVICE_NAME_MAX_LEN
+        int "ESP Rainmaker Matter Controller Device Name Max Length"
+        default 32
+        help
+            Set the maximum stored Matter device name length, including the terminating null byte.
+
+    config RMAKER_MTCTL_RMAKER_NODE_ID_MAX_LEN
+        int "ESP Rainmaker Matter Controller RainMaker Node ID Max Length"
+        default 40
+        help
+            Set the maximum stored RainMaker node ID length, including the terminating null byte.
+
+    menu "Report"
+
+        config RMAKER_MTCTL_REPORT_TASK_STACK_SIZE
+            int "ESP Rainmaker Matter Controller Report Task Stack Size"
+            default 8192
+            help
+                Set the stack size of ESP Rainmaker Matter Controller report task.
+
+        config RMAKER_MTCTL_REPORT_QUEUE_SIZE
+            int "ESP Rainmaker Matter Controller Report Queue Size"
+            default 32
+            help
+                Set the report task queue size for Matter attribute and event reports.
+
+        config RMAKER_MTCTL_REPORT_ATTR_BUCKET_CAPACITY
+            int "ESP Rainmaker Matter Controller Attribute Report Bucket Capacity"
+            default 3
+            help
+                Set the number of attribute report batches that may be published quickly after an idle period.
+
+        config RMAKER_MTCTL_REPORT_ATTR_BUCKET_REFILL_MS
+            int "ESP Rainmaker Matter Controller Attribute Report Bucket Token Refill (ms)"
+            default 10000
+            help
+                Set the token refill interval used to bound sustained RainMaker attribute report publish rate.
+
+        config RMAKER_MTCTL_REPORT_SUBSCRIBE_TIMEOUT_MS
+            int "ESP Rainmaker Matter Controller Report Subscribe Timeout (ms)"
+            default 30000
+            help
+                Set the timeout for Matter report subscription setup.
+
+    endmenu
+
+    menu "Command Response"
+
+        config RMAKER_MTCTL_CMDRESP_MTCMD_TIMEOUT_MS
+            int "ESP Rainmaker Matter Controller Matter Command Timeout (ms)"
+            default 20000
+            help
+                Set the timeout for Matter command-response operations.
+
+        config RMAKER_MTCTL_CMDRESP_CMDFIELD_BUFFER_SIZE
+            int "ESP Rainmaker Matter Controller Command Field Buffer Size"
+            default 120
+            help
+                Set the buffer size used for command field JSON fragments.
+
+        config RMAKER_MTCTL_CMDRESP_ATTRVAL_BUFFER_SIZE
+            int "ESP Rainmaker Matter Controller Attribute Value Buffer Size"
+            default 120
+            help
+                Set the buffer size used for attribute value JSON fragments.
+
+        config RMAKER_MTCTL_CMDRESP_RESPONSE_BUFFER_SIZE
+            int "ESP Rainmaker Matter Controller Command Response Buffer Size"
+            default 5000
+            help
+                Set the command-response JSON output buffer size.
+
+    endmenu
 
 endmenu

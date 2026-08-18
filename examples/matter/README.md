@@ -1,21 +1,20 @@
-# Matter + Rainmaker Examples
+# Matter + RainMaker Examples
 
 > Note: Works only with RainMaker iOS App v3.0.0 or later
 
 ## Prerequisites
 
-- ESP-IDF [v5.4.1](https://github.com/espressif/esp-idf/releases/v5.4.1)
-- [Espressif's SDK for Matter](https://github.com/espressif/esp-matter).
-- [ESP Rainmaker SDK](https://github.com/espressif/esp-rainmaker)
-Please go through the installation process (if required) for all of the above prerequisites.
+- ESP-IDF v5.5.3 is recommened (the exact version constraint is accourding to each example's `idf_component.yml`).
+- ESP RainMaker SDK checkout containing these examples.
+
+ESP-Matter is pulled by the ESP-IDF Component Manager as the `espressif/esp_matter` managed component. Clone or export a separate ESP-Matter checkout for these examples is not needed.
 
 ## Setting up the environment
-For building, the example you need to setup the IDF and ESP-Matter environment and also set the RainMaker path
+
+Set up ESP-IDF and the RainMaker path:
 
 ```
 $ cd /path/to/esp-idf
-$ . ./export.sh
-$ cd /path/to/esp-matter
 $ . ./export.sh
 $ export RMAKER_PATH=/path/to/esp-rainmaker
 ```
@@ -68,6 +67,7 @@ $ idf.py flash monitor
 ```
 
 ### Commissioning
+
 The QR Code required for commissioning your device can be found at the directory where esp-matter-mfg-tool command is executed or argument provided to `--outdir`.
 For e.g: If the command is run in esp-rainmaker directory , the QR code will be located at `${RMAKER_PATH}/out/<vendor-id>_<product-id>/<node-id>/<node-id>-qrcode.png`
 
@@ -96,7 +96,7 @@ Samples of keys.csv and master.csv can be found in $RMAKER_PATH/examples/matter/
 For testing, you can use the test vid, pid, PAI and CD as shown below
 
 ```
-$ esp-matter-mfg-tool --dac-in-secure-cert -v 0xFFF2 -p 0x8001 --pai -k $ESP_MATTER_PATH/connectedhomeip/connectedhomeip/credentials/test/attestation/Chip-Test-PAI-FFF2-8001-Key.pem -c $ESP_MATTER_PATH/connectedhomeip/connectedhomeip/credentials/test/attestation/Chip-Test-PAI-FFF2-8001-Cert.pem -cd $ESP_MATTER_PATH/connectedhomeip/connectedhomeip/credentials/test/certification-declaration/Chip-Test-CD-FFF2-8001.der --csv $RMAKER_PATH/examples/matter/mfg/keys.csv --mcsv $RMAKER_PATH/examples/matter/mfg/master.csv
+$ esp-matter-mfg-tool --dac-in-secure-cert -v 0xFFF2 -p 0x8001 --pai -k <esp-matter-path>/connectedhomeip/connectedhomeip/credentials/test/attestation/Chip-Test-PAI-FFF2-8001-Key.pem -c <esp-matter-path>/connectedhomeip/connectedhomeip/credentials/test/attestation/Chip-Test-PAI-FFF2-8001-Cert.pem -cd <esp-matter-path>/connectedhomeip/connectedhomeip/credentials/test/certification-declaration/Chip-Test-CD-FFF2-8001.der --csv $RMAKER_PATH/examples/matter/mfg/keys.csv --mcsv $RMAKER_PATH/examples/matter/mfg/master.csv
 ```
 
 Note the path where the files are generated after running the above command since it will be required later.

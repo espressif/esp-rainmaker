@@ -27,6 +27,9 @@
 #define MATTER_SATURATION 255
 #define MATTER_TEMPERATURE_FACTOR 1000000
 
+#define REMAP_TO_RANGE(value, from, to) ((value * to) / from)
+#define REMAP_TO_RANGE_INVERSE(value, factor) (factor / (value ? value : 1))
+
 /** Default attribute values used by Rainmaker during initialization */
 #define LIGHT_DEVICE_NAME "Matter Light"
 #define DEFAULT_POWER true
@@ -89,6 +92,7 @@ esp_err_t app_driver_light_set_power(app_driver_handle_t handle, bool val);
 esp_err_t app_driver_light_set_brightness(app_driver_handle_t handle, int value);
 esp_err_t app_driver_light_set_hue(app_driver_handle_t handle, int value);
 esp_err_t app_driver_light_set_saturation(app_driver_handle_t handle, int value);
+/** Approximate CCT using the RGB LED's warm-white to cool-white range; values are clamped to 2000 K to 6500 K. */
 esp_err_t app_driver_light_set_temperature(app_driver_handle_t handle, int value);
 
 

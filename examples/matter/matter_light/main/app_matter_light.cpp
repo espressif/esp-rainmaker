@@ -9,9 +9,7 @@
 #include <esp_log.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
-#include <nvs_flash.h>
 #include <string.h>
-#include <led_driver.h>
 #include <esp_matter_rainmaker.h>
 #include <platform/ESP32/route_hook/ESP32RouteHook.h>
 #include <app/clusters/color-control-server/color-control-server.h>
@@ -23,8 +21,7 @@
 #include <esp_rmaker_standard_params.h>
 #include <esp_rmaker_core.h>
 #include "app_priv.h"
-#include <app_matter.h>
-#include <utils/common_macros.h>
+#include <app_end_device.h>
 #ifndef CONFIG_EXAMPLE_USE_RAINMAKER_FABRIC
 #include <matter_commissioning_window_management.h>
 #include <protocomm_matter_ble.h>
@@ -64,7 +61,7 @@ static const char *app_matter_get_rmaker_param_name_from_id(uint32_t cluster_id,
 }
 
 static esp_rmaker_param_val_t app_matter_get_rmaker_val(esp_matter_attr_val_t *val, uint32_t cluster_id,
-                                                           uint32_t attribute_id)
+                                                        uint32_t attribute_id)
 {
     /* Attributes which need to be remapped */
     if (cluster_id == LevelControl::Id) {
@@ -92,21 +89,21 @@ static esp_rmaker_param_val_t app_matter_get_rmaker_val(esp_matter_attr_val_t *v
 }
 
 esp_err_t app_identification_cb(identification::callback_type_t type, uint16_t endpoint_id, uint8_t effect_id,
-                                       uint8_t effect_variant, void *priv_data)
+                                uint8_t effect_variant, void *priv_data)
 {
     ESP_LOGI(TAG, "Identification callback: type: %d, effect: %d", type, effect_id);
     return ESP_OK;
 }
 
 esp_err_t app_attribute_update_cb(attribute::callback_type_t type, uint16_t endpoint_id, uint32_t cluster_id,
-                                         uint32_t attribute_id, esp_matter_attr_val_t *val, void *priv_data)
+                                  uint32_t attribute_id, esp_matter_attr_val_t *val, void *priv_data)
 {
     esp_err_t err = ESP_OK;
 
     if (type == PRE_UPDATE) {
         /* Driver update */
         if (endpoint_id == light_endpoint_id) {
-            led_driver_handle_t handle = (led_driver_handle_t)priv_data;
+            app_driver_handle_t handle = static_cast<app_driver_handle_t>(priv_data);
             if (cluster_id == OnOff::Id) {
                 if (attribute_id == OnOff::Attributes::OnOff::Id) {
                     err = app_driver_light_set_power(handle, val->val.b);
@@ -197,28 +194,24 @@ void app_event_cb(const ChipDeviceEvent *event, intptr_t arg)
 #endif
         break;
 
-    case chip::DeviceLayer::DeviceEventType::kFabricRemoved:
-        {
-            ESP_LOGI(TAG, "Fabric removed successfully");
-            if (chip::Server::GetInstance().GetFabricTable().FabricCount() == 0)
-            {
-                chip::CommissioningWindowManager & commissionMgr = chip::Server::GetInstance().GetCommissioningWindowManager();
-                constexpr auto kTimeoutSeconds = chip::System::Clock::Seconds16(k_timeout_seconds);
-                if (!commissionMgr.IsCommissioningWindowOpen())
-                {
-                    /* After removing last fabric, this example does not remove the Wi-Fi credentials
-                     * and still has IP connectivity so, only advertising on DNS-SD.
-                     */
-                    CHIP_ERROR err = commissionMgr.OpenBasicCommissioningWindow(kTimeoutSeconds,
-                                                    chip::CommissioningWindowAdvertisement::kDnssdOnly);
-                    if (err != CHIP_NO_ERROR)
-                    {
-                        ESP_LOGE(TAG, "Failed to open commissioning window, err:%" CHIP_ERROR_FORMAT, err.Format());
-                    }
+    case chip::DeviceLayer::DeviceEventType::kFabricRemoved: {
+        ESP_LOGI(TAG, "Fabric removed successfully");
+        if (chip::Server::GetInstance().GetFabricTable().FabricCount() == 0) {
+            chip::CommissioningWindowManager & commissionMgr = chip::Server::GetInstance().GetCommissioningWindowManager();
+            constexpr auto kTimeoutSeconds = chip::System::Clock::Seconds16(k_timeout_seconds);
+            if (!commissionMgr.IsCommissioningWindowOpen()) {
+                /* After removing last fabric, this example does not remove the Wi-Fi credentials
+                 * and still has IP connectivity so, only advertising on DNS-SD.
+                 */
+                CHIP_ERROR err = commissionMgr.OpenBasicCommissioningWindow(kTimeoutSeconds,
+                                                                            chip::CommissioningWindowAdvertisement::kDnssdOnly);
+                if (err != CHIP_NO_ERROR) {
+                    ESP_LOGE(TAG, "Failed to open commissioning window, err:%" CHIP_ERROR_FORMAT, err.Format());
                 }
             }
-        break;
         }
+        break;
+    }
 
     case chip::DeviceLayer::DeviceEventType::kFabricWillBeRemoved:
         ESP_LOGI(TAG, "Fabric will be removed");
@@ -259,7 +252,8 @@ esp_err_t app_matter_light_create(app_driver_handle_t driver_handle)
 
     extended_color_light::config_t light_config;
     light_config.on_off.on_off = DEFAULT_POWER;
-    light_config.level_control.current_level = DEFAULT_BRIGHTNESS;
+    light_config.level_control.current_level =
+        REMAP_TO_RANGE(DEFAULT_BRIGHTNESS, STANDARD_BRIGHTNESS, MATTER_BRIGHTNESS);
     light_config.color_control.color_mode = static_cast<uint8_t>(ColorControl::ColorMode::kColorTemperature);
     light_config.color_control.enhanced_color_mode =
         static_cast<uint8_t>(ColorControl::ColorMode::kColorTemperature);
@@ -283,7 +277,8 @@ esp_err_t app_matter_light_create(app_driver_handle_t driver_handle)
         attribute::set_val(attr, &start_up_on_off);
 
         attr = attribute::get(light_endpoint_id, LevelControl::Id, LevelControl::Attributes::StartUpCurrentLevel::Id);
-        esp_matter_attr_val_t start_up_current_level = esp_matter_nullable_uint8(DEFAULT_BRIGHTNESS);
+        esp_matter_attr_val_t start_up_current_level = esp_matter_nullable_uint8(
+            REMAP_TO_RANGE(DEFAULT_BRIGHTNESS, STANDARD_BRIGHTNESS, MATTER_BRIGHTNESS));
         attribute::set_val(attr, &start_up_current_level);
 
         attr = attribute::get(light_endpoint_id, ColorControl::Id, ColorControl::Attributes::StartUpColorTemperatureMireds::Id);
@@ -322,7 +317,8 @@ esp_err_t app_matter_report_saturation(int val)
 esp_err_t app_matter_report_temperature(int val)
 {
     esp_matter_attr_val_t value = esp_matter_uint16(REMAP_TO_RANGE_INVERSE(val, MATTER_TEMPERATURE_FACTOR));
-    return attribute::report(light_endpoint_id, ColorControl::Id, ColorControl::Attributes::ColorTemperatureMireds::Id, &value);
+    return attribute::report(light_endpoint_id, ColorControl::Id, ColorControl::Attributes::ColorTemperatureMireds::Id,
+                             &value);
 }
 
 esp_err_t app_matter_report_brightness(int val)

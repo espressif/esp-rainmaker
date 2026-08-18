@@ -18,11 +18,14 @@
 #include <esp_rmaker_schedule.h>
 #include <esp_rmaker_scenes.h>
 #include <app_insights.h>
-#include <app_matter.h>
+#include <app_end_device.h>
 #include <app_matter_switch.h>
 #include <app_priv.h>
 
 static const char *TAG = "app_main";
+
+#define WIFI_RESET_BUTTON_TIMEOUT       3
+#define FACTORY_RESET_BUTTON_TIMEOUT    10
 
 static app_driver_handle_t switch_handle;
 
@@ -55,18 +58,18 @@ extern "C" void app_main()
     switch_handle = app_driver_light_init();
     app_driver_switch_set_power(switch_handle, DEFAULT_POWER);
     app_driver_handle_t button_handle = app_driver_button_init(switch_handle);
-    app_reset_button_register(button_handle);
+    app_reset_button_register((button_handle_t)button_handle, WIFI_RESET_BUTTON_TIMEOUT, FACTORY_RESET_BUTTON_TIMEOUT);
 
     /* Initialize Matter */
-    app_matter_init(app_attribute_update_cb,app_identification_cb);
-    app_matter_rmaker_init();
+    app_end_device_init(app_attribute_update_cb,app_identification_cb);
+    app_end_device_rmaker_init();
 
     /* Create Data Model for esp-matter */
     app_matter_switch_create(switch_handle);
 
     /* Matter start */
     esp_matter::client::set_request_callback(app_matter_client_command_callback, NULL, NULL);
-    app_matter_start(app_event_cb);
+    app_end_device_start(app_event_cb);
     app_matter_send_command_binding(DEFAULT_POWER);
 
     /* Initialize the ESP RainMaker Agent.
@@ -106,10 +109,10 @@ extern "C" void app_main()
     app_insights_enable();
 
     /* Pre start */
-    ESP_ERROR_CHECK(app_matter_rmaker_start());
+    ESP_ERROR_CHECK(app_end_device_rmaker_start());
 
     /* Enable Matter diagnostics console*/
-    app_matter_enable_matter_console();
+    app_end_device_enable_matter_console();
 
     // RainMaker start is deferred after Matter commissioning is complete
     // and BLE memory is reclaimed, so that MQTT connect doesnt fail.

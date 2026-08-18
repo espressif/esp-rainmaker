@@ -7,18 +7,17 @@
 */
 
 #include <esp_log.h>
+#include <sdkconfig.h>
 #include <stdlib.h>
 #include <string.h>
 
-#include <device.h>
-#include <button_gpio.h>
+#include <app_end_device.h>
 #include <esp_matter.h>
-#include <led_driver.h>
+#include <iot_button.h>
 #include <esp_rmaker_core.h>
 #include <esp_rmaker_standard_params.h>
 #include <app_priv.h>
 #include <app_matter_light.h>
-#include <utils/common_macros.h>
 
 using namespace esp_matter;
 using namespace chip::app::Clusters;
@@ -26,30 +25,120 @@ using namespace chip::app::Clusters;
 static const char *TAG = "app_driver";
 extern uint16_t light_endpoint_id;
 
-/* Do any conversions/remapping for the actual value here */
-esp_err_t app_driver_light_set_power(led_driver_handle_t handle, bool value)
+static bool current_power;
+static uint8_t current_brightness;
+static uint16_t current_hue;
+static uint8_t current_saturation;
+static bool current_temperature_mode;
+static uint8_t current_temperature_red;
+static uint8_t current_temperature_green;
+static uint8_t current_temperature_blue;
+
+static esp_err_t app_driver_light_refresh(app_driver_handle_t handle)
 {
-    return led_driver_set_power(handle, value);
+    led_indicator_handle_t led = static_cast<led_indicator_handle_t>(handle);
+
+    if (!current_power || current_brightness == 0) {
+        return app_end_device_led_set_rgb(led, 0, 0, 0);
+    }
+
+    uint16_t red = 0;
+    uint16_t green = 0;
+    uint16_t blue = 0;
+
+    if (current_temperature_mode) {
+        red = (current_temperature_red * current_brightness) / 100;
+        green = (current_temperature_green * current_brightness) / 100;
+        blue = (current_temperature_blue * current_brightness) / 100;
+    } else {
+        uint16_t hue = current_hue % 360;
+        uint16_t value = (current_brightness * 255) / 100;
+        uint16_t chroma = (value * current_saturation) / 100;
+        uint16_t hue_mod = hue % 120;
+        uint16_t distance = hue_mod > 60 ? hue_mod - 60 : 60 - hue_mod;
+        uint16_t secondary = (chroma * (60 - distance)) / 60;
+        uint16_t minimum = value - chroma;
+
+        if (hue < 60) {
+            red = chroma;
+            green = secondary;
+        } else if (hue < 120) {
+            red = secondary;
+            green = chroma;
+        } else if (hue < 180) {
+            green = chroma;
+            blue = secondary;
+        } else if (hue < 240) {
+            green = secondary;
+            blue = chroma;
+        } else if (hue < 300) {
+            red = secondary;
+            blue = chroma;
+        } else {
+            red = chroma;
+            blue = secondary;
+        }
+
+        red += minimum;
+        green += minimum;
+        blue += minimum;
+    }
+
+    return app_end_device_led_set_rgb(led, red, green, blue);
 }
 
-esp_err_t app_driver_light_set_brightness(led_driver_handle_t handle, int value)
+esp_err_t app_driver_light_set_power(app_driver_handle_t handle, bool value)
 {
-    return led_driver_set_brightness(handle, value);
+    current_power = value;
+    return app_driver_light_refresh(handle);
 }
 
-esp_err_t app_driver_light_set_hue(led_driver_handle_t handle, int value)
+esp_err_t app_driver_light_set_brightness(app_driver_handle_t handle, int value)
 {
-    return led_driver_set_hue(handle, value);
+    if (value != 0) {
+        current_brightness = value;
+    }
+    return app_driver_light_refresh(handle);
 }
 
-esp_err_t app_driver_light_set_saturation(led_driver_handle_t handle, int value)
+esp_err_t app_driver_light_set_hue(app_driver_handle_t handle, int value)
 {
-    return led_driver_set_saturation(handle, value);
+    current_hue = value;
+    current_temperature_mode = false;
+    return app_driver_light_refresh(handle);
 }
 
-esp_err_t app_driver_light_set_temperature(led_driver_handle_t handle, int value)
+esp_err_t app_driver_light_set_saturation(app_driver_handle_t handle, int value)
 {
-    return led_driver_set_temperature(handle, value);
+    current_saturation = value;
+    current_temperature_mode = false;
+    return app_driver_light_refresh(handle);
+}
+
+esp_err_t app_driver_light_set_temperature(app_driver_handle_t handle, int value)
+{
+    constexpr int min_temperature = 2000;
+    constexpr int max_temperature = 6500;
+    constexpr int warm_red = 255;
+    constexpr int warm_green = 180;
+    constexpr int warm_blue = 80;
+    constexpr int cool_red = 180;
+    constexpr int cool_green = 220;
+    constexpr int cool_blue = 255;
+
+    int temperature = value < min_temperature ? min_temperature : value;
+    temperature = temperature > max_temperature ? max_temperature : temperature;
+    int position = temperature - min_temperature;
+    int range = max_temperature - min_temperature;
+
+    current_temperature_red = warm_red + ((cool_red - warm_red) * position) / range;
+    current_temperature_green = warm_green + ((cool_green - warm_green) * position) / range;
+    current_temperature_blue = warm_blue + ((cool_blue - warm_blue) * position) / range;
+    current_temperature_mode = true;
+
+    ESP_LOGI(TAG, "Color temperature: %d K, emulated as RGB: (%d, %d, %d)", value, current_temperature_red,
+             current_temperature_green, current_temperature_blue);
+    return app_driver_light_refresh(handle);
 }
 
 static void app_driver_button_toggle_cb(void *arg, void *data)
@@ -75,7 +164,7 @@ esp_err_t app_driver_light_set_defaults()
     esp_err_t err = ESP_OK;
     uint16_t endpoint_id = light_endpoint_id;
     void *priv_data = endpoint::get_priv_data(endpoint_id);
-    led_driver_handle_t handle = (led_driver_handle_t)priv_data;
+    app_driver_handle_t handle = static_cast<app_driver_handle_t>(priv_data);
     node_t *node = node::get();
     endpoint_t *endpoint = endpoint::get(node, endpoint_id);
     cluster_t *cluster = NULL;
@@ -121,21 +210,14 @@ esp_err_t app_driver_light_set_defaults()
 
 app_driver_handle_t app_driver_light_init()
 {
-    /* Initialize led */
-    led_driver_config_t config = led_driver_get_config();
-    led_driver_handle_t handle = led_driver_init(&config);
-    return (app_driver_handle_t)handle;
+    ESP_LOGI(TAG, "Initializing RGB light driver");
+    return static_cast<app_driver_handle_t>(app_end_device_led_init());
 }
 
 app_driver_handle_t app_driver_button_init(void *user_data)
 {
-    /* Initialize button */
-    button_handle_t handle = NULL;
-    const button_config_t btn_cfg = {0};
-    const button_gpio_config_t btn_gpio_cfg = button_driver_get_config();
-
-    if (iot_button_new_gpio_device(&btn_cfg, &btn_gpio_cfg, &handle) != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to create button device");
+    button_handle_t handle = app_end_device_button_init();
+    if (!handle) {
         return NULL;
     }
 
