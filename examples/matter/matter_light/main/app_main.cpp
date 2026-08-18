@@ -20,7 +20,7 @@
 #include <esp_rmaker_console.h>
 
 #include "app_priv.h"
-#include <app_matter.h>
+#include <app_end_device.h>
 #include "app_matter_light.h"
 #if CHIP_DEVICE_CONFIG_ENABLE_THREAD
 #include <platform/ThreadStackManager.h>
@@ -100,9 +100,9 @@ extern "C" void app_main()
     app_reset_button_register((button_handle_t)button_handle, WIFI_RESET_BUTTON_TIMEOUT, FACTORY_RESET_BUTTON_TIMEOUT);
 
     /* Initialize Matter */
-    app_matter_init(app_attribute_update_cb,app_identification_cb);
+    app_end_device_init(app_attribute_update_cb,app_identification_cb);
 #ifdef CONFIG_EXAMPLE_USE_RAINMAKER_FABRIC
-    app_matter_rmaker_init();
+    app_end_device_rmaker_init();
 #else
     app_network_init();
 #endif
@@ -130,7 +130,7 @@ extern "C" void app_main()
 
 #ifdef CONFIG_EXAMPLE_USE_RAINMAKER_FABRIC
     /* Matter start */
-    app_matter_start(app_event_cb);
+    app_end_device_start(app_event_cb);
 #endif
 
     /* Create Data Model for esp-matter */
@@ -187,7 +187,7 @@ extern "C" void app_main()
 
 #ifdef CONFIG_EXAMPLE_USE_RAINMAKER_FABRIC
     /* Pre start */
-    ESP_ERROR_CHECK(app_matter_rmaker_start());
+    ESP_ERROR_CHECK(app_end_device_rmaker_start());
 #else
     err = app_network_set_custom_mfg_data(MFG_DATA_DEVICE_TYPE_LIGHT, MFG_DATA_DEVICE_SUBTYPE_LIGHT);
 
@@ -202,7 +202,7 @@ extern "C" void app_main()
     esp_matter::set_custom_commissionable_data_provider(&g_dynamic_passcode_provider);
 #endif
     /* Matter start */
-    app_matter_start(app_event_cb);
+    app_end_device_start(app_event_cb);
 
     bool is_network_provisioned = false;
 #ifdef CONFIG_ESP_RMAKER_NETWORK_OVER_WIFI
@@ -218,7 +218,7 @@ extern "C" void app_main()
     
     rmaker_init_done = true;
 
-    app_matter_enable_matter_console();
+    app_end_device_enable_matter_console();
 
     /* Register RainMaker commands only for on-network node mapping.
      * If the on-network node mapping not use console commands, can comment this line.

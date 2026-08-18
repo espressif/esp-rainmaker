@@ -19,7 +19,7 @@ static void (*g_boot_anim_end_cb)(void) = NULL;
 static void anim_timer_cb(lv_timer_t *timer)
 {
     static int32_t count = -90;
-    lv_obj_t *page = (lv_obj_t *) timer->user_data;
+    lv_obj_t *page = (lv_obj_t *)lv_timer_get_user_data(timer);
     static lv_obj_t *img_logo = NULL;
     static lv_obj_t *img_text = NULL;
 

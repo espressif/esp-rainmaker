@@ -1,0 +1,7 @@
+## IDF Component Manager Manifest File
+dependencies:
+  espressif/rmaker_matter_controller:
+    version: "*"
+    override_path: "../../../common/rmaker_matter_controller/"
+  espressif/esp_matter:
+    version: "~1.5.1"

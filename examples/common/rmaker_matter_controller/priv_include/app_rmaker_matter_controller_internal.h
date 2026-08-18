@@ -40,16 +40,16 @@ typedef struct {
     char *rmaker_group_id;
     QueueHandle_t event_task_queue;
     TaskHandle_t event_task_handle;
-    SemaphoreHandle_t dev_list_mutex;
-    matter_device_t *dev_list;
-    device_list_update_callback_t dev_list_update_cb;
+    matter_controller_device_list_update_callback_t dev_list_update_cb;
     bool is_setup_successfully_before;
     bool is_authorized;
     bool is_controller_setup;
+    bool initial_device_list_update_done;
     bool is_server_instance;
     matter_controller_setup_callback_t setup_callback;
     matter_controller_update_noc_callback_t update_noc_callback;
     esp_rmaker_device_t *service;
+    esp_rmaker_param_t *matter_devices_param;
     uint64_t matter_node_id;
 } matter_controller_handle_t;
 
@@ -87,6 +87,32 @@ esp_err_t rmaker_matter_controller_get_nvs(const char *key, uint8_t *val_buf, si
  * @return error in case of failure
  */
 esp_err_t rmaker_matter_controller_set_nvs(const char *key, const uint8_t *val, size_t val_len);
+
+/**
+ * @brief Enable command-response handling for Matter controller commands
+ *
+ * @return ESP_OK on success
+ * @return error in case of failure
+ */
+esp_err_t app_rmaker_matter_cmd_resp_enable(void);
+
+/**
+ * @brief Enable Matter attribute reporting runtime
+ *
+ * @return ESP_OK on success
+ * @return error in case of failure
+ */
+esp_err_t app_rmaker_matter_report_enable(void);
+
+/**
+ * @brief Update attribute-report subscriptions from a fetched Matter device list
+ *
+ * @param[in] dev_list The temporary Matter device list fetched by the controller
+ *
+ * @return ESP_OK on success
+ * @return error if the report layer could not accept the update
+ */
+esp_err_t app_rmaker_matter_report_on_device_list_update(const matter_device_t *dev_list);
 
 #ifdef __cplusplus
 }

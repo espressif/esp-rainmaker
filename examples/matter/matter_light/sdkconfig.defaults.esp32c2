@@ -122,3 +122,6 @@ CONFIG_WL_SECTOR_SIZE_512=y
 
 # Use MQTT for OTA (smaller flash footprint on C2; HTTPS is the global default)
 CONFIG_ESP_RMAKER_OTA_USE_MQTT=y
+
+# End-device button defaults
+CONFIG_APP_END_DEVICE_BOARD_BUTTON_GPIO=9

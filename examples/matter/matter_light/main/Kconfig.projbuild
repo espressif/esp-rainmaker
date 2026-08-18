@@ -1,5 +1,5 @@
 menu "Example Config"
-    
+
     config EXAMPLE_USE_RAINMAKER_FABRIC
         bool "Use RainMaker plus Matter fabric solution"
         default y

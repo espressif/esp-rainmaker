@@ -6,64 +6,115 @@
    CONDITIONS OF ANY KIND, either express or implied.
 */
 
-#include "esp_spiffs.h"
+#include <app_matter_ctrl.h>
+#include <box_main.h>
+#include <ui_main.h>
+#include <ui_matter_ctrl.h>
+
+#include <app_controller.h>
 #include <app_insights.h>
-#include <app_priv.h>
-#include <app_reset.h>
-#include <esp_err.h>
+#include <app_network.h>
+#include <app_rmaker_matter_controller.h>
+#include <cJSON.h>
+#include <esp_event.h>
+#include <esp_heap_caps.h>
 #include <esp_log.h>
+#include <esp_matter.h>
+#include <esp_matter_console.h>
+#include <esp_rmaker_auth_service.h>
 #include <esp_rmaker_core.h>
 #include <esp_rmaker_ota.h>
 #include <esp_rmaker_scenes.h>
 #include <esp_rmaker_schedule.h>
-#include <esp_rmaker_standard_devices.h>
-#include <esp_rmaker_standard_params.h>
-#include <esp_rmaker_standard_types.h>
+#include <esp_rmaker_standard_services.h>
+#include <esp_wifi.h>
 #include <nvs_flash.h>
-#include <app_matter.h>
-#include <app_matter_controller.h>
-#include <esp_matter_controller_console.h>
-#include <matter_controller_cluster.h>
-#include <nvs_flash.h>
-#include <platform/ESP32/route_hook/ESP32RouteHook.h>
+#include <network_provisioning/manager.h>
+#include <protocomm_security.h>
+
+#include <stdarg.h>
+#include <stdio.h>
 #include <string.h>
+
 #if CONFIG_OPENTHREAD_BORDER_ROUTER
 #include <esp_ot_config.h>
-#include <platform/ESP32/OpenthreadLauncher.h>
+#include <esp_rmaker_thread_br.h>
 #endif // CONFIG_OPENTHREAD_BORDER_ROUTER
-#if CONFIG_CUSTOM_COMMISSIONABLE_DATA_PROVIDER
-#include <esp_matter_providers.h>
-#include "dynamic_qrcode.h"
-#endif
-
-#include "box_main.h"
-
-#include "matter_ctrl_service.h"
-
-using namespace esp_matter;
 
 static const char *TAG = "app_main";
 
-bool rmaker_init_done = false;
-
-/* Callback to handle commands received from the RainMaker cloud */
-static esp_err_t write_cb(const esp_rmaker_device_t *device, const esp_rmaker_param_t *param,
-                          const esp_rmaker_param_val_t val, void *priv_data, esp_rmaker_write_ctx_t *ctx)
+static void *cjson_malloc(size_t size)
 {
-    if (ctx) {
-        ESP_LOGI(TAG, "Received write request via : %s", esp_rmaker_device_cb_src_to_str(ctx->src));
+    return heap_caps_malloc_prefer(size, 2, MALLOC_CAP_DEFAULT | MALLOC_CAP_SPIRAM,
+                                   MALLOC_CAP_DEFAULT | MALLOC_CAP_INTERNAL);
+}
+
+static void wifi_status_event_handler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data)
+{
+    (void)arg;
+    (void)event_data;
+
+    if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP) {
+        ui_acquire();
+        ui_main_status_bar_set_wifi(true);
+        ui_release();
+    } else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_DISCONNECTED) {
+        ui_acquire();
+        ui_main_status_bar_set_wifi(false);
+        ui_release();
+    }
+}
+
+static void app_network_event_handler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data)
+{
+    if (event_base == NETWORK_PROV_EVENT) {
+        switch (event_id) {
+        case NETWORK_PROV_WIFI_CRED_RECV:
+            ui_matter_config_update_cb(UI_MATTER_EVT_PROVISIONING);
+            break;
+        default:
+            break;
+        }
+        return;
     }
 
-    const char *param_name = esp_rmaker_param_get_name(param);
-    if (strcmp(param_name, ESP_RMAKER_DEF_POWER_NAME) == 0) {
-        app_matter_report_power(val.val.b);
+    if (event_base == PROTOCOMM_SECURITY_SESSION_EVENT) {
+        if (event_id == PROTOCOMM_SECURITY_SESSION_SETUP_OK) {
+            ui_matter_config_update_cb(UI_MATTER_EVT_PROVISIONING);
+        }
+        return;
     }
-    esp_rmaker_param_update(param, val);
-    return ESP_OK;
+
+    if (event_base != APP_NETWORK_EVENT) {
+        return;
+    }
+
+    switch (event_id) {
+    case APP_NETWORK_EVENT_QR_DISPLAY:
+        matter_ctrl_set_qr_payload((const char *)event_data);
+        matter_ctrl_set_provisioned(false);
+        break;
+    case APP_NETWORK_EVENT_PROV_TIMEOUT:
+    case APP_NETWORK_EVENT_PROV_RESTART:
+    case APP_NETWORK_EVENT_PROV_CRED_MISMATCH:
+        matter_ctrl_set_provisioned(false);
+        break;
+    default:
+        break;
+    }
 }
 
 extern "C" void app_main()
 {
+    /* RainMaker Matter controller keeps large cJSON trees for device metadata and attribute reports.
+     * Controller apps with PSRAM should install cJSON hooks before creating any cJSON object so these
+     * long-lived allocations prefer PSRAM instead of consuming scarce internal heap. */
+    cJSON_Hooks hooks = {
+        .malloc_fn = cjson_malloc,
+        .free_fn = free
+    };
+    cJSON_InitHooks(&hooks);
+
     /* Initialize NVS. */
     esp_err_t err = nvs_flash_init();
     if (err == ESP_ERR_NVS_NO_FREE_PAGES || err == ESP_ERR_NVS_NEW_VERSION_FOUND) {
@@ -72,115 +123,85 @@ extern "C" void app_main()
     }
     ESP_ERROR_CHECK(err);
 
-    /* Initialize drivers for button */
-    app_driver_handle_t button_handle = app_driver_button_init(NULL);
-    app_reset_button_register(button_handle);
+    /* Initialize network provisioning and status events. */
+    app_network_init();
+    ESP_ERROR_CHECK(esp_event_handler_register(APP_NETWORK_EVENT, ESP_EVENT_ANY_ID, &app_network_event_handler, NULL));
+    ESP_ERROR_CHECK(esp_event_handler_register(NETWORK_PROV_EVENT, ESP_EVENT_ANY_ID, &app_network_event_handler, NULL));
+    ESP_ERROR_CHECK(esp_event_handler_register(PROTOCOMM_SECURITY_SESSION_EVENT, ESP_EVENT_ANY_ID,
+                                               &app_network_event_handler, NULL));
+    ESP_ERROR_CHECK(esp_event_handler_register(IP_EVENT, IP_EVENT_STA_GOT_IP, &wifi_status_event_handler, NULL));
+    ESP_ERROR_CHECK(esp_event_handler_register(WIFI_EVENT, WIFI_EVENT_STA_DISCONNECTED, &wifi_status_event_handler,
+                                               NULL));
 
-    /* Initialize Matter */
-    app_matter_init(app_attribute_update_cb, app_identification_cb);
-
-    /* Add custom matter controller cluster */
-    node_t *matter_node = node::get();
-    if (!matter_node) {
-        ESP_LOGE(TAG, "Matter node creation failed");
-        abort();
-    }
-    endpoint_t *root_endpoint = esp_matter::endpoint::get(matter_node, 0);
-
-#if CONFIG_CONTROLLER_CUSTOM_CLUSTER_ENABLE
-    esp_matter::cluster::matter_controller::create(root_endpoint, CLUSTER_FLAG_SERVER);
-#endif
-
-    app_matter_rmaker_init();
-
-    app_matter_endpoint_create();
-
-    /* Matter start */
-#if CONFIG_CUSTOM_COMMISSIONABLE_DATA_PROVIDER
-    esp_matter::set_custom_commissionable_data_provider(&DynamicPasscodeCommissionableDataProvider::GetInstance());
-#endif
-#if CONFIG_OPENTHREAD_BORDER_ROUTER
-    /* Set OpenThread platform config */
-    esp_openthread_platform_config_t config = {
-        .radio_config = ESP_OPENTHREAD_DEFAULT_RADIO_CONFIG(),
-        .host_config = ESP_OPENTHREAD_DEFAULT_HOST_CONFIG(),
-        .port_config = ESP_OPENTHREAD_DEFAULT_PORT_CONFIG(),
-    };
-#if defined(CONFIG_OPENTHREAD_BORDER_ROUTER) && defined(CONFIG_AUTO_UPDATE_RCP)
-    esp_vfs_spiffs_conf_t rcp_fw_conf = {
-        .base_path = "/rcp_fw", .partition_label = "rcp_fw", .max_files = 10, .format_if_mount_failed = false
-    };
-    if (ESP_OK != esp_vfs_spiffs_register(&rcp_fw_conf)) {
-        ESP_LOGE(TAG, "Failed to mount rcp firmware storage");
-        return;
-    }
-    esp_rcp_update_config_t rcp_update_config = ESP_OPENTHREAD_RCP_UPDATE_CONFIG();
-    openthread_init_br_rcp(&rcp_update_config);
-#endif // CONFIG_OPENTHREAD_BORDER_ROUTER && CONFIG_AUTO_UPDATE_RCP
-    set_openthread_platform_config(&config);
-#endif
-    app_matter_start(app_event_cb);
-
-    /* Initialize the ESP RainMaker Agent.
-     */
+    /* Initialize the ESP RainMaker Agent. */
     esp_rmaker_config_t rainmaker_cfg = {
         .enable_time_sync = false,
     };
     esp_rmaker_node_t *node = esp_rmaker_node_init(&rainmaker_cfg, "ESP RainMaker Device", "Controller");
     if (!node) {
-        ESP_LOGE(TAG, "Could not initialise node.");
+        ESP_LOGE(TAG, "Could not initialise node. Aborting!!!");
         vTaskDelay(5000 / portTICK_PERIOD_MS);
         abort();
     }
 
-    esp_rmaker_device_t *device = esp_rmaker_device_create(CONTROLLER_DEVICE_NAME, ESP_RMAKER_DEVICE_SOCKET, NULL);
-    if (device) {
-        esp_rmaker_device_add_param(device, esp_rmaker_name_param_create(ESP_RMAKER_DEF_NAME_PARAM, CONTROLLER_DEVICE_NAME));
-        esp_rmaker_param_t *primary = esp_rmaker_power_param_create(ESP_RMAKER_DEF_POWER_NAME, DEFAULT_POWER);
-        esp_rmaker_device_add_param(device, primary);
-        esp_rmaker_device_assign_primary_param(device, primary);
-    }
-    esp_rmaker_device_add_cb(device, write_cb, NULL);
+    /* Enable system service. */
+    esp_rmaker_system_serv_config_t system_serv_config = {
+        .flags = SYSTEM_SERV_FLAGS_ALL,
+        .reboot_seconds = 0,
+        .reset_seconds = 2,
+        .reset_reboot_seconds = 0,
+    };
+    esp_rmaker_system_service_enable(&system_serv_config);
 
-    esp_rmaker_node_add_device(node, device);
+    /* Create Matter controller device and parameters. */
+    esp_rmaker_device_t *device = esp_rmaker_device_create("MatterController", "matter-controller", NULL);
+    ESP_ERROR_CHECK(app_controller_set_device_params(device));
+    ESP_ERROR_CHECK(esp_rmaker_node_add_device(node, device));
 
-    /* Enable timezone service which will be require for setting appropriate timezone
-     * from the phone apps for scheduling to work correctly.
-     * For more information on the various ways of setting timezone, please check
-     * https://rainmaker.espressif.com/docs/time-service.html.
-     */
+    /* Enable ESP RainMaker services. */
+    esp_rmaker_ota_enable_default();
     esp_rmaker_timezone_service_enable();
-
-    /* Enable scheduling. */
     esp_rmaker_schedule_enable();
-
-    /* Enable Scenes */
     esp_rmaker_scenes_enable();
-
-    esp_rmaker_controller_service_enable();
-
-    /* Enable Insights. Requires CONFIG_ESP_INSIGHTS_ENABLED=y */
     app_insights_enable();
+#if CONFIG_OPENTHREAD_BORDER_ROUTER
+    /* Enable Thread Border Router service. */
+    esp_openthread_platform_config_t thread_cfg = {
+        .radio_config = ESP_OPENTHREAD_DEFAULT_RADIO_CONFIG(),
+        .host_config = ESP_OPENTHREAD_DEFAULT_HOST_CONFIG(),
+        .port_config = ESP_OPENTHREAD_DEFAULT_PORT_CONFIG(),
+    };
+    ESP_ERROR_CHECK(esp_rmaker_thread_br_enable(&thread_cfg));
+#endif // CONFIG_OPENTHREAD_BORDER_ROUTER
 
-    /* Pre start */
-    ESP_ERROR_CHECK(app_matter_rmaker_start());
+    /* Initialize Matter controller. */
+    ESP_ERROR_CHECK(app_controller_init(matter_ctrl_on_device_list_update));
+    ESP_ERROR_CHECK(app_rmaker_matter_report_set_callback(matter_ctl_on_matter_report, NULL));
 
-    /* Start the ESP RainMaker Agent */
-    esp_rmaker_start();
-    rmaker_init_done = true;
-
-    /* Enable Matter diagnostics console*/
-    app_matter_enable_matter_console();
-#if CONFIG_ESP_MATTER_CONTROLLER_ENABLE
-    esp_matter::console::controller_register_commands();
-#endif
-#if CONFIG_OPENTHREAD_BORDER_ROUTER && CONFIG_OPENTHREAD_CLI
-    esp_matter::console::otcli_register_commands();
-#endif // CONFIG_OPENTHREAD_BORDER_ROUTER && CONFIG_OPENTHREAD_CLI
-
-    /* Enable Timer for device update */
-    update_device_refresh_ui_init();
-
-    /* Start box */
+    /* Initialize display and touchscreen UI. */
     box_main();
+
+    /* Start ESP RainMaker. */
+    esp_rmaker_auth_service_enable();
+    esp_rmaker_start();
+
+    /* Start network provisioning. */
+    ESP_ERROR_CHECK(app_network_set_custom_mfg_data(MFG_DATA_DEVICE_TYPE_MATTER_CONTROLLER,
+                                                    MFG_DATA_DEVICE_SUBTYPE_MATTER_CONTROLLER));
+    err = app_network_start(POP_TYPE_RANDOM);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Could not start Wi-Fi. Aborting!!!");
+        vTaskDelay(5000 / portTICK_PERIOD_MS);
+        abort();
+    }
+
+    /* Start Matter. */
+    matter_ctrl_set_provisioned(true);
+    ESP_ERROR_CHECK(esp_matter::start(NULL));
+    esp_matter::console::diagnostics_register_commands();
+    esp_matter::console::init();
+
+    /* Refresh touchscreen UI after Matter startup. */
+    ESP_ERROR_CHECK(matter_ctrl_ui_init());
+    ui_matter_config_update_cb(matter_ctrl_is_provisioned() ? UI_MATTER_EVT_REFRESH : UI_MATTER_EVT_LOADING);
 }

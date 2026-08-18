@@ -2,11 +2,15 @@
 dependencies:
   ## Required IDF version
   idf:
-    version: ">=5.0.0"
+    version: ">=5.4,<6"
+
+  espressif/button: "^4.1.4"
   espressif/esp_rainmaker:
     version: ">=1.0"
-  espressif/button:
-    version: "^4.1.4"
+    override_path: "../../../../components/esp_rainmaker/"
   espressif/rmaker_app_insights:
     version: "*"
-    override_path: '../../../common/rmaker_app_insights/'
+    override_path: "../../../common/rmaker_app_insights/"
+  espressif/rmaker_app_reset:
+    version: "*"
+    override_path: "../../../common/rmaker_app_reset/"

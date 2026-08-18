@@ -7,13 +7,13 @@
 */
 
 #include <esp_log.h>
+#include <sdkconfig.h>
 #include <stdlib.h>
 #include <string.h>
 
-#include <device.h>
-#include <button_gpio.h>
+#include <app_end_device.h>
 #include <esp_matter.h>
-#include <led_driver.h>
+#include <iot_button.h>
 #include <esp_rmaker_core.h>
 #include <esp_rmaker_standard_params.h>
 #include <app_matter_switch.h>
@@ -23,11 +23,15 @@ static const char *TAG = "app_driver";
 extern uint16_t switch_endpoint_id;
 static bool g_power = DEFAULT_POWER;
 
-/* Do any conversions/remapping for the actual value here */
-esp_err_t app_driver_switch_set_power(led_driver_handle_t handle, bool val)
+esp_err_t app_driver_switch_set_power(app_driver_handle_t handle, bool val)
 {
-    g_power = val;
-    return led_driver_set_power(handle, val);
+    led_indicator_handle_t led = static_cast<led_indicator_handle_t>(handle);
+    uint8_t level = val ? UINT8_MAX : 0;
+    esp_err_t err = app_end_device_led_set_rgb(led, level, level, level);
+    if (err == ESP_OK) {
+        g_power = val;
+    }
+    return err;
 }
 
 static void app_driver_button_toggle_cb(void *handle, void *usr_data)
@@ -38,27 +42,19 @@ static void app_driver_button_toggle_cb(void *handle, void *usr_data)
 
 esp_err_t app_driver_light_set_defaults()
 {
-    return app_driver_switch_set_power((led_driver_handle_t)esp_matter::endpoint::get_priv_data(switch_endpoint_id),
-                                        DEFAULT_POWER);
+    return app_driver_switch_set_power(esp_matter::endpoint::get_priv_data(switch_endpoint_id), DEFAULT_POWER);
 }
 
 app_driver_handle_t app_driver_light_init()
 {
-    /* Initialize led */
-    led_driver_config_t config = led_driver_get_config();
-    led_driver_handle_t handle = led_driver_init(&config);
-    return (app_driver_handle_t)handle;
+    ESP_LOGI(TAG, "Initializing switch indicator");
+    return static_cast<app_driver_handle_t>(app_end_device_led_init());
 }
 
 app_driver_handle_t app_driver_button_init(void *user_data)
 {
-    /* Initialize button */
-    button_handle_t handle = NULL;
-    const button_config_t btn_cfg = {0};
-    const button_gpio_config_t btn_gpio_cfg = button_driver_get_config();
-
-    if (iot_button_new_gpio_device(&btn_cfg, &btn_gpio_cfg, &handle) != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to create button device");
+    button_handle_t handle = app_end_device_button_init();
+    if (!handle) {
         return NULL;
     }
 
