@@ -43,7 +43,7 @@ static const char *rmaker_user_api_login_url = "login2";
 static app_rmaker_user_api_context_t g_rmaker_user_api_ctx = {0};
 
 #define APP_RMAKER_USER_API_URL_LEN                 256
-#define APP_RMAKER_USER_API_HTTP_TX_BUFFER_SIZE     2048
+#define APP_RMAKER_USER_API_HTTP_TX_BUFFER_SIZE     CONFIG_RM_USER_HTTP_TX_BUFFER_SIZE
 #define APP_RMAKER_USER_API_DEFAULT_BASE_URL        "https://api.rainmaker.espressif.com"
 #define APP_RMAKER_USER_API_LOCK()                  xSemaphoreTakeRecursive(g_rmaker_user_api_ctx.api_lock, portMAX_DELAY)
 #define APP_RMAKER_USER_API_UNLOCK()                xSemaphoreGiveRecursive(g_rmaker_user_api_ctx.api_lock)
