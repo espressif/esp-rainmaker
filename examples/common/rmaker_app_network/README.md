@@ -65,15 +65,21 @@ A node in this mode never joins a network, so `app_network_start()` returns with
 connection and no `IP_EVENT_STA_GOT_IP` or `OPENTHREAD_EVENT_ATTACHED` ever arrives. Anything in
 the application that waits on the network stays blocked. The BLE session itself is unaffected.
 
-In a RainMaker application this has three consequences:
+A RainMaker application must set `local_only` in `esp_rmaker_config_t`. The examples set it to
+`!app_network_provides_network()`. In this mode:
 
-- `esp_rmaker_task` blocks on the network-up event. That task is the work queue task, so the queue
-never drains: the node config is not reported, MQTT never connects, and queued items are dropped
-once the queue is full.
-- Do not enable OTA. A node that takes an OTA rolls back and reboots, because the OTA module waits
-90 seconds for an MQTT connection.
+- `esp_rmaker_task` does not wait for the network. It posts `RMAKER_EVENT_STARTED` and returns.
+If `local_only` is not set, the task blocks the work queue on the network-up event.
+- MQTT calls return `ESP_ERR_INVALID_STATE`, so the node config and param updates are not reported.
+- `esp_rmaker_ota_enable()` returns `ESP_ERR_NOT_SUPPORTED`. An image in
+`ESP_OTA_IMG_PENDING_VERIFY` is marked valid when the BLE session starts.
 - `esp_rmaker_wifi_reset()` is a no-op, because Wi-Fi is never initialised. Factory reset still
 works.
+- (RainMaker) The node has no time source. A client must write the `Timestamp` param on connect,
+or schedules do not run. A power cycle loses the time. `CONFIG_ESP_RMAKER_TIME_CURRENT_TIME_PARAM`
+adds the param.
+- (RainMaker) Self claiming needs a network. Flash a client certificate, or use assisted claiming
+(`CONFIG_ESP_RMAKER_ASSISTED_CLAIM`).
 
 
 

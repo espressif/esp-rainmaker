@@ -8,6 +8,7 @@
 #pragma once
 #include <esp_err.h>
 #include <esp_event.h>
+#include <stdbool.h>
 #include <stdint.h>
 
 #ifdef __cplusplus
@@ -173,6 +174,16 @@ char *app_network_get_device_pop_default(void);
  * @return NULL on failure.
  */
 char *app_network_get_device_service_name(void);
+
+/** Check if this build brings up a network stack
+ *
+ * A BLE session only build never starts the Wi-Fi station or OpenThread, so the
+ * node never joins a network.
+ *
+ * @return true if the build brings up a network stack.
+ * @return false for a BLE session only build.
+ */
+bool app_network_provides_network(void);
 
 #if CONFIG_APP_WIFI_PROV_COMPAT
 #define APP_WIFI_EVENT APP_NETWORK_EVENT

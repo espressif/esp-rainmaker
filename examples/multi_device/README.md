@@ -23,6 +23,8 @@ before you select the session only mode.
 The fragment does these:
 
 - Adds the local control endpoints to the BLE session (`CONFIG_ESP_RMAKER_ENABLE_PROV_LOCAL_CTRL`).
+- Adds the `Timestamp` param to the time service, so a client can set the clock
+  (`CONFIG_ESP_RMAKER_TIME_CURRENT_TIME_PARAM`).
 - On ESP32-C2, raises the NimBLE host task stack to the IDF default of 4096 bytes.
 - On ESP32-C3, applies footprint trims so that BLE and Wi-Fi fit in RAM together. The trims turn
   off WPA3 and reduce some task stacks.

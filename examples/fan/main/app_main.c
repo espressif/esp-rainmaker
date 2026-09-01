@@ -77,6 +77,7 @@ void app_main()
      * */
     esp_rmaker_config_t rainmaker_cfg = {
         .enable_time_sync = false,
+        .local_only = !app_network_provides_network(),
     };
     esp_rmaker_node_t *node = esp_rmaker_node_init(&rainmaker_cfg, "ESP RainMaker Device", "Fan");
     if (!node) {

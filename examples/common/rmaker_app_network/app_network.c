@@ -564,6 +564,11 @@ static void network_event_handler(void* arg, esp_event_base_t event_base, int32_
     }
 }
 
+bool app_network_provides_network(void)
+{
+    return APP_NETWORK_PROV_ENABLED;
+}
+
 void app_network_init()
 {
     /* Initialize the event loop, if not done already. */
