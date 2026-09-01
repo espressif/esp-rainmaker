@@ -1,0 +1,2 @@
+# Opt-in settings for a BLE session that stays up next to Wi-Fi.
+# Build with: idf.py -D SDKCONFIG_DEFAULTS="sdkconfig.defaults;sdkconfig.defaults.ble_session" build
