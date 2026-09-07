@@ -99,6 +99,7 @@ typedef struct {
     char *node_id;
     const esp_rmaker_node_t *node;
     bool enable_time_sync;
+    bool local_only;
     esp_rmaker_state_t state;
     bool mqtt_connected;
     esp_rmaker_mqtt_conn_params_t *mqtt_conn_params;
@@ -127,6 +128,14 @@ esp_rmaker_state_t esp_rmaker_get_state(void)
         return esp_rmaker_priv_data->state;
     }
     return ESP_RMAKER_STATE_DEINIT;
+}
+
+bool esp_rmaker_is_local_only(void)
+{
+    if (esp_rmaker_priv_data) {
+        return esp_rmaker_priv_data->local_only;
+    }
+    return false;
 }
 
 esp_err_t esp_rmaker_set_network_id(const char *network_id)
@@ -557,6 +566,27 @@ static void esp_rmaker_task(void *data)
     ESP_RMAKER_CHECK_HANDLE();
     esp_rmaker_priv_data->state = ESP_RMAKER_STATE_STARTING;
     esp_err_t err = ESP_FAIL;
+    if (esp_rmaker_priv_data->local_only) {
+#ifdef CONFIG_ESP_RMAKER_ASSISTED_CLAIM
+        /* Assisted claiming runs over the provisioning session and needs no network. */
+        if (esp_rmaker_priv_data->need_claim) {
+            err = esp_rmaker_assisted_claim_perform(esp_rmaker_priv_data->claim_data);
+            esp_rmaker_priv_data->claim_data = NULL;
+            if (err != ESP_OK) {
+                ESP_LOGE(TAG, "esp_rmaker_assisted_claim_perform() returned %d. Aborting", err);
+                esp_rmaker_priv_data->state = ESP_RMAKER_STATE_INIT_DONE;
+                return;
+            }
+            esp_rmaker_priv_data->need_claim = false;
+            esp_rmaker_priv_data->claim_done = false;
+        }
+#endif /* CONFIG_ESP_RMAKER_ASSISTED_CLAIM */
+        /* The node has no network, so self claiming, the network wait and MQTT are skipped. */
+        ESP_LOGI(TAG, "Local only mode. Started without a connection to ESP RainMaker.");
+        esp_rmaker_priv_data->state = ESP_RMAKER_STATE_STARTED;
+        esp_rmaker_post_event(RMAKER_EVENT_STARTED, NULL, 0);
+        return;
+    }
 #if defined(CONFIG_ESP_RMAKER_NETWORK_OVER_WIFI)
     wifi_ap_record_t ap_info;
 #elif defined(CONFIG_ESP_RMAKER_NETWORK_OVER_THREAD)
@@ -809,6 +839,29 @@ static esp_err_t esp_rmaker_mqtt_conn_params_init(esp_rmaker_priv_data_t *rmaker
     return ESP_FAIL;
 }
 
+#ifdef CONFIG_ESP_RMAKER_ASSISTED_CLAIM
+/* Set up assisted claiming for a local only node that has no client certificate yet. */
+static esp_err_t esp_rmaker_local_only_claim_init(esp_rmaker_priv_data_t *rmaker_priv_data, bool use_claiming)
+{
+    if (!use_claiming) {
+        return ESP_OK;
+    }
+    char *cert = esp_rmaker_get_client_cert();
+    if (cert) {
+        free(cert);
+        return ESP_OK;
+    }
+    rmaker_priv_data->claim_data = esp_rmaker_assisted_claim_init();
+    if (!rmaker_priv_data->claim_data) {
+        ESP_LOGE(TAG, "Failed to initialise Claiming.");
+        return ESP_FAIL;
+    }
+    rmaker_priv_data->need_claim = true;
+    rmaker_priv_data->claim_done = false;
+    return ESP_OK;
+}
+#endif /* CONFIG_ESP_RMAKER_ASSISTED_CLAIM */
+
 esp_err_t esp_rmaker_mqtt_reinit_with_new_params(void)
 {
     if (!esp_rmaker_priv_data) {
@@ -900,12 +953,17 @@ static esp_err_t esp_rmaker_init(const esp_rmaker_config_t *config, bool use_cla
         ESP_LOGE(TAG, "Failed to initialise storage");
         return ESP_FAIL;
     }
+    if (config->local_only && esp_rmaker_seed_random_bytes() != ESP_OK) {
+        return ESP_FAIL;
+    }
     esp_rmaker_priv_data = MEM_CALLOC_EXTRAM(1, sizeof(esp_rmaker_priv_data_t));
     if (!esp_rmaker_priv_data) {
         ESP_LOGE(TAG, "Failed to allocate memory");
         return ESP_ERR_NO_MEM;
     }
 
+    esp_rmaker_priv_data->local_only = config->local_only;
+    esp_rmaker_mqtt_set_disabled(config->local_only);
     esp_rmaker_priv_data->node_id = esp_rmaker_populate_node_id(use_claiming);
     if (!esp_rmaker_priv_data->node_id) {
         esp_rmaker_deinit_priv_data(esp_rmaker_priv_data);
@@ -928,7 +986,23 @@ static esp_err_t esp_rmaker_init(const esp_rmaker_config_t *config, bool use_cla
         return ESP_FAIL;
     }
 #endif /* !CONFIG_ESP_RMAKER_DISABLE_USER_MAPPING_PROV && !CONFIG_ESP_RMAKER_ENABLE_CHALLENGE_RESPONSE */
-    if (esp_rmaker_mqtt_conn_params_init(esp_rmaker_priv_data, use_claiming) != ESP_OK) {
+    if (esp_rmaker_priv_data->local_only) {
+        ESP_LOGI(TAG, "Local only mode. MQTT is not initialised.");
+#ifdef CONFIG_ESP_RMAKER_SELF_CLAIM
+        char *cert = esp_rmaker_get_client_cert();
+        if (use_claiming && !cert) {
+            ESP_LOGW(TAG, "Local only mode cannot self claim. Flash a client cert or use assisted claiming.");
+        }
+        free(cert);
+#endif /* CONFIG_ESP_RMAKER_SELF_CLAIM */
+#ifdef CONFIG_ESP_RMAKER_ASSISTED_CLAIM
+        if (esp_rmaker_local_only_claim_init(esp_rmaker_priv_data, use_claiming) != ESP_OK) {
+            esp_rmaker_deinit_priv_data(esp_rmaker_priv_data);
+            esp_rmaker_priv_data = NULL;
+            return ESP_FAIL;
+        }
+#endif /* CONFIG_ESP_RMAKER_ASSISTED_CLAIM */
+    } else if (esp_rmaker_mqtt_conn_params_init(esp_rmaker_priv_data, use_claiming) != ESP_OK) {
         esp_rmaker_deinit_priv_data(esp_rmaker_priv_data);
         esp_rmaker_priv_data = NULL;
         ESP_LOGE(TAG, "Failed to initialise MQTT Params. Please perform \"claiming\" using RainMaker CLI.");
@@ -1041,7 +1115,7 @@ const esp_rmaker_node_t *esp_rmaker_get_node()
 esp_err_t esp_rmaker_start(void)
 {
     ESP_RMAKER_CHECK_HANDLE(ESP_ERR_INVALID_STATE);
-    if (esp_rmaker_priv_data->enable_time_sync) {
+    if (esp_rmaker_priv_data->enable_time_sync && !esp_rmaker_priv_data->local_only) {
         esp_rmaker_time_sync_init(NULL);
     }
     ESP_LOGI(TAG, "Starting RainMaker Work Queue task");

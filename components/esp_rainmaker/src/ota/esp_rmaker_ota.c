@@ -27,6 +27,7 @@
 
 #include <esp_rmaker_utils.h>
 #include <esp_rmaker_common_events.h>
+#include <network_provisioning/manager.h>
 #include <esp_rmaker_utils.h>
 #include "esp_rmaker_internal.h"
 #include "esp_rmaker_ota_internal.h"
@@ -866,6 +867,15 @@ esp_err_t esp_rmaker_ota_mark_valid(void)
     return ESP_OK;
 }
 
+/* No MQTT connection can confirm a pending image on a local only node, so accept it once the BLE session starts. */
+static void esp_rmaker_ota_local_only_validate(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data)
+{
+    esp_event_handler_unregister(NETWORK_PROV_EVENT, NETWORK_PROV_START, &esp_rmaker_ota_local_only_validate);
+    ESP_LOGI(TAG, "BLE session started. Marking the pending image valid.");
+    esp_ota_mark_app_valid_cancel_rollback();
+    esp_rmaker_erase_rollback_flag();
+}
+
 /* requested: true for esp_rmaker_ota_mark_invalid(), false for the MQTT timeout rollback */
 static esp_err_t esp_rmaker_ota_rollback_and_reboot(bool requested)
 {
@@ -1050,6 +1060,15 @@ esp_err_t esp_rmaker_ota_enable(esp_rmaker_ota_config_t *ota_config, esp_rmaker_
     if ((type != OTA_USING_PARAMS) && (type != OTA_USING_TOPICS)) {
         ESP_LOGE(TAG,"Invalid arguments for esp_rmaker_ota_enable()");
         return ESP_ERR_INVALID_ARG;
+    }
+    if (esp_rmaker_is_local_only()) {
+        ESP_LOGW(TAG, "Local only mode. OTA is not enabled.");
+        const esp_partition_t *running = esp_ota_get_running_partition();
+        esp_ota_img_states_t ota_state;
+        if (esp_ota_get_state_partition(running, &ota_state) == ESP_OK && ota_state == ESP_OTA_IMG_PENDING_VERIFY) {
+            esp_event_handler_register(NETWORK_PROV_EVENT, NETWORK_PROV_START, &esp_rmaker_ota_local_only_validate, NULL);
+        }
+        return ESP_ERR_NOT_SUPPORTED;
     }
     static bool ota_init_done;
     if (ota_init_done) {

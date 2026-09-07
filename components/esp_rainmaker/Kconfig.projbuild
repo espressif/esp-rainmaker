@@ -711,6 +711,9 @@ menu "ESP RainMaker Config"
                 parameter to set the device's local RTC. This is useful for devices
                 that do not have internet access and cannot sync time via SNTP.
 
+                A node with local_only set needs this param, or schedules never run.
+                A client must write it on connect, because a power cycle loses the time.
+
     endmenu
 
     menu "ESP RainMaker Scheduling"

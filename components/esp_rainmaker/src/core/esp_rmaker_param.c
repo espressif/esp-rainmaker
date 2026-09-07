@@ -489,7 +489,7 @@ static esp_err_t esp_rmaker_report_param_internal(uint8_t flags)
 
             if (esp_rmaker_params_mqtt_init_done) {
                 esp_rmaker_mqtt_publish(publish_topic, node_params_buf, strlen(node_params_buf), RMAKER_MQTT_QOS1, NULL);
-            } else {
+            } else if (!esp_rmaker_is_local_only()) {
                 ESP_LOGW(TAG, "Not reporting params since params mqtt not initialized yet.");
             }
         }
@@ -927,7 +927,8 @@ esp_rmaker_param_t *esp_rmaker_param_create(const char *param_name, const char *
     } else {
         param->val.val = val.val;
     }
-    if ((properties & PROP_FLAG_TIME_SERIES) || (properties & PROP_FLAG_SIMPLE_TIME_SERIES)) {
+    if (((properties & PROP_FLAG_TIME_SERIES) || (properties & PROP_FLAG_SIMPLE_TIME_SERIES)) &&
+            !esp_rmaker_is_local_only()) {
         /* Time series params will require time sync */
         esp_rmaker_time_sync_init(NULL);
     }
@@ -1352,7 +1353,7 @@ esp_err_t esp_rmaker_report_node_state(void)
             ESP_LOGI(TAG, "Reporting params (init): %s", node_params_buf);
             if (esp_rmaker_params_mqtt_init_done) {
                 esp_rmaker_mqtt_publish(publish_topic, node_params_buf, strlen(node_params_buf), RMAKER_MQTT_QOS1, NULL);
-            } else {
+            } else if (!esp_rmaker_is_local_only()) {
                 ESP_LOGW(TAG, "Not reporting params since params mqtt not initialized yet.");
             }
         }
