@@ -214,7 +214,8 @@ void esp_rmaker_ota_finish_using_topics(esp_rmaker_ota_t *ota)
         free(ota->file_md5);
         ota->file_md5 = NULL;
     }
-    ota->ota_in_progress = false;
+    /* Stays in progress until the post-OTA reboot, see esp_rmaker_ota_success_reboot_sequence() */
+    ota->ota_in_progress = ota->reboot_pending;
 }
 static void ota_url_handler(const char *topic, void *payload, size_t payload_len, void *priv_data)
 {

@@ -49,6 +49,8 @@ static const char *TAG = "esp_rmaker_ota";
 
 /* OTA reboot timer and NVS constants */
 #define OTA_REBOOT_TIMER_SEC    10
+/* Attempts (1 s apart) to schedule the post-OTA reboot before rebooting immediately instead */
+#define OTA_REBOOT_SCHEDULE_RETRIES 3
 #define ESP_RMAKER_NVS_PART_NAME             "nvs"
 #define RMAKER_OTA_UPDATE_FLAG_NVS_NAME      "ota_update"
 
@@ -439,9 +441,32 @@ static esp_err_t esp_rmaker_ota_success_reboot_sequence(esp_rmaker_ota_handle_t 
              protocol_name, attempt_count, (attempt_count == 1) ? "" : "s");
     esp_rmaker_ota_report_status(ota_handle, OTA_STATUS_SUCCESS, success_info);
 #endif
+    /* A new image was written and only the reboot is pending. The finish functions keep the OTA
+     * marked in progress while this is set, so that a new OTA request cannot overwrite the freshly
+     * written partition before the reboot. Callbacks that do not go through this workflow (host MCU
+     * updates, config downloads) never set it and finish as usual.
+     */
+    esp_rmaker_ota_t *ota = (esp_rmaker_ota_t *)ota_handle;
+    if (ota) {
+        ota->reboot_pending = true;
+    }
 #ifndef CONFIG_ESP_RMAKER_OTA_DISABLE_AUTO_REBOOT
     ESP_LOGI(TAG, "%s OTA upgrade successful. Rebooting in %d seconds...", protocol_name, OTA_REBOOT_TIMER_SEC);
-    esp_rmaker_reboot(OTA_REBOOT_TIMER_SEC);
+    /* The OTA is held in progress until the device reboots, so a reboot has to follow. A failure
+     * here is most likely a momentarily full timer command queue (or a reboot already scheduled by
+     * someone else, which returns the same error): retry, and as a last resort reboot right away
+     * rather than leave the node refusing every further OTA until it is power-cycled.
+     */
+    for (int attempt = 1; esp_rmaker_reboot(OTA_REBOOT_TIMER_SEC) != ESP_OK; attempt++) {
+        if (attempt >= OTA_REBOOT_SCHEDULE_RETRIES) {
+            ESP_LOGE(TAG, "Could not schedule the reboot. OTA is held in progress until the device reboots, rebooting now.");
+            esp_rmaker_reboot(0);
+            break;
+        }
+        ESP_LOGW(TAG, "Failed to schedule reboot (attempt %d/%d), retrying. OTA is held in progress until the device reboots.",
+                 attempt, OTA_REBOOT_SCHEDULE_RETRIES);
+        vTaskDelay(pdMS_TO_TICKS(1000));
+    }
 #else
     ESP_LOGI(TAG, "%s OTA upgrade successful. Auto reboot is disabled. Requesting a Reboot via Event handler.", protocol_name);
     esp_rmaker_ota_post_event(RMAKER_OTA_EVENT_REQ_FOR_REBOOT, NULL, 0);

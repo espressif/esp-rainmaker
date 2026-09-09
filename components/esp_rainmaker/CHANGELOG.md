@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.16.1
+
+### Bug Fixes
+
+- OTA: keep the OTA marked in progress after a successful upgrade until the device reboots, so a
+  new OTA request (or a QoS1 redelivery of the same one) in the reboot wait window cannot overwrite
+  the freshly written partition. Custom OTA callbacks that do not write an ESP image (host MCU
+  updates, config downloads) are unaffected.
+
 ## 1.16.0
 
 ### Changes
