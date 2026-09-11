@@ -299,7 +299,7 @@ build_idf_v6.0:
 
 build_standalone_camera:
   extends: .build_template
-  image: espressif/idf:v5.5.4
+  image: espressif/idf:v5.5.5
   variables:
     # deprecated-declarations demoted: only hit is third-party esp_lvgl_port 2.8.0 (revisit).
     PEDANTIC_FLAGS: "-Werror -Wno-error=deprecated-declarations -Wno-error=cpp -Wno-error=int-to-pointer-cast -Wno-error=pointer-to-int-cast"
@@ -310,7 +310,7 @@ build_standalone_camera:
 
 build_split_camera:
   extends: .build_template
-  image: espressif/idf:v5.5.4
+  image: espressif/idf:v5.5.5
   variables:
     # deprecated-declarations demoted: only hit is third-party esp_lvgl_port 2.8.0 (revisit).
     PEDANTIC_FLAGS: "-Werror -Wno-error=deprecated-declarations -Wno-error=cpp -Wno-error=int-to-pointer-cast -Wno-error=pointer-to-int-cast"
