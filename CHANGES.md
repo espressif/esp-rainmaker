@@ -1,5 +1,12 @@
 # Changes
 
+## 09-Sep-2026: OTA Reboot Window Fix
+
+- A new OTA request arriving in the 10 s window between a successful OTA and the reboot could
+  overwrite the freshly written partition. The OTA now stays in progress until the device
+  reboots. Check the esp_rainmaker component's
+  [CHANGELOG v1.16.1](components/esp_rainmaker/CHANGELOG.md#1161) for details.
+
 ## 29-Jun-2026: ESP-IDF v6.0 Support
 
 - Add ESP-IDF v6.0 (mbedtls v4.0) compatibility: PSA crypto migration for node auth and

@@ -96,6 +96,12 @@ typedef struct {
  * The esp_rmaker_report_ota_status() API should be used to indicate the progress and
  * success/fail status.
  *
+ * If the OTA is performed via the RainMaker OTA workflow (default callback, or a custom
+ * callback that calls esp_rmaker_ota_default_cb()), the core keeps the OTA marked as in
+ * progress after a successful upgrade and rejects any further OTA request until the device
+ * reboots, so that the freshly written partition is not overwritten. A custom callback that
+ * writes an ESP image on its own does not get this protection.
+ *
  * @param[in] handle An OTA handle assigned by the ESP RainMaker Core
  * @param[in] ota_data The data to be used for the OTA
  *

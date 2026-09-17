@@ -48,6 +48,7 @@ typedef struct {
     int filesize;
     bool ota_in_progress;
     bool validation_in_progress;
+    bool reboot_pending;
     bool rolled_back;
     ota_status_t last_reported_status;
     void *transient_priv;

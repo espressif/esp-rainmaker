@@ -36,7 +36,8 @@ void esp_rmaker_ota_finish_using_params(esp_rmaker_ota_t *ota)
         free(ota->metadata);
         ota->metadata = NULL;
     }
-    ota->ota_in_progress = false;
+    /* Stays in progress until the post-OTA reboot, see esp_rmaker_ota_success_reboot_sequence() */
+    ota->ota_in_progress = ota->reboot_pending;
 }
 static esp_err_t esp_rmaker_ota_service_cb(const esp_rmaker_device_t *device, const esp_rmaker_param_t *param,
         const esp_rmaker_param_val_t val, void *priv_data, esp_rmaker_write_ctx_t *ctx)
