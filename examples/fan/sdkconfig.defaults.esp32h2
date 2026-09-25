@@ -12,3 +12,6 @@ CONFIG_NETWORK_PROV_SCAN_MAX_ENTRIES=64
 # Use 4MB optimised partition
 CONFIG_PARTITION_TABLE_CUSTOM=y
 CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions_4mb_optimised.csv"
+
+# Optimise for size: the app does not fit the 4MB-optimised app partition otherwise
+CONFIG_COMPILER_OPTIMIZATION_SIZE=y
