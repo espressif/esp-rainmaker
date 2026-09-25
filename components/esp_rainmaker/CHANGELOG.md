@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.17.0
+
+### Changes
+
+- OTA (topics): repeat the otafetch once when the otaurl subscription becomes active after the fetch
+  was sent, after the broker had rejected the subscription (e.g. throttling), or after the connection
+  dropped within a minute of a fetch (the reply may have been lost). Uses the new
+  `RMAKER_MQTT_EVENT_SUBSCRIBED` / `RMAKER_MQTT_EVENT_SUBSCRIBE_FAILED` events; the normal path
+  stays at one fetch per boot and nothing is fetched on a plain reconnect.
+- Requires `rmaker_common` >= 1.9.0, which retries rejected or dropped MQTT subscriptions with
+  backoff instead of recording a SUBACK failure as success.
+
 ## 1.16.1
 
 ### Bug Fixes

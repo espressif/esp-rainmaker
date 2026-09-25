@@ -42,6 +42,8 @@ static const char *TAG = "esp_rmaker_ota_using_topics";
 
 /* OTA fetch retry configuration */
 #define OTA_FETCH_TIMEOUT_SECONDS   60
+/* A disconnect this soon after a fetch may have swallowed the cloud's reply; fetch again on reconnect */
+#define OTA_FETCH_REPLY_WINDOW_SECONDS 60
 #define OTA_FETCH_RETRY_BASE_DELAY  30
 #define OTA_FETCH_MAX_RETRIES       5
 
@@ -57,6 +59,24 @@ typedef struct {
 } ota_fetch_state_t;
 
 static ota_fetch_state_t g_ota_fetch_state = {0};
+
+/* otaurl subscription tracking, see ota_sub_event_handler().
+ * s_fetch_on_ack: fetch once more when the subscription is (re-)acknowledged, because something may
+ * have been missed while it was not active: the reply to a fetch that went out before the
+ * acknowledgement, a job pushed while the broker had rejected or dropped the subscription, or the
+ * reply to a fetch that was still outstanding when the connection dropped.
+ * s_fetch_reply_pending / s_fetch_sent_tick: a fetch went out and no otaurl message has arrived
+ * since. The cloud sends nothing when there is no job, so this cannot be told from "no job" and is
+ * only trusted within OTA_FETCH_REPLY_WINDOW_SECONDS of the fetch.
+ * All of this is shared between the fetch path, the MQTT task and the event loop task, hence the
+ * critical section.
+ */
+static char s_otaurl_topic[MQTT_TOPIC_BUFFER_SIZE];
+static bool s_otaurl_sub_acked;
+static bool s_fetch_on_ack;
+static bool s_fetch_reply_pending;
+static TickType_t s_fetch_sent_tick;
+static portMUX_TYPE s_ota_sub_lock = portMUX_INITIALIZER_UNLOCKED;
 
 /* Forward declarations */
 static void ota_fetch_schedule_retry(void);
@@ -81,6 +101,23 @@ static void ota_fetch_cleanup(void)
 
     /* Reset state for next use instead of freeing */
     memset(&g_ota_fetch_state, 0, sizeof(g_ota_fetch_state));
+}
+
+/* Abandon a fetch that was waiting for its PUBACK when the connection dropped. It will not get one:
+ * esp-mqtt drops the publish from its outbox after CONFIG_MQTT_OUTBOX_EXPIRED_TIMEOUT_MS, and the
+ * stale "in progress" state would otherwise make the refetch on re-subscribe a no-op and leave
+ * recovery to the PUBACK timeout (a minute) plus its retry delay. retry_count is preserved, so a
+ * reconnect does not reset the existing backoff.
+ */
+static void ota_fetch_abort_in_flight(void)
+{
+    if (!g_ota_fetch_state.fetch_in_progress) {
+        return;
+    }
+    ESP_LOGW(TAG, "Disconnected while an OTA fetch was in flight. Abandoning it.");
+    unsigned int retry_count = g_ota_fetch_state.retry_count;
+    ota_fetch_cleanup();
+    g_ota_fetch_state.retry_count = retry_count;
 }
 
 static void ota_fetch_timeout_timer_cb(TimerHandle_t xTimer)
@@ -224,6 +261,10 @@ static void ota_url_handler(const char *topic, void *payload, size_t payload_len
     }
     esp_rmaker_ota_handle_t ota_handle = priv_data;
     esp_rmaker_ota_t *ota = (esp_rmaker_ota_t *)ota_handle;
+    /* Any otaurl message settles an outstanding fetch (a pushed job makes the fetch moot as well) */
+    portENTER_CRITICAL(&s_ota_sub_lock);
+    s_fetch_reply_pending = false;
+    portEXIT_CRITICAL(&s_ota_sub_lock);
     if (ota->ota_in_progress) {
         ESP_LOGE(TAG, "OTA already in progress. Please try later.");
         return;
@@ -451,6 +492,19 @@ static esp_err_t __esp_rmaker_ota_fetch(void)
     g_ota_fetch_state.expected_msg_id = msg_id;
     g_ota_fetch_state.fetch_in_progress = true;
 
+    /* The reply arrives on the otaurl topic. If that subscription is not known to be active yet,
+     * the reply may be lost, so repeat the fetch once the subscription is acknowledged. Remember
+     * when the fetch went out, so that a disconnect shortly after is treated the same way.
+     */
+    TickType_t now = xTaskGetTickCount();
+    portENTER_CRITICAL(&s_ota_sub_lock);
+    if (!s_otaurl_sub_acked) {
+        s_fetch_on_ack = true;
+    }
+    s_fetch_reply_pending = true;
+    s_fetch_sent_tick = now;
+    portEXIT_CRITICAL(&s_ota_sub_lock);
+
     /* Register event handler for MQTT PUBLISHED event */
     err = esp_event_handler_instance_register(RMAKER_COMMON_EVENT, RMAKER_MQTT_EVENT_PUBLISHED,
                                             ota_fetch_mqtt_event_handler, NULL,
@@ -544,16 +598,68 @@ static void esp_rmaker_ota_autofetch_cleanup(void)
 }
 #endif
 
+/* The MQTT glue retries a rejected or dropped subscription and reports the outcome through these
+ * events. A fetch sent before the otaurl subscription was acknowledged, or while the broker had
+ * rejected it, gets a reply nobody receives, so repeat it once when the subscription comes up.
+ * A plain reconnect re-acknowledges the subscription without a pending fetch and triggers nothing.
+ */
+static void ota_sub_event_handler(void *arg, esp_event_base_t base, int32_t id, void *data)
+{
+    if (id == RMAKER_MQTT_EVENT_DISCONNECTED) {
+        /* A fetch whose reply had not arrived yet may have lost it to the disconnect; fetch again once
+         * the subscription is back. Bounded by time, since "no reply yet" looks the same as "no job".
+         */
+        TickType_t now = xTaskGetTickCount();
+        portENTER_CRITICAL(&s_ota_sub_lock);
+        s_otaurl_sub_acked = false;
+        if (s_fetch_reply_pending &&
+                (now - s_fetch_sent_tick) < pdMS_TO_TICKS(OTA_FETCH_REPLY_WINDOW_SECONDS * 1000)) {
+            s_fetch_on_ack = true;
+        }
+        s_fetch_reply_pending = false;
+        portEXIT_CRITICAL(&s_ota_sub_lock);
+        ota_fetch_abort_in_flight();
+        return;
+    }
+    if (!data || strcmp((const char *)data, s_otaurl_topic) != 0) {
+        return;
+    }
+    bool fetch = false;
+    portENTER_CRITICAL(&s_ota_sub_lock);
+    if (id == RMAKER_MQTT_EVENT_SUBSCRIBE_FAILED) {
+        s_otaurl_sub_acked = false;
+        s_fetch_on_ack = true;
+    } else if (id == RMAKER_MQTT_EVENT_SUBSCRIBED) {
+        s_otaurl_sub_acked = true;
+        fetch = s_fetch_on_ack;
+        s_fetch_on_ack = false;
+    }
+    portEXIT_CRITICAL(&s_ota_sub_lock);
+    if (fetch) {
+        ESP_LOGI(TAG, "otaurl subscription is active now. Fetching OTA details again.");
+        esp_rmaker_ota_fetch_with_delay(RMAKER_OTA_FETCH_DELAY);
+    }
+}
+
 static esp_err_t esp_rmaker_ota_subscribe(void *priv_data)
 {
-    char subscribe_topic[MQTT_TOPIC_BUFFER_SIZE];
+    if (s_otaurl_topic[0] == '\0') {
+        snprintf(s_otaurl_topic, sizeof(s_otaurl_topic), "node/%s/%s", esp_rmaker_get_node_id(), OTAURL_TOPIC_SUFFIX);
+    }
 
-    snprintf(subscribe_topic, sizeof(subscribe_topic),"node/%s/%s", esp_rmaker_get_node_id(), OTAURL_TOPIC_SUFFIX);
+    /* Register before subscribing so that the acknowledgement is not missed */
+    static bool sub_events_registered;
+    if (!sub_events_registered) {
+        esp_event_handler_register(RMAKER_COMMON_EVENT, RMAKER_MQTT_EVENT_SUBSCRIBED, ota_sub_event_handler, NULL);
+        esp_event_handler_register(RMAKER_COMMON_EVENT, RMAKER_MQTT_EVENT_SUBSCRIBE_FAILED, ota_sub_event_handler, NULL);
+        esp_event_handler_register(RMAKER_COMMON_EVENT, RMAKER_MQTT_EVENT_DISCONNECTED, ota_sub_event_handler, NULL);
+        sub_events_registered = true;
+    }
 
-    ESP_LOGI(TAG, "Subscribing to: %s", subscribe_topic);
+    ESP_LOGI(TAG, "Subscribing to: %s", s_otaurl_topic);
     /* First unsubscribe, in case there is a stale subscription */
-    esp_rmaker_mqtt_unsubscribe(subscribe_topic);
-    esp_err_t err = esp_rmaker_mqtt_subscribe(subscribe_topic, ota_url_handler, RMAKER_MQTT_QOS1, priv_data);
+    esp_rmaker_mqtt_unsubscribe(s_otaurl_topic);
+    esp_err_t err = esp_rmaker_mqtt_subscribe(s_otaurl_topic, ota_url_handler, RMAKER_MQTT_QOS1, priv_data);
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "OTA URL Subscription Error %d", err);
     }

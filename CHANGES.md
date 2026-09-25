@@ -1,5 +1,13 @@
 # Changes
 
+## 09-Sep-2026: MQTT Subscription Retry
+
+- A subscription the MQTT broker rejected (for example under subscribe throttling) was treated as
+  successful and never retried until the next reconnect. `rmaker_common` 1.9.0 now retries such
+  subscriptions with backoff, and the OTA module repeats its otafetch once the otaurl subscription
+  is confirmed. Check the esp_rainmaker component's
+  [CHANGELOG v1.17.0](components/esp_rainmaker/CHANGELOG.md#1170) for details.
+
 ## 09-Sep-2026: OTA Reboot Window Fix
 
 - A new OTA request arriving in the 10 s window between a successful OTA and the reboot could
