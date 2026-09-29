@@ -205,7 +205,10 @@ static esp_err_t announce_mdns_service(const esp_rmaker_on_network_chal_resp_con
     MDNS_TXT_SET(MDNS_TXT_SECURE_VERSION_KEY, sec_ver_str);
 
     if (config->sec_ver == ESP_RMAKER_ON_NETWORK_SEC1) {
-        MDNS_TXT_SET(MDNS_TXT_POP_REQUIRED_KEY, config->pop ? "true" : "false");
+        bool pop_required = config->pop && strlen(config->pop) > 0;
+        MDNS_TXT_SET(MDNS_TXT_POP_REQUIRED_KEY, pop_required ? "true" : "false");
+    } else if (config->sec_ver == ESP_RMAKER_ON_NETWORK_SEC2) {
+        MDNS_TXT_SET(MDNS_TXT_POP_REQUIRED_KEY, "true");
     }
 
     ESP_LOGI(TAG, "mDNS service announced: %s.%s, port: %d", MDNS_SERVICE_TYPE, MDNS_SERVICE_PROTO, s_state.port);
@@ -303,8 +306,14 @@ static esp_err_t srp_client_register_service(const esp_rmaker_on_network_chal_re
 
     if (config->sec_ver == ESP_RMAKER_ON_NETWORK_SEC1) {
         txt_entries[txt_index].mKey = MDNS_TXT_POP_REQUIRED_KEY;
-        txt_entries[txt_index].mValue = (const uint8_t *)(config->pop ? "true" : "false");
-        txt_entries[txt_index].mValueLength = config->pop ? 4 : 5;
+        bool pop_required = config->pop && strlen(config->pop) > 0;
+        txt_entries[txt_index].mValue = (const uint8_t *)(pop_required ? "true" : "false");
+        txt_entries[txt_index].mValueLength = pop_required ? 4 : 5;
+        txt_index++;
+    } else if (config->sec_ver == ESP_RMAKER_ON_NETWORK_SEC2) {
+        txt_entries[txt_index].mKey = MDNS_TXT_POP_REQUIRED_KEY;
+        txt_entries[txt_index].mValue = (const uint8_t *)"true";
+        txt_entries[txt_index].mValueLength = 4;
         txt_index++;
     }
 
