@@ -7,11 +7,6 @@
 #   idf.py -D 'SDKCONFIG_DEFAULTS=sdkconfig.defaults;sdkconfig.defaults.esp32c6;sdkconfig.defaults.m5stack_tab5_pair.esp32c6' set-target esp32c6 build
 #
 # esp_hosted board variant - selects the Tab5-specific SDIO slave pinout for
-# the on-board C6. Requires the KVS SDK's esp_hosted with the slave-side Tab5
-# option (ESP32P4_TAB5_C6_BOARD) from esp_hosted_mcu !272 (merged to staging).
+# the on-board C6.
 #
 CONFIG_ESP32P4_TAB5_C6_BOARD=y
-# CONFIG_ESP_HOST_DEV_BOARD_NONE is not set
-# CONFIG_ESP_HOST_DEV_BOARD_P4_FUNC_BOARD is not set
-# CONFIG_ESP_HOST_DEV_BOARD_P4_C6_CORE is not set
-# CONFIG_ESP32P4_EYE_C6_BOARD is not set

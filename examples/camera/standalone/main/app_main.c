@@ -27,10 +27,14 @@
 #include "kvs_peer_connection.h"
 #include "media_stream.h"
 
-#if CONFIG_ESP_HOSTED_ENABLE_BT_NIMBLE
-/* On P4 the BLE controller lives on the C6 co-processor and is driven over the
- * esp_hosted VHCI transport; it must be explicitly brought up before BLE
+#if CONFIG_ESP_HOSTED_HOST_FEAT_BT
+/* On P4 the BLE controller lives on the C6/C5 co-processor and is reached over
+ * esp_hosted's HCI transport; it must be explicitly brought up before BLE
  * provisioning (NimBLE cannot init a local controller on the P4). */
+#include "esp_hosted_bt_host_stack.h"
+#endif
+
+#if CONFIG_ESP_HOSTED && !CONFIG_ESP_HOSTED_AUTO_CALL_INIT_BEFORE_APP_MAIN
 #include "esp_hosted.h"
 #endif
 
@@ -236,6 +240,14 @@ void app_main(void)
     }
 #endif
 
+#if CONFIG_ESP_HOSTED && !CONFIG_ESP_HOSTED_AUTO_CALL_INIT_BEFORE_APP_MAIN
+    /* hosted's auto-init is a constructor, so it would enumerate the co-processor
+     * while flash_slave() still holds it in ROM download mode, and give up.
+     * Boards that flash their own co-processor bring hosted up here instead. */
+    ESP_ERROR_CHECK(esp_hosted_init());
+    ESP_ERROR_CHECK(esp_hosted_connect_to_slave());
+#endif
+
     /* Initialize ESP CLI */
     esp_cli_start();
 
@@ -265,18 +277,14 @@ void app_main(void)
     /* Initialize reset button */
     initialize_reset_button();
 
-#if CONFIG_ESP_HOSTED_ENABLE_BT_NIMBLE
-    /* On P4 the BLE controller lives on the C6 co-processor and is reached over
-     * the esp_hosted VHCI transport. Bring it up here (at the example layer,
-     * before BLE provisioning starts) since NimBLE cannot init a local
-     * controller on the P4. It is left up after provisioning: the only safe
-     * teardown signal (NimBLE fully stopped) isn't exposed by app_network, and
-     * deinit'ing earlier races the NimBLE host shutdown. */
-    if (esp_hosted_bt_controller_init() != ESP_OK) {
-        ESP_LOGW(TAG, "Failed to init co-processor BT controller");
-    }
-    if (esp_hosted_bt_controller_enable() != ESP_OK) {
-        ESP_LOGW(TAG, "Failed to enable co-processor BT controller");
+#if CONFIG_ESP_HOSTED_HOST_FEAT_BT
+    /* Bring the co-processor's BT controller up and bind NimBLE to hosted's HCI
+     * before BLE provisioning starts. It is left up after provisioning: the only
+     * safe teardown signal (NimBLE fully stopped) isn't exposed by app_network,
+     * and tearing down earlier races the NimBLE host shutdown. */
+    esp_hosted_bt_host_stack_cfg_t bt_cfg = ESP_HOSTED_BT_HOST_STACK_CONFIG_DEFAULT();
+    if (esp_hosted_bt_host_stack_setup(&bt_cfg) != ESP_OK) {
+        ESP_LOGW(TAG, "Failed to set up the co-processor BT host stack");
     }
 #endif
 
@@ -293,11 +301,29 @@ void app_main(void)
     /* Initialize and start WebRTC */
     ESP_LOGI(TAG, "Starting WebRTC...");
 
+    /* Video and audio each follow the build and the board, as in the KVS SDK
+     * examples. A board without an audio codec (e.g. the P4 core boards)
+     * streams video only; initialising the microphone there asserts in the BSP. */
+    media_stream_video_capture_t *video_capture = NULL;
+    media_stream_audio_capture_t *audio_capture = NULL;
+#if CONFIG_MEDIA_STREAM_ENABLE_VIDEO_CAPTURE
+    video_capture = media_stream_get_video_capture_if();
+#endif
+#if CONFIG_MEDIA_STREAM_ENABLE_AUDIO_CAPTURE && CONFIG_MEDIA_STREAM_HAS_AUDIO_CODEC
+    audio_capture = media_stream_get_audio_capture_if();
+#endif
+    if (video_capture == NULL) {
+        ESP_LOGW(TAG, "Video capture not available - continuing without video");
+    }
+    if (audio_capture == NULL) {
+        ESP_LOGW(TAG, "Audio capture not available - continuing without audio");
+    }
+
     /* Configure WebRTC camera with standalone mode interfaces */
     rmaker_webrtc_camera_config_t camera_config = {
         .peer_connection_if = kvs_peer_connection_if_get(),
-        .video_capture = media_stream_get_video_capture_if(),
-        .audio_capture = media_stream_get_audio_capture_if(),
+        .video_capture = video_capture,
+        .audio_capture = audio_capture,
         .init_callback = NULL,
         .init_callback_user_data = NULL,
     };

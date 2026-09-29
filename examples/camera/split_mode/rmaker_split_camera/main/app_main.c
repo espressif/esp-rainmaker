@@ -24,7 +24,9 @@
 
 #include "rmaker_camera.h"
 #include "esp_cli.h"
-#include "esp_hosted_coprocessor.h"
+#include "eh_cp.h"
+#include "esp_netif.h"
+#include "power_save_handler.h"
 #include "bridge_peer_connection.h"
 #include "esp_work_queue.h"
 #include "sleep_command.h"
@@ -201,6 +203,26 @@ static int split_mode_init_callback(void *user_data)
     return 0;
 }
 
+static void on_got_ip(void *arg, esp_event_base_t base, int32_t id, void *data)
+{
+    esp_netif_t *netif = ((ip_event_got_ip_t *)data)->esp_netif;
+    esp_netif_dns_info_t dns = { 0 };
+
+    if (CONFIG_EXAMPLE_BACKUP_DNS_SERVER[0] == '\0') {
+        return;
+    }
+    /* One unanswered query fails a signaling call. DHCP's server first. */
+    if (esp_netif_get_dns_info(netif, ESP_NETIF_DNS_BACKUP, &dns) != ESP_OK ||
+        dns.ip.u_addr.ip4.addr == 0) {
+        dns.ip.type = ESP_IPADDR_TYPE_V4;
+        if (esp_netif_str_to_ip4(CONFIG_EXAMPLE_BACKUP_DNS_SERVER, &dns.ip.u_addr.ip4) != ESP_OK) {
+            ESP_LOGW(TAG, "Invalid backup DNS server: %s", CONFIG_EXAMPLE_BACKUP_DNS_SERVER);
+            return;
+        }
+        esp_netif_set_dns_info(netif, ESP_NETIF_DNS_BACKUP, &dns);
+    }
+}
+
 /* Initialize and register the reset button */
 static void initialize_reset_button(void)
 {
@@ -235,11 +257,16 @@ void app_main(void)
     /* Initialize ESP CLI */
     esp_cli_start();
 
-    /* Initialize Wi-Fi - must be called before esp_hosted_coprocessor_init */
+    /* Creates the default STA netif, which esp_hosted's network split picks up */
     app_network_init();
 
-    /* Initialize the network coprocessor */
-    esp_hosted_coprocessor_init();
+    /* Bring up the esp_hosted co-processor. AUTO_INIT is off so it comes after
+     * the netif above. */
+    ESP_ERROR_CHECK(eh_cp_init());
+    ESP_ERROR_CHECK(esp_event_handler_register(IP_EVENT, IP_EVENT_STA_GOT_IP, &on_got_ip, NULL));
+
+    /* Before anything can ask the co-processor to sleep */
+    power_save_init();
 
     /* Register an event handler to catch RainMaker common events */
     ESP_ERROR_CHECK(esp_event_handler_register(RMAKER_COMMON_EVENT, ESP_EVENT_ANY_ID,
@@ -286,6 +313,9 @@ void app_main(void)
         .init_callback = split_mode_init_callback,
         .init_callback_user_data = NULL,
     };
+
+    /* Wake the P4 on an offer */
+    power_save_register_webrtc_events();
 
     rmaker_webrtc_camera_init(&camera_config);
 

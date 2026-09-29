@@ -8,17 +8,17 @@
 
 #include <esp_console.h>
 #include <esp_log.h>
-#if CONFIG_IDF_TARGET_ESP32C6
-#include "host_power_save.h"
+#if CONFIG_ESP_HOSTED_CP_FEAT_HOST_PS
+#include "eh_cp_feat_host_ps_apis.h"
 #endif
 
 static const char *TAG = "sleep_cmd";
 
 static int wakeup_cli_handler(int argc, char *argv[])
 {
-#if CONFIG_IDF_TARGET_ESP32C6
+#if CONFIG_ESP_HOSTED_CP_FEAT_HOST_PS
     ESP_LOGI(TAG, "Asking P4 to wake-up...");
-    wakeup_host(500);
+    eh_cp_feat_host_ps_wakeup_host(500);
 #endif
     return 0;
 }

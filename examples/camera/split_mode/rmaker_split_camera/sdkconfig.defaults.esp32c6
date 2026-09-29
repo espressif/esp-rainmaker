@@ -50,8 +50,25 @@ CONFIG_LWIP_TCPIP_RECVMBOX_SIZE=64
 #
 # ESP-Hosted - Network coprocessor
 #
-# RainMaker already creates the STA netif, so have the co-processor reuse
-# WIFI_STA_DEF; otherwise create_slave_sta_netif asserts and the C6 boot-loops.
-CONFIG_ESP_HOSTED_REUSE_WIFI_STA_DEF_NETIF_INSTANCE=y
-CONFIG_SLAVE_LWIP_ENABLED=y
-CONFIG_ESP_SDIO_RX_Q_SIZE=10
+# RainMaker creates the STA netif (WIFI_STA_DEF) and esp_hosted's network split
+# picks it up, so there is no reuse switch any more.
+CONFIG_EH_TRANSPORT_CP_SDIO_RX_Q_SIZE=10
+
+# Wi-Fi init config. The P4 sends its own on every boot and deep-sleep wake,
+# and the co-processor re-initialises Wi-Fi when the two differ. That drops the
+# link and the signaling session. These are the values every P4 host of a C6
+# pair resolves to: the P4 allocates Wi-Fi and lwIP from PSRAM, so
+# esp_wifi_remote gives it static TX buffers only and 16 static RX buffers.
+CONFIG_ESP_WIFI_STATIC_RX_BUFFER_NUM=16
+CONFIG_ESP_WIFI_DYNAMIC_RX_BUFFER_NUM=32
+CONFIG_ESP_WIFI_DYNAMIC_TX_BUFFER=n
+CONFIG_ESP_WIFI_STATIC_TX_BUFFER=y
+CONFIG_ESP_WIFI_STATIC_TX_BUFFER_NUM=16
+CONFIG_ESP_WIFI_RX_BA_WIN=16
+
+#
+# BLE controller
+#
+# BLE is used only for provisioning. Running the controller from flash frees
+# about 23 KB of internal RAM, which the C6 needs for TLS and media forwarding.
+CONFIG_BT_CTRL_RUN_IN_FLASH_ONLY=y
