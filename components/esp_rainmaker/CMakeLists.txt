@@ -125,5 +125,10 @@ target_add_binary_data(${COMPONENT_TARGET} "server_certs/rmaker_claim_service_se
 target_add_binary_data(${COMPONENT_TARGET} "server_certs/rmaker_ota_server.crt" TEXT)
 
 # Added just to automatically trigger re-runs of CMake
-git_describe(RMAKER_VERSION ${COMPONENT_DIR})
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/.git")
+    git_describe(RMAKER_VERSION ${CMAKE_CURRENT_SOURCE_DIR})
+else()
+    set(RMAKER_VERSION "v${IDF_COMPONENT_VERSION}")
+endif()
+
 message("ESP RainMaker Project commit: " ${RMAKER_VERSION})
