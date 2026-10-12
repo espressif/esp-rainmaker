@@ -49,10 +49,10 @@ jobs:
         example: [fan, led_light, multi_device, switch, temperature_sensor]
         target: [esp32, esp32c3, esp32c6, esp32s3, esp32c2, esp32h2]
         include:
-          # Camera standalone requires IDF v5.5.4 and the KVS WebRTC SDK
+          # Camera standalone requires IDF v5.5.5 and the KVS WebRTC SDK
           - example: camera/standalone
             target: esp32s3
-            idf_image: espressif/idf:v5.5.4
+            idf_image: espressif/idf:v5.5.5
             kvs_sdk_branch: main
 
     steps:
