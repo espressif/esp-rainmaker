@@ -171,7 +171,15 @@ esp_err_t esp_rmaker_populate_params(char *buf, size_t *buf_len, uint8_t flags, 
             device = device->next;
         }
     }
-    *buf_len = json_gen_str_end(&jstr);
+    int len = json_gen_str_end(&jstr);
+    if (len == JSON_GEN_ERR_BUF_FULL) {
+        /* Measure again so that the caller gets the required size */
+        err = esp_rmaker_populate_params(NULL, buf_len, flags, false) == ESP_OK ? ESP_ERR_NO_MEM : ESP_FAIL;
+    } else if (len < 0) {
+        err = ESP_FAIL;
+    } else {
+        *buf_len = len;
+    }
     return err;
 }
 
@@ -427,6 +435,10 @@ set_params_free:
 
 esp_err_t esp_rmaker_handle_set_params(char *data, size_t data_len, esp_rmaker_req_src_t src)
 {
+    /* json_parser rejects a NUL inside the given length */
+    if (data && data_len > 0 && data[data_len - 1] == '\0') {
+        data_len--;
+    }
     ESP_LOGI(TAG, "Received params: %.*s", (int) data_len, data);
     jparse_ctx_t jctx;
     if (json_parse_start(&jctx, data, data_len) != 0) {

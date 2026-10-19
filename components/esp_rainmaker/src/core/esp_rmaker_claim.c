@@ -102,45 +102,6 @@ extern uint8_t claim_service_server_root_ca_pem_end[] asm("_binary_rmaker_claim_
 
 static EventGroupHandle_t claim_event_group;
 static const int CLAIM_TASK_BIT = BIT0;
-static void escape_new_line(esp_rmaker_claim_data_t *data)
-{
-    char *str = (char *)data->csr;
-    memset(data->payload, 0, sizeof(data->payload));
-    char *target_str = (char *)data->payload;
-    /* Hack to just avoid a "\r\n" at the end of string */
-    if (str[strlen(str) - 1] == '\n') {
-        str[strlen(str) - 1] = '\0';
-    }
-    while (*str) {
-        if (*str == '\n') {
-            *target_str++ = '\\';
-            *target_str++ = 'n';
-            str++;
-            continue;
-        }
-        *target_str++ = *str++;
-    }
-    *target_str = '\0';
-    strcpy((char *)data->csr, (char *)data->payload);
-    ESP_LOGD(TAG, "Modified CSR : %s", data->csr);
-}
-
-static void unescape_new_line(char *str)
-{
-    char *target_str = str;
-    while (*str) {
-        if (*str == '\\') {
-            str++;
-            if (*str == 'n') {
-                *target_str++ = '\n';
-                str++;
-            }
-        }
-        *target_str++ = *str++;
-    }
-    *target_str = '\0';
-}
-
 static esp_err_t esp_rmaker_claim_generate_csr(esp_rmaker_claim_data_t *claim_data, const char *common_name)
 {
     if (!claim_data || !common_name) {
@@ -331,7 +292,6 @@ static esp_err_t handle_claim_verify_response(esp_rmaker_claim_data_t *claim_dat
             }
             json_obj_get_string(&jctx, "certificate", value_buf, required_len);
             json_parse_end(&jctx);
-            unescape_new_line(value_buf);
             esp_err_t err = esp_rmaker_factory_set(ESP_RMAKER_CLIENT_CERT_NVS_KEY, value_buf, strlen(value_buf));
             free(value_buf);
             return err;
@@ -483,7 +443,10 @@ static esp_err_t handle_self_claim_init_response(esp_rmaker_claim_data_t *claim_
                 json_gen_obj_set_string(&jstr, "node_policies", "videostream");
 #endif
                 json_gen_end_object(&jstr);
-                json_gen_str_end(&jstr);
+                if (json_gen_str_end(&jstr) < 0) {
+                    ESP_LOGE(TAG, "Failed to generate Claim Verify Request.");
+                    return ESP_FAIL;
+                }
                 return ESP_OK;
             } else {
                 ESP_LOGE(TAG, "HMAC Challenge failed.");
@@ -675,15 +638,16 @@ static esp_err_t handle_assisted_claim_init_response(esp_rmaker_claim_data_t *cl
                 ESP_LOGE(TAG, "Failed to generate CSR.");
                 return err;
             }
-            escape_new_line(claim_data);
-
             json_gen_str_t jstr;
             json_gen_str_start(&jstr, claim_data->payload, sizeof(claim_data->payload), NULL, NULL);
             json_gen_start_object(&jstr);
             json_gen_obj_set_string(&jstr, "csr", (char *)claim_data->csr);
             json_gen_obj_set_bool(&jstr, "send_mqtt_host", true);
             json_gen_end_object(&jstr);
-            json_gen_str_end(&jstr);
+            if (json_gen_str_end(&jstr) < 0) {
+                ESP_LOGE(TAG, "Failed to generate Claim Verify Request.");
+                return ESP_FAIL;
+            }
             claim_data->payload_len = strlen(claim_data->payload);
             claim_data->payload_offset = 0;
             return ESP_OK;
@@ -1056,10 +1020,6 @@ esp_err_t __esp_rmaker_claim_init(esp_rmaker_claim_data_t *claim_data)
         ESP_LOGE(TAG, "Failed to generate CSR.");
         return err;
     }
-     /* New line characters from the CSR need to be removed and replaced with explicit \n for the claiming
-     * service to parse properly. Make that change here and store the CSR in storage.
-     */
-    escape_new_line(claim_data);
 #endif /* CONFIG_ESP_RMAKER_SELF_CLAIM */
     return err;
 }

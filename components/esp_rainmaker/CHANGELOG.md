@@ -1,5 +1,25 @@
 # Changelog
 
+## 2.0.0
+
+### Breaking Changes
+
+- Requires `json_parser` and `json_generator` 2.0.0. The generator escapes strings on output and the
+  parser returns them decoded, so the claim code no longer escapes the CSR or unescapes the
+  certificate by hand.
+- String param values, scene and schedule names now reach the application decoded (for example, `\"`
+  arrives as `"`). Applications that unescaped these values by hand must stop.
+- Boolean params accept only `true` and `false`; `1` and `0` are rejected.
+
+### Bug Fixes
+
+- Params: report the required buffer size when the params JSON does not fit, so that the buffer is
+  reallocated instead of failing.
+- Params: ignore a NUL byte at the end of a set-params payload, so that schedule and scene actions
+  still parse with json_parser 2.0.0.
+- Param command-response: return an error when the response JSON does not fit the buffer, instead of
+  reporting a length larger than the buffer.
+
 ## 1.17.1
 
 ### Bug Fixes

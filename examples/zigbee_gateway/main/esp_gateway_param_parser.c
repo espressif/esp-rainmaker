@@ -120,25 +120,10 @@ static inline bool parse_long_address(const char *input, esp_zb_ieee_addr_t addr
     return (parse_address(input, (esp_zb_ieee_addr_t *)addr, ADDR_LONG) != ADDR_INVALID);
 }
 
-static void remove_escape_char(char *json_string_data)
-{
-    char *target_json_string_data = json_string_data;
-    while (*json_string_data)
-    {
-        if (*json_string_data == '\\')
-        {
-            json_string_data++;
-        }
-        *target_json_string_data++ = *json_string_data++;
-    }
-    *target_json_string_data = '\0';
-}
-
 esp_err_t esp_zb_prase_ic_obj(char *payload, esp_zigbee_ic_mac_address_t *ic_mac_value)
 {
     int payload_len = 0;
     payload_len = strlen(payload);
-    remove_escape_char(payload);
     /*
     {
     "install_code": "<install code>",
