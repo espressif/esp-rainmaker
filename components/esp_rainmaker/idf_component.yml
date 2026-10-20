@@ -16,7 +16,7 @@ dependencies:
   espressif/json_parser:
     version: "~2.0.0"
   espressif/json_generator:
-    version: "~2.0.0"
+    version: "~2.1.0"
   espressif/esp_schedule:
     version: "~1.3.2"
   espressif/network_provisioning:

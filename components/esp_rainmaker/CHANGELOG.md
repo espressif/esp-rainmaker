@@ -4,11 +4,12 @@
 
 ### Breaking Changes
 
-- Requires `json_parser` and `json_generator` 2.0.0. The generator escapes strings on output and the
-  parser returns them decoded, so the claim code no longer escapes the CSR or unescapes the
+- Requires `json_parser` 2.0.0 and `json_generator` 2.1.0. The generator escapes strings on output
+  and the parser returns them decoded, so the claim code no longer escapes the CSR or unescapes the
   certificate by hand.
 - String param values, scene and schedule names now reach the application decoded (for example, `\"`
-  arrives as `"`). Applications that unescaped these values by hand must stop.
+  arrives as `"`). Applications that unescaped these values by hand must stop. Values that an
+  application saved in its own storage with an earlier version are still escaped.
 - Boolean params accept only `true` and `false`; `1` and `0` are rejected.
 
 ### Bug Fixes
@@ -19,6 +20,9 @@
   still parse with json_parser 2.0.0.
 - Param command-response: return an error when the response JSON does not fit the buffer, instead of
   reporting a length larger than the buffer.
+- Params: store string param values in NVS JSON-escaped and decode them on load, the same format as
+  earlier versions. Values saved before an OTA update no longer show extra backslashes, and a
+  downgrade still reads them.
 
 ## 1.17.1
 
