@@ -34,6 +34,9 @@
 #include <esp_idf_version.h>
 
 #include <network_provisioning/manager.h>
+#ifdef CONFIG_NETWORK_PROV_NETWORK_TYPE_WIFI
+#include <esp_netif.h>
+#endif
 
 #ifdef CONFIG_ESP_RMAKER_LOCAL_CTRL_CHAL_RESP_ENABLE
 #define CHAL_RESP_ENDPOINT      "ch_resp"
@@ -89,7 +92,10 @@ static bool g_chal_resp_cleanup_done = false;   /* Tracks if mDNS cleanup is don
 #endif
 
 static char *g_serv_name;
-static bool wait_for_provisioning;
+static bool prov_active;
+#ifdef CONFIG_NETWORK_PROV_NETWORK_TYPE_WIFI
+static bool prov_creds_recv;
+#endif
 /********* Handler functions for responding to control requests / commands *********/
 
 static esp_err_t get_property_values(size_t props_count,
@@ -773,7 +779,14 @@ static esp_err_t __esp_rmaker_start_local_ctrl_service(const char *serv_name)
 #endif
 
     /* Start esp_local_ctrl service */
-    ESP_ERROR_CHECK(esp_local_ctrl_start(&config));
+    esp_err_t ret = esp_local_ctrl_start(&config);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to start esp_local_ctrl. err=0x%x", ret);
+#if ESP_RMAKER_LOCAL_CTRL_SECURITY_TYPE == 1
+        free(pop);
+#endif
+        return ret;
+    }
 
 #ifdef ESP_RMAKER_SUPPORTS_MDNS
     /* The instance name of mdns service set by esp_local_ctrl_start is 'Local Control Service'.
@@ -831,26 +844,40 @@ static esp_err_t __esp_rmaker_start_local_ctrl_service(const char *serv_name)
     return ESP_OK;
 }
 
+static void esp_rmaker_local_ctrl_deferred_start(void *priv_data)
+{
+    if (g_serv_name) {
+        __esp_rmaker_start_local_ctrl_service(g_serv_name);
+        free(g_serv_name);
+        g_serv_name = NULL;
+    }
+}
+
 static void esp_rmaker_local_ctrl_prov_event_handler(void* arg, esp_event_base_t event_base,
                           int32_t event_id, void* event_data)
 {
-    ESP_LOGI(TAG, "Event %"PRIu32, event_id);
+    ESP_LOGD(TAG, "Event %"PRIu32, event_id);
     if (event_base == NETWORK_PROV_EVENT) {
         switch (event_id) {
             case NETWORK_PROV_START:
-                wait_for_provisioning = true;
+                prov_active = true;
                 break;
+#ifdef CONFIG_NETWORK_PROV_NETWORK_TYPE_WIFI
+            case NETWORK_PROV_WIFI_CRED_RECV:
+                prov_creds_recv = true;
+                break;
+            case NETWORK_PROV_WIFI_CRED_FAIL:
+                prov_creds_recv = false;
+                break;
+#endif
             case NETWORK_PROV_DEINIT:
-                if (wait_for_provisioning == true) {
-                    wait_for_provisioning = false;
-                    if (g_serv_name) {
-                        __esp_rmaker_start_local_ctrl_service(g_serv_name);
-                        free(g_serv_name);
-                        g_serv_name = NULL;
-                    }
-                }
-                esp_event_handler_unregister(NETWORK_PROV_EVENT, NETWORK_PROV_START, &esp_rmaker_local_ctrl_prov_event_handler);
-                esp_event_handler_unregister(NETWORK_PROV_EVENT, NETWORK_PROV_DEINIT, &esp_rmaker_local_ctrl_prov_event_handler);
+                prov_active = false;
+#ifdef CONFIG_NETWORK_PROV_NETWORK_TYPE_WIFI
+                prov_creds_recv = false;
+#endif
+                /* Queued behind the first attempt, so it sees g_serv_name if that attempt deferred. */
+                esp_rmaker_work_queue_add_task(esp_rmaker_local_ctrl_deferred_start, NULL);
+                esp_event_handler_unregister(NETWORK_PROV_EVENT, ESP_EVENT_ANY_ID, &esp_rmaker_local_ctrl_prov_event_handler);
                 break;
             default:
                 break;
@@ -865,18 +892,30 @@ bool esp_rmaker_local_ctrl_service_started(void)
 
 esp_err_t esp_rmaker_init_local_ctrl_service(void)
 {
-    /* ESP Local Control uses protocomm_httpd, which is also used by SoftAP Provisioning.
-     * If local control is started before provisioning ends, it fails because only one protocomm_httpd
-     * instance is allowed at a time.
-     * So, we check for the NETWORK_PROV_START event, and if received, wait for the NETWORK_PROV_DEINIT
-     * event before starting local control.
-     * This would not be required in case of BLE Provisioning, but this code has no easy way of knowing
-     * what provisioning transport is being used and hence this logic will come into picture for both,
-     * SoftAP and BLE provisioning.
-     */
-    esp_event_handler_register(NETWORK_PROV_EVENT, NETWORK_PROV_START, &esp_rmaker_local_ctrl_prov_event_handler, NULL);
-    esp_event_handler_register(NETWORK_PROV_EVENT, NETWORK_PROV_DEINIT, &esp_rmaker_local_ctrl_prov_event_handler, NULL);
+    /* Track provisioning, so that a deferred start can retry after NETWORK_PROV_DEINIT. */
+    esp_event_handler_register(NETWORK_PROV_EVENT, ESP_EVENT_ANY_ID, &esp_rmaker_local_ctrl_prov_event_handler, NULL);
     return ESP_OK;
+}
+
+/* True when the network under provisioning has connected, so NETWORK_PROV_DEINIT follows soon. */
+static bool prov_network_connected(void)
+{
+#ifdef CONFIG_NETWORK_PROV_NETWORK_TYPE_WIFI
+    esp_netif_t *sta = esp_netif_get_handle_from_ifkey("WIFI_STA_DEF");
+    esp_netif_ip_info_t ip_info;
+    if (prov_creds_recv && sta && esp_netif_get_ip_info(sta, &ip_info) == ESP_OK &&
+            ip_info.ip.addr != 0) {
+        return true;
+    }
+#endif
+#ifdef CONFIG_NETWORK_PROV_NETWORK_TYPE_THREAD
+    network_prov_thread_state_t thread_state;
+    if (network_prov_mgr_get_thread_state(&thread_state) == ESP_OK &&
+            thread_state == NETWORK_PROV_THREAD_ATTACHED) {
+        return true;
+    }
+#endif
+    return false;
 }
 
 esp_err_t esp_rmaker_start_local_ctrl_service(const char *serv_name)
@@ -885,11 +924,19 @@ esp_err_t esp_rmaker_start_local_ctrl_service(const char *serv_name)
         esp_rmaker_local_ctrl_service_enable();
     }
 
-    if (!wait_for_provisioning) {
-        return __esp_rmaker_start_local_ctrl_service(serv_name);
+    bool prov_was_active = prov_active;
+    /* Wait, so that local control does not use heap that provisioning releases soon. */
+    if (prov_was_active && prov_network_connected()) {
+        ESP_LOGI(TAG, "Local control service start: waiting for provisioning to finish.");
+    } else {
+        esp_err_t err = __esp_rmaker_start_local_ctrl_service(serv_name);
+        /* ESP_ERR_NOT_SUPPORTED with provisioning active means that provisioning holds protocomm_httpd. */
+        if (err != ESP_ERR_NOT_SUPPORTED || !prov_was_active) {
+            return err;
+        }
+        ESP_LOGI(TAG, "Local control service start: HTTP transport in use by provisioning. Waiting for it to finish.");
     }
 
-    ESP_LOGI(TAG, "Waiting for Wi-Fi provisioning to finish.");
     g_serv_name = strdup(serv_name);
     if (g_serv_name) {
         return ESP_OK;
@@ -918,8 +965,7 @@ esp_err_t esp_rmaker_local_ctrl_disable(void)
         free(g_serv_name);
         g_serv_name = NULL;
     }
-    esp_event_handler_unregister(NETWORK_PROV_EVENT, NETWORK_PROV_START, &esp_rmaker_local_ctrl_prov_event_handler);
-    esp_event_handler_unregister(NETWORK_PROV_EVENT, NETWORK_PROV_DEINIT, &esp_rmaker_local_ctrl_prov_event_handler);
+    esp_event_handler_unregister(NETWORK_PROV_EVENT, ESP_EVENT_ANY_ID, &esp_rmaker_local_ctrl_prov_event_handler);
     if (!g_local_ctrl_is_started) {
         return ESP_OK;
     }
