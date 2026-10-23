@@ -12,6 +12,8 @@
 #include "nvs_flash.h"
 
 #include <esp_rmaker_core.h>
+#include <esp_rmaker_time_sync.h>
+#include <esp_sntp.h>
 #include <esp_rmaker_standard_types.h>
 #include <esp_rmaker_standard_params.h>
 #include <esp_rmaker_common_events.h>
@@ -36,6 +38,8 @@ static const char *TAG = "app_main";
 /* Configuration */
 #define BUTTON_GPIO          CONFIG_EXAMPLE_BOARD_BUTTON_GPIO
 #define BUTTON_ACTIVE_LEVEL  0
+/* How long signaling waits for the first SNTP sync after the network is up */
+#define TIME_SYNC_WAIT_MS    15000
 #define WIFI_RESET_BUTTON_TIMEOUT       5
 #define FACTORY_RESET_BUTTON_TIMEOUT    10
 
@@ -140,8 +144,9 @@ void ble_transport_ll_deinit(void)
 /* Initialize the RainMaker node and camera device */
 static esp_err_t initialize_rainmaker_device(void)
 {
+    /* KVS signs every request with the system clock, so it needs real time */
     esp_rmaker_config_t config = {
-        .enable_time_sync = false,
+        .enable_time_sync = true,
     };
 
     /* Initialize the RainMaker node */
@@ -203,9 +208,8 @@ static int split_mode_init_callback(void *user_data)
     return 0;
 }
 
-static void on_got_ip(void *arg, esp_event_base_t base, int32_t id, void *data)
+static void set_backup_dns(esp_netif_t *netif)
 {
-    esp_netif_t *netif = ((ip_event_got_ip_t *)data)->esp_netif;
     esp_netif_dns_info_t dns = { 0 };
 
     if (CONFIG_EXAMPLE_BACKUP_DNS_SERVER[0] == '\0') {
@@ -220,6 +224,17 @@ static void on_got_ip(void *arg, esp_event_base_t base, int32_t id, void *data)
             return;
         }
         esp_netif_set_dns_info(netif, ESP_NETIF_DNS_BACKUP, &dns);
+    }
+}
+
+static void on_got_ip(void *arg, esp_event_base_t base, int32_t id, void *data)
+{
+    set_backup_dns(((ip_event_got_ip_t *)data)->esp_netif);
+
+    /* SNTP starts with RainMaker, before there is a network. Its first request
+     * fails, and lwIP sends the next one only after 15 s. Send it now. */
+    if (esp_sntp_enabled() && !esp_rmaker_time_check()) {
+        esp_sntp_restart();
     }
 }
 
@@ -301,6 +316,13 @@ void app_main(void)
         abort();
     }
     ESP_LOGI(TAG, "Network connection established");
+
+    /* With the clock still at 1970 KVS rejects the signed requests, and
+     * signaling only gets through after a clock-skew retry. */
+    if (esp_rmaker_time_wait_for_sync(pdMS_TO_TICKS(TIME_SYNC_WAIT_MS)) != ESP_OK) {
+        ESP_LOGW(TAG, "Time not synchronised after %d ms; starting signaling anyway",
+                 TIME_SYNC_WAIT_MS);
+    }
 
     /* Initialize and start WebRTC */
     ESP_LOGI(TAG, "Starting WebRTC...");
