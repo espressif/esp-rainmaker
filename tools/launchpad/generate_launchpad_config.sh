@@ -75,6 +75,7 @@ EOF
         TARGETS=($(ls | grep "$app".bin | awk -F "_"$app".bin$" '{print $1}' | grep -v '_'))
 
         IMAGES=()
+        ELFS=()
 
         CHIPSETS="chipsets = ["
         for target in "${TARGETS[@]}"
@@ -83,6 +84,10 @@ EOF
             CHIPSETS+="\"$tUP\","
             image="image."$target" = \""$target"_$app.bin\""
             IMAGES+=("$image")
+            # Not read by Launchpad; relative to firmware_images_url, like image.*
+            if [ -f "$target"_$app.elf.gz ]; then
+                ELFS+=("elf-gz."$target" = \""$target"_$app.elf.gz\"")
+            fi
         done
         CHIPSETS+="]"
         # remove last comma
@@ -93,6 +98,11 @@ EOF
         for img in "${IMAGES[@]}"
         do
             echo $img >> $OUT_FILE
+        done
+
+        for elf in "${ELFS[@]}"
+        do
+            echo $elf >> $OUT_FILE
         done
 
         echo "ios_app_url = \"https://apps.apple.com/app/esp-rainmaker/id1497491540\"" >> $OUT_FILE
@@ -109,7 +119,7 @@ EOF
         echo "readme.text = \"https://raw.githubusercontent.com/$REPO_OWNER/$REPO_NAME/master/examples/$README_PATH/README.md\"" >> $OUT_FILE
         echo "" >> $OUT_FILE
 
-        unset CHIPSETS IMAGES
+        unset CHIPSETS IMAGES ELFS
     done
 }
 
