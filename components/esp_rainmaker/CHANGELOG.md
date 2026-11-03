@@ -17,6 +17,9 @@
       'failed'; the next one is reported 'rejected'.
     - A rollback via `esp_rmaker_ota_mark_invalid()` (including a failed `ota_diag` check) is
       reported 'rejected'.
+    - The firmware that is rolled back to, if built with this option, also reports 'failed' (within
+      the same per-job count) for rollbacks where the new firmware had not stored this information,
+      e.g. a reset early in boot or a new firmware without this option.
 
 ## 2.0.0
 

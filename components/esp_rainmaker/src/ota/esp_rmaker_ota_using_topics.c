@@ -666,6 +666,31 @@ static esp_err_t esp_rmaker_ota_subscribe(void *priv_data)
     return err;
 }
 
+#ifdef CONFIG_ESP_RMAKER_OTA_ROLLBACK_REPORT_FAILED_EARLY
+/* Rollback for which the new firmware did not store the 'failed' information: it reset before
+ * doing so, it does not have this feature, or it used up the retries (or was marked invalid,
+ * which also uses them up). Report 'failed' for the first CONFIG_ESP_RMAKER_OTA_ROLLBACK_RETRY_COUNT
+ * rollbacks of the job, and 'rejected' after that.
+ */
+static void esp_rmaker_ota_report_rollback(esp_rmaker_ota_t *ota)
+{
+    char job_id[64];
+    if (esp_rmaker_ota_get_job_id(job_id, sizeof(job_id)) == ESP_OK) {
+        uint32_t count = esp_rmaker_ota_advance_job_counter(job_id, RMAKER_OTA_RB_CNT_NVS_NAME,
+                RMAKER_OTA_RB_JID_NVS_NAME);
+        if (count <= CONFIG_ESP_RMAKER_OTA_ROLLBACK_RETRY_COUNT) {
+            char info[64];
+            snprintf(info, sizeof(info), "Firmware rolled back before validation (attempt %u/%d)",
+                    (unsigned)count, CONFIG_ESP_RMAKER_OTA_ROLLBACK_RETRY_COUNT);
+            esp_rmaker_ota_report_status((esp_rmaker_ota_handle_t )ota, OTA_STATUS_FAILED, info);
+            return;
+        }
+        esp_rmaker_ota_clear_job_counter(RMAKER_OTA_RB_CNT_NVS_NAME, RMAKER_OTA_RB_JID_NVS_NAME);
+    }
+    esp_rmaker_ota_report_status((esp_rmaker_ota_handle_t )ota, OTA_STATUS_REJECTED, "Firmware rolled back");
+}
+#endif /* CONFIG_ESP_RMAKER_OTA_ROLLBACK_REPORT_FAILED_EARLY */
+
 static void esp_rmaker_ota_work_fn(void *priv_data)
 {
     esp_rmaker_ota_t *ota = (esp_rmaker_ota_t *)priv_data;
@@ -727,7 +752,11 @@ static void esp_rmaker_ota_work_fn(void *priv_data)
             }
             ota->transient_priv = NULL;
         } else {
+#ifdef CONFIG_ESP_RMAKER_OTA_ROLLBACK_REPORT_FAILED_EARLY
+            esp_rmaker_ota_report_rollback(ota);
+#else
             esp_rmaker_ota_report_status((esp_rmaker_ota_handle_t )ota, OTA_STATUS_REJECTED, "Firmware rolled back");
+#endif
         }
         ota->rolled_back = false;
     }
