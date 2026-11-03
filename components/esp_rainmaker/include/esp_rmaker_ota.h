@@ -300,10 +300,30 @@ esp_err_t esp_rmaker_ota_mark_valid(void);
  * at any point of time before RainMaker core's internal logic and the application's logic mark the OTA
  * as valid.
  *
+ * @note With CONFIG_ESP_RMAKER_OTA_ROLLBACK_REPORT_FAILED_EARLY, a rollback requested via this API is
+ * reported as 'rejected'.
+ *
  * @return ESP_OK on success
  * @return error on failure
  */
 esp_err_t esp_rmaker_ota_mark_invalid(void);
+
+/** Store the information to report 'failed' if the new firmware is rolled back before validation
+ *
+ * Needs CONFIG_ESP_RMAKER_OTA_ROLLBACK_REPORT_FAILED_EARLY. On the first boot after an OTA, this
+ * stores the OTA job ID such that if the device resets or crashes before the firmware is validated,
+ * the firmware that is rolled back to reports 'failed' instead of 'rejected', and the OTA job
+ * stays open. This is undone when the firmware is marked valid or invalid.
+ *
+ * This is called internally by esp_rmaker_ota_enable(). The application can call it earlier,
+ * right after nvs_flash_init(), to reduce the time window in which a reset is reported as 'rejected'.
+ * It does nothing if this is not the first boot after an OTA, or if it has already been called.
+ *
+ * @return ESP_OK on success (or if there is nothing to do)
+ * @return ESP_ERR_NOT_SUPPORTED if CONFIG_ESP_RMAKER_OTA_ROLLBACK_REPORT_FAILED_EARLY is not enabled
+ * @return error on failure
+ */
+esp_err_t esp_rmaker_ota_arm_rollback_report(void);
 #ifdef __cplusplus
 }
 #endif

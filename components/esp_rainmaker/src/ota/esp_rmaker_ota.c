@@ -39,6 +39,9 @@ static esp_err_t esp_rmaker_ota_success_reboot_sequence(esp_rmaker_ota_handle_t 
 static void event_handler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data);
 static esp_err_t esp_rmaker_erase_rollback_flag(void);
 #endif
+#ifdef CONFIG_ESP_RMAKER_OTA_ROLLBACK_REPORT_FAILED_EARLY
+static void esp_rmaker_ota_disarm_rollback_report(void);
+#endif
 
 
 #ifdef CONFIG_ESP_RMAKER_USE_CERT_BUNDLE
@@ -494,6 +497,59 @@ esp_err_t esp_rmaker_ota_default_cb(esp_rmaker_ota_handle_t ota_handle, esp_rmak
 #endif
 }
 
+#if defined(CONFIG_ESP_RMAKER_OTA_TEST_ROLLBACK) || defined(CONFIG_ESP_RMAKER_OTA_ROLLBACK_REPORT_FAILED_EARLY)
+esp_err_t esp_rmaker_ota_get_job_id(char *job_id, size_t job_id_size)
+{
+    nvs_handle handle;
+    esp_err_t err = nvs_open_from_partition(ESP_RMAKER_NVS_PART_NAME, RMAKER_OTA_NVS_NAMESPACE,
+                                            NVS_READONLY, &handle);
+    if (err != ESP_OK) {
+        return err;
+    }
+    /* Stored as a blob without the NULL terminator */
+    memset(job_id, 0, job_id_size);
+    size_t len = job_id_size - 1;
+    err = nvs_get_blob(handle, RMAKER_OTA_JOB_ID_NVS_NAME, job_id, &len);
+    nvs_close(handle);
+    return err;
+}
+
+uint32_t esp_rmaker_ota_advance_job_counter(const char *job_id, const char *cnt_key, const char *jid_key)
+{
+    char stored_job_id[64] = {0};
+    uint32_t count = 0;
+    nvs_handle handle;
+    if (nvs_open_from_partition(ESP_RMAKER_NVS_PART_NAME, RMAKER_OTA_NVS_NAMESPACE,
+                                NVS_READWRITE, &handle) != ESP_OK) {
+        return 1;
+    }
+    size_t len = sizeof(stored_job_id) - 1;
+    nvs_get_blob(handle, jid_key, stored_job_id, &len);
+    nvs_get_u32(handle, cnt_key, &count);
+    bool same_job = job_id && stored_job_id[0] && (strcmp(job_id, stored_job_id) == 0);
+    count = same_job ? count + 1 : 1;
+    nvs_set_u32(handle, cnt_key, count);
+    if (job_id) {
+        nvs_set_blob(handle, jid_key, job_id, strlen(job_id));
+    }
+    nvs_commit(handle);
+    nvs_close(handle);
+    return count;
+}
+
+void esp_rmaker_ota_clear_job_counter(const char *cnt_key, const char *jid_key)
+{
+    nvs_handle handle;
+    if (nvs_open_from_partition(ESP_RMAKER_NVS_PART_NAME, RMAKER_OTA_NVS_NAMESPACE,
+                                NVS_READWRITE, &handle) == ESP_OK) {
+        nvs_erase_key(handle, cnt_key);
+        nvs_erase_key(handle, jid_key);
+        nvs_commit(handle);
+        nvs_close(handle);
+    }
+}
+#endif /* CONFIG_ESP_RMAKER_OTA_TEST_ROLLBACK || CONFIG_ESP_RMAKER_OTA_ROLLBACK_REPORT_FAILED_EARLY */
+
 #ifdef CONFIG_ESP_RMAKER_OTA_TEST_ROLLBACK
 #warning "CONFIG_ESP_RMAKER_OTA_TEST_ROLLBACK is enabled: this firmware will report 'failed' and roll back on every successful OTA until CONFIG_ESP_RMAKER_OTA_TEST_ROLLBACK_COUNT cycles complete (0 = indefinite). Use only for OTA pipeline testing — do not ship."
 
@@ -505,58 +561,22 @@ esp_err_t esp_rmaker_ota_default_cb(esp_rmaker_ota_handle_t ota_handle, esp_rmak
 
 /* Decide which test cycle this iteration represents: increment if the current
  * OTA job_id (read from NVS, set by the previous firmware) matches what was
- * stored last time, reset to 1 otherwise (new job or first run). Persists the
- * new (job_id, count) pair so the next cycle sees it.
+ * stored last time, reset to 1 otherwise (new job or first run).
  *
- * Both 64-byte job_id buffers are kept inside this helper's stack frame so
- * they are freed before the caller invokes the deep MQTT-publish chain in
+ * The 64-byte job_id buffer is kept inside this helper's stack frame so
+ * it is freed before the caller invokes the deep MQTT-publish chain in
  * esp_rmaker_ota_report_status — sys_evt's stack is tight. */
 static uint32_t esp_rmaker_ota_test_advance_cycle(void)
 {
-    char current_job_id[64] = {0};
-    char stored_job_id[64] = {0};
-    bool have_current = false;
-    uint32_t count = 0;
-
-    nvs_handle handle;
-    if (nvs_open_from_partition(ESP_RMAKER_NVS_PART_NAME, RMAKER_OTA_NVS_NAMESPACE,
-                                NVS_READONLY, &handle) == ESP_OK) {
-        size_t len = sizeof(current_job_id) - 1;
-        if (nvs_get_blob(handle, RMAKER_OTA_JOB_ID_NVS_NAME, current_job_id, &len) == ESP_OK) {
-            have_current = true;
-        }
-        len = sizeof(stored_job_id) - 1;
-        nvs_get_blob(handle, RMAKER_OTA_TEST_JID_NVS_NAME, stored_job_id, &len);
-        nvs_get_u32(handle, RMAKER_OTA_TEST_CNT_NVS_NAME, &count);
-        nvs_close(handle);
-    }
-    bool same_job = have_current && stored_job_id[0] &&
-                    (strcmp(current_job_id, stored_job_id) == 0);
-    count = same_job ? count + 1 : 1;
-
-    if (nvs_open_from_partition(ESP_RMAKER_NVS_PART_NAME, RMAKER_OTA_NVS_NAMESPACE,
-                                NVS_READWRITE, &handle) == ESP_OK) {
-        nvs_set_u32(handle, RMAKER_OTA_TEST_CNT_NVS_NAME, count);
-        if (have_current) {
-            nvs_set_blob(handle, RMAKER_OTA_TEST_JID_NVS_NAME,
-                         current_job_id, strlen(current_job_id));
-        }
-        nvs_commit(handle);
-        nvs_close(handle);
-    }
-    return count;
+    char job_id[64];
+    bool have_job_id = (esp_rmaker_ota_get_job_id(job_id, sizeof(job_id)) == ESP_OK);
+    return esp_rmaker_ota_advance_job_counter(have_job_id ? job_id : NULL,
+            RMAKER_OTA_TEST_CNT_NVS_NAME, RMAKER_OTA_TEST_JID_NVS_NAME);
 }
 
 static void esp_rmaker_ota_test_clear_cycle_state(void)
 {
-    nvs_handle handle;
-    if (nvs_open_from_partition(ESP_RMAKER_NVS_PART_NAME, RMAKER_OTA_NVS_NAMESPACE,
-                                NVS_READWRITE, &handle) == ESP_OK) {
-        nvs_erase_key(handle, RMAKER_OTA_TEST_CNT_NVS_NAME);
-        nvs_erase_key(handle, RMAKER_OTA_TEST_JID_NVS_NAME);
-        nvs_commit(handle);
-        nvs_close(handle);
-    }
+    esp_rmaker_ota_clear_job_counter(RMAKER_OTA_TEST_CNT_NVS_NAME, RMAKER_OTA_TEST_JID_NVS_NAME);
 }
 
 /* Test-only: drive one iteration of the repeat-OTA test loop. Increments the
@@ -576,6 +596,10 @@ static void esp_rmaker_ota_test_clear_cycle_state(void)
  * we stop here. */
 static bool esp_rmaker_ota_test_handle_post_mqtt(esp_rmaker_ota_t *ota)
 {
+#ifdef CONFIG_ESP_RMAKER_OTA_ROLLBACK_REPORT_FAILED_EARLY
+    /* The reports below read the job ID from its regular NVS key */
+    esp_rmaker_ota_disarm_rollback_report();
+#endif
     uint32_t count = esp_rmaker_ota_test_advance_cycle();
     uint32_t max_count = CONFIG_ESP_RMAKER_OTA_TEST_ROLLBACK_COUNT;
 
@@ -690,6 +714,120 @@ static esp_err_t esp_rmaker_erase_rollback_flag(void)
     return ESP_OK;
 }
 
+#ifdef CONFIG_ESP_RMAKER_OTA_ROLLBACK_REPORT_FAILED_EARLY
+#define RMAKER_OTA_ROLLBACK_RETRY_COUNT    CONFIG_ESP_RMAKER_OTA_ROLLBACK_RETRY_COUNT
+
+/* Moves the job ID to the same NVS keys that esp_ota_rollback() uses, as soon as the new firmware
+ * boots. If the device then resets before validation, the firmware rolled back to (esp_rainmaker
+ * 1.9.0 or later) reports 'failed' and the job stays open. Older firmware finds no job ID and
+ * reports nothing. After RMAKER_OTA_ROLLBACK_RETRY_COUNT rollbacks of the same job, the job ID is
+ * left in place, so that the next rollback is reported 'rejected'.
+ */
+esp_err_t esp_rmaker_ota_arm_rollback_report(void)
+{
+    static bool s_done;
+    if (s_done) {
+        return ESP_OK;
+    }
+    const esp_partition_t *running = esp_ota_get_running_partition();
+    esp_ota_img_states_t ota_state;
+    if ((esp_ota_get_state_partition(running, &ota_state) != ESP_OK) ||
+            (ota_state != ESP_OTA_IMG_PENDING_VERIFY)) {
+        s_done = true;
+        return ESP_OK;
+    }
+    nvs_handle handle;
+    esp_err_t err = nvs_open_from_partition(ESP_RMAKER_NVS_PART_NAME, RMAKER_OTA_NVS_NAMESPACE, NVS_READWRITE, &handle);
+    if (err != ESP_OK) {
+        /* Not marking as done, so that it can be retried, eg. once NVS is initialised */
+        ESP_LOGW(TAG, "Failed to open NVS to store rollback report: %s", esp_err_to_name(err));
+        return err;
+    }
+    s_done = true;
+    uint8_t ota_update = 0;
+    size_t len = sizeof(ota_update);
+    char job_id[64] = {0};
+    size_t job_id_len = sizeof(job_id) - 1;
+    /* Nothing to do if this was not a RainMaker OTA with a job ID (eg. OTA_USING_PARAMS) */
+    if ((nvs_get_blob(handle, RMAKER_OTA_UPDATE_FLAG_NVS_NAME, &ota_update, &len) != ESP_OK) ||
+            (nvs_get_blob(handle, RMAKER_OTA_JOB_ID_NVS_NAME, job_id, &job_id_len) != ESP_OK)) {
+        nvs_close(handle);
+        return ESP_OK;
+    }
+    uint32_t count = esp_rmaker_ota_advance_job_counter(job_id, RMAKER_OTA_RB_CNT_NVS_NAME,
+            RMAKER_OTA_RB_JID_NVS_NAME);
+    if (count > RMAKER_OTA_ROLLBACK_RETRY_COUNT) {
+        ESP_LOGW(TAG, "OTA job %s already rolled back %d times. A rollback will be reported as rejected.",
+                job_id, RMAKER_OTA_ROLLBACK_RETRY_COUNT);
+        nvs_close(handle);
+        return ESP_OK;
+    }
+    char fail_reason[64];
+    snprintf(fail_reason, sizeof(fail_reason), "Firmware rolled back before validation (attempt %u/%d)",
+            (unsigned)count, RMAKER_OTA_ROLLBACK_RETRY_COUNT);
+    /* Job ID erased last, so that a reset in between still leaves a job ID to report against */
+    err = nvs_set_str(handle, RMAKER_OTA_FAIL_JOB_ID_NVS_NAME, job_id);
+    if (err == ESP_OK) {
+        nvs_set_str(handle, RMAKER_OTA_FAIL_REASON_NVS_NAME, fail_reason);
+        err = nvs_erase_key(handle, RMAKER_OTA_JOB_ID_NVS_NAME);
+    }
+    nvs_commit(handle);
+    nvs_close(handle);
+    if (err != ESP_OK) {
+        ESP_LOGW(TAG, "Failed to store rollback report: %s", esp_err_to_name(err));
+        return err;
+    }
+    ESP_LOGI(TAG, "A rollback before validation will be reported as failed (attempt %u/%d).",
+            (unsigned)count, RMAKER_OTA_ROLLBACK_RETRY_COUNT);
+    return ESP_OK;
+}
+
+/* Undoes esp_rmaker_ota_arm_rollback_report(), so that the status reported from now on
+ * uses the job ID from its regular NVS key.
+ */
+static void esp_rmaker_ota_disarm_rollback_report(void)
+{
+    nvs_handle handle;
+    if (nvs_open_from_partition(ESP_RMAKER_NVS_PART_NAME, RMAKER_OTA_NVS_NAMESPACE, NVS_READWRITE, &handle) != ESP_OK) {
+        return;
+    }
+    char job_id[64] = {0};
+    size_t len = sizeof(job_id);
+    if (nvs_get_str(handle, RMAKER_OTA_FAIL_JOB_ID_NVS_NAME, job_id, &len) == ESP_OK) {
+        nvs_set_blob(handle, RMAKER_OTA_JOB_ID_NVS_NAME, job_id, strlen(job_id));
+        nvs_erase_key(handle, RMAKER_OTA_FAIL_JOB_ID_NVS_NAME);
+        nvs_erase_key(handle, RMAKER_OTA_FAIL_REASON_NVS_NAME);
+        nvs_commit(handle);
+    }
+    nvs_close(handle);
+}
+
+/* For an explicit rollback (esp_rmaker_ota_mark_invalid()): leave the job ID in place and
+ * mark the retries as used up, so that the rollback is reported 'rejected' also by firmware
+ * that reports 'failed' when it finds only the job ID.
+ */
+static void esp_rmaker_ota_reject_rollback_report(void)
+{
+    esp_rmaker_ota_disarm_rollback_report();
+    char job_id[64];
+    if (esp_rmaker_ota_get_job_id(job_id, sizeof(job_id)) != ESP_OK) {
+        return;
+    }
+    nvs_handle handle;
+    if (nvs_open_from_partition(ESP_RMAKER_NVS_PART_NAME, RMAKER_OTA_NVS_NAMESPACE, NVS_READWRITE, &handle) == ESP_OK) {
+        nvs_set_u32(handle, RMAKER_OTA_RB_CNT_NVS_NAME, RMAKER_OTA_ROLLBACK_RETRY_COUNT);
+        nvs_set_blob(handle, RMAKER_OTA_RB_JID_NVS_NAME, job_id, strlen(job_id));
+        nvs_commit(handle);
+        nvs_close(handle);
+    }
+}
+#else
+esp_err_t esp_rmaker_ota_arm_rollback_report(void)
+{
+    return ESP_ERR_NOT_SUPPORTED;
+}
+#endif /* CONFIG_ESP_RMAKER_OTA_ROLLBACK_REPORT_FAILED_EARLY */
+
 esp_err_t esp_rmaker_ota_mark_valid(void)
 {
     const esp_partition_t *running = esp_ota_get_running_partition();
@@ -706,6 +844,11 @@ esp_err_t esp_rmaker_ota_mark_valid(void)
     if (!ota) {
         return ESP_ERR_INVALID_ARG;
     }
+#ifdef CONFIG_ESP_RMAKER_OTA_ROLLBACK_REPORT_FAILED_EARLY
+    /* The success report below reads the job ID from its regular NVS key */
+    esp_rmaker_ota_disarm_rollback_report();
+    esp_rmaker_ota_clear_job_counter(RMAKER_OTA_RB_CNT_NVS_NAME, RMAKER_OTA_RB_JID_NVS_NAME);
+#endif
     esp_ota_mark_app_valid_cancel_rollback();
     esp_rmaker_erase_rollback_flag();
     ota->ota_in_progress = false;
@@ -723,7 +866,8 @@ esp_err_t esp_rmaker_ota_mark_valid(void)
     return ESP_OK;
 }
 
-esp_err_t esp_rmaker_ota_mark_invalid(void)
+/* requested: true for esp_rmaker_ota_mark_invalid(), false for the MQTT timeout rollback */
+static esp_err_t esp_rmaker_ota_rollback_and_reboot(bool requested)
 {
     const esp_partition_t *running = esp_ota_get_running_partition();
     esp_ota_img_states_t ota_state;
@@ -733,8 +877,18 @@ esp_err_t esp_rmaker_ota_mark_invalid(void)
             return ESP_ERR_INVALID_STATE;
         }
     }
+#ifdef CONFIG_ESP_RMAKER_OTA_ROLLBACK_REPORT_FAILED_EARLY
+    if (requested) {
+        esp_rmaker_ota_reject_rollback_report();
+    }
+#endif
     esp_ota_mark_app_invalid_rollback_and_reboot();
     return ESP_OK;
+}
+
+esp_err_t esp_rmaker_ota_mark_invalid(void)
+{
+    return esp_rmaker_ota_rollback_and_reboot(true);
 }
 
 
@@ -742,7 +896,22 @@ static void esp_ota_rollback(TimerHandle_t handle)
 {
     ESP_LOGE(TAG, "Could not verify firmware even after %d seconds since boot-up. Rolling back.",
             RMAKER_OTA_ROLLBACK_WAIT_PERIOD);
-#ifdef CONFIG_ESP_RMAKER_OTA_ROLLBACK_REPORT_FAILED
+#if defined(CONFIG_ESP_RMAKER_OTA_ROLLBACK_REPORT_FAILED_EARLY)
+    /* The job ID was already moved at boot by esp_rmaker_ota_arm_rollback_report(), unless the
+     * retries are used up (in which case it must stay in place). Just update the reason.
+     */
+    nvs_handle nvs_handle_fail;
+    if (nvs_open_from_partition(ESP_RMAKER_NVS_PART_NAME, RMAKER_OTA_NVS_NAMESPACE, NVS_READWRITE, &nvs_handle_fail) == ESP_OK) {
+        size_t len = 0;
+        if (nvs_get_str(nvs_handle_fail, RMAKER_OTA_FAIL_JOB_ID_NVS_NAME, NULL, &len) == ESP_OK) {
+            char fail_reason[64];
+            snprintf(fail_reason, sizeof(fail_reason), "MQTT did not connect within %d seconds", RMAKER_OTA_ROLLBACK_WAIT_PERIOD);
+            nvs_set_str(nvs_handle_fail, RMAKER_OTA_FAIL_REASON_NVS_NAME, fail_reason);
+            nvs_commit(nvs_handle_fail);
+        }
+        nvs_close(nvs_handle_fail);
+    }
+#elif defined(CONFIG_ESP_RMAKER_OTA_ROLLBACK_REPORT_FAILED)
     /* Store failure reason and job_id in separate NVS keys so that after rollback,
      * new firmware (with this feature) can report "failed" status with the correct job_id.
      * Also erase the main job_id key so that old firmware (without this feature) won't
@@ -775,7 +944,7 @@ static void esp_ota_rollback(TimerHandle_t handle)
         nvs_close(nvs_handle_fail);
     }
 #endif /* CONFIG_ESP_RMAKER_OTA_ROLLBACK_REPORT_FAILED */
-    esp_rmaker_ota_mark_invalid();
+    esp_rmaker_ota_rollback_and_reboot(false);
 }
 
 static esp_err_t esp_ota_check_for_mqtt(esp_rmaker_ota_t *ota)
@@ -830,6 +999,9 @@ static void esp_rmaker_ota_manage_rollback(esp_rmaker_ota_t *ota)
                  * MQTT connection. The below flag will tell the OTA functions that the earlier
                  * OTA is still in progress.
                  */
+#ifdef CONFIG_ESP_RMAKER_OTA_ROLLBACK_REPORT_FAILED_EARLY
+                esp_rmaker_ota_arm_rollback_report();
+#endif
                 ota->ota_in_progress = true;
                 esp_ota_check_for_mqtt(ota);
             } else {

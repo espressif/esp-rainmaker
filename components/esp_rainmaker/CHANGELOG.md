@@ -1,5 +1,23 @@
 # Changelog
 
+## 2.1.0
+
+### New Features
+
+- OTA (topics): option to report 'failed' instead of 'rejected' for any rollback before the new
+  firmware is validated (power cut, crash, reset before the MQTT connection), so that the OTA job
+  stays open and is offered again.
+    - Enable via `CONFIG_ESP_RMAKER_OTA_ROLLBACK_REPORT_FAILED_EARLY` (under
+      `CONFIG_ESP_RMAKER_OTA_ROLLBACK_REPORT_FAILED`).
+    - The new firmware stores the 'failed' information in NVS as soon as it boots, instead of only
+      on the MQTT timeout. Works with previous firmware on esp_rainmaker 1.9.0 or later.
+    - New API `esp_rmaker_ota_arm_rollback_report()` lets the application do this right after
+      `nvs_flash_init()`, before `esp_rmaker_ota_enable()`, for an even smaller window.
+    - At most `CONFIG_ESP_RMAKER_OTA_ROLLBACK_RETRY_COUNT` (default 3) rollbacks per job are reported
+      'failed'; the next one is reported 'rejected'.
+    - A rollback via `esp_rmaker_ota_mark_invalid()` (including a failed `ota_diag` check) is
+      reported 'rejected'.
+
 ## 2.0.0
 
 ### Breaking Changes
