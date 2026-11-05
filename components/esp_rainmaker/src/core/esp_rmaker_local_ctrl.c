@@ -450,6 +450,9 @@ esp_err_t esp_rmaker_local_ctrl_enable_chal_resp(const char *instance_name)
         const char *pop = esp_rmaker_local_ctrl_get_pop();
         mdns_service_txt_item_set(MDNS_SERVICE_TYPE_CHAL_RESP, MDNS_SERVICE_PROTO, "pop_required",
                                   (pop && strlen(pop) > 0) ? "true" : "false");
+#elif ESP_RMAKER_LOCAL_CTRL_SECURITY_TYPE == 2
+        /* Sec2 uses the PoP as the SRP password */
+        mdns_service_txt_item_set(MDNS_SERVICE_TYPE_CHAL_RESP, MDNS_SERVICE_PROTO, "pop_required", "true");
 #else
         mdns_service_txt_item_set(MDNS_SERVICE_TYPE_CHAL_RESP, MDNS_SERVICE_PROTO, "pop_required", "false");
 #endif

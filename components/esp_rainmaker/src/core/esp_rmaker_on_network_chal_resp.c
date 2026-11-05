@@ -205,7 +205,10 @@ static esp_err_t announce_mdns_service(const esp_rmaker_on_network_chal_resp_con
     MDNS_TXT_SET(MDNS_TXT_SECURE_VERSION_KEY, sec_ver_str);
 
     if (config->sec_ver == ESP_RMAKER_ON_NETWORK_SEC1) {
-        MDNS_TXT_SET(MDNS_TXT_POP_REQUIRED_KEY, config->pop ? "true" : "false");
+        bool pop_required = config->pop && strlen(config->pop) > 0;
+        MDNS_TXT_SET(MDNS_TXT_POP_REQUIRED_KEY, pop_required ? "true" : "false");
+    } else if (config->sec_ver == ESP_RMAKER_ON_NETWORK_SEC2) {
+        MDNS_TXT_SET(MDNS_TXT_POP_REQUIRED_KEY, "true");
     }
 
     ESP_LOGI(TAG, "mDNS service announced: %s.%s, port: %d", MDNS_SERVICE_TYPE, MDNS_SERVICE_PROTO, s_state.port);
@@ -303,8 +306,14 @@ static esp_err_t srp_client_register_service(const esp_rmaker_on_network_chal_re
 
     if (config->sec_ver == ESP_RMAKER_ON_NETWORK_SEC1) {
         txt_entries[txt_index].mKey = MDNS_TXT_POP_REQUIRED_KEY;
-        txt_entries[txt_index].mValue = (const uint8_t *)(config->pop ? "true" : "false");
-        txt_entries[txt_index].mValueLength = config->pop ? 4 : 5;
+        bool pop_required = config->pop && strlen(config->pop) > 0;
+        txt_entries[txt_index].mValue = (const uint8_t *)(pop_required ? "true" : "false");
+        txt_entries[txt_index].mValueLength = pop_required ? 4 : 5;
+        txt_index++;
+    } else if (config->sec_ver == ESP_RMAKER_ON_NETWORK_SEC2) {
+        txt_entries[txt_index].mKey = MDNS_TXT_POP_REQUIRED_KEY;
+        txt_entries[txt_index].mValue = (const uint8_t *)"true";
+        txt_entries[txt_index].mValueLength = 4;
         txt_index++;
     }
 
@@ -359,11 +368,17 @@ static esp_err_t setup_security(protocomm_t *pc, const esp_rmaker_on_network_cha
 
     switch (config->sec_ver) {
         case ESP_RMAKER_ON_NETWORK_SEC_NONE:
+#ifdef CONFIG_ESP_PROTOCOMM_SUPPORT_SECURITY_VERSION_0
             ESP_LOGW(TAG, "Using Security 0 (no security) - NOT recommended for production");
             err = protocomm_set_security(pc, SECURITY_ENDPOINT, &protocomm_security0, NULL);
+#else
+            ESP_LOGE(TAG, "Security 0 not supported. Enable CONFIG_ESP_PROTOCOMM_SUPPORT_SECURITY_VERSION_0");
+            return ESP_ERR_NOT_SUPPORTED;
+#endif
             break;
 
         case ESP_RMAKER_ON_NETWORK_SEC1:
+#ifdef CONFIG_ESP_PROTOCOMM_SUPPORT_SECURITY_VERSION_1
             ESP_LOGI(TAG, "Using Security 1 (Curve25519 + AES-CTR)");
             if (config->pop && strlen(config->pop) > 0) {
                 s_state.sec1_params = calloc(1, sizeof(protocomm_security1_params_t));
@@ -379,6 +394,10 @@ static esp_err_t setup_security(protocomm_t *pc, const esp_rmaker_on_network_cha
                 err = protocomm_set_security(pc, SECURITY_ENDPOINT, &protocomm_security1, NULL);
                 ESP_LOGI(TAG, "Security 1 configured without POP");
             }
+#else
+            ESP_LOGE(TAG, "Security 1 not supported. Enable CONFIG_ESP_PROTOCOMM_SUPPORT_SECURITY_VERSION_1");
+            return ESP_ERR_NOT_SUPPORTED;
+#endif
             break;
 
         case ESP_RMAKER_ON_NETWORK_SEC2:
@@ -429,6 +448,27 @@ static void cleanup_security_params(void)
 #endif
 }
 
+/* Returns true if protocomm Kconfig enables the security version */
+static bool is_sec_ver_supported(esp_rmaker_on_network_sec_t sec_ver)
+{
+    switch (sec_ver) {
+#ifdef CONFIG_ESP_PROTOCOMM_SUPPORT_SECURITY_VERSION_0
+        case ESP_RMAKER_ON_NETWORK_SEC_NONE:
+            return true;
+#endif
+#ifdef CONFIG_ESP_PROTOCOMM_SUPPORT_SECURITY_VERSION_1
+        case ESP_RMAKER_ON_NETWORK_SEC1:
+            return true;
+#endif
+#ifdef CONFIG_ESP_PROTOCOMM_SUPPORT_SECURITY_VERSION_2
+        case ESP_RMAKER_ON_NETWORK_SEC2:
+            return true;
+#endif
+        default:
+            return false;
+    }
+}
+
 esp_err_t esp_rmaker_on_network_chal_resp_start(const esp_rmaker_on_network_chal_resp_config_t *config)
 {
     if (s_state.running) {
@@ -436,14 +476,20 @@ esp_err_t esp_rmaker_on_network_chal_resp_start(const esp_rmaker_on_network_chal
         return ESP_ERR_INVALID_STATE;
     }
 
-    /* Enable the core challenge-response handler (in case it was disabled previously) */
-    esp_rmaker_chal_resp_enable();
-
     /* Use default config if none provided */
     esp_rmaker_on_network_chal_resp_config_t default_config = ESP_RMAKER_ON_NETWORK_CHAL_RESP_DEFAULT_CONFIG();
     if (!config) {
         config = &default_config;
     }
+
+    if (!is_sec_ver_supported(config->sec_ver)) {
+        ESP_LOGE(TAG, "Security %d not supported. Check CONFIG_ESP_PROTOCOMM_SUPPORT_SECURITY_VERSION_%d",
+                 config->sec_ver, config->sec_ver);
+        return ESP_ERR_NOT_SUPPORTED;
+    }
+
+    /* Enable the core challenge-response handler (in case it was disabled previously) */
+    esp_rmaker_chal_resp_enable();
 
     esp_err_t err;
 

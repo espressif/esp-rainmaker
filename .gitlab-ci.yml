@@ -322,6 +322,8 @@ build_split_camera:
 build_homekit:
   extends: .build_template
   image: espressif/idf:release-v5.5
+  # Manual until esp_rainmaker moves to json_generator 2.x, which esp-homekit-sdk master needs
+  when: manual
   variables:
     EXAMPLE_TARGETS: "esp32 esp32s2 esp32c3 esp32s3 esp32c6 esp32c2"
   script:
