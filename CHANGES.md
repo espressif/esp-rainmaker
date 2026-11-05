@@ -1,5 +1,13 @@
 # Changes
 
+## 05-Nov-2026: On-Network Challenge-Response Fixes
+
+- The on-network challenge-response service failed to build when protocomm Security 0 or 1 was
+  disabled. It now builds, and it returns `ESP_ERR_NOT_SUPPORTED` at start for a disabled
+  security version. The mDNS / Thread SRP TXT records now advertise `pop_required=true` for Sec2.
+  Check the esp_rainmaker component's
+  [CHANGELOG v1.17.1](components/esp_rainmaker/CHANGELOG.md#1171) for details.
+
 ## 09-Sep-2026: MQTT Subscription Retry
 
 - A subscription the MQTT broker rejected (for example under subscribe throttling) was treated as

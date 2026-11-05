@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.17.1
+
+### Bug Fixes
+
+- On-network challenge-response: fix the build when `CONFIG_ESP_PROTOCOMM_SUPPORT_SECURITY_VERSION_0`
+  or `_1` is disabled. `esp_rmaker_on_network_chal_resp_start()` now returns `ESP_ERR_NOT_SUPPORTED`
+  before it starts protocomm if the requested security version is not enabled.
+- Challenge-response mDNS / Thread SRP TXT records: advertise `pop_required=true` for Sec2, which
+  uses the PoP as the SRP password. An empty Sec1 PoP now advertises `pop_required=false`.
+
 ## 1.17.0
 
 ### Changes
