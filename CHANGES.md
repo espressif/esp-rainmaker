@@ -1,5 +1,33 @@
 # Changes
 
+## 05-Nov-2026: json_parser 2.0.0 and json_generator 2.1.0
+
+**IMPORTANT BEHAVIORAL CHANGES**: The build does not fail on these changes. Check the application
+code before you update to esp_rainmaker 2.0.0:
+
+- String param values, scene names and schedule names now arrive decoded. Remove hand-written
+  unescaping, or the values change.
+- `json_generator` now escapes strings. Remove hand-written escaping before `json_gen_*` calls,
+  or the values get extra backslashes.
+- Boolean params accept only `true` and `false`. A set-params request with `1` or `0` is rejected.
+
+Details:
+
+- esp_rainmaker 2.0.0 requires `json_parser` 2.0.0 and `json_generator` 2.1.0. The parser returns
+  strings decoded and the generator escapes them on output, so string param values, scene and
+  schedule names reach the application decoded, and hand-written escaping or unescaping in
+  application code must go (the `zigbee_gateway` example drops `remove_escape_char()`). A build
+  can hold only one version of each library, so application code that uses them directly must
+  move to 2.x together with esp_rainmaker: `json_gen_str_end()` returns a negative error instead
+  of a length on failure, `json_parse_start()` needs the exact text length with no NUL inside it,
+  and `*_get_bool()` accepts only `true`/`false`. The camera examples bump json_parser to `~2.0.0`.
+  The `homekit_switch` example needs an esp-homekit-sdk checkout that includes commit `57ec5e26`.
+- The matter examples stay on esp_rainmaker 1.17.1, because esp_matter 1.5.1 needs
+  `json_generator` 1.x.
+- Check the esp_rainmaker component's
+  [CHANGELOG v2.0.0](components/esp_rainmaker/CHANGELOG.md#200) for the NVS compatibility
+  details and the other fixes.
+
 ## 05-Nov-2026: On-Network Challenge-Response Fixes
 
 - The on-network challenge-response service failed to build when protocomm Security 0 or 1 was

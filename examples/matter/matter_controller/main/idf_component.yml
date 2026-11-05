@@ -4,9 +4,9 @@ dependencies:
   idf:
     version: ">=5.4,<6"
 
+  ## esp_matter 1.5.1 needs json_generator 1.x
   espressif/esp_rainmaker:
-    version: ">=1.0"
-    override_path: "../../../../components/esp_rainmaker/"
+    version: "~1.17.1"
   espressif/rmaker_app_insights:
     version: "*"
     override_path: "../../../common/rmaker_app_insights/"

@@ -670,7 +670,13 @@ static esp_err_t esp_rmaker_schedule_parse_trigger(jparse_ctx_t *jctx, esp_rmake
                     type = TRIGGER_TYPE_DATE;
                     json_obj_get_int(jctx, "mm", &repeat_months);
                     json_obj_get_int(jctx, "yy", &year);
-                    json_obj_get_bool(jctx, "r", &repeat_every_year);
+                    /* The device reports "r" as an int; also accept a bool */
+                    int repeat_every_year_int = 0;
+                    if (json_obj_get_int(jctx, "r", &repeat_every_year_int) == 0) {
+                        repeat_every_year = (repeat_every_year_int == 1);
+                    } else {
+                        json_obj_get_bool(jctx, "r", &repeat_every_year);
+                    }
                 }
             }
         json_arr_leave_object(jctx);

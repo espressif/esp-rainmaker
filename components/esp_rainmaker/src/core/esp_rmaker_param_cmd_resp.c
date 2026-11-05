@@ -131,11 +131,16 @@ static esp_err_t esp_rmaker_set_params_cmd_handler(const void *in_data, size_t i
     }
 
     json_gen_end_object(&jstr);
-    size_t response_len = json_gen_str_end(&jstr);
+    int response_len = json_gen_str_end(&jstr);
 
     /* Cleanup - params_str is now pointing to static buffer, so no need to free it */
     if (changed_params_json) {
         free(changed_params_json);
+    }
+
+    if (response_len < 0) {
+        ESP_LOGE(TAG, "Failed to generate response JSON: %d", response_len);
+        return ESP_FAIL;
     }
 
     /* Set output to static buffer */

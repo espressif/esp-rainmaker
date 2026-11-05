@@ -9,7 +9,7 @@ dependencies:
   espressif/button:
     version: "^4.1.4"
   espressif/json_parser:
-    version: "~1.0.3"
+    version: "~2.0.0"
   espressif/rmaker_common:
     version: "*"
   espressif/rmaker_app_reset:

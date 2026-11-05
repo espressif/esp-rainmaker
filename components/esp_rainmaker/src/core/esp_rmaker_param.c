@@ -171,7 +171,15 @@ esp_err_t esp_rmaker_populate_params(char *buf, size_t *buf_len, uint8_t flags, 
             device = device->next;
         }
     }
-    *buf_len = json_gen_str_end(&jstr);
+    int len = json_gen_str_end(&jstr);
+    if (len == JSON_GEN_ERR_BUF_FULL) {
+        /* Measure again so that the caller gets the required size */
+        err = esp_rmaker_populate_params(NULL, buf_len, flags, false) == ESP_OK ? ESP_ERR_NO_MEM : ESP_FAIL;
+    } else if (len < 0) {
+        err = ESP_FAIL;
+    } else {
+        *buf_len = len;
+    }
     return err;
 }
 
@@ -427,6 +435,10 @@ set_params_free:
 
 esp_err_t esp_rmaker_handle_set_params(char *data, size_t data_len, esp_rmaker_req_src_t src)
 {
+    /* json_parser rejects a NUL inside the given length */
+    if (data && data_len > 0 && data[data_len - 1] == '\0') {
+        data_len--;
+    }
     ESP_LOGI(TAG, "Received params: %.*s", (int) data_len, data);
     jparse_ctx_t jctx;
     if (json_parse_start(&jctx, data, data_len) != 0) {
@@ -506,6 +518,57 @@ esp_err_t esp_rmaker_register_for_group_params(const char *group_id)
     return ESP_OK;
 }
 
+/* Return str JSON-escaped without quotes, the form in which string params are stored in NVS */
+static char *esp_rmaker_param_escape_str(const char *str)
+{
+    size_t len = strlen(str);
+    int escaped_len = json_gen_escape_string(str, len, NULL, 0);
+    if (escaped_len < 0) {
+        return NULL;
+    }
+    char *escaped = MEM_ALLOC_EXTRAM(escaped_len + 1);
+    if (!escaped) {
+        return NULL;
+    }
+    if (json_gen_escape_string(str, len, escaped, escaped_len + 1) < 0) {
+        free(escaped);
+        return NULL;
+    }
+    return escaped;
+}
+
+/* buf holds len bytes of stored text at buf + 1, with a spare byte on each side.
+ * Return the value: a decoded string in a new buffer, else the text moved to the start of buf. */
+static char *esp_rmaker_param_load_str(char *buf, size_t len, bool decode)
+{
+    char *text = buf + 1;
+    if (decode && memchr(text, '\\', len)) {
+        /* Parse "<text>" in place as a JSON string */
+        buf[0] = '"';
+        text[len] = '"';
+        char *decoded = NULL;
+        int decoded_len = 0;
+        jparse_ctx_t jctx;
+        if (json_parse_start(&jctx, buf, len + 2) == 0) {
+            if ((json_root_get_strlen(&jctx, &decoded_len) == 0) &&
+                    ((decoded = MEM_CALLOC_EXTRAM(1, decoded_len + 1)) != NULL) &&
+                    (json_root_get_string(&jctx, decoded, decoded_len + 1) != 0)) {
+                free(decoded);
+                decoded = NULL;
+            }
+            json_parse_end(&jctx);
+        }
+        if (decoded) {
+            free(buf);
+            return decoded;
+        }
+        /* Keep the text as is, as firmware may have stored it raw */
+    }
+    memmove(buf, text, len);
+    buf[len] = '\0';
+    return buf;
+}
+
 esp_err_t esp_rmaker_param_get_stored_value(_esp_rmaker_param_t *param, esp_rmaker_param_val_t *val)
 {
     if (!param || !param->parent || !val) {
@@ -518,28 +581,30 @@ esp_err_t esp_rmaker_param_get_stored_value(_esp_rmaker_param_t *param, esp_rmak
     }
     if ((param->val.type == RMAKER_VAL_TYPE_STRING) || (param->val.type == RMAKER_VAL_TYPE_OBJECT) ||
                 (param->val.type == RMAKER_VAL_TYPE_ARRAY)) {
+        /* Leave a spare byte on each side of the text for esp_rmaker_param_load_str() */
         size_t len = 0;
+        char *s_val = NULL;
         if ((err = nvs_get_blob(handle, param->name, NULL, &len)) == ESP_OK) {
             ESP_LOGD(TAG, "nvs_get_blob: %s, len: %d", param->name, len);
-            char *s_val = MEM_CALLOC_EXTRAM(1, len + 1);
-            if (!s_val) {
-                err = ESP_ERR_NO_MEM;
-            } else {
-                nvs_get_blob(handle, param->name, s_val, &len);
-                s_val[len] = '\0';
-                val->type = param->val.type;
-                val->val.s = s_val;
+            s_val = MEM_CALLOC_EXTRAM(1, len + 2);
+            if (s_val) {
+                nvs_get_blob(handle, param->name, s_val + 1, &len);
             }
         } else if ((err = nvs_get_str(handle, param->name, NULL, &len)) == ESP_OK) {
             ESP_LOGD(TAG, "nvs_get_str: %s, len: %d", param->name, len);
             /* In order to be compatible with the previous nvs_set_str() */
-            char *s_val = MEM_CALLOC_EXTRAM(1, len);
+            s_val = MEM_CALLOC_EXTRAM(1, len + 1);
+            if (s_val) {
+                nvs_get_str(handle, param->name, s_val + 1, &len);
+                len = strlen(s_val + 1);
+            }
+        }
+        if (err == ESP_OK) {
             if (!s_val) {
                 err = ESP_ERR_NO_MEM;
             } else {
-                nvs_get_str(handle, param->name, s_val, &len);
                 val->type = param->val.type;
-                val->val.s = s_val;
+                val->val.s = esp_rmaker_param_load_str(s_val, len, param->val.type == RMAKER_VAL_TYPE_STRING);
             }
         }
     } else {
@@ -564,8 +629,19 @@ esp_err_t esp_rmaker_param_store_value(_esp_rmaker_param_t *param)
                 (param->val.type == RMAKER_VAL_TYPE_ARRAY)) {
         /* Store only if value is not NULL */
         if (param->val.val.s) {
-            err = nvs_set_blob(handle, param->name, param->val.val.s, strlen(param->val.val.s));
+            const char *s_val = param->val.val.s;
+            char *escaped = NULL;
+            if (param->val.type == RMAKER_VAL_TYPE_STRING) {
+                escaped = esp_rmaker_param_escape_str(s_val);
+                if (escaped) {
+                    s_val = escaped;
+                } else {
+                    ESP_LOGW(TAG, "Failed to escape %s.%s. Storing it as is.", param->parent->name, param->name);
+                }
+            }
+            err = nvs_set_blob(handle, param->name, s_val, strlen(s_val));
             nvs_commit(handle);
+            free(escaped);
         } else {
             err = ESP_OK;
         }
