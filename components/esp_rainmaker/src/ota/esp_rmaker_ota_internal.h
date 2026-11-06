@@ -24,6 +24,8 @@ extern "C" {
 #define RMAKER_OTA_UPDATE_FLAG_NVS_NAME     "ota_update"
 #define RMAKER_OTA_FAIL_REASON_NVS_NAME     "ota_fail_rsn"
 #define RMAKER_OTA_FAIL_JOB_ID_NVS_NAME     "ota_fail_jid"
+#define RMAKER_OTA_RB_CNT_NVS_NAME          "ota_rb_cnt"
+#define RMAKER_OTA_RB_JID_NVS_NAME          "ota_rb_jid"
 #define RMAKER_OTA_FETCH_DELAY              5
 
 #if defined(CONFIG_BT_ENABLED) && !defined(CONFIG_IDF_TARGET_ESP32P4)
@@ -84,6 +86,15 @@ esp_err_t esp_rmaker_ota_start_workflow(esp_rmaker_ota_handle_t ota_handle, esp_
 
 /* OTA image header validation */
 esp_err_t validate_image_header(esp_rmaker_ota_handle_t ota_handle, esp_app_desc_t *new_app_info);
+
+#if defined(CONFIG_ESP_RMAKER_OTA_TEST_ROLLBACK) || defined(CONFIG_ESP_RMAKER_OTA_ROLLBACK_REPORT_FAILED_EARLY)
+/* Read the OTA job ID stored in NVS (NULL terminated) */
+esp_err_t esp_rmaker_ota_get_job_id(char *job_id, size_t job_id_size);
+/* Per-job counter in NVS: returns the stored count + 1 if job_id matches the job ID stored under
+ * jid_key, else 1, and stores the new (job_id, count). A NULL job_id always gives 1. */
+uint32_t esp_rmaker_ota_advance_job_counter(const char *job_id, const char *cnt_key, const char *jid_key);
+void esp_rmaker_ota_clear_job_counter(const char *cnt_key, const char *jid_key);
+#endif
 
 #ifdef __cplusplus
 }

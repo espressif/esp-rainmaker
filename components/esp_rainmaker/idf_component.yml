@@ -1,4 +1,4 @@
-version: "2.0.0"
+version: "2.1.0"
 description: ESP RainMaker firmware agent
 url: https://github.com/espressif/esp-rainmaker/tree/master/components/esp_rainmaker
 repository: https://github.com/espressif/esp-rainmaker.git

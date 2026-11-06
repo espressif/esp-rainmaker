@@ -489,6 +489,35 @@ menu "ESP RainMaker Config"
                 firmware versions indefinitely (new firmware boots → MQTT fails → rollback → OTA retry →
                 new firmware boots again).
 
+        config ESP_RMAKER_OTA_ROLLBACK_REPORT_FAILED_EARLY
+            bool "Also report 'failed' for rollbacks after a reset or crash before validation"
+            depends on ESP_RMAKER_OTA_ROLLBACK_REPORT_FAILED
+            default n
+            help
+                Extends ESP_RMAKER_OTA_ROLLBACK_REPORT_FAILED to any rollback that happens before the new
+                firmware is validated, such as a power cut or crash before the MQTT connection, so that the
+                OTA job stays open and is offered again. Only for OTA_USING_TOPICS.
+
+                The new firmware stores the 'failed' information as soon as it boots (also available to the
+                application via esp_rmaker_ota_arm_rollback_report()), so this works even if the previous
+                firmware is an older one (esp_rainmaker 1.9.0 or later). The firmware that is rolled back
+                to, if built with this option, also reports 'failed' for rollbacks where that information
+                was not stored.
+
+                Rollbacks are reported 'failed' up to ESP_RMAKER_OTA_ROLLBACK_RETRY_COUNT times per OTA job,
+                and 'rejected' after that. A rollback requested via esp_rmaker_ota_mark_invalid() (including
+                a failed ota_diag check) is always reported 'rejected'.
+
+        config ESP_RMAKER_OTA_ROLLBACK_RETRY_COUNT
+            int "Max rollbacks reported as 'failed' per OTA job"
+            depends on ESP_RMAKER_OTA_ROLLBACK_REPORT_FAILED_EARLY
+            range 1 100
+            default 3
+            help
+                Number of rollbacks for the same OTA job that are reported as 'failed', so that the job is
+                offered again. The next rollback is reported as 'rejected', which ends the job for the node.
+                Each retry downloads the full image again.
+
         config ESP_RMAKER_OTA_TEST_ROLLBACK
             bool "Test-only: report 'failed' and roll back even on a successful OTA"
             default n
