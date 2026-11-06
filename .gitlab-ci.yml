@@ -357,6 +357,18 @@ build_matter:
     - *build_matter_examples
     - *build_matter_controller_example
 
+build_matter_controller_idf_v5.5:
+  stage: build
+  image: espressif/esp-matter:release-v1.5_idf_v5.5.5
+  tags:
+    - build
+  variables:
+    PEDANTIC_FLAGS: ""
+    CONTROLLER_EXAMPLE_TARGET: "esp32s3"
+  script:
+    - *setup_ninja_shim
+    - *build_matter_controller_example
+
 build_zigbee_gateway:
   extends: .build_template
   image: espressif/idf:release-v5.3
