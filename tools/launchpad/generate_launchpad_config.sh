@@ -103,6 +103,8 @@ EOF
             README_PATH="camera/standalone"
         elif [[ $README_PATH == "split_camera" ]]; then
             README_PATH="camera/split_mode"
+        elif [[ $README_PATH == "matter_controller" ]]; then
+            README_PATH="matter/matter_controller"
         fi
         echo "readme.text = \"https://raw.githubusercontent.com/$REPO_OWNER/$REPO_NAME/master/examples/$README_PATH/README.md\"" >> $OUT_FILE
         echo "" >> $OUT_FILE

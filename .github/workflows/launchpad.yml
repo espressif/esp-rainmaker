@@ -44,7 +44,9 @@ jobs:
     runs-on: ubuntu-latest
     container:
       image: ${{ matrix.idf_image || 'espressif/idf:v5.5.1' }}
+    continue-on-error: ${{ matrix.optional || false }}
     strategy:
+      fail-fast: false
       matrix:
         example: [fan, led_light, multi_device, switch, temperature_sensor]
         target: [esp32, esp32c3, esp32c6, esp32s3, esp32c2, esp32h2]
@@ -54,6 +56,12 @@ jobs:
             target: esp32s3
             idf_image: espressif/idf:v5.5.5
             kvs_sdk_branch: main
+          # Matter controller needs the ESP-Matter toolchain (gn, zap, host tools)
+          # bundled in the esp-matter docker image. esp32s3 only (octal PSRAM, 8 MB flash).
+          - example: matter/matter_controller
+            target: esp32s3
+            idf_image: espressif/esp-matter:release-v1.5_idf_v5.5.5
+            optional: true
 
     steps:
       - uses: actions/checkout@v4
@@ -73,12 +81,14 @@ jobs:
       - name: build application
         run: |
           . $IDF_PATH/export.sh
+          # esp-matter images carry ESP_MATTER_PATH; source its export.sh for gn/zap host tools
+          [ -n "$ESP_MATTER_PATH" ] && . $ESP_MATTER_PATH/export.sh
           export ESP_RMAKER_PATH=$PWD
           [ -d /opt/kvs-sdk ] && export KVS_SDK_PATH=/opt/kvs-sdk
           cd examples/${{ matrix.example }}
 
           # Lets use the assisted claim by default for launchpad examples
-          echo "CONFIG_ESP_RMAKER_ASSISTED_CLAIM=y" >> sdkconfig.defaults
+          grep -q '^CONFIG_ESP_RMAKER_ASSISTED_CLAIM=y' sdkconfig.defaults || echo "CONFIG_ESP_RMAKER_ASSISTED_CLAIM=y" >> sdkconfig.defaults
 
           idf.py set-target ${{ matrix.target }} build
 

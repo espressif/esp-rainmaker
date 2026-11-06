@@ -18,7 +18,10 @@ This example runs a (client only) Matter controller working with ESP RainMaker, 
 
 ## Build
 
-ESP-IDF v5.5.3 is recommeneded.
+> [!IMPORTANT]
+> **Hardware:** ESP32-S3 with PSRAM and at least 8 MB flash. The default config and the prebuilt Launchpad binary use **octal PSRAM** (e.g. ESP32-S3-DevKitC-1 N8R8 / N16R8). For a board with quad PSRAM, set `CONFIG_SPIRAM_MODE_QUAD=y` before building. The firmware aborts at boot if PSRAM is missing or in the other mode.
+
+ESP-IDF v5.5.3 is recommended.
 
 ```bash
 idf.py set-target esp32s3
