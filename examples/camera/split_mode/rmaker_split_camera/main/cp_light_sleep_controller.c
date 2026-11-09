@@ -12,6 +12,8 @@
 #ifdef CONFIG_ESP_HOSTED_CP_LIGHT_SLEEP_ENABLE
 
 #include "esp_pm.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/semphr.h"
 
 static const char TAG[] = "cp_light_sleep";
 
@@ -58,6 +60,9 @@ static esp_pm_lock_handle_t pm_lock = NULL;        /* NO_LIGHT_SLEEP */
 static esp_pm_lock_handle_t freq_lock = NULL;      /* CPU_FREQ_MAX   */
 static bool pm_lock_acquired = false;
 static bool pm_configured = false;
+/* start() and stop() run from both the host power-save worker and the wake
+ * path, so the lock state changes under this mutex. */
+static SemaphoreHandle_t s_state_mutex;
 
 esp_err_t cp_light_sleep_controller_init(void)
 {
@@ -86,6 +91,35 @@ esp_err_t cp_light_sleep_controller_init(void)
 		pm_lock = NULL;
 		return ret;
 	}
+	if (s_state_mutex == NULL) {
+		s_state_mutex = xSemaphoreCreateMutex();
+		if (s_state_mutex == NULL) {
+			esp_pm_lock_delete(pm_lock);
+			pm_lock = NULL;
+			esp_pm_lock_delete(freq_lock);
+			freq_lock = NULL;
+			return ESP_ERR_NO_MEM;
+		}
+	}
+
+	/* Hold both locks before auto light sleep is switched on, so the CP
+	 * cannot nap between esp_pm_configure() and the first stop(). */
+	ret = esp_pm_lock_acquire(pm_lock);
+	if (ret == ESP_OK) {
+		ret = esp_pm_lock_acquire(freq_lock);
+		if (ret != ESP_OK) {
+			esp_pm_lock_release(pm_lock);
+		}
+	}
+	if (ret != ESP_OK) {
+		ESP_LOGE(TAG, "Failed to acquire PM locks: %s", esp_err_to_name(ret));
+		esp_pm_lock_delete(pm_lock);
+		pm_lock = NULL;
+		esp_pm_lock_delete(freq_lock);
+		freq_lock = NULL;
+		return ret;
+	}
+	pm_lock_acquired = true;
 
 	esp_pm_config_t pm_config = {
 		.max_freq_mhz       = CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ,
@@ -96,6 +130,9 @@ esp_err_t cp_light_sleep_controller_init(void)
 	ret = esp_pm_configure(&pm_config);
 	if (ret != ESP_OK) {
 		ESP_LOGE(TAG, "Failed to configure PM: %s", esp_err_to_name(ret));
+		esp_pm_lock_release(pm_lock);
+		esp_pm_lock_release(freq_lock);
+		pm_lock_acquired = false;
 		esp_pm_lock_delete(pm_lock);
 		pm_lock = NULL;
 		esp_pm_lock_delete(freq_lock);
@@ -113,8 +150,7 @@ esp_err_t cp_light_sleep_controller_init(void)
 #endif
 
 	pm_configured = true;
-
-	(void)cp_light_sleep_controller_stop();
+	ESP_LOGI(TAG, "Light sleep DISABLED");
 
 	ESP_LOGI(TAG, "Light sleep initialized successfully");
 	return ESP_OK;
@@ -126,7 +162,9 @@ esp_err_t cp_light_sleep_controller_start(void)
 		ESP_LOGE(TAG, "Light sleep not initialized");
 		return ESP_ERR_INVALID_STATE;
 	}
+	xSemaphoreTake(s_state_mutex, portMAX_DELAY);
 	if (!pm_lock_acquired) {
+		xSemaphoreGive(s_state_mutex);
 		return ESP_OK;
 	}
 	esp_err_t ret = esp_pm_lock_release(pm_lock);
@@ -138,6 +176,7 @@ esp_err_t cp_light_sleep_controller_start(void)
 		ESP_EARLY_LOGE(TAG, "Failed to release PM locks: %s / %s",
 		               esp_err_to_name(ret), esp_err_to_name(fret));
 	}
+	xSemaphoreGive(s_state_mutex);
 	return (ret != ESP_OK) ? ret : fret;
 }
 
@@ -147,7 +186,9 @@ esp_err_t cp_light_sleep_controller_stop(void)
 		ESP_LOGE(TAG, "Light sleep not initialized");
 		return ESP_ERR_INVALID_STATE;
 	}
+	xSemaphoreTake(s_state_mutex, portMAX_DELAY);
 	if (pm_lock_acquired) {
+		xSemaphoreGive(s_state_mutex);
 		return ESP_OK;
 	}
 	esp_err_t ret = esp_pm_lock_acquire(pm_lock);
@@ -159,6 +200,7 @@ esp_err_t cp_light_sleep_controller_stop(void)
 		ESP_LOGE(TAG, "Failed to acquire PM locks: %s / %s",
 		         esp_err_to_name(ret), esp_err_to_name(fret));
 	}
+	xSemaphoreGive(s_state_mutex);
 	return (ret != ESP_OK) ? ret : fret;
 }
 
@@ -172,11 +214,11 @@ esp_err_t cp_light_sleep_controller_deinit(void)
 	if (!pm_configured) {
 		return ESP_OK;
 	}
-	if (!pm_lock_acquired && pm_lock) {
-		if (esp_pm_lock_acquire(pm_lock) == ESP_OK) {
-			pm_lock_acquired = true;
-			if (freq_lock) esp_pm_lock_acquire(freq_lock);
-		}
+	/* esp_pm_lock_delete() refuses a held lock, so release them first. */
+	xSemaphoreTake(s_state_mutex, portMAX_DELAY);
+	if (pm_lock_acquired) {
+		esp_pm_lock_release(pm_lock);
+		if (freq_lock) esp_pm_lock_release(freq_lock);
 	}
 	if (pm_lock) {
 		esp_pm_lock_delete(pm_lock);
@@ -188,6 +230,7 @@ esp_err_t cp_light_sleep_controller_deinit(void)
 	}
 	pm_lock_acquired = false;
 	pm_configured = false;
+	xSemaphoreGive(s_state_mutex);
 	return ESP_OK;
 }
 

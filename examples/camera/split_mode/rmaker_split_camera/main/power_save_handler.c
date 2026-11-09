@@ -39,9 +39,8 @@ static const char *TAG = "power_save";
 #include "esp_pm.h"
 #include "esp_event.h"
 
-/* power_save_init() is reached only from signaling_pre_wifi_init(), which the
- * example arms on the co-processor targets alone. Mirror that condition here,
- * or these helpers are dead code on every other target. */
+/* The Wi-Fi power-save helpers apply on the co-processor targets alone. On any
+ * other target they would be dead code. */
 #if defined(CONFIG_IDF_TARGET_ESP32C6) || defined(CONFIG_IDF_TARGET_ESP32C5)
 #define PS_WIFI_KNOBS_ENABLED 1
 #else
@@ -308,7 +307,7 @@ static void resume_application_tasks(void)
  * this internally; the value only bounds how long the caller blocks. */
 #define HOST_WAKEUP_TIMEOUT_MS 2000
 
-#if SLAVE_LIGHT_SLEEP_ON_HOST_DEEP_SLEEP && HOST_PS_INTEGRATION_ENABLED
+#if SLAVE_HOOKS_FOR_HOST_DEEP_SLEEP && HOST_PS_INTEGRATION_ENABLED
 
 /* The host-sleep callbacks live in host_ps_integration.c, vendored from
  * esp_hosted's power_save example: they stop the CLI and enter CP light sleep
@@ -321,10 +320,12 @@ static void app_webrtc_event_handler(app_webrtc_event_data_t *event_data, void *
     }
 
     switch (event_data->event_id) {
-        case APP_WEBRTC_EVENT_RECEIVED_OFFER:
-            ESP_LOGI(TAG, "Received offer, waking up host");
-            eh_cp_feat_host_ps_wakeup_host(HOST_WAKEUP_TIMEOUT_MS);
-            break;
+        /* An offer wakes the host: the signaling bridge adapter calls
+         * eh_cp_feat_host_ps_wakeup_host() before it forwards one.
+         * This event does not fire on the co-processor today. The bridge peer
+         * connection does not report peer state, so app_webrtc never raises it.
+         * The handler is kept for when it does: it would wake a host that slept
+         * again before media started. On an awake host the call returns at once. */
         case APP_WEBRTC_EVENT_STREAMING_STARTED:
             ESP_LOGI(TAG, "Streaming started, waking up host");
             eh_cp_feat_host_ps_wakeup_host(HOST_WAKEUP_TIMEOUT_MS);
@@ -333,15 +334,16 @@ static void app_webrtc_event_handler(app_webrtc_event_data_t *event_data, void *
             break;
     }
 }
-#endif /* SLAVE_LIGHT_SLEEP_ON_HOST_DEEP_SLEEP && HOST_PS_INTEGRATION_ENABLED */
+#endif /* SLAVE_HOOKS_FOR_HOST_DEEP_SLEEP && HOST_PS_INTEGRATION_ENABLED */
 
 esp_err_t power_save_init(void)
 {
     esp_err_t ret = ESP_OK;
 
 #if PS_WIFI_KNOBS_ENABLED
-    /* Runs before esp_wifi_init(), so the Wi-Fi power-save mode cannot be set
-     * here. Register for the start event instead and apply it there. A failure
+    /* app_main() calls this after app_network_init() and before
+     * app_network_start(), so Wi-Fi is not started yet. Register for the start
+     * event and apply the power-save mode there, at every start. A failure
      * costs power, not function, so it must not bring the co-processor down:
      * a reboot here takes the host's wake path with it. */
     esp_err_t evt_ret = esp_event_handler_register(WIFI_EVENT, WIFI_EVENT_STA_START,

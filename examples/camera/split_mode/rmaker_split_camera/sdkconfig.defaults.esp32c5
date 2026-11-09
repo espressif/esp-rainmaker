@@ -106,7 +106,9 @@ CONFIG_SPIRAM_SPEED_80M=y
 # common defaults do; drivers that need internal RAM ask for it explicitly.
 CONFIG_SPIRAM_MALLOC_ALWAYSINTERNAL=0
 CONFIG_SPIRAM_TRY_ALLOCATE_WIFI_LWIP=y
-CONFIG_SPIRAM_MALLOC_RESERVE_INTERNAL=32768
+# esp_hosted frees its SDIO DMA aggregation buffer (15872 B) while the host
+# sleeps and allocates it again in internal RAM at every host wake.
+CONFIG_SPIRAM_MALLOC_RESERVE_INTERNAL=65536
 CONFIG_SPIRAM_ALLOW_BSS_SEG_EXTERNAL_MEMORY=y
 CONFIG_SPIRAM_ALLOW_NOINIT_SEG_EXTERNAL_MEMORY=y
 CONFIG_NVS_ALLOCATE_CACHE_IN_SPIRAM=y
@@ -127,6 +129,8 @@ CONFIG_ESP_HOSTED_CP_FEAT_HOST_PS_UNLOAD_BUS_WHILE_SLEEPING=y
 # P4-C5 core board pin; another board overlay must set its own. Without a
 # value esp_hosted leaves the pin at -1 and its #error stops the build.
 CONFIG_ESP_HOSTED_CP_FEAT_HOST_PS_HOST_WAKEUP_GPIO=3
+# Each signaling keep-alive ping wakes the radio. The default is 10 s.
+CONFIG_KVS_SIGNALING_WSS_PING_INTERVAL_SEC=60
 
 # Hosted - Light sleep on Deep sleep
 CONFIG_PM_ENABLE=y
@@ -149,6 +153,9 @@ CONFIG_PM_SLP_IRAM_OPT=y
 CONFIG_PM_SLEEP_FUNC_IN_IRAM=y
 CONFIG_PM_RTOS_IDLE_OPT=y
 CONFIG_PM_SLP_DEFAULT_PARAMS_OPT=y
+# The reset button wakes the chip through a GPIO interrupt. Its handler calls
+# gpio_intr_disable(), which must run from IRAM during a flash write.
+CONFIG_GPIO_CTRL_FUNC_IN_IRAM=y
 # FreeRTOS and the ringbuf stay in flash. Pulling them into IRAM costs about
 # 30 KiB of internal RAM, and softAP then fails to allocate its beacon buffer.
 CONFIG_FREERTOS_USE_TRACE_FACILITY=y

@@ -75,6 +75,15 @@ The C5 on the core board has its own USB-UART port, so flash it directly. The
 core-board `streaming_only` overlay keeps the P4's slave flasher off, since it
 would reset the C5 on every P4 wake.
 
+The C5 build has no reset button. The button must wake the C5 from light
+sleep, and only GPIO 0-6 can do that on the C5. The core board's boot button
+is on GPIO 28, so the example logs a warning and runs without it. To reset
+the device, use the factory reset in the ESP RainMaker phone app (the example
+enables the RainMaker system service), or wire a button to GPIO 0-6 and set
+`CONFIG_EXAMPLE_BOARD_BUTTON_GPIO`. The `reset-to-factory` console command
+works only until the first host wake: esp_hosted's console restart drops it
+until rmaker_common 1.13.0.
+
 *__NOTE__*:
 - ESP32-C6 on the EV / P4-EYE boards does not have an onboard UART port. You will need to use ESP-Prog or any other JTAG.
 - Use following Pin configuration:

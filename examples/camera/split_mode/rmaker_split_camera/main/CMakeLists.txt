@@ -19,4 +19,7 @@ idf_component_register(
              # esp_hosted links its SDIO slave transport against this without
              # declaring it; the top-level COMPONENTS trim would drop it.
              "esp_driver_sdio"
+    # NETWORK_PROV_END and the modem clock, for the C5 BLE clock release
+    PRIV_REQUIRES "network_provisioning"
+                  "esp_hw_support"
     )

@@ -4,8 +4,17 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#include <stdbool.h>
+#include <stddef.h>
 #include "host_ps_integration.h"
 #include "sdkconfig.h"
+
+static void (*s_cli_register_cb)(void);
+
+void host_ps_integration_set_cli_register_cb(void (*cb)(void))
+{
+	s_cli_register_cb = cb;
+}
 
 #if CONFIG_ESP_HOSTED_CP_FEAT_HOST_PS
 
@@ -14,6 +23,9 @@
 #include "eh_cp_feat_host_ps_apis.h"
 #include "eh_cp_cli.h"
 #include "esp_log.h"
+#include "esp_pm.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
 
 #if CONFIG_HEAP_TRACING
 #define MEMORY_LEAK_CHECKING 1
@@ -55,21 +67,96 @@ static inline void optional_debug_cycle_end(void)
 #endif
 }
 
+#if defined(CONFIG_PM_POWER_DOWN_PERIPHERAL_IN_LIGHT_SLEEP) && \
+    defined(CONFIG_ESP_HOSTED_CP_LIGHT_SLEEP_PERIPHERAL_POWERDOWN) && \
+    defined(CONFIG_ESP_HOSTED_CP_FEAT_CLI)
+#define CLI_STOPS_IN_LIGHT_SLEEP 1
+
+/* The CLI stops before the UART powers down in light sleep, and starts again
+ * when the host wakes. One task does both, in order. The host power-save
+ * callbacks only set s_cli_wanted and notify it, because they run on
+ * esp_hosted's ps_alert_task, partly under its transition lock. A console
+ * command that wakes the host would wait for that lock while the callback
+ * waits for the console to stop. The task holds a NO_LIGHT_SLEEP lock while
+ * the CLI runs, so the chip sleeps only after the CLI has stopped. */
+#define CLI_TASK_STACK  3072
+#define CLI_TASK_PRIO   3
+
+static TaskHandle_t s_cli_task;
+static esp_pm_lock_handle_t s_cli_pm_lock;
+static volatile bool s_cli_wanted = true;
+
+static void cli_task(void *arg)
+{
+	bool running = true;    /* the app started the CLI at boot */
+
+	(void)arg;
+	for (;;) {
+		ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
+		/* Read the wanted state once per pass: a sleep and wake between two reads
+		 * would otherwise start a CLI that is already running. */
+		bool want;
+		while (running != (want = s_cli_wanted)) {
+			if (want) {
+				esp_pm_lock_acquire(s_cli_pm_lock);
+				ESP_LOGI(TAG, "Restarting CLI (UART powered up)");
+				(void)eh_cp_feat_cli_start(NULL);
+				if (s_cli_register_cb != NULL) {
+					s_cli_register_cb();
+				}
+				running = true;
+			} else {
+				ESP_LOGI(TAG, "Stopping CLI (UART powering down)");
+				eh_cp_feat_cli_stop();
+				running = false;
+				esp_pm_lock_release(s_cli_pm_lock);
+			}
+			ESP_LOGD(TAG, "CLI task stack left: %u B", (unsigned)uxTaskGetStackHighWaterMark(NULL));
+		}
+	}
+}
+
+static esp_err_t cli_task_init(void)
+{
+	if (s_cli_task != NULL) {
+		return ESP_OK;
+	}
+	esp_err_t ret = esp_pm_lock_create(ESP_PM_NO_LIGHT_SLEEP, 0, "cli", &s_cli_pm_lock);
+	if (ret != ESP_OK) {
+		return ret;
+	}
+	esp_pm_lock_acquire(s_cli_pm_lock);     /* the CLI is running */
+	if (xTaskCreate(cli_task, "cp_cli", CLI_TASK_STACK, NULL, CLI_TASK_PRIO, &s_cli_task) != pdPASS) {
+		esp_pm_lock_release(s_cli_pm_lock);
+		esp_pm_lock_delete(s_cli_pm_lock);
+		s_cli_pm_lock = NULL;
+		return ESP_ERR_NO_MEM;
+	}
+	return ESP_OK;
+}
+
+static inline void set_cli_wanted(bool wanted)
+{
+	if (s_cli_task != NULL) {
+		s_cli_wanted = wanted;
+		xTaskNotifyGive(s_cli_task);
+	}
+}
+#else
+#define CLI_STOPS_IN_LIGHT_SLEEP 0
+#endif
+
 static inline void stop_cli_for_light_sleep(void)
 {
-#if defined(CONFIG_PM_POWER_DOWN_PERIPHERAL_IN_LIGHT_SLEEP) && \
-    defined(CONFIG_ESP_HOSTED_CP_LIGHT_SLEEP_PERIPHERAL_POWERDOWN)
-	ESP_EARLY_LOGI(TAG, "Stopping CLI (UART powering down)");
-	eh_cp_feat_cli_stop();
+#if CLI_STOPS_IN_LIGHT_SLEEP
+	set_cli_wanted(false);
 #endif
 }
 
 static inline void start_cli_after_light_sleep(void)
 {
-#if defined(CONFIG_PM_POWER_DOWN_PERIPHERAL_IN_LIGHT_SLEEP) && \
-    defined(CONFIG_ESP_HOSTED_CP_LIGHT_SLEEP_PERIPHERAL_POWERDOWN)
-	ESP_EARLY_LOGI(TAG, "Restarting CLI (UART powered up)");
-	(void)eh_cp_feat_cli_start(NULL);
+#if CLI_STOPS_IN_LIGHT_SLEEP
+	set_cli_wanted(true);
 #endif
 }
 
@@ -110,6 +197,10 @@ static void on_ready_cb(void)
 
 #ifdef CONFIG_ESP_HOSTED_CP_LIGHT_SLEEP_ENABLE
 	stop_cli_for_light_sleep();
+	/* While the host sleeps, esp_hosted logs two INFO lines for each host-bound
+	 * packet it drops (about one a second). At 115200 baud each costs
+	 * milliseconds awake. Keep the warnings. */
+	esp_log_level_set("ehcp_host_ps", ESP_LOG_WARN);
 	(void)cp_light_sleep_controller_start();
 #else
 	ESP_EARLY_LOGW(TAG, "Light sleep not enabled in menuconfig");
@@ -135,6 +226,7 @@ static void off_ready_cb(void)
 	optional_debug_log_heap_snapshot("off_ready_before");
 
 	start_cli_after_light_sleep();
+	esp_log_level_set("ehcp_host_ps", ESP_LOG_INFO);
 	optional_debug_cycle_end();
 
 	optional_debug_log_heap_snapshot("off_ready_after");
@@ -154,6 +246,14 @@ esp_err_t host_ps_integration_init(void)
 		.host_power_save_off_prepare_cb = off_prepare_cb,
 		.host_power_save_off_ready_cb   = off_ready_cb,
 	};
+
+#if CLI_STOPS_IN_LIGHT_SLEEP
+	esp_err_t cli_ret = cli_task_init();
+	if (cli_ret != ESP_OK) {
+		ESP_LOGE(TAG, "CLI task init failed: %s", esp_err_to_name(cli_ret));
+		return cli_ret;
+	}
+#endif
 
 	esp_err_t ret = eh_cp_feat_host_ps_cp__enable(&cbs);
 	if (ret != ESP_OK) {

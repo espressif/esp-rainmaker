@@ -29,15 +29,25 @@
 #include "eh_cp.h"
 #include "esp_netif.h"
 #include "power_save_handler.h"
+#include "host_ps_integration.h"
 #include "bridge_peer_connection.h"
 #include "esp_work_queue.h"
 #include "sleep_command.h"
+#if CONFIG_IDF_TARGET_ESP32C5 && CONFIG_BT_LE_LP_CLK_SRC_MAIN_XTAL
+#include <network_provisioning/manager.h>
+#include "esp_private/esp_modem_clock.h"
+#endif
 
 static const char *TAG = "app_main";
 
 /* Configuration */
 #define BUTTON_GPIO          CONFIG_EXAMPLE_BOARD_BUTTON_GPIO
 #define BUTTON_ACTIVE_LEVEL  0
+#if CONFIG_ESP_HOSTED_CP_FEAT_HOST_PS && CONFIG_ESP_HOSTED_CP_LIGHT_SLEEP_ENABLE
+#define BUTTON_IRQ_WAKE      true
+#else
+#define BUTTON_IRQ_WAKE      false
+#endif
 /* How long signaling waits for the first SNTP sync after the network is up */
 #define TIME_SYNC_WAIT_MS    15000
 #define WIFI_RESET_BUTTON_TIMEOUT       5
@@ -177,7 +187,29 @@ static esp_err_t initialize_rainmaker_device(void)
         return ESP_FAIL;
     }
 
+    /* Reboot and factory reset from the phone app. The C5 has no reset button,
+     * and its console loses reset-to-factory after a host wake. */
+    esp_rmaker_system_serv_config_t system_serv_config = {
+        .flags = SYSTEM_SERV_FLAGS_ALL,
+        .reboot_seconds = 2,
+        .reset_seconds = 2,
+        .reset_reboot_seconds = 2,
+    };
+    if (esp_rmaker_system_service_enable(&system_serv_config) != ESP_OK) {
+        ESP_LOGW(TAG, "Failed to enable the system service");
+    }
+
     return ESP_OK;
+}
+
+/* esp_hosted's CLI restart on a host wake clears the console command table and adds back
+ * only its own commands, so register the app's again. */
+static void register_cli_after_wake(void)
+{
+    esp_cli_register_cmds();
+    esp_rmaker_common_register_commands();
+    esp_rmaker_register_commands();
+    (void)sleep_command_register_cli();
 }
 
 /* Mode-specific initialization callback for split mode */
@@ -238,6 +270,25 @@ static void on_got_ip(void *arg, esp_event_base_t base, int32_t id, void *data)
     }
 }
 
+#if CONFIG_IDF_TARGET_ESP32C5 && CONFIG_BT_LE_LP_CLK_SRC_MAIN_XTAL
+/* BLE init keeps the main XTAL on through light sleep for its low-power clock.
+ * On the C5, esp_bt_controller_deinit() does not release it: IDF has the
+ * modem_clock_deselect_lp_clock_source(PERIPH_BT_MODULE) calls commented out in
+ * components/bt/controller/esp32c5/bt.c (lines 1115 and 1140 in v5.5.5 and
+ * v6.0.3). The C6 controller makes the same calls. Without this, every light
+ * sleep after BLE provisioning costs about 4-5 mA more. app_network's handler,
+ * registered first, has torn BLE down by now.
+ * IDF fixes this in "fix(bt): fix deselect slow clk missing on ESP32-C5"
+ * It is in v5.5.6 and v6.1.1, and on release/v6.0 after v6.0.3. With that
+ * fix this second call does nothing more. Remove it once the minimum supported
+ * IDF has the fix. */
+static void on_prov_end(void *arg, esp_event_base_t base, int32_t id, void *data)
+{
+    modem_clock_deselect_lp_clock_source(PERIPH_BT_MODULE);
+    ESP_LOGI(TAG, "Provisioning ended: released the BLE XTAL clock");
+}
+#endif
+
 /* Initialize and register the reset button */
 static void initialize_reset_button(void)
 {
@@ -248,12 +299,20 @@ static void initialize_reset_button(void)
     button_gpio_config_t gpio_cfg = {
         .gpio_num = BUTTON_GPIO,
         .active_level = BUTTON_ACTIVE_LEVEL,
-        .enable_power_save = false,
+        /* With CP light sleep, wake on a GPIO interrupt: a polled button runs a
+         * 20 ms timer, which keeps the co-processor out of light sleep. The
+         * interrupt handler needs CONFIG_GPIO_CTRL_FUNC_IN_IRAM, or a press
+         * during a flash write panics. Without light sleep, poll. */
+        .enable_power_save = BUTTON_IRQ_WAKE,
     };
     button_handle_t btn_handle = NULL;
     if (iot_button_new_gpio_device(&btn_cfg, &gpio_cfg, &btn_handle) == ESP_OK && btn_handle) {
         /* Register reset button */
         app_reset_button_register(btn_handle, WIFI_RESET_BUTTON_TIMEOUT, FACTORY_RESET_BUTTON_TIMEOUT);
+    } else {
+        /* A GPIO that cannot wake the chip from light sleep is rejected. On the
+         * ESP32-C5 only GPIO 0-6 can, so the boot button on GPIO 28 is not used. */
+        ESP_LOGW(TAG, "No reset button: GPIO %d cannot wake the chip from light sleep", BUTTON_GPIO);
     }
 }
 
@@ -279,8 +338,12 @@ void app_main(void)
      * the netif above. */
     ESP_ERROR_CHECK(eh_cp_init());
     ESP_ERROR_CHECK(esp_event_handler_register(IP_EVENT, IP_EVENT_STA_GOT_IP, &on_got_ip, NULL));
+#if CONFIG_IDF_TARGET_ESP32C5 && CONFIG_BT_LE_LP_CLK_SRC_MAIN_XTAL
+    ESP_ERROR_CHECK(esp_event_handler_register(NETWORK_PROV_EVENT, NETWORK_PROV_END, &on_prov_end, NULL));
+#endif
 
     /* Before anything can ask the co-processor to sleep */
+    host_ps_integration_set_cli_register_cb(register_cli_after_wake);
     power_save_init();
 
     /* Register an event handler to catch RainMaker common events */
@@ -336,7 +399,8 @@ void app_main(void)
         .init_callback_user_data = NULL,
     };
 
-    /* Wake the P4 on an offer */
+    /* The bridge adapter wakes the P4 for an offer. The media-start wake does
+     * not fire in split mode yet (see power_save_handler.c). */
     power_save_register_webrtc_events();
 
     rmaker_webrtc_camera_init(&camera_config);
