@@ -1,5 +1,36 @@
 # Changelog
 
+## 2.3.0
+
+### New Features
+
+- Local only mode for a node with no network, for example a node that runs only a BLE session. Set
+  `local_only` in `esp_rmaker_config_t`. The node then skips self claiming, the network wait and
+  MQTT, and still posts `RMAKER_EVENT_STARTED`. `esp_rmaker_is_local_only()` reports the mode.
+    - MQTT calls return `ESP_ERR_INVALID_STATE`.
+    - SNTP does not start, and the `wifi-prov` console command returns `ESP_ERR_NOT_SUPPORTED`.
+    - The node has no time source. Enable `CONFIG_ESP_RMAKER_TIME_CURRENT_TIME_PARAM`, and let a
+      client write `Timestamp` on connect, or schedules do not run. A power cycle loses the time.
+    - `esp_rmaker_ota_enable()` returns `ESP_ERR_NOT_SUPPORTED`. An image in
+      `ESP_OTA_IMG_PENDING_VERIFY` is marked valid when the BLE session starts.
+    - With `CONFIG_ESP_RMAKER_ASSISTED_CLAIM`, a node with no client certificate claims over the
+      BLE session. Self claiming needs a network, so a self claiming node needs a pre-flashed client
+      certificate.
+    - The factory random bytes behind the PoP are written at init, because the node does not claim.
+- BLE local control stays available after provisioning when the provisioning manager runs in
+  `NETWORK_PROV_MODE_SESSION_ONLY`. This requires `network_provisioning` 1.4.0 or later.
+
+### Bug Fixes
+
+- Local control set-params now returns an error, with no response, for a payload that is not valid
+  JSON or not a valid set-params fragment. The transport can then detect a lost BLE packet. The
+  Bluedroid transport closes the connection on this error.
+- The buffers of a fragmented get or set-params transfer are now freed when the BLE client that
+  started it disconnects, or when a new BLE client connects. Before, they stayed allocated until
+  provisioning ended.
+- `esp_rmaker_node_auth_sign_msg()` no longer leaks a copy of the client private key on every
+  signature.
+
 ## 2.2.1
 
 ### Bug Fixes
