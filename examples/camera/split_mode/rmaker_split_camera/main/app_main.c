@@ -31,6 +31,7 @@
 #include "power_save_handler.h"
 #include "host_ps_integration.h"
 #include "bridge_peer_connection.h"
+#include "webrtc_bridge.h"
 #include "esp_work_queue.h"
 #include "sleep_command.h"
 #if CONFIG_IDF_TARGET_ESP32C5 && CONFIG_BT_LE_LP_CLK_SRC_MAIN_XTAL
@@ -234,6 +235,13 @@ static int split_mode_init_callback(void *user_data)
     /* Register sleep commands for power management */
     if (sleep_command_register_cli() != 0) {
         ESP_LOGE(TAG, "Failed to register sleep commands");
+        return -1;
+    }
+
+    /* The bridge command framework must exist before app_webrtc_init(), which
+     * registers internal handlers (e.g. GET_TIME) through it. */
+    if (bridge_cmd_init() != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to initialize the bridge command framework");
         return -1;
     }
 

@@ -36,6 +36,9 @@ dependencies:
   signaling_bridge_adapter:
     path: ${KVS_SDK_PATH}/components/signaling_bridge_adapter
     version: "*"
+  webrtc_bridge:
+    path: ${KVS_SDK_PATH}/components/webrtc_bridge
+    version: "*"
 
   # Local components
   rmaker_camera:
