@@ -247,7 +247,8 @@ esp_rmaker_aws_credentials_t* esp_rmaker_get_aws_security_token(const char *role
     client_cert_pem = NULL;
     client_key_pem = NULL;
 
-    ESP_LOGI(TAG, "Response: %s", resp);
+    /* The body holds the secret key and session token, so only its size is logged. */
+    ESP_LOGI(TAG, "Received credentials response (%d bytes)", (int)strlen(resp));
 
     /* Parse response JSON using json_parser */
     jparse_ctx_t jctx;
