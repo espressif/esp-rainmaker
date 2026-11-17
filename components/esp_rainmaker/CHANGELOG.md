@@ -1,5 +1,12 @@
 # Changelog
 
+## 2.1.1
+
+### Bug Fixes
+
+- AWS credentials: stop logging the credential provider's response, which holds the secret key and
+  session token. Only its size is logged.
+
 ## 2.1.0
 
 ### New Features
