@@ -95,9 +95,15 @@ jobs:
           cd build
           TARGET_CHIP=`cat project_description.json | python3 -c 'import sys,json; print(json.load(sys.stdin)["target"])'`
           APP_BIN=`cat project_description.json | python3 -c 'import sys,json; print(json.load(sys.stdin)["app_bin"])'`
+          APP_ELF=`cat project_description.json | python3 -c 'import sys,json; print(json.load(sys.stdin)["app_elf"])'`
 
           OUT_BIN=$ESP_RMAKER_PATH/images/"$TARGET_CHIP"_RainMaker_"$APP_BIN"
           esptool.py --chip $TARGET_CHIP merge_bin -o $OUT_BIN @flash_args
+
+          # Keeps .symtab for function names and .debug_frame for the RISC-V GDB unwind.
+          TOOLPREFIX=`cat project_description.json | python3 -c 'import sys,json; print(json.load(sys.stdin)["monitor_toolprefix"])'`
+          "${TOOLPREFIX}objcopy" --strip-debug --keep-section=.debug_frame "$APP_ELF" app_stripped.elf
+          gzip -9nc app_stripped.elf > "${OUT_BIN%.bin}.elf.gz"
 
       - name: Set artifact name
         id: artifact
@@ -148,6 +154,24 @@ jobs:
           echo "- ESP-IDF: [`git -C $IDF_PATH rev-parse HEAD`](https://github.com/espressif/esp-idf/tree/`git -C $IDF_PATH rev-parse HEAD`)" >> build_cfg.md
           echo "- ESP-RainMaker: [${{steps.checkout.outputs.commit}}](https://github.com/espressif/esp-rainmaker/tree/${{steps.checkout.outputs.commit}})" >> build_cfg.md
           echo "" >> build_cfg.md
+          echo "" >> build_cfg.md
+
+          echo "#### Debug Symbols" >> build_cfg.md
+          echo "" >> build_cfg.md
+          echo "Each image has a gzipped app ELF next to it, at \`<target>_RainMaker_<app>.elf.gz\`." >> build_cfg.md
+          echo "The ELF has no DWARF debug info except \`.debug_frame\`, so a backtrace decodes to function names only." >> build_cfg.md
+          echo "Use it to decode a backtrace from a device that runs that image:" >> build_cfg.md
+          echo "" >> build_cfg.md
+          echo "\`\`\`" >> build_cfg.md
+          echo "gunzip <target>_RainMaker_<app>.elf.gz" >> build_cfg.md
+          echo "# Xtensa targets:" >> build_cfg.md
+          echo "python -m esp_idf_monitor -p <port> --target <target> --toolchain-prefix xtensa-<target>-elf- <target>_RainMaker_<app>.elf" >> build_cfg.md
+          echo "# RISC-V targets:" >> build_cfg.md
+          echo "python -m esp_idf_monitor -p <port> --decode-panic backtrace --target <target> --toolchain-prefix riscv32-esp-elf- <target>_RainMaker_<app>.elf" >> build_cfg.md
+          echo "\`\`\`" >> build_cfg.md
+          echo "" >> build_cfg.md
+          echo "The monitor prints \"Checksum mismatch between flashed and built applications\" for this ELF." >> build_cfg.md
+          echo "This is expected: the firmware records the checksum of the full ELF, before the strip step." >> build_cfg.md
           echo "" >> build_cfg.md
 
           cat $ESP_RMAKER_PATH/tools/launchpad/app_link_guide.md >> build_cfg.md
