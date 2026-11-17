@@ -15,4 +15,16 @@ menu "RainMaker User API Configuration"
             Enable helper C APIs for common User API handling so that creating the HTTP requests and parsing the responses can be avoided.
             Refer the header file for more info.
 
+    config RM_USER_HTTP_TX_BUFFER_SIZE
+        int "HTTP TX Buffer Size"
+        range 2048 16384
+        default 2048
+        help
+            Set the buffer size, in bytes, for the HTTP request line and headers,
+            including the access token in the Authorization header.
+            If the buffer is too small to hold them, every authenticated User API
+            call fails with a timeout. Request bodies are written separately and
+            are not limited by this buffer. Increase this value for longer access
+            tokens, at the cost of higher heap usage per HTTP client.
+
 endmenu
