@@ -13,6 +13,3 @@
 # C6 won't enumerate over the P4-EYE's C6 socket wiring.
 #
 CONFIG_ESP32P4_EYE_C6_BOARD=y
-# CONFIG_ESP_HOST_DEV_BOARD_NONE is not set
-# CONFIG_ESP_HOST_DEV_BOARD_P4_FUNC_BOARD is not set
-# CONFIG_ESP_HOST_DEV_BOARD_P4_C6_CORE is not set

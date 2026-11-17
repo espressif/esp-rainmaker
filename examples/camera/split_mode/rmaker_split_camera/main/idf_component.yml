@@ -2,7 +2,7 @@
 dependencies:
   ## Required IDF version
   idf:
-    version: ">=5.4.0"
+    version: ">=5.5.5"
   espressif/esp_rainmaker:
     version: ">=1.0"
     override_path: ../../../../../components/esp_rainmaker
@@ -20,11 +20,13 @@ dependencies:
     version: "*"
 
   # Components from KVS SDK
-  network_coprocessor:
-    version: "*"
-    path: ${KVS_SDK_PATH}/components/network_coprocessor
+  # This build is the esp_hosted co-processor: it runs signaling locally and
+  # serves the P4 host over SDIO. Keep the version in step with the host side
+  # (the KVS SDK's streaming_only).
+  espressif/esp_hosted:
+    version: "3.1.0"
     rules:
-      - if: "target in [esp32c6]"
+      - if: "target in [esp32c6, esp32c5]"
   esp_webrtc_utils:
     path: ${KVS_SDK_PATH}/components/esp_webrtc_utils
     version: "*"
@@ -33,6 +35,9 @@ dependencies:
     version: "*"
   signaling_bridge_adapter:
     path: ${KVS_SDK_PATH}/components/signaling_bridge_adapter
+    version: "*"
+  webrtc_bridge:
+    path: ${KVS_SDK_PATH}/components/webrtc_bridge
     version: "*"
 
   # Local components

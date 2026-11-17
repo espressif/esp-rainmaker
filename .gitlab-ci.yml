@@ -310,11 +310,13 @@ build_standalone_camera:
 
 build_split_camera:
   extends: .build_template
+  # The co-processor runs esp_hosted 3.x, whose SDIO SW aggregation sends more
+  # than 4092 bytes at a time. v5.5.5 is the first v5.5 release without that cap.
   image: espressif/idf:v5.5.5
   variables:
     # deprecated-declarations demoted: only hit is third-party esp_lvgl_port 2.8.0 (revisit).
     PEDANTIC_FLAGS: "-Werror -Wno-error=deprecated-declarations -Wno-error=cpp -Wno-error=int-to-pointer-cast -Wno-error=pointer-to-int-cast"
-    EXAMPLE_TARGETS: "esp32c6"
+    EXAMPLE_TARGETS: "esp32c6 esp32c5"
     EXAMPLES: "camera/split_mode/rmaker_split_camera"
   script:
     - *build_camera_examples

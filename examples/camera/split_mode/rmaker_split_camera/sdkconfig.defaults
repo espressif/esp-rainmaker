@@ -142,10 +142,37 @@ CONFIG_ESP_RMAKER_ASSISTED_CLAIM=y
 #
 CONFIG_ENABLE_SIGNALLING_ONLY=y
 
-# ESP-Hosted network coprocessor (this C6 IS the SDIO slave firmware on the new
-# SDK). Build the slave sources, carry Wi-Fi only, own app_main.
-CONFIG_NETWORK_COPROCESSOR_BUILD_FIRMWARE=y
-CONFIG_ESP_HOSTED_CP_WIFI=y
-CONFIG_ESP_HOSTED_CP_BT=n
-CONFIG_ESP_HOSTED_NETWORK_SPLIT_ENABLED=y
-CONFIG_ESP_HOSTED_COPROCESSOR_APP_MAIN=n
+# This build IS the esp_hosted co-processor: it runs KVS signaling locally and
+# serves the P4 host over SDIO. Wi-Fi only; the co-processor provisions over BLE
+# itself, so hosted carries no BT.
+CONFIG_ESP_HOSTED=y
+CONFIG_ESP_HOSTED_CP=y
+CONFIG_ESP_HOSTED_CP_FOR_MCU=y
+CONFIG_ESP_HOSTED_CP_RPC_V2=y
+CONFIG_ESP_HOSTED_CP_FEAT_WIFI=y
+CONFIG_ESP_HOSTED_CP_FEAT_BT=n
+CONFIG_ESP_HOSTED_CP_FEAT_NW_SPLIT=y
+
+# The bridge carries signaling and commands over the peer-data channel.
+CONFIG_ESP_HOSTED_CP_FEAT_PEER_DATA=y
+
+# app_main owns init ordering: the netif is created before eh_cp_init().
+CONFIG_ESP_HOSTED_AUTO_CALL_INIT_BEFORE_APP_MAIN=n
+
+# Under network split the host drives association; the co-processor must not
+# start its own connect attempt when the STA interface comes up. RainMaker's
+# app_network does the connect.
+CONFIG_ESP_HOSTED_CP_FEAT_NW_SPLIT_WIFI_AUTO_CONNECT_ON_STA_START=n
+
+# Packets that match no port rule go to the host. The co-processor runs only
+# signaling, whose sockets sit in its own port range; the host runs WebRTC and
+# must receive STUN/TURN replies and media on its ephemeral ports.
+CONFIG_ESP_HOSTED_DEFAULT_NETWORK_STACK_HOST=y
+
+# The P4 host calls esp_wifi_init() over RPC after a deep-sleep wake. If its init
+# config differs from ours, hosted re-initialises Wi-Fi and drops the link, so
+# keep Enterprise off on both sides.
+CONFIG_ESP_WIFI_ENTERPRISE_SUPPORT=n
+
+# Share the application's console instead of opening a second one.
+CONFIG_ESP_HOSTED_CP_CLI_NEW_INSTANCE=n

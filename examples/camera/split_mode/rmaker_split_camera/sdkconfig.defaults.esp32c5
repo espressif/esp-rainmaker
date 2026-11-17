@@ -1,0 +1,186 @@
+# ESP32-C5 specific configuration for rmaker_split_camera.
+#
+# Derived from the KVS SDK's examples/signaling_only/sdkconfig.defaults.esp32c5
+# (host deep sleep + CP light sleep). Keep the Wi-Fi init values below equal to
+# that file: the P4 side (streaming_only) is aligned to them, and a mismatch
+# makes hosted re-initialise Wi-Fi on every host wake.
+
+# 1. CPU
+#--------
+CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ_240=y
+
+# 2. BT Configuration
+#---------------------
+CONFIG_BT_ENABLED=y
+CONFIG_BT_LE_SLEEP_ENABLE=y
+
+# The co-processor provisions over BLE itself with its own NimBLE host
+# (CONFIG_BT_NIMBLE_ENABLED in sdkconfig.defaults).
+
+# BLE is used only for provisioning. Keep it out of internal RAM: NimBLE
+# allocates from PSRAM and the controller runs from flash.
+CONFIG_BT_NIMBLE_MEM_ALLOC_MODE_EXTERNAL=y
+CONFIG_BT_CTRL_RUN_IN_FLASH_ONLY=y
+
+# 3.1 BLE over SPI/SDIO
+#-----------------------
+CONFIG_BT_LE_HCI_INTERFACE_USE_RAM=y
+
+# 3.2 BLE over UART
+#-------------------
+# Enable below config, delete sdkconfig, build/ and rebuild
+# CONFIG_BT_LE_HCI_INTERFACE_USE_UART=y
+# CONFIG_BT_LE_HCI_UART_TX_PIN=5
+# CONFIG_BT_LE_HCI_UART_RX_PIN=18
+# CONFIG_BT_LE_HCI_UART_FLOWCTRL=n
+# #CONFIG_BT_LE_HCI_UART_RTS_PIN=19
+# #CONFIG_BT_LE_HCI_UART_CTS_PIN=8
+
+
+# 5. Mempool
+#------------
+CONFIG_ESP_CACHE_MALLOC=y
+
+
+# 6. Examples
+#-------------------------
+
+
+# 7. Transport config
+#---------------------
+# CONFIG_ESP_SDIO_NSEND_PSAMPLE=y
+# CONFIG_ESP_SDIO_DEFAULT_SPEED=y
+# CONFIG_ESP_SDIO_STREAMING_MODE=n
+
+
+# 8. Wifi config
+#----------------
+CONFIG_ESP_WIFI_AMPDU_TX_ENABLED=y
+CONFIG_ESP_WIFI_AMPDU_RX_ENABLED=y
+
+CONFIG_ESP_WIFI_RX_IRAM_OPT=n
+CONFIG_ESP_WIFI_IRAM_OPT=n
+CONFIG_ESP_WIFI_EXTRA_IRAM_OPT=n
+# The others above trade IRAM for throughput and stay off. This one is the
+# Wi-Fi sleep path, which runs while flash and cache are down under CP light
+# sleep, so it must be in IRAM.
+CONFIG_ESP_WIFI_SLP_IRAM_OPT=y
+
+# 9. LWIP config
+#----------------
+CONFIG_LWIP_TCP_SND_BUF_DEFAULT=11520
+CONFIG_LWIP_TCP_WND_DEFAULT=11520
+CONFIG_LWIP_TCP_RECVMBOX_SIZE=16
+CONFIG_LWIP_UDP_RECVMBOX_SIZE=16
+CONFIG_LWIP_TCPIP_RECVMBOX_SIZE=32
+CONFIG_LWIP_TCP_SACK_OUT=y
+CONFIG_LWIP_TCPIP_CORE_LOCKING=y
+CONFIG_LWIP_TCPIP_CORE_LOCKING_INPUT=y
+CONFIG_LWIP_L2_TO_L3_COPY=y
+
+# 10. Optimizations
+#-------------------
+CONFIG_COMPILER_OPTIMIZATION_SIZE=y
+CONFIG_ESPTOOLPY_FLASHMODE_QIO=y
+CONFIG_ESPTOOLPY_FLASHFREQ_80M=y
+
+# 11. Stats
+#-----------
+#CONFIG_ESP_HOSTED_FUNCTION_PROFILING=y
+# Transport packet stats print every 30 s on a co-processor that is meant to be
+# asleep: each line is a CPU wake and a blocking UART write. hosted ships this
+# default n. Uncomment for bench work.
+# CONFIG_ESP_PKT_STATS=y
+
+# 13. Mem optimizations
+#---------------------
+CONFIG_FREERTOS_PLACE_FUNCTIONS_INTO_FLASH=y
+
+# 14. SPIRAM config
+CONFIG_SPIRAM=y
+CONFIG_SPIRAM_MODE_QUAD=y
+CONFIG_SPIRAM_SPEED_80M=y
+# RainMaker (MQTT, params) on top of hosted and signaling leaves the C5's
+# internal RAM at ~15 KB lowest-ever, and task creation and the KVS WebSocket
+# handshake fail there. Let even small mallocs go to PSRAM, as RainMaker's
+# common defaults do; drivers that need internal RAM ask for it explicitly.
+CONFIG_SPIRAM_MALLOC_ALWAYSINTERNAL=0
+CONFIG_SPIRAM_TRY_ALLOCATE_WIFI_LWIP=y
+# esp_hosted frees its SDIO DMA aggregation buffer (15872 B) while the host
+# sleeps and allocates it again in internal RAM at every host wake.
+CONFIG_SPIRAM_MALLOC_RESERVE_INTERNAL=65536
+CONFIG_SPIRAM_ALLOW_BSS_SEG_EXTERNAL_MEMORY=y
+CONFIG_SPIRAM_ALLOW_NOINIT_SEG_EXTERNAL_MEMORY=y
+CONFIG_NVS_ALLOCATE_CACHE_IN_SPIRAM=y
+
+#
+# ESP-Hosted - Network coprocessor
+#
+CONFIG_ESP_HOSTED_CP_FEAT_NW_SPLIT=y
+CONFIG_EH_TRANSPORT_CP_SDIO_RX_Q_SIZE=10
+CONFIG_EH_TRANSPORT_CP_SDIO_TX_Q_SIZE=10
+
+CONFIG_ESP_HOSTED_CP_FEAT_BT=n
+
+# Hosted : Host deep sleep & wake up
+CONFIG_ESP_HOSTED_CP_FEAT_HOST_PS=y
+CONFIG_ESP_HOSTED_CP_FEAT_HOST_PS_DEEP_SLEEP=y
+CONFIG_ESP_HOSTED_CP_FEAT_HOST_PS_UNLOAD_BUS_WHILE_SLEEPING=y
+# P4-C5 core board pin; another board overlay must set its own. Without a
+# value esp_hosted leaves the pin at -1 and its #error stops the build.
+CONFIG_ESP_HOSTED_CP_FEAT_HOST_PS_HOST_WAKEUP_GPIO=3
+# Each signaling keep-alive ping wakes the radio. The default is 10 s.
+CONFIG_KVS_SIGNALING_WSS_PING_INTERVAL_SEC=60
+
+# Hosted - Light sleep on Deep sleep
+CONFIG_PM_ENABLE=y
+# Enable peripheral powerdown for maximum power saving during light sleep
+# This requires proper IRAM placement for ISR handlers
+CONFIG_PM_POWER_DOWN_PERIPHERAL_IN_LIGHT_SLEEP=y
+CONFIG_FREERTOS_USE_TICKLESS_IDLE=y
+CONFIG_BT_LE_SLEEP_ENABLE=y
+# ESP_HOSTED_CP_LIGHT_SLEEP_ENABLE is a promptless helper derived from this
+# choice; assigning it directly has no effect. POWER_MAX is the mode that
+# selects the PM, tickless-idle, bus-unload and peripheral-powerdown options
+# already listed above.
+CONFIG_ESP_HOSTED_CP_LIGHT_SLEEP_POWER_MAX=y
+CONFIG_ESP_HOSTED_CP_LIGHT_SLEEP_MIN_FREQ_MHZ=12
+
+# The sleep path itself must survive with flash and cache down. Without these
+# the co-processor resets at the moment light sleep is entered. Hosted's own
+# light-sleep example sets the same group.
+CONFIG_PM_SLP_IRAM_OPT=y
+CONFIG_PM_SLEEP_FUNC_IN_IRAM=y
+CONFIG_PM_RTOS_IDLE_OPT=y
+CONFIG_PM_SLP_DEFAULT_PARAMS_OPT=y
+# The reset button wakes the chip through a GPIO interrupt. Its handler calls
+# gpio_intr_disable(), which must run from IRAM during a flash write.
+CONFIG_GPIO_CTRL_FUNC_IN_IRAM=y
+# FreeRTOS and the ringbuf stay in flash. Pulling them into IRAM costs about
+# 30 KiB of internal RAM, and softAP then fails to allocate its beacon buffer.
+CONFIG_FREERTOS_USE_TRACE_FACILITY=y
+
+# The board is selected by sdkconfig.defaults.p4_c5_core_board.esp32c5, not
+# here: these defaults stay board-neutral. The old name assigned at this
+# point had no 3.x counterpart and did nothing.
+
+# ─── Aligned with esp_hosted's power-save reference ────────────────────────────
+# examples/power_save/host+cp/network_split__host_deep_sleep_cp_light_sleep/cp,
+# ESP32-C5 values. See the esp32c6 defaults for the same block; Bluetooth and
+# the partition table stay application-specific.
+CONFIG_ESP_HOSTED_CP_FEAT_HOST_PS_AUTO_INIT=n
+
+CONFIG_ESP_WIFI_STATIC_RX_BUFFER_NUM=10
+CONFIG_ESP_WIFI_DYNAMIC_RX_BUFFER_NUM=32
+# The example sets CONFIG_ESP_WIFI_DYNAMIC_TX_BUFFER_NUM. It has no effect
+# while the Wi-Fi TX buffers are static, which is what this build resolves to:
+# sdkconfig.defaults asks for dynamic but the request never applies. Left out
+# rather than carried as a line that does nothing.
+CONFIG_ESP_WIFI_AMPDU_TX_ENABLED=y
+CONFIG_ESP_WIFI_TX_BA_WIN=16
+CONFIG_ESP_WIFI_AMPDU_RX_ENABLED=y
+CONFIG_ESP_WIFI_RX_BA_WIN=16
+
+# C5 light-sleep specifics from the example.
+CONFIG_ESP_PHY_MAC_BB_PD=y
+CONFIG_ESP_WIFI_ENHANCED_LIGHT_SLEEP=y

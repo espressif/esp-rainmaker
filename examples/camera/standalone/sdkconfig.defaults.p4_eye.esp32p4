@@ -38,14 +38,11 @@ CONFIG_PARTITION_TABLE_FILENAME="partitions.16mb.csv"
 #
 # Slave flasher - P4-EYE ships with the C6 on the same PCB, so the P4 image
 # carries the C6 network_adapter binaries in the slave SPIFFS partition and
-# flashes them on boot over UART. Addresses MUST match the network_adapter C6
-# partition layout (table at 0x8000, first app slot at 0x10000); the component
-# defaults (0xC000 / 0x20000) target a different layout and brick the C6 boot
-# chain. EV / Function dev boards use ESP-Prog on the C6 instead; overlays off.
+# flashes them on boot over UART. The network_adapter C6 layout (partition
+# table at 0xC000, app at 0x20000) matches the component defaults.
+# EV / Function dev boards use ESP-Prog on the C6 instead; overlays off.
 #
 CONFIG_SLAVE_FLASHER_ENABLE=y
-CONFIG_SLAVE_PARTITION_TABLE_ADDRESS=0x8000
-CONFIG_SLAVE_APPLICATION_ADDRESS=0x10000
 CONFIG_SLAVE_UART_RX_PIN=36
 CONFIG_SLAVE_UART_TX_PIN=35
 CONFIG_SLAVE_GPIO0_TRIGGER_PIN=33
@@ -82,3 +79,9 @@ CONFIG_LV_DISP_DEF_REFR_PERIOD=200
 CONFIG_BSP_DISPLAY_LVGL_MAX_SLEEP=100
 CONFIG_ESP_TASK_WDT_TIMEOUT_S=15
 CONFIG_LV_COLOR_16_SWAP=y
+
+# This board flashes its own co-processor. esp_hosted's auto-init is a C
+# constructor that runs before app_main, so it would reset the co-processor and
+# start SDIO enumeration while slave_flasher still holds it in ROM download
+# mode. Bring-up then times out. The app brings hosted up itself after flashing.
+CONFIG_ESP_HOSTED_AUTO_CALL_INIT_BEFORE_APP_MAIN=n

@@ -1,5 +1,12 @@
 # Changes
 
+## 17-Nov-2026: camera examples on esp_hosted 3.1.0
+
+- The camera examples take esp_hosted 3.1.0 from the component manager. The split camera
+  needs ESP-IDF v5.5.5 or later on v5.5, v6.0.3 or later on v6.0, or v6.1 and later.
+- esp_hosted 3.x renamed its Kconfig options. Regenerate a saved `sdkconfig`, and move a
+  custom board overlay to the 3.x names used by the example overlays.
+
 ## 05-Nov-2026: json_parser 2.0.0 and json_generator 2.1.0
 
 **IMPORTANT BEHAVIORAL CHANGES**: The build does not fail on these changes. Check the application
