@@ -8,6 +8,7 @@
 #include <esp_log.h>
 #include <esp_idf_version.h>
 #include "mbedtls/platform.h"
+#include "mbedtls/platform_util.h"
 #include "mbedtls/pk.h"
 #if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(6, 0, 0)
 #include "mbedtls/md.h"
@@ -471,6 +472,10 @@ cleanup:
     }
     if (char_signature) {
         free(char_signature);
+    }
+    if (priv_key) {
+        mbedtls_platform_zeroize(priv_key, priv_key_len);
+        free(priv_key);
     }
     mbedtls_pk_free(&pk_ctx);
 #if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(6, 0, 0) && defined(CONFIG_ESP_RMAKER_USE_ESP_SECURE_CERT_MGR) && defined(CONFIG_MBEDTLS_HARDWARE_ECDSA_SIGN)
