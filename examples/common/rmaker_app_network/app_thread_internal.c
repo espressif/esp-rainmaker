@@ -14,6 +14,7 @@
 #include <freertos/event_groups.h>
 #include <freertos/task.h>
 #include <app_network.h>
+#include <app_network_mode.h>
 
 #ifdef CONFIG_NETWORK_PROV_NETWORK_TYPE_THREAD
 #include <app_thread_internal.h>
@@ -61,7 +62,11 @@ static void event_handler(void* arg, esp_event_base_t event_base,
     if (event_base == NETWORK_PROV_EVENT) {
         switch (event_id) {
         case NETWORK_PROV_START:
+#if APP_NETWORK_BLE_PERSISTENT_SESSION
+            ESP_LOGI(TAG, "BLE session started");
+#else
             ESP_LOGI(TAG, "Provisioning started");
+#endif
             break;
         case NETWORK_PROV_THREAD_DATASET_RECV: {
             break;
@@ -90,6 +95,7 @@ static void event_handler(void* arg, esp_event_base_t event_base,
     }
 }
 
+#if APP_NETWORK_PROV_ENABLED
 static esp_netif_t* init_openthread_netif(const esp_openthread_platform_config_t* config)
 {
     esp_netif_config_t cfg = ESP_NETIF_DEFAULT_OPENTHREAD();
@@ -126,22 +132,26 @@ static void ot_task_worker(void* aContext)
     esp_vfs_eventfd_unregister();
     vTaskDelete(NULL);
 }
+#endif /* APP_NETWORK_PROV_ENABLED */
 #endif /* CONFIG_NETWORK_PROV_NETWORK_TYPE_THREAD */
 
 esp_err_t thread_init()
 {
 #ifdef CONFIG_NETWORK_PROV_NETWORK_TYPE_THREAD
-    /* Initialize TCP/IP */
+    /* Initialize TCP/IP. Required even without the OpenThread stack, since
+     * RainMaker calls into lwIP unconditionally at boot. */
     esp_netif_init();
 
     /* Register our event handler for OpenThread and Provisioning related events */
     ESP_ERROR_CHECK(esp_event_handler_register(NETWORK_PROV_EVENT, ESP_EVENT_ANY_ID, &event_handler, NULL));
 
+#if APP_NETWORK_PROV_ENABLED
     esp_vfs_eventfd_config_t eventfd_config = {
         .max_fds = 3,
     };
     ESP_ERROR_CHECK(esp_vfs_eventfd_register(&eventfd_config));
     xTaskCreate(ot_task_worker, "ot_task", 6144, xTaskGetCurrentTaskHandle(), 5, NULL);
+#endif /* APP_NETWORK_PROV_ENABLED */
     return ESP_OK;
 #else
     return ESP_ERR_NOT_SUPPORTED;
@@ -152,10 +162,17 @@ esp_err_t thread_start(const char *pop, const char *service_name, const char *se
                        size_t mfg_data_len, bool *provisioned)
 {
 #ifdef CONFIG_NETWORK_PROV_NETWORK_TYPE_THREAD
+    *provisioned = false;
+
     /* Configuration for the provisioning manager */
     network_prov_mgr_config_t config = {
         .scheme = network_prov_scheme_ble,
 
+#if APP_NETWORK_BLE_PERSISTENT_SESSION
+        /* BLE outlives provisioning, so release Classic BT memory only. */
+        .mode = NETWORK_PROV_MODE_SESSION_ONLY,
+        .scheme_event_handler = NETWORK_PROV_SCHEME_BLE_EVENT_HANDLER_FREE_BT,
+#else
         /* Any default scheme specific event handler that you would
          * like to choose. Since our example application requires
          * neither BT nor BLE, we can choose to release the associated
@@ -163,76 +180,95 @@ esp_err_t thread_start(const char *pop, const char *service_name, const char *se
          * (in case when device is already provisioned). Choosing
          * appropriate scheme specific event handler allows the manager
          * to take care of this automatically.*/
-        .scheme_event_handler = NETWORK_PROV_SCHEME_BLE_EVENT_HANDLER_FREE_BTDM
+        .scheme_event_handler = NETWORK_PROV_SCHEME_BLE_EVENT_HANDLER_FREE_BTDM,
+#endif /* APP_NETWORK_BLE_PERSISTENT_SESSION */
     };
 
     /* Initialize provisioning manager with the
      * configuration parameters set above */
     ESP_ERROR_CHECK(network_prov_mgr_init(config));
 
-    /* Let's find out if the device is provisioned */
-    ESP_ERROR_CHECK(network_prov_mgr_is_thread_provisioned(provisioned));
-    /* If device is not yet provisioned start provisioning service */
-    if (!(*provisioned)) {
-        ESP_LOGI(TAG, "Starting provisioning");
-
-        /* What is the security level that we want (0, 1, or 2):
-         *      - NETWORK_PROV_SECURITY_0 is simply plain text communication.
-         *      - NETWORK_PROV_SECURITY_1 is secure communication which consists of secure handshake
-         *          using X25519 key exchange and proof of possession (pop) and AES-CTR
-         *          for encryption/decryption of messages.
-         *      - NETWORK_PROV_SECURITY_2 is SRP6a based authentication and key exchange
-         *        + AES-GCM encryption/decryption of messages
-         */
+    /* What is the security level that we want (0, 1, or 2):
+     *      - NETWORK_PROV_SECURITY_0 is simply plain text communication.
+     *      - NETWORK_PROV_SECURITY_1 is secure communication which consists of secure handshake
+     *          using X25519 key exchange and proof of possession (pop) and AES-CTR
+     *          for encryption/decryption of messages.
+     *      - NETWORK_PROV_SECURITY_2 is SRP6a based authentication and key exchange
+     *        + AES-GCM encryption/decryption of messages
+     */
 #if CONFIG_APP_PROV_SECURITY_VERSION_2
-        network_prov_security_t security = NETWORK_PROV_SECURITY_2;
-        network_prov_security2_params_t sec2_params = {};
-        sec2_params.salt = sec_salt;
-        sec2_params.salt_len = sec_salt_len;
-        sec2_params.verifier = sec_verifier;
-        sec2_params.verifier_len = sec_verifier_len;
-        network_prov_security2_params_t *sec_params = &sec2_params;
+    network_prov_security_t security = NETWORK_PROV_SECURITY_2;
+    /* The manager keeps this pointer and dereferences it at handshake time. */
+    static network_prov_security2_params_t sec2_params;
+    sec2_params.salt = sec_salt;
+    sec2_params.salt_len = sec_salt_len;
+    sec2_params.verifier = sec_verifier;
+    sec2_params.verifier_len = sec_verifier_len;
+    network_prov_security2_params_t *sec_params = &sec2_params;
 #else
-        network_prov_security_t security = NETWORK_PROV_SECURITY_1;
-        network_prov_security1_params_t *sec_params = pop;
+    network_prov_security_t security = NETWORK_PROV_SECURITY_1;
+    network_prov_security1_params_t *sec_params = pop;
 #endif
 
-        /* This step is only useful when scheme is network_prov_scheme_ble. This will
-         * set a custom 128 bit UUID which will be included in the BLE advertisement
-         * and will correspond to the primary GATT service that provides provisioning
-         * endpoints as GATT characteristics. Each GATT characteristic will be
-         * formed using the primary service UUID as base, with different auto assigned
-         * 12th and 13th bytes (assume counting starts from 0th byte). The client side
-         * applications must identify the endpoints by reading the User Characteristic
-         * Description descriptor (0x2901) for each characteristic, which contains the
-         * endpoint name of the characteristic */
-        uint8_t custom_service_uuid[] = {
-            /* This is a random uuid. This can be modified if you want to change the BLE uuid. */
-            /* 12th and 13th bit will be replaced by internal bits. */
-            0xb4, 0xdf, 0x5a, 0x1c, 0x3f, 0x6b, 0xf4, 0xbf,
-            0xea, 0x4a,0x82, 0x03, 0x04, 0x90, 0x1a, 0x02,
-        };
-        esp_err_t err = network_prov_scheme_ble_set_service_uuid(custom_service_uuid);
+    /* This step is only useful when scheme is network_prov_scheme_ble. This will
+     * set a custom 128 bit UUID which will be included in the BLE advertisement
+     * and will correspond to the primary GATT service that provides provisioning
+     * endpoints as GATT characteristics. Each GATT characteristic will be
+     * formed using the primary service UUID as base, with different auto assigned
+     * 12th and 13th bytes (assume counting starts from 0th byte). The client side
+     * applications must identify the endpoints by reading the User Characteristic
+     * Description descriptor (0x2901) for each characteristic, which contains the
+     * endpoint name of the characteristic */
+    /* Static: the scheme keeps this pointer and reads it when it starts the advert. */
+    static uint8_t custom_service_uuid[] = {
+        /* This is a random uuid. This can be modified if you want to change the BLE uuid. */
+        /* 12th and 13th bit will be replaced by internal bits. */
+        0xb4, 0xdf, 0x5a, 0x1c, 0x3f, 0x6b, 0xf4, 0xbf,
+        0xea, 0x4a,0x82, 0x03, 0x04, 0x90, 0x1a, 0x02,
+    };
+    esp_err_t err = network_prov_scheme_ble_set_service_uuid(custom_service_uuid);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "thread_prov_scheme_ble_set_service_uuid failed %d", err);
+        return err;
+    }
+
+    if (mfg_data) {
+        err = network_prov_scheme_ble_set_mfg_data(mfg_data, mfg_data_len);
         if (err != ESP_OK) {
-            ESP_LOGE(TAG, "thread_prov_scheme_ble_set_service_uuid failed %d", err);
+            ESP_LOGE(TAG, "Failed to set mfg data, err=0x%x", err);
             return err;
         }
+    }
 
-        if (mfg_data) {
-            err = network_prov_scheme_ble_set_mfg_data(mfg_data, mfg_data_len);
-            if (err != ESP_OK) {
-                ESP_LOGE(TAG, "Failed to set mfg data, err=0x%x", err);
-                return err;
-            }
-        }
+#if APP_NETWORK_PROV_ENABLED
+    /* Let's find out if the device is provisioned */
+    ESP_ERROR_CHECK(network_prov_mgr_is_thread_provisioned(provisioned));
+#endif /* APP_NETWORK_PROV_ENABLED */
 
+    /* If device is not yet provisioned start provisioning service */
+    if (!(*provisioned)) {
+#if APP_NETWORK_PROV_ENABLED
+        ESP_LOGI(TAG, "Starting provisioning");
+#if APP_NETWORK_BLE_PERSISTENT_SESSION
+        /* Layer the provisioning endpoints on top of the BLE session. */
+        ESP_ERROR_CHECK(network_prov_mgr_enable_provisioning());
+#endif
+#else
+        ESP_LOGI(TAG, "Starting BLE session");
+#endif /* APP_NETWORK_PROV_ENABLED */
         /* Start provisioning service */
         ESP_ERROR_CHECK(network_prov_mgr_start_provisioning(security, (const void *) sec_params, service_name, service_key));
     } else {
         ESP_LOGI(TAG, "Already provisioned, enabling netif and starting Thread");
+#if APP_NETWORK_BLE_PERSISTENT_SESSION
+        /* Start the session without the provisioning endpoints, so that other
+         * modules keep their endpoints and the stored dataset is left alone. */
+        ESP_ERROR_CHECK(network_prov_mgr_start_provisioning(security, (const void *) sec_params, service_name, service_key));
+#else
         /* We don't need the manager as device is already provisioned,
          * so let's release it's resources */
         network_prov_mgr_deinit();
+#endif /* APP_NETWORK_BLE_PERSISTENT_SESSION */
 
         esp_openthread_lock_acquire(portMAX_DELAY);
         otInstance* instance = esp_openthread_get_instance();

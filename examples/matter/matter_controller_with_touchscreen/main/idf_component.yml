@@ -6,7 +6,7 @@ dependencies:
   espressif/esp_board_manager:
     version: "~0.6.0"
   espressif/esp_lvgl_adapter: "~0.6.2"
-  ## esp_matter 1.5.1 needs json_generator 1.x
+  ## esp_matter 1.5.1 needs json_generator 1.x, so no network_provisioning 1.4
   espressif/esp_rainmaker:
     version: "~1.17.1"
   espressif/m5stack_boards: "*"
@@ -15,6 +15,5 @@ dependencies:
     version: "*"
     override_path: "../../../common/rmaker_app_insights/"
   espressif/rmaker_app_network:
-    version: "*"
-    override_path: "../../../common/rmaker_app_network/"
+    version: "~1.4.5"
   lvgl/lvgl: "~9.5.0"

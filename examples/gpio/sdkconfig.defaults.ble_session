@@ -1,2 +1,5 @@
-# Opt-in settings for a BLE session that stays up next to Wi-Fi.
+# Settings for the ALWAYS and SESSION_ONLY BLE modes of rmaker_app_network.
 # Build with: idf.py -D SDKCONFIG_DEFAULTS="sdkconfig.defaults;sdkconfig.defaults.ble_session" build
+
+# Local control endpoints on the BLE session
+CONFIG_ESP_RMAKER_ENABLE_PROV_LOCAL_CTRL=y

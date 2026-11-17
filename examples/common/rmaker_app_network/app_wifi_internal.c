@@ -26,6 +26,7 @@
 
 #include <app_wifi_internal.h>
 #include <app_network.h>
+#include <app_network_mode.h>
 
 #if CONFIG_APP_PROV_SECURITY_VERSION_2
 static const char *sec_salt = NULL;
@@ -69,7 +70,11 @@ static void prov_event_handler(void* arg, esp_event_base_t event_base,
     if (event_base == NETWORK_PROV_EVENT) {
         switch (event_id) {
             case NETWORK_PROV_START:
+#if APP_NETWORK_BLE_PERSISTENT_SESSION
+                ESP_LOGI(TAG, "BLE session started");
+#else
                 ESP_LOGI(TAG, "Provisioning started");
+#endif
                 break;
             case NETWORK_PROV_WIFI_CRED_RECV: {
                 wifi_sta_config_t *wifi_sta_cfg = (wifi_sta_config_t *)event_data;
@@ -121,15 +126,18 @@ static void wifi_init_sta()
 esp_err_t app_wifi_internal_init(void)
 {
 #ifdef CONFIG_NETWORK_PROV_NETWORK_TYPE_WIFI
-    /* Initialize TCP/IP */
+    /* Initialize TCP/IP. Required even without the Wi-Fi stack, since RainMaker
+     * calls into lwIP unconditionally at boot. */
     esp_netif_init();
     /* Register event handler for Provisioning related events */
     ESP_ERROR_CHECK(esp_event_handler_register(NETWORK_PROV_EVENT, ESP_EVENT_ANY_ID, &prov_event_handler, NULL));
 
+#if APP_NETWORK_PROV_ENABLED
     /* Initialize Wi-Fi including netif with default config */
     esp_netif_create_default_wifi_sta();
     wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
     ESP_ERROR_CHECK(esp_wifi_init(&cfg));
+#endif /* APP_NETWORK_PROV_ENABLED */
     return ESP_OK;
 #else /* CONFIG_NETWORK_PROV_NETWORK_TYPE_THREAD */
     return ESP_ERR_NOT_SUPPORTED;
@@ -141,6 +149,8 @@ esp_err_t app_wifi_internal_start(const char *pop, const char *service_name,
                                   size_t mfg_data_len, bool *provisioned)
 {
 #ifdef CONFIG_NETWORK_PROV_NETWORK_TYPE_WIFI
+    *provisioned = false;
+
     /* Configuration for the provisioning manager */
     network_prov_mgr_config_t config = {
 #ifdef CONFIG_APP_NETWORK_RESET_PROV_ON_FAILURE
@@ -156,6 +166,11 @@ esp_err_t app_wifi_internal_start(const char *pop, const char *service_name,
         .scheme = network_prov_scheme_softap,
 #endif /* CONFIG_APP_NETWORK_PROV_TRANSPORT_BLE */
 
+#if APP_NETWORK_BLE_PERSISTENT_SESSION
+        /* BLE outlives provisioning, so release Classic BT memory only. */
+        .mode = NETWORK_PROV_MODE_SESSION_ONLY,
+        .scheme_event_handler = NETWORK_PROV_SCHEME_BLE_EVENT_HANDLER_FREE_BT,
+#else
         /* Any default scheme specific event handler that you would
          * like to choose. Since our example application requires
          * neither BT nor BLE, we can choose to release the associated
@@ -165,81 +180,102 @@ esp_err_t app_wifi_internal_start(const char *pop, const char *service_name,
          * to take care of this automatically. This can be set to
          * NETWORK_PROV_EVENT_HANDLER_NONE when using network_prov_scheme_softap*/
 #ifdef CONFIG_APP_NETWORK_PROV_TRANSPORT_BLE
-        .scheme_event_handler = NETWORK_PROV_SCHEME_BLE_EVENT_HANDLER_FREE_BTDM
+        .scheme_event_handler = NETWORK_PROV_SCHEME_BLE_EVENT_HANDLER_FREE_BTDM,
 #else /* CONFIG_APP_NETWORK_PROV_TRANSPORT_SOFTAP */
         .scheme_event_handler = NETWORK_PROV_EVENT_HANDLER_NONE,
 #endif /* CONFIG_APP_NETWORK_PROV_TRANSPORT_BLE */
+#endif /* APP_NETWORK_BLE_PERSISTENT_SESSION */
     };
 
     /* Initialize provisioning manager with the
      * configuration parameters set above */
     ESP_ERROR_CHECK(network_prov_mgr_init(config));
+
+    /* What is the security level that we want (0, 1, or 2):
+     *      - NETWORK_PROV_SECURITY_0 is simply plain text communication.
+     *      - NETWORK_PROV_SECURITY_1 is secure communication which consists of secure handshake
+     *          using X25519 key exchange and proof of possession (pop) and AES-CTR
+     *          for encryption/decryption of messages.
+     *      - NETWORK_PROV_SECURITY_2 is SRP6a based authentication and key exchange
+     *        + AES-GCM encryption/decryption of messages
+     */
+#if CONFIG_APP_PROV_SECURITY_VERSION_2
+    network_prov_security_t security = NETWORK_PROV_SECURITY_2;
+    /* The manager keeps this pointer and dereferences it at handshake time. */
+    static network_prov_security2_params_t sec2_params;
+    sec2_params.salt = sec_salt;
+    sec2_params.salt_len = sec_salt_len;
+    sec2_params.verifier = sec_verifier;
+    sec2_params.verifier_len = sec_verifier_len;
+    network_prov_security2_params_t *sec_params = &sec2_params;
+#else
+    network_prov_security_t security = NETWORK_PROV_SECURITY_1;
+    network_prov_security1_params_t *sec_params = pop;
+#endif
+
+#ifdef CONFIG_APP_NETWORK_PROV_TRANSPORT_BLE
+    /* This step is only useful when scheme is wifi_prov_scheme_ble. This will
+     * set a custom 128 bit UUID which will be included in the BLE advertisement
+     * and will correspond to the primary GATT service that provides provisioning
+     * endpoints as GATT characteristics. Each GATT characteristic will be
+     * formed using the primary service UUID as base, with different auto assigned
+     * 12th and 13th bytes (assume counting starts from 0th byte). The client side
+     * applications must identify the endpoints by reading the User Characteristic
+     * Description descriptor (0x2901) for each characteristic, which contains the
+     * endpoint name of the characteristic */
+    /* Static: the scheme keeps this pointer and reads it when it starts the advert. */
+    static uint8_t custom_service_uuid[] = {
+        /* This is a random uuid. This can be modified if you want to change the BLE uuid. */
+        /* 12th and 13th bit will be replaced by internal bits. */
+        0xb4, 0xdf, 0x5a, 0x1c, 0x3f, 0x6b, 0xf4, 0xbf,
+        0xea, 0x4a, 0x82, 0x03, 0x04, 0x90, 0x1a, 0x02,
+    };
+    esp_err_t err = network_prov_scheme_ble_set_service_uuid(custom_service_uuid);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "wifi_prov_scheme_ble_set_service_uuid failed %d", err);
+        return err;
+    }
+    if (mfg_data) {
+        err = network_prov_scheme_ble_set_mfg_data(mfg_data, mfg_data_len);
+        if (err != ESP_OK) {
+            ESP_LOGE(TAG, "Failed to set mfg data, err=0x%x", err);
+            return err;
+        }
+    }
+#endif /* CONFIG_APP_NETWORK_PROV_TRANSPORT_BLE */
+
+#if APP_NETWORK_PROV_ENABLED
     /* Let's find out if the device is provisioned */
     network_prov_mgr_is_wifi_provisioned(provisioned);
+#endif /* APP_NETWORK_PROV_ENABLED */
+
     /* If device is not yet provisioned start provisioning service */
     if (!(*provisioned)) {
+#if APP_NETWORK_PROV_ENABLED
         ESP_LOGI(TAG, "Starting provisioning");
 #if CONFIG_ESP_WIFI_SOFTAP_SUPPORT
         esp_netif_create_default_wifi_ap();
 #endif
-        /* What is the security level that we want (0, 1, or 2):
-         *      - NETWORK_PROV_SECURITY_0 is simply plain text communication.
-         *      - NETWORK_PROV_SECURITY_1 is secure communication which consists of secure handshake
-         *          using X25519 key exchange and proof of possession (pop) and AES-CTR
-         *          for encryption/decryption of messages.
-         *      - NETWORK_PROV_SECURITY_2 is SRP6a based authentication and key exchange
-         *        + AES-GCM encryption/decryption of messages
-         */
-#if CONFIG_APP_PROV_SECURITY_VERSION_2
-        network_prov_security_t security = NETWORK_PROV_SECURITY_2;
-        network_prov_security2_params_t sec2_params = {};
-        sec2_params.salt = sec_salt;
-        sec2_params.salt_len = sec_salt_len;
-        sec2_params.verifier = sec_verifier;
-        sec2_params.verifier_len = sec_verifier_len;
-        network_prov_security2_params_t *sec_params = &sec2_params;
-#else
-        network_prov_security_t security = NETWORK_PROV_SECURITY_1;
-        network_prov_security1_params_t *sec_params = pop;
+#if APP_NETWORK_BLE_PERSISTENT_SESSION
+        /* Layer the provisioning endpoints on top of the BLE session. */
+        ESP_ERROR_CHECK(network_prov_mgr_enable_provisioning());
 #endif
-
-#ifdef CONFIG_APP_NETWORK_PROV_TRANSPORT_BLE
-        /* This step is only useful when scheme is wifi_prov_scheme_ble. This will
-         * set a custom 128 bit UUID which will be included in the BLE advertisement
-         * and will correspond to the primary GATT service that provides provisioning
-         * endpoints as GATT characteristics. Each GATT characteristic will be
-         * formed using the primary service UUID as base, with different auto assigned
-         * 12th and 13th bytes (assume counting starts from 0th byte). The client side
-         * applications must identify the endpoints by reading the User Characteristic
-         * Description descriptor (0x2901) for each characteristic, which contains the
-         * endpoint name of the characteristic */
-        uint8_t custom_service_uuid[] = {
-            /* This is a random uuid. This can be modified if you want to change the BLE uuid. */
-            /* 12th and 13th bit will be replaced by internal bits. */
-            0xb4, 0xdf, 0x5a, 0x1c, 0x3f, 0x6b, 0xf4, 0xbf,
-            0xea, 0x4a, 0x82, 0x03, 0x04, 0x90, 0x1a, 0x02,
-        };
-        esp_err_t err = network_prov_scheme_ble_set_service_uuid(custom_service_uuid);
-        if (err != ESP_OK) {
-            ESP_LOGE(TAG, "wifi_prov_scheme_ble_set_service_uuid failed %d", err);
-            return err;
-        }
-        if (mfg_data) {
-            err = network_prov_scheme_ble_set_mfg_data(mfg_data, mfg_data_len);
-            if (err != ESP_OK) {
-                ESP_LOGE(TAG, "Failed to set mfg data, err=0x%x", err);
-                return err;
-            }
-        }
-#endif /* CONFIG_APP_NETWORK_PROV_TRANSPORT_BLE */
-
+#else
+        ESP_LOGI(TAG, "Starting BLE session");
+#endif /* APP_NETWORK_PROV_ENABLED */
         /* Start provisioning service */
         ESP_ERROR_CHECK(network_prov_mgr_start_provisioning(security, (const void *) sec_params, service_name, service_key));
     } else {
         ESP_LOGI(TAG, "Already provisioned, starting Wi-Fi STA");
+#if APP_NETWORK_BLE_PERSISTENT_SESSION
+        /* Start the session without the provisioning endpoints, so that other
+         * modules keep their endpoints and the stored credentials are left alone. */
+        ESP_ERROR_CHECK(network_prov_mgr_start_provisioning(security, (const void *) sec_params, service_name, service_key));
+#else
         /* We don't need the manager as device is already provisioned,
-         * so let's release it's resources */
+         * so let's release its resources */
         network_prov_mgr_deinit();
+#endif /* APP_NETWORK_BLE_PERSISTENT_SESSION */
 
         /* Register WiFi event handlers for reconnection management.
          * Since device is already provisioned, we need to handle WiFi reconnections ourselves.

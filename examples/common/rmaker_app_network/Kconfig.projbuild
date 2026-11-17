@@ -54,6 +54,45 @@ menu "ESP RainMaker App Wi-Fi Provisioning"
             depends on !IDF_TARGET_ESP32S2
     endchoice
 
+    choice APP_NETWORK_BLE_MODE
+        bool "BLE mode"
+        depends on APP_NETWORK_PROV_TRANSPORT_BLE
+        default APP_NETWORK_BLE_MODE_PROV_ONLY
+        help
+            Select when the BLE session runs. All three modes apply to Wi-Fi and
+            Thread builds alike.
+
+            The session always carries the prov-session and proto-ver endpoints.
+            Other modules add their own endpoints to it from the NETWORK_PROV_INIT
+            and NETWORK_PROV_START events.
+
+        config APP_NETWORK_BLE_MODE_PROV_ONLY
+            bool "Provisioning only"
+            help
+                Start the session on an unprovisioned boot only, with the
+                provisioning endpoints on it. Release BLE when provisioning
+                completes. This is the default behaviour.
+
+        config APP_NETWORK_BLE_MODE_ALWAYS
+            bool "Provisioning and always-on BLE session"
+            help
+                Start the session on every boot. On an unprovisioned boot the
+                provisioning endpoints are added to it, and they go away when
+                provisioning completes or the provisioning timeout expires. The
+                session itself stays up in both cases.
+
+        config APP_NETWORK_BLE_MODE_SESSION_ONLY
+            bool "BLE session only, no provisioning"
+            help
+                Start the session on every boot and never add the provisioning
+                endpoints. The network stack (Wi-Fi station or OpenThread) is never
+                initialised, so app_network_start() returns without waiting for a
+                network connection.
+
+                Read the component README before you select this mode. A node in
+                this mode never joins a network.
+    endchoice
+
     config APP_NETWORK_PROV_TRANSPORT
         int
         default 1 if APP_NETWORK_PROV_TRANSPORT_SOFTAP

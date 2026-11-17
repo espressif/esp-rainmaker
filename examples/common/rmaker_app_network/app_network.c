@@ -43,6 +43,7 @@
 #include <nvs_flash.h>
 #include <esp_timer.h>
 #include <app_network.h>
+#include <app_network_mode.h>
 
 ESP_EVENT_DEFINE_BASE(APP_NETWORK_EVENT);
 static const char *TAG = "app_network";
@@ -311,7 +312,11 @@ static void app_network_print_qr(const char *name, const char *username, const c
     }
 #endif /* CONFIG_APP_NETWORK_PROV_COMPACT_QR */
 #ifdef CONFIG_APP_NETWORK_PROV_SHOW_QR
+#if APP_NETWORK_PROV_ENABLED
     ESP_LOGI(TAG, "Scan this QR code from the ESP RainMaker phone app for Provisioning.");
+#else
+    ESP_LOGI(TAG, "Scan this QR code from the ESP RainMaker phone app for BLE local control.");
+#endif
     qrcode_display(payload);
 #endif /* CONFIG_APP_NETWORK_PROV_SHOW_QR */
     ESP_LOGI(TAG, "If QR code is not visible, copy paste the below URL in a browser.\n%s?data=%s", QRCODE_BASE_URL, payload);
@@ -472,11 +477,30 @@ char *app_network_get_device_service_name(void)
     return service_name;
 }
 
+static void network_event_handler(void* arg, esp_event_base_t event_base, int32_t event_id, void* event_data);
+
+#ifdef APP_PROV_STOP_ON_CREDS_MISMATCH
+static int pop_failed_cnt;
+#if APP_NETWORK_PROV_ENABLED
+/* Count wrong PoP attempts only while the provisioning endpoints are live, so
+ * that a failed login on a plain session cannot stop it. */
+static void app_network_arm_pop_lockout(void)
+{
+    pop_failed_cnt = 0;
+    ESP_ERROR_CHECK(esp_event_handler_register(PROTOCOMM_SECURITY_SESSION_EVENT, ESP_EVENT_ANY_ID, &network_event_handler, NULL));
+}
+#endif /* APP_NETWORK_PROV_ENABLED */
+
+static void app_network_disarm_pop_lockout(void)
+{
+    esp_event_handler_unregister(PROTOCOMM_SECURITY_SESSION_EVENT, ESP_EVENT_ANY_ID, &network_event_handler);
+}
+#endif
+
 static void network_event_handler(void* arg, esp_event_base_t event_base, int32_t event_id, void* event_data)
 {
 
 #ifdef APP_PROV_STOP_ON_CREDS_MISMATCH
-    static int failed_cnt = 0;
     if (event_base == PROTOCOMM_SECURITY_SESSION_EVENT) {
         switch (event_id) {
             case PROTOCOMM_SECURITY_SESSION_SETUP_OK:
@@ -487,12 +511,9 @@ static void network_event_handler(void* arg, esp_event_base_t event_base, int32_
             case PROTOCOMM_SECURITY_SESSION_CREDENTIALS_MISMATCH:
                 ESP_LOGE(TAG, "Received incorrect PoP or invalid security params! event: %d", (int) event_id);
                 if (CONFIG_APP_NETWORK_PROV_MAX_POP_MISMATCH &&
-                        (++failed_cnt >= CONFIG_APP_NETWORK_PROV_MAX_POP_MISMATCH)) {
+                        (++pop_failed_cnt >= CONFIG_APP_NETWORK_PROV_MAX_POP_MISMATCH)) {
                     /* stop provisioning for security reasons */
-                    /* Deregister from protocomm security events immediately to prevent
-                     * further events from triggering this handler after provisioning stops.
-                     */
-                    esp_event_handler_unregister(PROTOCOMM_SECURITY_SESSION_EVENT, ESP_EVENT_ANY_ID, &network_event_handler);
+                    app_network_disarm_pop_lockout();
                     network_prov_mgr_stop_provisioning();
                     ESP_LOGW(TAG, "Max PoP attempts reached! Provisioning disabled for security reasons. Please reboot device to restart provisioning");
                     esp_event_post(APP_NETWORK_EVENT, APP_NETWORK_EVENT_PROV_CRED_MISMATCH, NULL, 0, portMAX_DELAY);
@@ -528,12 +549,13 @@ static void network_event_handler(void* arg, esp_event_base_t event_base, int32_
             prov_stop_timer = NULL;
         }
 #ifdef APP_PROV_STOP_ON_CREDS_MISMATCH
-        /* Deregister from protocomm security events since provisioning is complete.
-         * This prevents local control errors from triggering provisioning error handlers.
-         */
-        esp_event_handler_unregister(PROTOCOMM_SECURITY_SESSION_EVENT, ESP_EVENT_ANY_ID, &network_event_handler);
+        /* Provisioning is complete, so a later failed login must not be counted
+         * against the PoP lockout. */
+        app_network_disarm_pop_lockout();
 #endif
+#if !APP_NETWORK_BLE_PERSISTENT_SESSION
         network_prov_mgr_deinit();
+#endif
 
 #if !CONFIG_APP_NETWORK_ASYNCHRONOUS_CONNECTION
         /* Signal main application that provisioning has ended */
@@ -564,9 +586,6 @@ void app_network_init()
 #if !CONFIG_APP_NETWORK_ASYNCHRONOUS_CONNECTION
     network_event_group = xEventGroupCreate();
 #endif /* CONFIG_APP_NETWORK_ASYNCHRONOUS_CONNECTION */
-#ifdef APP_PROV_STOP_ON_CREDS_MISMATCH
-    ESP_ERROR_CHECK(esp_event_handler_register(PROTOCOMM_SECURITY_SESSION_EVENT, ESP_EVENT_ANY_ID, &network_event_handler, NULL));
-#endif
 #ifdef CONFIG_NETWORK_PROV_NETWORK_TYPE_WIFI
     ESP_ERROR_CHECK(esp_event_handler_register(IP_EVENT, IP_EVENT_STA_GOT_IP, &network_event_handler, NULL));
 #endif
@@ -692,12 +711,25 @@ esp_err_t app_network_start(app_network_pop_type_t pop_type)
 #else /* CONFIG_APP_NETWORK_PROV_TRANSPORT_SOFTAP */
         app_network_print_qr(service_name, username, pop, PROV_TRANSPORT_SOFTAP);
 #endif /* CONFIG_APP_NETWORK_PROV_TRANSPORT_BLE */
+#if APP_NETWORK_PROV_ENABLED
         app_network_start_timer();
+#ifdef APP_PROV_STOP_ON_CREDS_MISMATCH
+        app_network_arm_pop_lockout();
+#endif
 #if !CONFIG_APP_NETWORK_ASYNCHRONOUS_CONNECTION
         /* Signal main application that provisioning has started */
         xEventGroupSetBits(network_event_group, NETWORK_PROV_STARTED_EVENT);
 #endif /* CONFIG_APP_NETWORK_ASYNCHRONOUS_CONNECTION */
+#endif /* APP_NETWORK_PROV_ENABLED */
     }
+#if APP_NETWORK_BLE_PERSISTENT_SESSION
+    else {
+        /* The BLE session runs even when already provisioned, so print what a
+         * client needs to connect to it. */
+        ESP_LOGI(TAG, "BLE session started. Device Name: %s, PoP: %s",
+                 service_name, pop ? pop : "none");
+    }
+#endif /* APP_NETWORK_BLE_PERSISTENT_SESSION */
     free(pop);
     intro_print(provisioned);
     if (custom_mfg_data) {
@@ -705,10 +737,12 @@ esp_err_t app_network_start(app_network_pop_type_t pop_type)
         custom_mfg_data = NULL;
         custom_mfg_data_len = 0;
     }
-#if !CONFIG_APP_NETWORK_ASYNCHRONOUS_CONNECTION
-    /* Wait for Network connection */
+#if !CONFIG_APP_NETWORK_ASYNCHRONOUS_CONNECTION && APP_NETWORK_PROV_ENABLED
+    /* Wait for Network connection.
+     * Skipped for BLE-local-control-only nodes, which never bring up the network
+     * stack and would otherwise block here forever. */
     xEventGroupWaitBits(network_event_group, NETWORK_CONNECTED_EVENT, false, true, portMAX_DELAY);
-#endif /* CONFIG_APP_NETWORK_ASYNCHRONOUS_CONNECTION */
+#endif /* !CONFIG_APP_NETWORK_ASYNCHRONOUS_CONNECTION && APP_NETWORK_PROV_ENABLED */
     return err;
 }
 
