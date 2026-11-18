@@ -142,6 +142,96 @@ void   rmaker_prov_local_ctrl__resp_get_data__free_unpacked
   assert(message->base.descriptor == &rmaker_prov_local_ctrl__resp_get_data__descriptor);
   protobuf_c_message_free_unpacked ((ProtobufCMessage*)message, allocator);
 }
+void   rmaker_prov_local_ctrl__cmd_set_data__init
+                     (RmakerProvLocalCtrl__CmdSetData         *message)
+{
+  static const RmakerProvLocalCtrl__CmdSetData init_value = RMAKER_PROV_LOCAL_CTRL__CMD_SET_DATA__INIT;
+  *message = init_value;
+}
+size_t rmaker_prov_local_ctrl__cmd_set_data__get_packed_size
+                     (const RmakerProvLocalCtrl__CmdSetData *message)
+{
+  assert(message->base.descriptor == &rmaker_prov_local_ctrl__cmd_set_data__descriptor);
+  return protobuf_c_message_get_packed_size ((const ProtobufCMessage*)(message));
+}
+size_t rmaker_prov_local_ctrl__cmd_set_data__pack
+                     (const RmakerProvLocalCtrl__CmdSetData *message,
+                      uint8_t       *out)
+{
+  assert(message->base.descriptor == &rmaker_prov_local_ctrl__cmd_set_data__descriptor);
+  return protobuf_c_message_pack ((const ProtobufCMessage*)message, out);
+}
+size_t rmaker_prov_local_ctrl__cmd_set_data__pack_to_buffer
+                     (const RmakerProvLocalCtrl__CmdSetData *message,
+                      ProtobufCBuffer *buffer)
+{
+  assert(message->base.descriptor == &rmaker_prov_local_ctrl__cmd_set_data__descriptor);
+  return protobuf_c_message_pack_to_buffer ((const ProtobufCMessage*)message, buffer);
+}
+RmakerProvLocalCtrl__CmdSetData *
+       rmaker_prov_local_ctrl__cmd_set_data__unpack
+                     (ProtobufCAllocator  *allocator,
+                      size_t               len,
+                      const uint8_t       *data)
+{
+  return (RmakerProvLocalCtrl__CmdSetData *)
+     protobuf_c_message_unpack (&rmaker_prov_local_ctrl__cmd_set_data__descriptor,
+                                allocator, len, data);
+}
+void   rmaker_prov_local_ctrl__cmd_set_data__free_unpacked
+                     (RmakerProvLocalCtrl__CmdSetData *message,
+                      ProtobufCAllocator *allocator)
+{
+  if(!message)
+    return;
+  assert(message->base.descriptor == &rmaker_prov_local_ctrl__cmd_set_data__descriptor);
+  protobuf_c_message_free_unpacked ((ProtobufCMessage*)message, allocator);
+}
+void   rmaker_prov_local_ctrl__resp_set_data__init
+                     (RmakerProvLocalCtrl__RespSetData         *message)
+{
+  static const RmakerProvLocalCtrl__RespSetData init_value = RMAKER_PROV_LOCAL_CTRL__RESP_SET_DATA__INIT;
+  *message = init_value;
+}
+size_t rmaker_prov_local_ctrl__resp_set_data__get_packed_size
+                     (const RmakerProvLocalCtrl__RespSetData *message)
+{
+  assert(message->base.descriptor == &rmaker_prov_local_ctrl__resp_set_data__descriptor);
+  return protobuf_c_message_get_packed_size ((const ProtobufCMessage*)(message));
+}
+size_t rmaker_prov_local_ctrl__resp_set_data__pack
+                     (const RmakerProvLocalCtrl__RespSetData *message,
+                      uint8_t       *out)
+{
+  assert(message->base.descriptor == &rmaker_prov_local_ctrl__resp_set_data__descriptor);
+  return protobuf_c_message_pack ((const ProtobufCMessage*)message, out);
+}
+size_t rmaker_prov_local_ctrl__resp_set_data__pack_to_buffer
+                     (const RmakerProvLocalCtrl__RespSetData *message,
+                      ProtobufCBuffer *buffer)
+{
+  assert(message->base.descriptor == &rmaker_prov_local_ctrl__resp_set_data__descriptor);
+  return protobuf_c_message_pack_to_buffer ((const ProtobufCMessage*)message, buffer);
+}
+RmakerProvLocalCtrl__RespSetData *
+       rmaker_prov_local_ctrl__resp_set_data__unpack
+                     (ProtobufCAllocator  *allocator,
+                      size_t               len,
+                      const uint8_t       *data)
+{
+  return (RmakerProvLocalCtrl__RespSetData *)
+     protobuf_c_message_unpack (&rmaker_prov_local_ctrl__resp_set_data__descriptor,
+                                allocator, len, data);
+}
+void   rmaker_prov_local_ctrl__resp_set_data__free_unpacked
+                     (RmakerProvLocalCtrl__RespSetData *message,
+                      ProtobufCAllocator *allocator)
+{
+  if(!message)
+    return;
+  assert(message->base.descriptor == &rmaker_prov_local_ctrl__resp_set_data__descriptor);
+  protobuf_c_message_free_unpacked ((ProtobufCMessage*)message, allocator);
+}
 void   rmaker_prov_local_ctrl__rmaker_local_ctrl_payload__init
                      (RmakerProvLocalCtrl__RMakerLocalCtrlPayload         *message)
 {
@@ -251,7 +341,7 @@ const ProtobufCMessageDescriptor rmaker_prov_local_ctrl__payload_buf__descriptor
   (ProtobufCMessageInit) rmaker_prov_local_ctrl__payload_buf__init,
   NULL,NULL,NULL    /* reserved[123] */
 };
-static const ProtobufCFieldDescriptor rmaker_prov_local_ctrl__cmd_get_data__field_descriptors[4] =
+static const ProtobufCFieldDescriptor rmaker_prov_local_ctrl__cmd_get_data__field_descriptors[5] =
 {
   {
     "DataType",
@@ -301,17 +391,30 @@ static const ProtobufCFieldDescriptor rmaker_prov_local_ctrl__cmd_get_data__fiel
     0,             /* flags */
     0,NULL,NULL    /* reserved1,reserved2, etc */
   },
+  {
+    "ParamsFilter",
+    5,
+    PROTOBUF_C_LABEL_NONE,
+    PROTOBUF_C_TYPE_BYTES,
+    0,   /* quantifier_offset */
+    offsetof(RmakerProvLocalCtrl__CmdGetData, paramsfilter),
+    NULL,
+    NULL,
+    0,             /* flags */
+    0,NULL,NULL    /* reserved1,reserved2, etc */
+  },
 };
 static const unsigned rmaker_prov_local_ctrl__cmd_get_data__field_indices_by_name[] = {
   0,   /* field[0] = DataType */
   3,   /* field[3] = HasTimestamp */
   1,   /* field[1] = Offset */
+  4,   /* field[4] = ParamsFilter */
   2,   /* field[2] = Timestamp */
 };
 static const ProtobufCIntRange rmaker_prov_local_ctrl__cmd_get_data__number_ranges[1 + 1] =
 {
   { 1, 0 },
-  { 0, 4 }
+  { 0, 5 }
 };
 const ProtobufCMessageDescriptor rmaker_prov_local_ctrl__cmd_get_data__descriptor =
 {
@@ -321,7 +424,7 @@ const ProtobufCMessageDescriptor rmaker_prov_local_ctrl__cmd_get_data__descripto
   "RmakerProvLocalCtrl__CmdGetData",
   "rmaker_prov_local_ctrl",
   sizeof(RmakerProvLocalCtrl__CmdGetData),
-  4,
+  5,
   rmaker_prov_local_ctrl__cmd_get_data__field_descriptors,
   rmaker_prov_local_ctrl__cmd_get_data__field_indices_by_name,
   1,  rmaker_prov_local_ctrl__cmd_get_data__number_ranges,
@@ -379,7 +482,109 @@ const ProtobufCMessageDescriptor rmaker_prov_local_ctrl__resp_get_data__descript
   (ProtobufCMessageInit) rmaker_prov_local_ctrl__resp_get_data__init,
   NULL,NULL,NULL    /* reserved[123] */
 };
-static const ProtobufCFieldDescriptor rmaker_prov_local_ctrl__rmaker_local_ctrl_payload__field_descriptors[3] =
+static const ProtobufCFieldDescriptor rmaker_prov_local_ctrl__cmd_set_data__field_descriptors[1] =
+{
+  {
+    "Buf",
+    1,
+    PROTOBUF_C_LABEL_NONE,
+    PROTOBUF_C_TYPE_MESSAGE,
+    0,   /* quantifier_offset */
+    offsetof(RmakerProvLocalCtrl__CmdSetData, buf),
+    &rmaker_prov_local_ctrl__payload_buf__descriptor,
+    NULL,
+    0,             /* flags */
+    0,NULL,NULL    /* reserved1,reserved2, etc */
+  },
+};
+static const unsigned rmaker_prov_local_ctrl__cmd_set_data__field_indices_by_name[] = {
+  0,   /* field[0] = Buf */
+};
+static const ProtobufCIntRange rmaker_prov_local_ctrl__cmd_set_data__number_ranges[1 + 1] =
+{
+  { 1, 0 },
+  { 0, 1 }
+};
+const ProtobufCMessageDescriptor rmaker_prov_local_ctrl__cmd_set_data__descriptor =
+{
+  PROTOBUF_C__MESSAGE_DESCRIPTOR_MAGIC,
+  "rmaker_prov_local_ctrl.CmdSetData",
+  "CmdSetData",
+  "RmakerProvLocalCtrl__CmdSetData",
+  "rmaker_prov_local_ctrl",
+  sizeof(RmakerProvLocalCtrl__CmdSetData),
+  1,
+  rmaker_prov_local_ctrl__cmd_set_data__field_descriptors,
+  rmaker_prov_local_ctrl__cmd_set_data__field_indices_by_name,
+  1,  rmaker_prov_local_ctrl__cmd_set_data__number_ranges,
+  (ProtobufCMessageInit) rmaker_prov_local_ctrl__cmd_set_data__init,
+  NULL,NULL,NULL    /* reserved[123] */
+};
+static const ProtobufCFieldDescriptor rmaker_prov_local_ctrl__resp_set_data__field_descriptors[3] =
+{
+  {
+    "Status",
+    1,
+    PROTOBUF_C_LABEL_NONE,
+    PROTOBUF_C_TYPE_ENUM,
+    0,   /* quantifier_offset */
+    offsetof(RmakerProvLocalCtrl__RespSetData, status),
+    &rmaker_prov_local_ctrl__rmaker_local_ctrl_status__descriptor,
+    NULL,
+    0,             /* flags */
+    0,NULL,NULL    /* reserved1,reserved2, etc */
+  },
+  {
+    "Received",
+    2,
+    PROTOBUF_C_LABEL_NONE,
+    PROTOBUF_C_TYPE_UINT32,
+    0,   /* quantifier_offset */
+    offsetof(RmakerProvLocalCtrl__RespSetData, received),
+    NULL,
+    NULL,
+    0,             /* flags */
+    0,NULL,NULL    /* reserved1,reserved2, etc */
+  },
+  {
+    "MaxLen",
+    3,
+    PROTOBUF_C_LABEL_NONE,
+    PROTOBUF_C_TYPE_UINT32,
+    0,   /* quantifier_offset */
+    offsetof(RmakerProvLocalCtrl__RespSetData, maxlen),
+    NULL,
+    NULL,
+    0,             /* flags */
+    0,NULL,NULL    /* reserved1,reserved2, etc */
+  },
+};
+static const unsigned rmaker_prov_local_ctrl__resp_set_data__field_indices_by_name[] = {
+  2,   /* field[2] = MaxLen */
+  1,   /* field[1] = Received */
+  0,   /* field[0] = Status */
+};
+static const ProtobufCIntRange rmaker_prov_local_ctrl__resp_set_data__number_ranges[1 + 1] =
+{
+  { 1, 0 },
+  { 0, 3 }
+};
+const ProtobufCMessageDescriptor rmaker_prov_local_ctrl__resp_set_data__descriptor =
+{
+  PROTOBUF_C__MESSAGE_DESCRIPTOR_MAGIC,
+  "rmaker_prov_local_ctrl.RespSetData",
+  "RespSetData",
+  "RmakerProvLocalCtrl__RespSetData",
+  "rmaker_prov_local_ctrl",
+  sizeof(RmakerProvLocalCtrl__RespSetData),
+  3,
+  rmaker_prov_local_ctrl__resp_set_data__field_descriptors,
+  rmaker_prov_local_ctrl__resp_set_data__field_indices_by_name,
+  1,  rmaker_prov_local_ctrl__resp_set_data__number_ranges,
+  (ProtobufCMessageInit) rmaker_prov_local_ctrl__resp_set_data__init,
+  NULL,NULL,NULL    /* reserved[123] */
+};
+static const ProtobufCFieldDescriptor rmaker_prov_local_ctrl__rmaker_local_ctrl_payload__field_descriptors[5] =
 {
   {
     "msg",
@@ -417,17 +622,43 @@ static const ProtobufCFieldDescriptor rmaker_prov_local_ctrl__rmaker_local_ctrl_
     PROTOBUF_C_FIELD_FLAG_ONEOF,             /* flags */
     0,NULL,NULL    /* reserved1,reserved2, etc */
   },
+  {
+    "cmdSetData",
+    12,
+    PROTOBUF_C_LABEL_NONE,
+    PROTOBUF_C_TYPE_MESSAGE,
+    offsetof(RmakerProvLocalCtrl__RMakerLocalCtrlPayload, payload_case),
+    offsetof(RmakerProvLocalCtrl__RMakerLocalCtrlPayload, cmdsetdata),
+    &rmaker_prov_local_ctrl__cmd_set_data__descriptor,
+    NULL,
+    PROTOBUF_C_FIELD_FLAG_ONEOF,             /* flags */
+    0,NULL,NULL    /* reserved1,reserved2, etc */
+  },
+  {
+    "respSetData",
+    13,
+    PROTOBUF_C_LABEL_NONE,
+    PROTOBUF_C_TYPE_MESSAGE,
+    offsetof(RmakerProvLocalCtrl__RMakerLocalCtrlPayload, payload_case),
+    offsetof(RmakerProvLocalCtrl__RMakerLocalCtrlPayload, respsetdata),
+    &rmaker_prov_local_ctrl__resp_set_data__descriptor,
+    NULL,
+    PROTOBUF_C_FIELD_FLAG_ONEOF,             /* flags */
+    0,NULL,NULL    /* reserved1,reserved2, etc */
+  },
 };
 static const unsigned rmaker_prov_local_ctrl__rmaker_local_ctrl_payload__field_indices_by_name[] = {
   1,   /* field[1] = cmdGetData */
+  3,   /* field[3] = cmdSetData */
   0,   /* field[0] = msg */
   2,   /* field[2] = respGetData */
+  4,   /* field[4] = respSetData */
 };
 static const ProtobufCIntRange rmaker_prov_local_ctrl__rmaker_local_ctrl_payload__number_ranges[2 + 1] =
 {
   { 1, 0 },
   { 10, 1 },
-  { 0, 3 }
+  { 0, 5 }
 };
 const ProtobufCMessageDescriptor rmaker_prov_local_ctrl__rmaker_local_ctrl_payload__descriptor =
 {
@@ -437,7 +668,7 @@ const ProtobufCMessageDescriptor rmaker_prov_local_ctrl__rmaker_local_ctrl_paylo
   "RmakerProvLocalCtrl__RMakerLocalCtrlPayload",
   "rmaker_prov_local_ctrl",
   sizeof(RmakerProvLocalCtrl__RMakerLocalCtrlPayload),
-  3,
+  5,
   rmaker_prov_local_ctrl__rmaker_local_ctrl_payload__field_descriptors,
   rmaker_prov_local_ctrl__rmaker_local_ctrl_payload__field_indices_by_name,
   2,  rmaker_prov_local_ctrl__rmaker_local_ctrl_payload__number_ranges,
@@ -504,18 +735,22 @@ const ProtobufCEnumDescriptor rmaker_prov_local_ctrl__rmaker_local_ctrl_data_typ
   rmaker_prov_local_ctrl__rmaker_local_ctrl_data_type__value_ranges,
   NULL,NULL,NULL,NULL   /* reserved[1234] */
 };
-static const ProtobufCEnumValue rmaker_prov_local_ctrl__rmaker_local_ctrl_msg_type__enum_values_by_number[2] =
+static const ProtobufCEnumValue rmaker_prov_local_ctrl__rmaker_local_ctrl_msg_type__enum_values_by_number[4] =
 {
   { "TypeCmdGetData", "RMAKER_PROV_LOCAL_CTRL__RMAKER_LOCAL_CTRL_MSG_TYPE__TypeCmdGetData", 0 },
   { "TypeRespGetData", "RMAKER_PROV_LOCAL_CTRL__RMAKER_LOCAL_CTRL_MSG_TYPE__TypeRespGetData", 1 },
+  { "TypeCmdSetData", "RMAKER_PROV_LOCAL_CTRL__RMAKER_LOCAL_CTRL_MSG_TYPE__TypeCmdSetData", 2 },
+  { "TypeRespSetData", "RMAKER_PROV_LOCAL_CTRL__RMAKER_LOCAL_CTRL_MSG_TYPE__TypeRespSetData", 3 },
 };
 static const ProtobufCIntRange rmaker_prov_local_ctrl__rmaker_local_ctrl_msg_type__value_ranges[] = {
-{0, 0},{0, 2}
+{0, 0},{0, 4}
 };
-static const ProtobufCEnumValueIndex rmaker_prov_local_ctrl__rmaker_local_ctrl_msg_type__enum_values_by_name[2] =
+static const ProtobufCEnumValueIndex rmaker_prov_local_ctrl__rmaker_local_ctrl_msg_type__enum_values_by_name[4] =
 {
   { "TypeCmdGetData", 0 },
+  { "TypeCmdSetData", 2 },
   { "TypeRespGetData", 1 },
+  { "TypeRespSetData", 3 },
 };
 const ProtobufCEnumDescriptor rmaker_prov_local_ctrl__rmaker_local_ctrl_msg_type__descriptor =
 {
@@ -524,9 +759,9 @@ const ProtobufCEnumDescriptor rmaker_prov_local_ctrl__rmaker_local_ctrl_msg_type
   "RMakerLocalCtrlMsgType",
   "RmakerProvLocalCtrl__RMakerLocalCtrlMsgType",
   "rmaker_prov_local_ctrl",
-  2,
+  4,
   rmaker_prov_local_ctrl__rmaker_local_ctrl_msg_type__enum_values_by_number,
-  2,
+  4,
   rmaker_prov_local_ctrl__rmaker_local_ctrl_msg_type__enum_values_by_name,
   1,
   rmaker_prov_local_ctrl__rmaker_local_ctrl_msg_type__value_ranges,

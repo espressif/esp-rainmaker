@@ -4,16 +4,18 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#include <ctype.h>
+#include <stdlib.h>
 #include <string.h>
 #include <esp_log.h>
+#include <json_parser.h>
+#include <json_generator.h>
 #include <esp_event.h>
 #include "esp_rmaker_prov_local_ctrl.pb-c.h"
 #include "esp_rmaker_internal.h"
 #include <esp_rmaker_core.h>
 #include <esp_rmaker_utils.h>
 #include <network_provisioning/manager.h>
-#include <json_parser.h>
-#include <json_generator.h>
 
 static const char *TAG = "esp_rmaker_prov_local_ctrl";
 
@@ -39,19 +41,83 @@ typedef struct {
 
 static prov_local_ctrl_data_t *s_local_ctrl_data = NULL;
 
+/* Reassembly buffer for fragmented set_params. Separate from the get buffer. */
+typedef struct {
+    uint8_t *data;
+    uint32_t total_len;
+    uint32_t received;
+} prov_set_frag_t;
+
+static prov_set_frag_t *s_set_frag = NULL;
+
+#ifdef CONFIG_ESP_RMAKER_PROV_LOCAL_CTRL_SET_FRAG
+static esp_err_t esp_rmaker_set_params_frag_body(RmakerProvLocalCtrl__RMakerLocalCtrlPayload *msg,
+                                                 uint8_t **outbuf, ssize_t *outlen);
+#endif
+
 /**
- * @brief Create a signed response JSON from raw data
+ * @brief Create a JSON error response
  *
- * Creates a response in format: {"node_payload": {"data": <data>, "timestamp": <ts>}, "signature": "..."}
+ * Creates a response in format: {"status":"fail","description":"<reason>"}
+ * Returns ESP_OK to keep BLE connection alive.
  *
- * @param[in] data Raw JSON data string (will be freed by this function)
- * @param[in] timestamp Timestamp to include in the signed payload
- * @param[out] out_response Pointer to store the allocated response string (caller must free)
- * @param[out] out_len Pointer to store the response length
+ * @param[in] reason Error description string
+ * @param[out] outbuf Pointer to store the allocated response buffer
+ * @param[out] outlen Pointer to store the response length
  *
- * @return ESP_OK on success, error code otherwise
+ * @return ESP_OK (always, to prevent BLE disconnection)
  */
-static esp_err_t create_signed_response(char *data, int64_t timestamp, char **out_response, size_t *out_len)
+static esp_err_t send_error_response(const char *reason, uint8_t **outbuf, ssize_t *outlen)
+{
+    char err_msg[128];
+    snprintf(err_msg, sizeof(err_msg), "{\"status\":\"fail\",\"description\":\"%s\"}", reason ? reason : "unknown error");
+
+    size_t resp_len = strlen(err_msg);
+    uint8_t *resp_buf = (uint8_t *)MEM_ALLOC_EXTRAM(resp_len);
+    if (!resp_buf) {
+        /* Last resort - if we can't even allocate error message, return empty response */
+        *outbuf = NULL;
+        *outlen = 0;
+        return ESP_OK;
+    }
+
+    memcpy(resp_buf, err_msg, resp_len);
+    *outbuf = resp_buf;
+    *outlen = resp_len;
+
+    return ESP_OK;
+}
+
+static void prov_local_ctrl_data_free(void)
+{
+    if (s_local_ctrl_data) {
+        if (s_local_ctrl_data->data) {
+            free(s_local_ctrl_data->data);
+        }
+        free(s_local_ctrl_data);
+        s_local_ctrl_data = NULL;
+    }
+}
+
+static const char *prov_local_ctrl_data_name(prov_local_ctrl_data_type_t data_type)
+{
+    if (data_type == PROV_LOCAL_CTRL_TYPE_PARAMS) {
+        return "params";
+    }
+    return "config";
+}
+
+static void prov_set_frag_free(void)
+{
+    if (s_set_frag) {
+        free(s_set_frag->data);
+        free(s_set_frag);
+        s_set_frag = NULL;
+    }
+}
+
+static esp_err_t create_signed_response(char *data, int64_t timestamp,
+                                             char **out_response, size_t *out_len)
 {
     if (!data || !out_response || !out_len) {
         if (data) {
@@ -137,51 +203,137 @@ static esp_err_t create_signed_response(char *data, int64_t timestamp, char **ou
     return ESP_OK;
 }
 
-/**
- * @brief Create a JSON error response
- *
- * Creates a response in format: {"status":"fail","description":"<reason>"}
- * Returns ESP_OK to keep BLE connection alive.
- *
- * @param[in] reason Error description string
- * @param[out] outbuf Pointer to store the allocated response buffer
- * @param[out] outlen Pointer to store the response length
- *
- * @return ESP_OK (always, to prevent BLE disconnection)
- */
-static esp_err_t send_error_response(const char *reason, uint8_t **outbuf, ssize_t *outlen)
+#ifdef CONFIG_ESP_RMAKER_PROV_LOCAL_CTRL_GET_FILTER
+static esp_err_t filter_copy_device_name(const jparse_ctx_t *jctx, json_tok_t *key, char **out)
 {
-    char err_msg[128];
-    snprintf(err_msg, sizeof(err_msg), "{\"status\":\"fail\",\"description\":\"%s\"}", reason ? reason : "unknown error");
-
-    size_t resp_len = strlen(err_msg);
-    uint8_t *resp_buf = (uint8_t *)MEM_ALLOC_EXTRAM(resp_len);
-    if (!resp_buf) {
-        /* Last resort - if we can't even allocate error message, return empty response */
-        *outbuf = NULL;
-        *outlen = 0;
-        return ESP_OK;
+    /* Read the key token as a standalone JSON string, with escapes decoded. */
+    jparse_ctx_t name_ctx = { .js = jctx->js, .tokens = key };
+    int nlen = 0;
+    if (json_root_get_strlen(&name_ctx, &nlen) != 0 || nlen <= 0 ||
+            nlen > ESP_RMAKER_PARAM_FILTER_MAX_NAME_LEN) {
+        return ESP_ERR_INVALID_ARG;
     }
-
-    memcpy(resp_buf, err_msg, resp_len);
-    *outbuf = resp_buf;
-    *outlen = resp_len;
-
+    char *name = MEM_CALLOC_EXTRAM(1, (size_t)nlen + 1);
+    if (!name) {
+        return ESP_ERR_NO_MEM;
+    }
+    if (json_root_get_string(&name_ctx, name, nlen + 1) != 0) {
+        free(name);
+        return ESP_ERR_INVALID_ARG;
+    }
+    *out = name;
     return ESP_OK;
 }
 
-static void prov_local_ctrl_data_free(void)
+static esp_err_t filter_copy_arr_string(jparse_ctx_t *jctx, uint32_t index, char **out)
 {
-    if (s_local_ctrl_data) {
-        if (s_local_ctrl_data->data) {
-            free(s_local_ctrl_data->data);
-        }
-        free(s_local_ctrl_data);
-        s_local_ctrl_data = NULL;
+    int nlen = 0;
+    if (json_arr_get_strlen(jctx, index, &nlen) != 0 || nlen <= 0 ||
+            nlen > ESP_RMAKER_PARAM_FILTER_MAX_NAME_LEN) {
+        return ESP_ERR_INVALID_ARG;
     }
+    char *name = MEM_CALLOC_EXTRAM(1, (size_t)nlen + 1);
+    if (!name) {
+        return ESP_ERR_NO_MEM;
+    }
+    if (json_arr_get_string(jctx, index, name, nlen + 1) != 0) {
+        free(name);
+        return ESP_ERR_INVALID_ARG;
+    }
+    *out = name;
+    return ESP_OK;
 }
 
-static esp_err_t prov_local_ctrl_data_init(prov_local_ctrl_data_type_t data_type, bool has_timestamp, int64_t timestamp)
+static void param_filter_free(esp_rmaker_param_filter_t *filters, size_t filter_count)
+{
+    for (size_t i = 0; i < filter_count; i++) {
+        free(filters[i].name);
+        for (size_t p = 0; p < filters[i].param_count; p++) {
+            free(filters[i].param_names[p]);
+        }
+        free(filters[i].param_names);
+    }
+    free(filters);
+}
+
+static esp_err_t param_filter_parse(const uint8_t *json, size_t json_len,
+                                    esp_rmaker_param_filter_t **filters, size_t *filter_count)
+{
+    jparse_ctx_t jctx;
+    if (json_parse_start(&jctx, (const char *)json, (int)json_len) != 0) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    json_tok_t *params = json_obj_get_val_tok(&jctx, "params", JSMN_OBJECT);
+    if (!params || params->size <= 0 || params->size > ESP_RMAKER_PARAM_FILTER_MAX_DEVICES) {
+        json_parse_end(&jctx);
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    esp_rmaker_param_filter_t *parsed = MEM_CALLOC_EXTRAM((size_t)params->size, sizeof(*parsed));
+    if (!parsed) {
+        json_parse_end(&jctx);
+        return ESP_ERR_NO_MEM;
+    }
+
+    esp_err_t err = ESP_OK;
+    json_tok_t *key = params + 1;
+    for (int i = 0; i < params->size; i++) {
+        err = filter_copy_device_name(&jctx, key, &parsed[i].name);
+        if (err != ESP_OK) {
+            break;
+        }
+        json_tok_t *value = key + 1;
+        if (value->type == JSMN_PRIMITIVE) {
+            jparse_ctx_t value_ctx = { .js = jctx.js, .tokens = value };
+            bool all_params = false;
+            if (json_root_get_bool(&value_ctx, &all_params) != 0 || !all_params) {
+                err = ESP_ERR_INVALID_ARG;
+                break;
+            }
+            key = value + 1;
+            continue;
+        }
+        if (value->type != JSMN_ARRAY || value->size <= 0 ||
+                value->size > ESP_RMAKER_PARAM_FILTER_MAX_PARAMS) {
+            err = ESP_ERR_INVALID_ARG;
+            break;
+        }
+        parsed[i].param_names = MEM_CALLOC_EXTRAM((size_t)value->size, sizeof(char *));
+        if (!parsed[i].param_names) {
+            err = ESP_ERR_NO_MEM;
+            break;
+        }
+        parsed[i].param_count = (size_t)value->size;
+        jctx.cur = value;
+        for (int p = 0; p < value->size; p++) {
+            err = filter_copy_arr_string(&jctx, (uint32_t)p, &parsed[i].param_names[p]);
+            if (err != ESP_OK) {
+                break;
+            }
+        }
+        if (err != ESP_OK) {
+            break;
+        }
+        /* Each accepted array element is a single string token. */
+        key = value + 1 + value->size;
+    }
+    size_t num = (size_t)params->size;
+    json_parse_end(&jctx);
+
+    if (err != ESP_OK) {
+        param_filter_free(parsed, num);
+        return err;
+    }
+    *filters = parsed;
+    *filter_count = num;
+    return ESP_OK;
+}
+#endif /* CONFIG_ESP_RMAKER_PROV_LOCAL_CTRL_GET_FILTER */
+
+
+static esp_err_t prov_local_ctrl_data_init(prov_local_ctrl_data_type_t data_type, bool has_timestamp, int64_t timestamp,
+                                           const uint8_t *params_filter, size_t params_filter_len)
 {
     /* Free any existing data */
     prov_local_ctrl_data_free();
@@ -198,11 +350,30 @@ static esp_err_t prov_local_ctrl_data_init(prov_local_ctrl_data_type_t data_type
     s_local_ctrl_data->timestamp = timestamp;
 
     char *raw_data = NULL;
-    const char *data_name = (data_type == PROV_LOCAL_CTRL_TYPE_PARAMS) ? "params" : "config";
+    const char *data_name = prov_local_ctrl_data_name(data_type);
 
     /* Get the raw data based on type */
     if (data_type == PROV_LOCAL_CTRL_TYPE_PARAMS) {
-        raw_data = esp_rmaker_get_node_params();
+#ifdef CONFIG_ESP_RMAKER_PROV_LOCAL_CTRL_GET_FILTER
+        if (params_filter_len > 0) {
+            esp_rmaker_param_filter_t *filters = NULL;
+            size_t filter_count = 0;
+            esp_err_t err = param_filter_parse(params_filter, params_filter_len, &filters, &filter_count);
+            if (err != ESP_OK) {
+                prov_local_ctrl_data_free();
+                return err;
+            }
+            err = esp_rmaker_get_filtered_node_params(filters, filter_count, &raw_data);
+            param_filter_free(filters, filter_count);
+            if (err != ESP_OK) {
+                prov_local_ctrl_data_free();
+                return err;
+            }
+        } else
+#endif
+        {
+            raw_data = esp_rmaker_get_node_params();
+        }
     } else {
         raw_data = esp_rmaker_get_node_config();
     }
@@ -214,8 +385,8 @@ static esp_err_t prov_local_ctrl_data_init(prov_local_ctrl_data_type_t data_type
     }
 
     if (has_timestamp) {
-        /* Create signed response using helper function
-         * Note: raw_data ownership is transferred to create_signed_response */
+        /* Create signed response using helper function.
+         * raw_data ownership is transferred to create_signed_response. */
         char *signed_data = NULL;
         size_t signed_data_len = 0;
         esp_err_t err = create_signed_response(raw_data, timestamp, &signed_data, &signed_data_len);
@@ -243,38 +414,24 @@ static esp_err_t prov_local_ctrl_data_init(prov_local_ctrl_data_type_t data_type
 }
 
 /**
- * @brief Generic handler for getting data (params or config) with chunking support
+ * @brief Send one fragment of a get response.
  *
- * @param[in] session_id Session ID
- * @param[in] inbuf Input buffer (protobuf message)
- * @param[in] inlen Input buffer length
- * @param[out] outbuf Output buffer
- * @param[out] outlen Output buffer length
- * @param[in] priv_data Private data (unused)
- * @param[in] data_type Type of data (params or config)
- *
- * @return ESP_OK on success, error code otherwise
+ * params_filter is used only for filtered params when requested_offset is 0.
+ * reject skips generation and returns reject_status with an empty buffer.
  */
-static esp_err_t esp_rmaker_get_data_handler(uint32_t session_id, const uint8_t *inbuf, ssize_t inlen,
-                                              uint8_t **outbuf, ssize_t *outlen, void *priv_data,
-                                              prov_local_ctrl_data_type_t data_type)
+static esp_err_t esp_rmaker_reply_get_data(uint8_t **outbuf, ssize_t *outlen,
+                                           prov_local_ctrl_data_type_t data_type,
+                                           bool reject,
+                                           RmakerProvLocalCtrl__RMakerLocalCtrlStatus reject_status,
+                                           uint32_t requested_offset, bool has_timestamp, int64_t timestamp,
+                                           const uint8_t *params_filter, size_t params_filter_len)
 {
     if (!outbuf || !outlen) {
         ESP_LOGE(TAG, "Invalid params");
         return ESP_ERR_INVALID_ARG;
     }
 
-    const char *data_name = (data_type == PROV_LOCAL_CTRL_TYPE_PARAMS) ? "params" : "config";
-
-    /* Parse the received protobuf message */
-    RmakerProvLocalCtrl__RMakerLocalCtrlPayload *msg = NULL;
-    if (inbuf && inlen > 0) {
-        msg = rmaker_prov_local_ctrl__rmaker_local_ctrl_payload__unpack(NULL, inlen, inbuf);
-        if (!msg) {
-            ESP_LOGE(TAG, "Failed to unpack message");
-            return ESP_ERR_INVALID_ARG;
-        }
-    }
+    const char *data_name = prov_local_ctrl_data_name(data_type);
 
     /* Initialize response */
     RmakerProvLocalCtrl__RMakerLocalCtrlPayload response = RMAKER_PROV_LOCAL_CTRL__RMAKER_LOCAL_CTRL_PAYLOAD__INIT;
@@ -287,27 +444,12 @@ static esp_err_t esp_rmaker_get_data_handler(uint32_t session_id, const uint8_t 
     response.payload_case = RMAKER_PROV_LOCAL_CTRL__RMAKER_LOCAL_CTRL_PAYLOAD__PAYLOAD_RESP_GET_DATA;
     response.respgetdata = &resp_get_data;
 
-    /* Get the requested offset and timestamp from command */
-    uint32_t requested_offset = 0;
-    bool has_timestamp = false;
-    int64_t timestamp = 0;
     bool is_last_fragment = false;
     bool is_first_fragment = false;
 
-    if (msg && msg->payload_case == RMAKER_PROV_LOCAL_CTRL__RMAKER_LOCAL_CTRL_PAYLOAD__PAYLOAD_CMD_GET_DATA) {
-        if (msg->cmdgetdata) {
-            /* Verify data type matches */
-            if (msg->cmdgetdata->datatype != (data_type == PROV_LOCAL_CTRL_TYPE_PARAMS ?
-                                              RMAKER_PROV_LOCAL_CTRL__RMAKER_LOCAL_CTRL_DATA_TYPE__TypeParams :
-                                              RMAKER_PROV_LOCAL_CTRL__RMAKER_LOCAL_CTRL_DATA_TYPE__TypeConfig)) {
-                ESP_LOGE(TAG, "Data type mismatch in request");
-                resp_get_data.status = RMAKER_PROV_LOCAL_CTRL__RMAKER_LOCAL_CTRL_STATUS__InvalidParam;
-                goto send_response;
-            }
-            requested_offset = msg->cmdgetdata->offset;
-            has_timestamp = msg->cmdgetdata->hastimestamp;
-            timestamp = msg->cmdgetdata->timestamp;
-        }
+    if (reject) {
+        resp_get_data.status = reject_status;
+        goto send_response;
     }
 
     is_first_fragment = (requested_offset == 0);
@@ -322,15 +464,19 @@ static esp_err_t esp_rmaker_get_data_handler(uint32_t session_id, const uint8_t 
 
     /* If offset is 0, initialize/reinitialize the data */
     if (is_first_fragment) {
-        esp_err_t err = prov_local_ctrl_data_init(data_type, has_timestamp, timestamp);
+        esp_err_t err = prov_local_ctrl_data_init(data_type, has_timestamp, timestamp, params_filter, params_filter_len);
         if (err != ESP_OK) {
-            resp_get_data.status = RMAKER_PROV_LOCAL_CTRL__RMAKER_LOCAL_CTRL_STATUS__NoMemory;
+            if (err == ESP_ERR_INVALID_ARG) {
+                resp_get_data.status = RMAKER_PROV_LOCAL_CTRL__RMAKER_LOCAL_CTRL_STATUS__InvalidParam;
+            } else {
+                resp_get_data.status = RMAKER_PROV_LOCAL_CTRL__RMAKER_LOCAL_CTRL_STATUS__NoMemory;
+            }
             goto send_response;
         }
     }
 
-    /* Check if data is available */
-    if (!s_local_ctrl_data || !s_local_ctrl_data->data) {
+    /* Check if this continuation belongs to the transfer started at offset 0. */
+    if (!s_local_ctrl_data || !s_local_ctrl_data->data || s_local_ctrl_data->data_type != data_type) {
         ESP_LOGE(TAG, "%s data not initialized", data_name);
         resp_get_data.status = RMAKER_PROV_LOCAL_CTRL__RMAKER_LOCAL_CTRL_STATUS__Fail;
         goto send_response;
@@ -372,11 +518,6 @@ static esp_err_t esp_rmaker_get_data_handler(uint32_t session_id, const uint8_t 
     }
 
 send_response:
-    /* Free input message if it was allocated */
-    if (msg) {
-        rmaker_prov_local_ctrl__rmaker_local_ctrl_payload__free_unpacked(msg, NULL);
-    }
-
     /* Serialize the response */
     size_t resp_len = rmaker_prov_local_ctrl__rmaker_local_ctrl_payload__get_packed_size(&response);
     uint8_t *resp_buf = MEM_ALLOC_EXTRAM(resp_len);
@@ -398,16 +539,119 @@ send_response:
     return ESP_OK;
 }
 
+static esp_err_t esp_rmaker_get_data_handler(uint32_t session_id, const uint8_t *inbuf, ssize_t inlen,
+                                              uint8_t **outbuf, ssize_t *outlen, void *priv_data,
+                                              prov_local_ctrl_data_type_t data_type)
+{
+    (void)session_id;
+    (void)priv_data;
+    if (!outbuf || !outlen) {
+        ESP_LOGE(TAG, "Invalid params");
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    RmakerProvLocalCtrl__RMakerLocalCtrlPayload *msg = NULL;
+    if (inbuf && inlen > 0) {
+        msg = rmaker_prov_local_ctrl__rmaker_local_ctrl_payload__unpack(NULL, (size_t)inlen, inbuf);
+        if (!msg) {
+            ESP_LOGE(TAG, "Failed to unpack message");
+            return ESP_ERR_INVALID_ARG;
+        }
+    }
+
+    bool reject = false;
+    uint32_t requested_offset = 0;
+    bool has_timestamp = false;
+    int64_t timestamp = 0;
+    if (msg && msg->payload_case == RMAKER_PROV_LOCAL_CTRL__RMAKER_LOCAL_CTRL_PAYLOAD__PAYLOAD_CMD_GET_DATA &&
+            msg->cmdgetdata) {
+        RmakerProvLocalCtrl__RMakerLocalCtrlDataType expect =
+            (data_type == PROV_LOCAL_CTRL_TYPE_PARAMS) ?
+            RMAKER_PROV_LOCAL_CTRL__RMAKER_LOCAL_CTRL_DATA_TYPE__TypeParams :
+            RMAKER_PROV_LOCAL_CTRL__RMAKER_LOCAL_CTRL_DATA_TYPE__TypeConfig;
+        if (msg->cmdgetdata->datatype != expect) {
+            ESP_LOGE(TAG, "Data type mismatch in request");
+            reject = true;
+        } else {
+            requested_offset = msg->cmdgetdata->offset;
+            has_timestamp = msg->cmdgetdata->hastimestamp;
+            timestamp = msg->cmdgetdata->timestamp;
+        }
+    }
+
+    esp_err_t err = esp_rmaker_reply_get_data(outbuf, outlen, data_type, reject,
+                                              RMAKER_PROV_LOCAL_CTRL__RMAKER_LOCAL_CTRL_STATUS__InvalidParam,
+                                              requested_offset, has_timestamp, timestamp, NULL, 0);
+    if (msg) {
+        rmaker_prov_local_ctrl__rmaker_local_ctrl_payload__free_unpacked(msg, NULL);
+    }
+    return err;
+}
+
 static esp_err_t esp_rmaker_get_params_handler(uint32_t session_id, const uint8_t *inbuf, ssize_t inlen,
                                                 uint8_t **outbuf, ssize_t *outlen, void *priv_data)
 {
-    return esp_rmaker_get_data_handler(session_id, inbuf, inlen, outbuf, outlen, priv_data,
-                                       PROV_LOCAL_CTRL_TYPE_PARAMS);
+    (void)session_id;
+    (void)priv_data;
+    if (!outbuf || !outlen) {
+        ESP_LOGE(TAG, "Invalid params");
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    RmakerProvLocalCtrl__RMakerLocalCtrlPayload *msg = NULL;
+    if (inbuf && inlen > 0) {
+        msg = rmaker_prov_local_ctrl__rmaker_local_ctrl_payload__unpack(NULL, (size_t)inlen, inbuf);
+        if (!msg) {
+            ESP_LOGE(TAG, "Failed to unpack get_params message");
+            return ESP_ERR_INVALID_ARG;
+        }
+    }
+
+    bool reject = false;
+    uint32_t requested_offset = 0;
+    bool has_timestamp = false;
+    int64_t timestamp = 0;
+    const uint8_t *params_filter = NULL;
+    size_t params_filter_len = 0;
+    if (msg && msg->payload_case == RMAKER_PROV_LOCAL_CTRL__RMAKER_LOCAL_CTRL_PAYLOAD__PAYLOAD_CMD_GET_DATA &&
+            msg->cmdgetdata) {
+        if (msg->cmdgetdata->datatype != RMAKER_PROV_LOCAL_CTRL__RMAKER_LOCAL_CTRL_DATA_TYPE__TypeParams) {
+            ESP_LOGE(TAG, "Data type mismatch in get_params request");
+            reject = true;
+        } else {
+            requested_offset = msg->cmdgetdata->offset;
+            has_timestamp = msg->cmdgetdata->hastimestamp;
+            timestamp = msg->cmdgetdata->timestamp;
+            if (requested_offset == 0 && msg->cmdgetdata->paramsfilter.len > 0) {
+#ifdef CONFIG_ESP_RMAKER_PROV_LOCAL_CTRL_GET_FILTER
+                params_filter = msg->cmdgetdata->paramsfilter.data;
+                params_filter_len = msg->cmdgetdata->paramsfilter.len;
+                if (params_filter_len > ESP_RMAKER_PARAM_FILTER_MAX_JSON_LEN) {
+                    ESP_LOGE(TAG, "ParamsFilter too long (%u)", (unsigned)params_filter_len);
+                    reject = true;
+                }
+#else
+                ESP_LOGW(TAG, "ParamsFilter ignored; GET_FILTER disabled");
+#endif
+            }
+        }
+    }
+
+    esp_err_t err = esp_rmaker_reply_get_data(outbuf, outlen, PROV_LOCAL_CTRL_TYPE_PARAMS, reject,
+                                              RMAKER_PROV_LOCAL_CTRL__RMAKER_LOCAL_CTRL_STATUS__InvalidParam,
+                                              requested_offset, has_timestamp, timestamp,
+                                              params_filter, params_filter_len);
+    if (msg) {
+        rmaker_prov_local_ctrl__rmaker_local_ctrl_payload__free_unpacked(msg, NULL);
+    }
+    return err;
 }
 
 static esp_err_t esp_rmaker_set_params_handler(uint32_t session_id, const uint8_t *inbuf, ssize_t inlen,
                                                 uint8_t **outbuf, ssize_t *outlen, void *priv_data)
 {
+    (void)session_id;
+    (void)priv_data;
     ESP_LOGI(TAG, "Set params handler invoked");
     if (!inbuf || inlen <= 0 || !outbuf || !outlen) {
         ESP_LOGE(TAG, "Invalid params");
@@ -417,16 +661,38 @@ static esp_err_t esp_rmaker_set_params_handler(uint32_t session_id, const uint8_
         return ESP_ERR_INVALID_ARG;
     }
 
-    ESP_LOGD(TAG, "Received params data of length: %d", inlen);
+    const uint8_t *body = inbuf;
+    ssize_t body_len = inlen;
+    while (body_len > 0 && isspace((unsigned char)*body)) {
+        body++;
+        body_len--;
+    }
 
-    /* Handle set params */
-    esp_err_t err = esp_rmaker_handle_set_params((char *)inbuf, inlen, ESP_RMAKER_REQ_SRC_BLE_LOCAL);
+#ifdef CONFIG_ESP_RMAKER_PROV_LOCAL_CTRL_SET_FRAG
+    if (body_len <= 0 || body[0] != '{') {
+        RmakerProvLocalCtrl__RMakerLocalCtrlPayload *msg =
+            rmaker_prov_local_ctrl__rmaker_local_ctrl_payload__unpack(NULL, (size_t)inlen, inbuf);
+        if (!msg) {
+            ESP_LOGE(TAG, "Failed to unpack set_params fragment request");
+            return send_error_response("invalid request", outbuf, outlen);
+        }
+        esp_err_t err = esp_rmaker_set_params_frag_body(msg, outbuf, outlen);
+        rmaker_prov_local_ctrl__rmaker_local_ctrl_payload__free_unpacked(msg, NULL);
+        return err;
+    }
+#else
+    if (body_len <= 0 || body[0] != '{') {
+        return send_error_response("invalid request", outbuf, outlen);
+    }
+#endif
+
+    ESP_LOGD(TAG, "Received params data of length: %d", (int)inlen);
+    esp_err_t err = esp_rmaker_handle_set_params((char *)inbuf, (size_t)inlen, ESP_RMAKER_REQ_SRC_BLE_LOCAL);
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "Failed to handle set params: %s", esp_err_to_name(err));
         return send_error_response("failed to set params", outbuf, outlen);
     }
 
-    /* Allocate a JSON success response */
     const char *success_msg = "{\"status\":\"success\"}";
     size_t resp_len = strlen(success_msg);
     uint8_t *resp_buf = (uint8_t *)MEM_ALLOC_EXTRAM(resp_len);
@@ -437,7 +703,7 @@ static esp_err_t esp_rmaker_set_params_handler(uint32_t session_id, const uint8_
 
     memcpy(resp_buf, success_msg, resp_len);
     *outbuf = resp_buf;
-    *outlen = resp_len;
+    *outlen = (ssize_t)resp_len;
 
     ESP_LOGI(TAG, "Set params handler completed successfully");
     return ESP_OK;
@@ -449,6 +715,114 @@ static esp_err_t esp_rmaker_get_config_handler(uint32_t session_id, const uint8_
     return esp_rmaker_get_data_handler(session_id, inbuf, inlen, outbuf, outlen, priv_data,
                                        PROV_LOCAL_CTRL_TYPE_CONFIG);
 }
+
+#ifdef CONFIG_ESP_RMAKER_PROV_LOCAL_CTRL_SET_FRAG
+static esp_err_t prov_set_frag_send(RmakerProvLocalCtrl__RMakerLocalCtrlStatus status,
+                                    uint32_t received, uint8_t **outbuf, ssize_t *outlen)
+{
+    RmakerProvLocalCtrl__RMakerLocalCtrlPayload response =
+        RMAKER_PROV_LOCAL_CTRL__RMAKER_LOCAL_CTRL_PAYLOAD__INIT;
+    response.msg = RMAKER_PROV_LOCAL_CTRL__RMAKER_LOCAL_CTRL_MSG_TYPE__TypeRespSetData;
+
+    RmakerProvLocalCtrl__RespSetData resp = RMAKER_PROV_LOCAL_CTRL__RESP_SET_DATA__INIT;
+    resp.status = status;
+    resp.received = received;
+    resp.maxlen = CONFIG_ESP_RMAKER_PROV_LOCAL_CTRL_SET_FRAG_MAX_LEN;
+    response.payload_case = RMAKER_PROV_LOCAL_CTRL__RMAKER_LOCAL_CTRL_PAYLOAD__PAYLOAD_RESP_SET_DATA;
+    response.respsetdata = &resp;
+
+    size_t resp_len = rmaker_prov_local_ctrl__rmaker_local_ctrl_payload__get_packed_size(&response);
+    uint8_t *resp_buf = MEM_ALLOC_EXTRAM(resp_len);
+    if (!resp_buf) {
+        ESP_LOGE(TAG, "Failed to allocate set_params fragment response");
+        return ESP_ERR_NO_MEM;
+    }
+    rmaker_prov_local_ctrl__rmaker_local_ctrl_payload__pack(&response, resp_buf);
+    *outbuf = resp_buf;
+    *outlen = (ssize_t)resp_len;
+    return ESP_OK;
+}
+static esp_err_t esp_rmaker_set_params_frag_body(RmakerProvLocalCtrl__RMakerLocalCtrlPayload *msg,
+                                                 uint8_t **outbuf, ssize_t *outlen)
+{
+    esp_err_t send_err = ESP_OK;
+    RmakerProvLocalCtrl__RMakerLocalCtrlStatus status =
+        RMAKER_PROV_LOCAL_CTRL__RMAKER_LOCAL_CTRL_STATUS__InvalidParam;
+    uint32_t received_out = 0;
+    const uint32_t set_frag_max_total = CONFIG_ESP_RMAKER_PROV_LOCAL_CTRL_SET_FRAG_MAX_LEN;
+
+    if (msg->payload_case != RMAKER_PROV_LOCAL_CTRL__RMAKER_LOCAL_CTRL_PAYLOAD__PAYLOAD_CMD_SET_DATA ||
+            !msg->cmdsetdata || !msg->cmdsetdata->buf) {
+        ESP_LOGE(TAG, "set_params fragment request is not CmdSetData");
+        prov_set_frag_free();
+        goto respond;
+    }
+
+    RmakerProvLocalCtrl__PayloadBuf *frag = msg->cmdsetdata->buf;
+    uint32_t offset = frag->offset;
+    uint32_t total = frag->totallen;
+    size_t len = frag->payload.len;
+    const uint8_t *bytes = frag->payload.data;
+
+    if (len == 0 || len > DATA_FRAGMENT_SIZE || total == 0 || total > set_frag_max_total ||
+            offset > total || len > (size_t)(total - offset) || !bytes) {
+        ESP_LOGE(TAG, "Invalid set_params fragment offset=%lu len=%u total=%lu",
+                 (unsigned long)offset, (unsigned)len, (unsigned long)total);
+        prov_set_frag_free();
+        goto respond;
+    }
+
+    if (offset == 0) {
+        prov_set_frag_free();
+        s_set_frag = MEM_CALLOC_EXTRAM(1, sizeof(*s_set_frag));
+        if (!s_set_frag) {
+            status = RMAKER_PROV_LOCAL_CTRL__RMAKER_LOCAL_CTRL_STATUS__NoMemory;
+            goto respond;
+        }
+        s_set_frag->data = MEM_CALLOC_EXTRAM(1, (size_t)total + 1);
+        if (!s_set_frag->data) {
+            prov_set_frag_free();
+            status = RMAKER_PROV_LOCAL_CTRL__RMAKER_LOCAL_CTRL_STATUS__NoMemory;
+            goto respond;
+        }
+        s_set_frag->total_len = total;
+        s_set_frag->received = 0;
+    } else if (!s_set_frag || s_set_frag->total_len != total || offset != s_set_frag->received) {
+        ESP_LOGE(TAG, "set_params fragment is not contiguous");
+        prov_set_frag_free();
+        goto respond;
+    }
+
+    memcpy(s_set_frag->data + offset, bytes, len);
+    s_set_frag->received = offset + (uint32_t)len;
+
+    if (s_set_frag->received == s_set_frag->total_len) {
+        uint32_t total_len = s_set_frag->total_len;
+        s_set_frag->data[total_len] = '\0';
+        esp_err_t err = esp_rmaker_handle_set_params((char *)s_set_frag->data, total_len,
+                                                     ESP_RMAKER_REQ_SRC_BLE_LOCAL);
+        prov_set_frag_free();
+        if (err != ESP_OK) {
+            ESP_LOGE(TAG, "Failed to apply fragmented set params");
+            status = RMAKER_PROV_LOCAL_CTRL__RMAKER_LOCAL_CTRL_STATUS__Fail;
+            received_out = 0;
+        } else {
+            status = RMAKER_PROV_LOCAL_CTRL__RMAKER_LOCAL_CTRL_STATUS__Success;
+            received_out = total_len;
+            ESP_LOGI(TAG, "set_params fragment applied %lu bytes", (unsigned long)total_len);
+        }
+    } else {
+        status = RMAKER_PROV_LOCAL_CTRL__RMAKER_LOCAL_CTRL_STATUS__Success;
+        received_out = s_set_frag->received;
+        ESP_LOGD(TAG, "set_params fragment stored %lu/%lu",
+                 (unsigned long)received_out, (unsigned long)s_set_frag->total_len);
+    }
+
+respond:
+    send_err = prov_set_frag_send(status, received_out, outbuf, outlen);
+    return send_err;
+}
+#endif /* CONFIG_ESP_RMAKER_PROV_LOCAL_CTRL_SET_FRAG */
 
 static esp_err_t esp_rmaker_get_params_endpoint_create(void)
 {
@@ -516,6 +890,7 @@ static void esp_rmaker_prov_local_ctrl_event_handler(void *arg, esp_event_base_t
             case NETWORK_PROV_END: {
                 /* Clean up data, keep handler registered for future provisioning */
                 prov_local_ctrl_data_free();
+                prov_set_frag_free();
                 ESP_LOGI(TAG, "Local ctrl data cleaned up");
                 break;
             }
@@ -546,6 +921,7 @@ esp_err_t esp_rmaker_prov_local_ctrl_deinit(void)
 
     /* Clean up any remaining data */
     prov_local_ctrl_data_free();
+    prov_set_frag_free();
 
     return ESP_OK;
 }

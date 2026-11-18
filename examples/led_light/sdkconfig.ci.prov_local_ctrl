@@ -1,0 +1,3 @@
+# CI overlay: compile esp_rmaker_prov_local_ctrl.c paths in led_light
+CONFIG_ESP_RMAKER_ENABLE_CHALLENGE_RESPONSE=y
+CONFIG_ESP_RMAKER_ENABLE_PROV_LOCAL_CTRL=y

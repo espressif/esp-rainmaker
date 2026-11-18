@@ -102,6 +102,25 @@ esp_err_t esp_rmaker_attribute_delete(esp_rmaker_attr_t *attr);
 char *esp_rmaker_get_node_config(void);
 char *esp_rmaker_get_node_params(void);
 esp_err_t esp_rmaker_handle_set_params(char *data, size_t data_len, esp_rmaker_req_src_t src);
+
+#ifdef CONFIG_ESP_RMAKER_ENABLE_PROV_LOCAL_CTRL
+/* Sized so CmdGetData.ParamsFilter fits one ~512-byte BLE attribute write. */
+#define ESP_RMAKER_PARAM_FILTER_MAX_DEVICES   8
+#define ESP_RMAKER_PARAM_FILTER_MAX_PARAMS    16
+#define ESP_RMAKER_PARAM_FILTER_MAX_NAME_LEN  32
+#define ESP_RMAKER_PARAM_FILTER_MAX_JSON_LEN  384
+#define ESP_RMAKER_SET_FRAG_CAP               "set_frag"
+
+/* One device or service to read. param_names == NULL reads every param. */
+typedef struct {
+    char *name;
+    char **param_names;
+    size_t param_count;
+} esp_rmaker_param_filter_t;
+
+esp_err_t esp_rmaker_get_filtered_node_params(esp_rmaker_param_filter_t *filters,
+                                              size_t filter_count, char **out_json);
+#endif
 esp_err_t esp_rmaker_populate_params(char *buf, size_t *buf_len, uint8_t flags, bool reset_flags);
 esp_err_t esp_rmaker_param_cmd_resp_enable(void);
 esp_err_t esp_rmaker_user_mapping_prov_init(void);
