@@ -753,8 +753,8 @@ static void esp_rmaker_task(void *data)
 #ifdef CONFIG_ESP_RMAKER_LOCAL_CTRL_ENABLE
     err = esp_rmaker_local_ctrl_enable();
     if (err != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to start local control service. Aborting!!!");
-        goto rmaker_end;
+        /* Local control is not necessary for the cloud connection. */
+        ESP_LOGE(TAG, "Failed to start local control service: %s. Continuing without it.", esp_err_to_name(err));
     }
 #endif /* CONFIG_ESP_RMAKER_LOCAL_CTRL_ENABLE */
     err = esp_rmaker_mqtt_connect();

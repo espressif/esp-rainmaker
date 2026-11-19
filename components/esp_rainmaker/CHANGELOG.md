@@ -1,5 +1,16 @@
 # Changelog
 
+## 2.2.1
+
+### Bug Fixes
+
+- Local control: wait for the end of provisioning only when necessary. Before, it waited
+  whenever provisioning ran, for up to 30 minutes. It now waits only in two cases: the network
+  under provisioning has connected and provisioning ends soon, or SoftAP provisioning holds
+  `protocomm_httpd`. In other cases, for example an Ethernet IP during BLE provisioning, it
+  starts at once. A failed `esp_local_ctrl_start()` no longer aborts. The node logs an error
+  and continues to the MQTT connection without local control.
+
 ## 2.2.0
 
 ### New Features

@@ -1,5 +1,14 @@
 # Changes
 
+## 19-Nov-2026: Local Control Defers Only When Necessary
+
+- Local control waited for provisioning to end before it started, on every transport. On a board
+  with Ethernet and Wi-Fi, this delayed challenge-response over Ethernet by up to 30 minutes. It
+  now waits only when the network under provisioning has connected, or when SoftAP provisioning
+  holds the HTTP server.
+  Check the esp_rainmaker component's
+  [CHANGELOG v2.2.1](components/esp_rainmaker/CHANGELOG.md#221) for details.
+
 ## 17-Nov-2026: camera examples on esp_hosted 3.1.0
 
 - The camera examples take esp_hosted 3.1.0 from the component manager. The split camera
