@@ -1,5 +1,23 @@
 # Changelog
 
+## 2.2.0
+
+### New Features
+
+- Local control during BLE provisioning (`CONFIG_ESP_RMAKER_ENABLE_PROV_LOCAL_CTRL`) extends the existing
+  `get_params` and `set_params` endpoints instead of adding new ones.
+    - `rmaker_extra` stays at version `1.0`. When `CONFIG_ESP_RMAKER_PROV_LOCAL_CTRL_SET_FRAG` is enabled, its
+      `cap` list adds `set_frag` beside `ch_resp` and `local_ctrl`. Apps that do not see `set_frag` keep sending
+      one JSON body to `set_params` and reading every parameter from `get_params`.
+    - `set_params`: JSON bodies starting with `{` behave as before. Otherwise the body is `RMakerLocalCtrlPayload`
+      with `CmdSetData` / `RespSetData` fragments (optional `MaxLen` in the response). Each `Payload` is at most
+      200 bytes; `TotalLen` is bounded by `CONFIG_ESP_RMAKER_PROV_LOCAL_CTRL_SET_FRAG_MAX_LEN` (default 8192).
+    - The optional `CmdGetData.ParamsFilter` field filters `get_params` at offset 0.
+      For example, `{"params":{"Light":["Power"],"Schedule":true}}` selects `Light.Power` and every
+      `Schedule` parameter. The filter is limited to 384 bytes so it fits in one BLE write.
+      Unknown device, service and parameter names are skipped with a warning. The response uses
+      chunked `RespGetData` with an optional timestamp and signature.
+
 ## 2.1.1
 
 ### Bug Fixes

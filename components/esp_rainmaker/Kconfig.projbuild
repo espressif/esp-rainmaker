@@ -285,6 +285,36 @@ menu "ESP RainMaker Config"
 
             Note: This feature requires challenge-response to be enabled.
 
+    if ESP_RMAKER_ENABLE_PROV_LOCAL_CTRL
+
+        config ESP_RMAKER_PROV_LOCAL_CTRL_SET_FRAG
+            bool "Fragmented set_params over BLE provisioning"
+            default y
+            help
+                When enabled, set_params accepts CmdSetData protobuf fragments (non-JSON body).
+                rmaker_extra advertises cap set_frag. Legacy single JSON bodies still work.
+
+        config ESP_RMAKER_PROV_LOCAL_CTRL_GET_FILTER
+            bool "Filtered get_params via CmdGetData.ParamsFilter"
+            default y
+            help
+                When enabled, get_params accepts optional ParamsFilter at offset 0, up to
+                384 bytes. Use {"params":{"Light":["Power"],"Schedule":true}} to select
+                named parameters of a device or service. Use true to select all its
+                parameters. Unknown names are skipped with a warning.
+
+        config ESP_RMAKER_PROV_LOCAL_CTRL_SET_FRAG_MAX_LEN
+            int "Maximum set_params fragment JSON length"
+            depends on ESP_RMAKER_PROV_LOCAL_CTRL_SET_FRAG
+            default 8192
+            range 256 65536
+            help
+                Maximum TotalLen, in bytes, for one fragmented set_params transfer.
+                At offset 0 the device allocates this many bytes of heap and holds
+                them until the transfer finishes or provisioning ends.
+
+    endif
+
     config RMAKER_NAME_PARAM_CB
         bool "Call device callback for Name param"
         default n

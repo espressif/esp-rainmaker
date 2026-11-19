@@ -212,6 +212,198 @@ char *esp_rmaker_get_node_params(void)
     return node_params;
 }
 
+#ifdef CONFIG_ESP_RMAKER_ENABLE_PROV_LOCAL_CTRL
+#ifdef CONFIG_ESP_RMAKER_PROV_LOCAL_CTRL_GET_FILTER
+static bool param_filter_name_seen(const esp_rmaker_param_filter_t *filters, size_t count,
+                                   const char *name)
+{
+    for (size_t i = 0; i < count; i++) {
+        if (filters[i].name && strcmp(filters[i].name, name) == 0) {
+            return true;
+        }
+    }
+    return false;
+}
+
+static void param_filter_free_entry(esp_rmaker_param_filter_t *filter)
+{
+    free(filter->name);
+    filter->name = NULL;
+    if (filter->param_names) {
+        for (size_t p = 0; p < filter->param_count; p++) {
+            free(filter->param_names[p]);
+            filter->param_names[p] = NULL;
+        }
+        free(filter->param_names);
+        filter->param_names = NULL;
+    }
+    filter->param_count = 0;
+}
+
+/* Drop unknown or duplicate names. Strings that are skipped are freed here. */
+static void param_filter_validate(esp_rmaker_param_filter_t *filters, size_t *filter_count)
+{
+    if (!filters || !filter_count) {
+        return;
+    }
+    size_t out = 0;
+    for (size_t i = 0; i < *filter_count; i++) {
+        if (!filters[i].name || filters[i].name[0] == '\0') {
+            param_filter_free_entry(&filters[i]);
+            continue;
+        }
+        if (param_filter_name_seen(filters, out, filters[i].name)) {
+            ESP_LOGW(TAG, "Duplicate device or service in get_params filter: %s", filters[i].name);
+            param_filter_free_entry(&filters[i]);
+            continue;
+        }
+        _esp_rmaker_device_t *device = (_esp_rmaker_device_t *)esp_rmaker_node_get_device_by_name(
+                                           esp_rmaker_get_node(), filters[i].name);
+        if (!device) {
+            ESP_LOGW(TAG, "Unknown device or service in get_params filter: %s", filters[i].name);
+            param_filter_free_entry(&filters[i]);
+            continue;
+        }
+        if (filters[i].param_names) {
+            size_t kept = 0;
+            for (size_t p = 0; p < filters[i].param_count; p++) {
+                char *pname = filters[i].param_names[p];
+                filters[i].param_names[p] = NULL;
+                if (!pname || pname[0] == '\0') {
+                    free(pname);
+                    continue;
+                }
+                bool dup = false;
+                for (size_t q = 0; q < kept; q++) {
+                    if (strcmp(pname, filters[i].param_names[q]) == 0) {
+                        dup = true;
+                        break;
+                    }
+                }
+                if (dup || !esp_rmaker_device_get_param_by_name((esp_rmaker_device_t *)device, pname)) {
+                    ESP_LOGW(TAG, "%s param %s on %s", dup ? "Duplicate" : "Unknown", pname, filters[i].name);
+                    free(pname);
+                    continue;
+                }
+                filters[i].param_names[kept++] = pname;
+            }
+            filters[i].param_count = kept;
+            if (kept == 0) {
+                ESP_LOGW(TAG, "No known params for %s after filter", filters[i].name);
+                free(filters[i].param_names);
+                filters[i].param_names = NULL;
+                param_filter_free_entry(&filters[i]);
+                continue;
+            }
+        }
+        if (out != i) {
+            filters[out] = filters[i];
+            memset(&filters[i], 0, sizeof(filters[i]));
+        }
+        out++;
+    }
+    *filter_count = out;
+}
+
+static esp_err_t esp_rmaker_populate_filtered_params(char *buf, size_t *buf_len,
+                                                     const esp_rmaker_param_filter_t *filters,
+                                                     size_t filter_count)
+{
+    esp_err_t err = ESP_OK;
+    json_gen_str_t jstr;
+    json_gen_str_start(&jstr, buf, *buf_len, NULL, NULL);
+    json_gen_start_object(&jstr);
+    for (size_t i = 0; i < filter_count; i++) {
+        _esp_rmaker_device_t *device = (_esp_rmaker_device_t *)esp_rmaker_node_get_device_by_name(
+                                           esp_rmaker_get_node(), filters[i].name);
+        if (!device) {
+            return ESP_FAIL;
+        }
+        json_gen_push_object(&jstr, device->name);
+        if (!filters[i].param_names) {
+            _esp_rmaker_param_t *param = device->params;
+            while (param) {
+                esp_rmaker_report_value(&param->val, param->name, &jstr);
+                param = param->next;
+            }
+        } else {
+            for (size_t p = 0; p < filters[i].param_count; p++) {
+                _esp_rmaker_param_t *param = (_esp_rmaker_param_t *)esp_rmaker_device_get_param_by_name(
+                                                 (esp_rmaker_device_t *)device, filters[i].param_names[p]);
+                if (!param) {
+                    return ESP_FAIL;
+                }
+                esp_rmaker_report_value(&param->val, param->name, &jstr);
+            }
+        }
+        json_gen_pop_object(&jstr);
+    }
+    if (json_gen_end_object(&jstr) < 0) {
+        err = ESP_ERR_NO_MEM;
+    }
+    int len = json_gen_str_end(&jstr);
+    if (len == JSON_GEN_ERR_BUF_FULL) {
+        err = esp_rmaker_populate_filtered_params(NULL, buf_len, filters, filter_count) == ESP_OK ?
+              ESP_ERR_NO_MEM : ESP_FAIL;
+    } else if (len < 0) {
+        err = ESP_FAIL;
+    } else {
+        *buf_len = len;
+    }
+    return err;
+}
+
+esp_err_t esp_rmaker_get_filtered_node_params(esp_rmaker_param_filter_t *filters,
+                                              size_t filter_count, char **out_json)
+{
+    esp_err_t err;
+
+    if (!out_json) {
+        return ESP_ERR_INVALID_ARG;
+    }
+    *out_json = NULL;
+    param_filter_validate(filters, &filter_count);
+    if (filter_count == 0) {
+        char *empty = MEM_CALLOC_EXTRAM(1, 3);
+        if (!empty) {
+            return ESP_ERR_NO_MEM;
+        }
+        strcpy(empty, "{}");
+        *out_json = empty;
+        return ESP_OK;
+    }
+    size_t req_size = 0;
+    err = esp_rmaker_populate_filtered_params(NULL, &req_size, filters, filter_count);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to measure filtered params JSON");
+        return err;
+    }
+    req_size += RMAKER_PARAMS_SIZE_MARGIN;
+    char *buf = MEM_CALLOC_EXTRAM(1, req_size);
+    if (!buf) {
+        return ESP_ERR_NO_MEM;
+    }
+    err = esp_rmaker_populate_filtered_params(buf, &req_size, filters, filter_count);
+    if (err == ESP_ERR_NO_MEM) {
+        free(buf);
+        req_size += RMAKER_PARAMS_SIZE_MARGIN;
+        buf = MEM_CALLOC_EXTRAM(1, req_size);
+        if (!buf) {
+            return ESP_ERR_NO_MEM;
+        }
+        err = esp_rmaker_populate_filtered_params(buf, &req_size, filters, filter_count);
+    }
+    if (err != ESP_OK) {
+        free(buf);
+        ESP_LOGE(TAG, "Failed to generate filtered params JSON");
+        return err;
+    }
+    *out_json = buf;
+    return ESP_OK;
+}
+#endif /* CONFIG_ESP_RMAKER_PROV_LOCAL_CTRL_GET_FILTER */
+#endif /* CONFIG_ESP_RMAKER_ENABLE_PROV_LOCAL_CTRL */
+
 static char * esp_rmaker_param_get_buf(size_t size)
 {
     static char *s_node_params_buf;

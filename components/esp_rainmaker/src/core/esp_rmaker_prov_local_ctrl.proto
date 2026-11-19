@@ -28,6 +28,15 @@ message CmdGetData {
     int64 Timestamp = 3;
     /* Flag to indicate if timestamp is provided (since 0 is a valid timestamp) */
     bool HasTimestamp = 4;
+    /* Optional filter for TypeParams on offset 0 only; ignored on later chunks.
+     * ParamsFilter is limited to 384 bytes to fit in one BLE characteristic write.
+     * Format: {"params":{"Light":["Power","Brightness"],"Schedule":true}}
+     * Each device or service maps to a non-empty array of parameter names
+     * or true to select all of its parameters. The params object must be non-empty.
+     * Unknown device, service and parameter names are skipped with a warning.
+     * Duplicates are skipped. The response uses chunked RespGetData.
+     */
+    bytes ParamsFilter = 5;
 }
 
 /* Response with data (params or config) */
@@ -36,9 +45,33 @@ message RespGetData {
     PayloadBuf Buf = 2;
 }
 
+/* App -> device fragment of a set-params JSON body (set_params endpoint).
+ * When the set_params body does not start with '{', the payload is this message
+ * (RMakerLocalCtrlPayload with CmdSetData). Payload length is 1..200. Offset 0
+ * starts a transfer; later offsets must equal bytes already accepted. TotalLen
+ * is the full JSON size, stays constant, and is bounded by Kconfig. JSON is
+ * applied only when Offset + Payload length == TotalLen.
+ */
+message CmdSetData {
+    PayloadBuf Buf = 1;
+}
+
+/* Device -> app. Received is how many bytes of this transfer have been accepted.
+ * Intermediate Success leaves those bytes stored. Success with Received == TotalLen
+ * means the JSON was applied. Any failure discards the transfer and returns Received 0.
+ * MaxLen is the configured maximum TotalLen when set-params fragmentation is enabled.
+ */
+message RespSetData {
+    RMakerLocalCtrlStatus Status = 1;
+    uint32 Received = 2;
+    uint32 MaxLen = 3;
+}
+
 enum RMakerLocalCtrlMsgType {
     TypeCmdGetData = 0;
     TypeRespGetData = 1;
+    TypeCmdSetData = 2;
+    TypeRespSetData = 3;
 }
 
 message RMakerLocalCtrlPayload {
@@ -46,5 +79,7 @@ message RMakerLocalCtrlPayload {
     oneof payload {
         CmdGetData cmdGetData = 10;
         RespGetData respGetData = 11;
+        CmdSetData cmdSetData = 12;
+        RespSetData respSetData = 13;
     }
 }

@@ -326,8 +326,13 @@ static void esp_rmaker_chal_resp_event_handler(void *arg, esp_event_base_t event
                 /* Set rmaker_extra capabilities
                  * Always include ch_resp, and include local_ctrl if enabled */
 #ifdef CONFIG_ESP_RMAKER_ENABLE_PROV_LOCAL_CTRL
+#ifdef CONFIG_ESP_RMAKER_PROV_LOCAL_CTRL_SET_FRAG
+                static const char *capabilities[] = {"ch_resp", "local_ctrl", ESP_RMAKER_SET_FRAG_CAP};
+                network_prov_mgr_set_app_info(RMAKER_EXTRA_APP_NAME, RMAKER_EXTRA_APP_VERSION, capabilities, 3);
+#else
                 static const char *capabilities[] = {"ch_resp", "local_ctrl"};
                 network_prov_mgr_set_app_info(RMAKER_EXTRA_APP_NAME, RMAKER_EXTRA_APP_VERSION, capabilities, 2);
+#endif
 #else
                 static const char *capabilities[] = {"ch_resp"};
                 network_prov_mgr_set_app_info(RMAKER_EXTRA_APP_NAME, RMAKER_EXTRA_APP_VERSION, capabilities, 1);
