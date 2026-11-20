@@ -21,6 +21,13 @@
 #define ESP_RMAKER_MQTT_CRED_HOST_NVS_KEY "mqtt_cred_host"
 #define ESP_RMAKER_CLIENT_CSR_NVS_KEY    "csr"
 #define ESP_RMAKER_CLIENT_RANDOM_NVS_KEY "random"
+#define ESP_RMAKER_RANDOM_NUMBER_LEN     64
+
+/** Store general purpose random bytes in the factory partition if absent
+ *
+ * @return ESP_OK on success, or if the bytes are already present.
+ */
+esp_err_t esp_rmaker_seed_random_bytes(void);
 
 /** Returns the client certificate
  *

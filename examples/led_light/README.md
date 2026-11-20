@@ -4,6 +4,31 @@
 
 Follow the ESP RainMaker Documentation [Get Started](https://rainmaker.espressif.com/docs/get-started.html) section to build and flash this firmware. Just note the path of this example.
 
+### BLE local control on every boot
+
+By default, BLE runs only during provisioning. For BLE local control on every boot, build with the
+opt-in `sdkconfig.defaults.ble_session` fragment:
+
+```
+idf.py -D SDKCONFIG_DEFAULTS="sdkconfig.defaults;sdkconfig.defaults.ble_session" set-target esp32c3
+idf.py menuconfig
+idf.py build
+```
+
+In menuconfig, open `ESP RainMaker App Wi-Fi Provisioning` > `BLE mode`. Select
+`Provisioning and always-on BLE session` or `BLE session only, no provisioning`. The fragment does
+not select the mode. Read the [rmaker_app_network README](../common/rmaker_app_network/README.md#ble-mode)
+before you select the session only mode.
+
+The fragment does these:
+
+- Adds the local control endpoints to the BLE session (`CONFIG_ESP_RMAKER_ENABLE_PROV_LOCAL_CTRL`).
+- Adds the `Timestamp` param to the time service, so a client can set the clock
+  (`CONFIG_ESP_RMAKER_TIME_CURRENT_TIME_PARAM`).
+- On ESP32-C2, raises the NimBLE host task stack to the IDF default of 4096 bytes.
+- On ESP32-C3, applies footprint trims so that BLE and Wi-Fi fit in RAM together. The trims turn
+  off WPA3 and reduce some task stacks.
+
 ## What to expect in this example?
 
 - This example uses the BOOT button and RGB LED on the ESP32-S2-Saola-1/ESP32-C3-DevKitC board to demonstrate a lightbulb.

@@ -88,6 +88,11 @@ typedef struct {
      * attempting to connect to the ESP RainMaker service
      */
     bool enable_time_sync;
+    /** Local only operation
+     * Setting this true skips MQTT, self claiming and the wait for a network
+     * connection, for a node that never reaches the ESP RainMaker service.
+     */
+    bool local_only;
 } esp_rmaker_config_t;
 
 /** ESP RainMaker Parameter Value type */
@@ -454,6 +459,13 @@ esp_err_t esp_rmaker_node_deinit(const esp_rmaker_node_t *node);
  * @return esp_rmaker_state_t current state of the ESP RainMaker agent
  */
 esp_rmaker_state_t esp_rmaker_get_state(void);
+
+/**
+ * @brief Check if the ESP RainMaker agent runs in local only mode
+ *
+ * @return true if local_only was set in esp_rmaker_config_t, false otherwise.
+ */
+bool esp_rmaker_is_local_only(void);
 
 /** Get a handle to the Node
  *

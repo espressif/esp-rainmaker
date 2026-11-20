@@ -16,6 +16,7 @@ dependencies:
     version: "*"
   espressif/rmaker_app_network:
     version: "*"
+    override_path: ../../../../common/rmaker_app_network
   espressif/rmaker_app_insights:
     version: "*"
 

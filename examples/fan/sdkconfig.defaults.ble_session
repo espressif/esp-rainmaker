@@ -1,0 +1,8 @@
+# Settings for the ALWAYS and SESSION_ONLY BLE modes of rmaker_app_network.
+# Build with: idf.py -D SDKCONFIG_DEFAULTS="sdkconfig.defaults;sdkconfig.defaults.ble_session" build
+
+# A session only node has no SNTP, so a client sets the clock through this param
+CONFIG_ESP_RMAKER_TIME_CURRENT_TIME_PARAM=y
+
+# Local control endpoints on the BLE session
+CONFIG_ESP_RMAKER_ENABLE_PROV_LOCAL_CTRL=y

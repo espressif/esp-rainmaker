@@ -233,3 +233,6 @@ esp_err_t esp_rmaker_connectivity_reconfigure_lwt_for_node_id_change(void);
  * @return error in case of failure
  */
 esp_err_t esp_rmaker_mqtt_reconnect(void);
+
+/** @brief Make MQTT calls return ESP_ERR_INVALID_STATE. Deinit and disconnect become no-ops. */
+void esp_rmaker_mqtt_set_disabled(bool disabled);

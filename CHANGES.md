@@ -1,5 +1,13 @@
 # Changes
 
+## 19-Nov-2026: BLE Local Control After Provisioning
+
+- BLE local control was available only during provisioning. `rmaker_app_network` now has
+  `CONFIG_APP_NETWORK_BLE_MODE`, which can keep the BLE session up after provisioning, or run a node
+  on the BLE session alone with no network stack. Such a node sets the new `local_only` flag in
+  `esp_rmaker_config_t`. Check the esp_rainmaker component's
+  [CHANGELOG v2.3.0](components/esp_rainmaker/CHANGELOG.md#230) for details.
+
 ## 19-Nov-2026: Local Control Defers Only When Necessary
 
 - Local control waited for provisioning to end before it started, on every transport. On a board

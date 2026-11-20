@@ -44,6 +44,10 @@ endif()
 
 list(APPEND priv_req esp_app_format openthread network_provisioning)
 
+if(CONFIG_ESP_RMAKER_ENABLE_PROV_LOCAL_CTRL)
+    list(APPEND priv_req protocomm)
+endif()
+
 if(CONFIG_ESP_RMAKER_ENABLE_CHALLENGE_RESPONSE)
     list(APPEND core_srcs
         "src/core/esp_rmaker_chal_resp.c"

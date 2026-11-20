@@ -16,12 +16,14 @@
 #include <esp_rmaker_mqtt_glue.h>
 #include <esp_rmaker_client_data.h>
 #include <esp_rmaker_core.h>
+#include <esp_rmaker_internal.h>
 
 #include "esp_rmaker_mqtt.h"
 #include "esp_rmaker_mqtt_budget.h"
 
 static const char *TAG = "esp_rmaker_mqtt";
 static esp_rmaker_mqtt_config_t g_mqtt_config;
+static bool g_mqtt_disabled;
 
 esp_rmaker_mqtt_conn_params_t *esp_rmaker_mqtt_get_conn_params(void)
 {
@@ -41,6 +43,10 @@ esp_err_t esp_rmaker_mqtt_setup(esp_rmaker_mqtt_config_t mqtt_config)
 
 esp_err_t esp_rmaker_mqtt_init(esp_rmaker_mqtt_conn_params_t *conn_params)
 {
+    if (g_mqtt_disabled) {
+        ESP_LOGW(TAG, "Cannot init. MQTT is disabled.");
+        return ESP_ERR_INVALID_STATE;
+    }
     if (!g_mqtt_config.setup_done) {
         esp_rmaker_mqtt_glue_setup(&g_mqtt_config);
     }
@@ -59,6 +65,9 @@ esp_err_t esp_rmaker_mqtt_init(esp_rmaker_mqtt_conn_params_t *conn_params)
 
 void esp_rmaker_mqtt_deinit(void)
 {
+    if (g_mqtt_disabled) {
+        return;
+    }
     esp_rmaker_mqtt_budgeting_deinit();
     if (g_mqtt_config.deinit) {
         return g_mqtt_config.deinit();
@@ -68,6 +77,10 @@ void esp_rmaker_mqtt_deinit(void)
 
 esp_err_t esp_rmaker_mqtt_connect(void)
 {
+    if (g_mqtt_disabled) {
+        ESP_LOGW(TAG, "Cannot connect. MQTT is disabled.");
+        return ESP_ERR_INVALID_STATE;
+    }
     if (g_mqtt_config.connect) {
         esp_err_t err = g_mqtt_config.connect();
         if (err == ESP_OK) {
@@ -82,6 +95,9 @@ esp_err_t esp_rmaker_mqtt_connect(void)
 
 esp_err_t esp_rmaker_mqtt_disconnect(void)
 {
+    if (g_mqtt_disabled) {
+        return ESP_OK;
+    }
     esp_rmaker_mqtt_budgeting_stop();
     if (g_mqtt_config.disconnect) {
         return g_mqtt_config.disconnect();
@@ -92,6 +108,9 @@ esp_err_t esp_rmaker_mqtt_disconnect(void)
 
 esp_err_t esp_rmaker_mqtt_subscribe(const char *topic, esp_rmaker_mqtt_subscribe_cb_t cb, uint8_t qos, void *priv_data)
 {
+    if (g_mqtt_disabled) {
+        return ESP_ERR_INVALID_STATE;
+    }
     ESP_LOGD(TAG, "Subscribing to topic: %s", topic);
     if (g_mqtt_config.subscribe) {
         return g_mqtt_config.subscribe(topic, cb, qos, priv_data);
@@ -102,6 +121,9 @@ esp_err_t esp_rmaker_mqtt_subscribe(const char *topic, esp_rmaker_mqtt_subscribe
 
 esp_err_t esp_rmaker_mqtt_unsubscribe(const char *topic)
 {
+    if (g_mqtt_disabled) {
+        return ESP_ERR_INVALID_STATE;
+    }
     if (g_mqtt_config.unsubscribe) {
         return g_mqtt_config.unsubscribe(topic);
     }
@@ -109,8 +131,19 @@ esp_err_t esp_rmaker_mqtt_unsubscribe(const char *topic)
     return ESP_OK;
 }
 
+void esp_rmaker_mqtt_set_disabled(bool disabled)
+{
+    g_mqtt_disabled = disabled;
+}
+
 esp_err_t esp_rmaker_mqtt_publish(const char *topic, void *data, size_t data_len, uint8_t qos, int *msg_id)
 {
+    if (g_mqtt_disabled) {
+        if (msg_id) {
+            *msg_id = -1;
+        }
+        return ESP_ERR_INVALID_STATE;
+    }
     ESP_LOGD(TAG, "Publishing to topic: %s", topic);
     if (esp_rmaker_mqtt_is_budget_available() != true) {
         ESP_LOGE(TAG, "Out of MQTT Budget. Dropping publish message.");
@@ -129,6 +162,10 @@ esp_err_t esp_rmaker_mqtt_publish(const char *topic, void *data, size_t data_len
 
 esp_err_t esp_rmaker_mqtt_update_config(esp_rmaker_mqtt_conn_params_t *conn_params)
 {
+    if (g_mqtt_disabled) {
+        ESP_LOGW(TAG, "Cannot update config. MQTT is disabled.");
+        return ESP_ERR_INVALID_STATE;
+    }
     if (g_mqtt_config.update_config) {
         return g_mqtt_config.update_config(conn_params);
     }

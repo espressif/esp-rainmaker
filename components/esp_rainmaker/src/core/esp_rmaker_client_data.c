@@ -17,6 +17,7 @@
 #include <string.h>
 
 #include <esp_log.h>
+#include <esp_random.h>
 
 #include <esp_rmaker_factory.h>
 #include <esp_rmaker_core.h>
@@ -153,6 +154,22 @@ size_t esp_rmaker_get_client_key_len()
     }
 #endif /* CONFIG_ESP_RMAKER_USE_ESP_SECURE_CERT_MGR && !CONFIG_ESP_SECURE_CERT_DS_PERIPHERAL */
     return esp_rmaker_factory_get_size(ESP_RMAKER_CLIENT_KEY_NVS_KEY) + 1; /* +1 for NULL terminating byte */
+}
+
+esp_err_t esp_rmaker_seed_random_bytes(void)
+{
+    char *stored = esp_rmaker_factory_get(ESP_RMAKER_CLIENT_RANDOM_NVS_KEY);
+    if (stored) {
+        free(stored);
+        return ESP_OK;
+    }
+    uint8_t random_bytes[ESP_RMAKER_RANDOM_NUMBER_LEN];
+    esp_fill_random(random_bytes, sizeof(random_bytes));
+    esp_err_t err = esp_rmaker_factory_set(ESP_RMAKER_CLIENT_RANDOM_NVS_KEY, random_bytes, sizeof(random_bytes));
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to store random bytes to storage.");
+    }
+    return err;
 }
 
 char * esp_rmaker_get_client_csr()

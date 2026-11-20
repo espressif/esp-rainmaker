@@ -78,8 +78,6 @@
 
 static const char *TAG = "esp_claim";
 
-#define ESP_RMAKER_RANDOM_NUMBER_LEN    64
-
 #ifdef CONFIG_ESP_RMAKER_SELF_CLAIM
 #include "soc/soc.h"
 #include "soc/efuse_reg.h"
@@ -997,22 +995,9 @@ esp_err_t __esp_rmaker_claim_init(esp_rmaker_claim_data_t *claim_data)
             return err;
         }
     }
-    /* Check if the general purpose random bytes are already present in the storage */
-    char *stored_random_bytes = esp_rmaker_factory_get(ESP_RMAKER_CLIENT_RANDOM_NVS_KEY);
-    if (stored_random_bytes == NULL) {
-        /* Generate random bytes for general purpose use */
-        uint8_t random_bytes[ESP_RMAKER_RANDOM_NUMBER_LEN];
-        esp_fill_random(&random_bytes, sizeof(random_bytes));
-
-        /* Store the random bytes in the factory storage */
-        err = esp_rmaker_factory_set(ESP_RMAKER_CLIENT_RANDOM_NVS_KEY, random_bytes, sizeof(random_bytes));
-        if (err != ESP_OK) {
-            ESP_LOGE(TAG, "Failed to store random bytes to storage.");
-            return err;
-        }
-    } else {
-        /* Free the copy of the random bytes as it isn't required here. */
-        free(stored_random_bytes);
+    err = esp_rmaker_seed_random_bytes();
+    if (err != ESP_OK) {
+        return err;
     }
 #ifdef CONFIG_ESP_RMAKER_SELF_CLAIM
     err = esp_rmaker_claim_generate_csr(claim_data, esp_rmaker_get_node_id());

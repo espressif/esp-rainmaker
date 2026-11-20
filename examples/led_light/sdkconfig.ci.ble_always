@@ -1,0 +1,2 @@
+# CI overlay: build led_light with the BLE session on every boot
+CONFIG_APP_NETWORK_BLE_MODE_ALWAYS=y

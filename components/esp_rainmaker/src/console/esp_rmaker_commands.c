@@ -74,6 +74,10 @@ static void register_get_node_id()
 static int wifi_prov_handler(int argc, char** argv)
 {
 #ifdef CONFIG_ESP_RMAKER_NETWORK_OVER_WIFI
+    if (esp_rmaker_is_local_only()) {
+        printf("%s: Not supported in local only mode.\n", TAG);
+        return ESP_ERR_NOT_SUPPORTED;
+    }
     if (argc < 2) {
         printf("%s: Invalid Usage.\n", TAG);
         return ESP_ERR_INVALID_ARG;

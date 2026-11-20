@@ -1104,9 +1104,10 @@ esp_err_t esp_rmaker_schedule_enable(void)
         ESP_LOGE(TAG, "Couldn't allocate schedule_priv_data");
         return ESP_ERR_NO_MEM;
     }
-    esp_rmaker_time_sync_init(NULL);
-
-    esp_schedule_init(false, NULL, NULL);
+    if (!esp_rmaker_is_local_only()) {
+        esp_rmaker_time_sync_init(NULL);
+        esp_schedule_init(false, NULL, NULL);
+    }
 
     schedule_priv_data->schedule_service = esp_rmaker_create_schedule_service("Schedule", write_cb, NULL, MAX_SCHEDULES, NULL);
     if (!schedule_priv_data->schedule_service) {

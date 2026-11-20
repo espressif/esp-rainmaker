@@ -897,7 +897,7 @@ esp_err_t esp_rmaker_init_local_ctrl_service(void)
     return ESP_OK;
 }
 
-/* True when the network under provisioning has connected, so NETWORK_PROV_DEINIT follows soon. */
+/* True when the network under provisioning has connected. */
 static bool prov_network_connected(void)
 {
 #ifdef CONFIG_NETWORK_PROV_NETWORK_TYPE_WIFI
@@ -925,8 +925,10 @@ esp_err_t esp_rmaker_start_local_ctrl_service(const char *serv_name)
     }
 
     bool prov_was_active = prov_active;
-    /* Wait, so that local control does not use heap that provisioning releases soon. */
-    if (prov_was_active && prov_network_connected()) {
+    /* In FULL mode, provisioning ends and releases its heap soon after its network connects.
+     * Wait for that. SESSION_ONLY mode never sends NETWORK_PROV_DEINIT. */
+    if (prov_was_active && network_prov_mgr_get_mode() == NETWORK_PROV_MODE_FULL &&
+            prov_network_connected()) {
         ESP_LOGI(TAG, "Local control service start: waiting for provisioning to finish.");
     } else {
         esp_err_t err = __esp_rmaker_start_local_ctrl_service(serv_name);

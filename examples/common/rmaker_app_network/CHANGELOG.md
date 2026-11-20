@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.5.0]
+
+### Added
+- `CONFIG_APP_NETWORK_BLE_MODE` selects when the BLE session runs: `PROV_ONLY` (default), `ALWAYS`,
+  or `SESSION_ONLY` with no network stack. The two modes that keep the session up allow BLE local
+  control after provisioning.
+- `app_network_provides_network()` reports if the build brings up a network stack. Pass its inverse
+  as `local_only` to `esp_rmaker_node_init()`.
+
+### Changed
+- Requires `network_provisioning` 1.4.0.
+
 ## [1.3.1]
 
 ### Fixed
