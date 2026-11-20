@@ -1,0 +1,2 @@
+# CI overlay: build led_light with the BLE session only and no network stack
+CONFIG_APP_NETWORK_BLE_MODE_SESSION_ONLY=y
